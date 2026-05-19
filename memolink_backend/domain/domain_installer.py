@@ -1,0 +1,30 @@
+from __future__ import annotations
+from sqlalchemy.orm import Session
+
+from memolink_backend.domain.interfaces.i_user_repository import IUserRepository
+from memolink_backend.domain.interfaces.i_note_repository import INoteRepository
+from memolink_backend.domain.interfaces.i_conversation_repository import IConversationRepository
+from memolink_backend.domain.repositories.user_repository import UserRepository
+from memolink_backend.domain.repositories.note_repository import NoteRepository
+from memolink_backend.domain.repositories.conversation_repository import ConversationRepository
+from memolink_backend.business.services.embedding_service import EmbeddingService
+
+
+class DomainInstaller:
+    def __init__(self, db: Session):
+        self._db = db
+
+    def get_db(self) -> Session:
+        return self._db
+
+    def get_embedding_service(self) -> EmbeddingService:
+        return EmbeddingService()
+
+    def get_user_repository(self) -> IUserRepository:
+        return UserRepository(self._db)
+
+    def get_note_repository(self) -> INoteRepository:
+        return NoteRepository(self._db)
+
+    def get_conversation_repository(self) -> IConversationRepository:
+        return ConversationRepository(self._db)

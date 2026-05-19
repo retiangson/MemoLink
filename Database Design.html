@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MemoLink — Database Design</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --accent:    #6366f1;
+      --accent-lt: #818cf8;
+      --bg:        #0f0f13;
+      --surface:   #16161d;
+      --card:      #1e1e2a;
+      --border:    #2a2a38;
+      --text:      #e2e8f0;
+      --muted:     #94a3b8;
+      --green:     #22c55e;
+      --red:       #f87171;
+      --cyan:      #22d3ee;
+      --amber:     #f59e0b;
+      --purple:    #c084fc;
+    }
+
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: var(--bg); color: var(--text);
+      line-height: 1.7; min-height: 100vh;
+    }
+
+    nav {
+      position: sticky; top: 0; z-index: 100;
+      background: rgba(15,15,19,.85); backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 2rem; display: flex; align-items: center; gap: 1rem; height: 56px;
+    }
+    .nav-logo { font-weight: 700; font-size: 1.15rem; color: var(--accent-lt); letter-spacing: -.5px; }
+    .nav-links { display: flex; gap: .25rem; margin-left: auto; }
+    .nav-links a {
+      color: var(--muted); text-decoration: none; font-size: .85rem;
+      padding: .35rem .75rem; border-radius: 6px; transition: all .2s;
+    }
+    .nav-links a:hover { color: var(--text); background: var(--card); }
+    .nav-links a.active { color: var(--accent-lt); background: rgba(99,102,241,.12); }
+
+    .page-header { padding: 4rem 2rem 2.5rem; max-width: 900px; margin: 0 auto; }
+    .section-label {
+      font-size: .72rem; font-weight: 700; letter-spacing: .12em;
+      text-transform: uppercase; color: var(--accent-lt); margin-bottom: .6rem;
+    }
+    .page-header h1 {
+      font-size: clamp(1.8rem, 4vw, 2.8rem); font-weight: 800;
+      letter-spacing: -.03em;
+      background: linear-gradient(135deg, #e2e8f0 30%, var(--accent-lt));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .page-header p { color: var(--muted); margin-top: .75rem; font-size: .97rem; }
+
+    .container { max-width: 1060px; margin: 0 auto; padding: 0 2rem 4rem; }
+    section { margin-top: 3rem; }
+    h2 { font-size: 1.4rem; font-weight: 700; letter-spacing: -.02em; color: var(--text); margin-bottom: 1rem; }
+    h3 { font-size: 1.05rem; font-weight: 600; color: var(--text); margin-bottom: .5rem; }
+    p  { color: var(--muted); font-size: .93rem; margin-top: .4rem; }
+
+    .divider { border: none; border-top: 1px solid var(--border); margin: 2.5rem 0; }
+
+    /* TABLE SCHEMA */
+    .schema-card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 14px; overflow: hidden; margin-top: 1.4rem;
+    }
+    .schema-header {
+      display: flex; align-items: center; gap: .75rem;
+      padding: 1rem 1.5rem; border-bottom: 1px solid var(--border);
+      background: rgba(99,102,241,.05);
+    }
+    .schema-icon { font-size: 1.2rem; }
+    .schema-name { font-weight: 700; font-size: 1rem; color: var(--text); }
+    .schema-desc { font-size: .82rem; color: var(--muted); margin-left: auto; }
+
+    .col-table { width: 100%; border-collapse: collapse; font-size: .86rem; }
+    .col-table th {
+      text-align: left; padding: .6rem 1.5rem;
+      border-bottom: 1px solid var(--border);
+      color: var(--muted); font-weight: 600; font-size: .75rem;
+      text-transform: uppercase; letter-spacing: .06em;
+    }
+    .col-table td { padding: .65rem 1.5rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+    .col-table tr:last-child td { border-bottom: none; }
+    .col-table tr:hover td { background: rgba(255,255,255,.02); }
+
+    .col-name { font-family: 'Cascadia Code', 'Fira Code', monospace; color: var(--cyan); }
+    .col-type { font-family: 'Cascadia Code', 'Fira Code', monospace; color: var(--amber); font-size: .8rem; }
+    .col-notes { color: var(--muted); font-size: .82rem; }
+
+    .badge-pk { display: inline-block; background: rgba(192,132,252,.15); color: var(--purple); font-size: .68rem; font-weight: 700; padding: .15rem .45rem; border-radius: 3px; margin-right: .3rem; }
+    .badge-fk { display: inline-block; background: rgba(34,211,238,.12); color: var(--cyan); font-size: .68rem; font-weight: 700; padding: .15rem .45rem; border-radius: 3px; margin-right: .3rem; }
+    .badge-uq { display: inline-block; background: rgba(245,158,11,.12); color: var(--amber); font-size: .68rem; font-weight: 700; padding: .15rem .45rem; border-radius: 3px; margin-right: .3rem; }
+    .badge-nn { display: inline-block; background: rgba(248,113,113,.12); color: var(--red); font-size: .68rem; font-weight: 700; padding: .15rem .45rem; border-radius: 3px; margin-right: .3rem; }
+    .badge-idx { display: inline-block; background: rgba(34,197,94,.1); color: var(--green); font-size: .68rem; font-weight: 700; padding: .15rem .45rem; border-radius: 3px; margin-right: .3rem; }
+
+    /* ERD DIAGRAM */
+    .erd-wrap {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 14px; padding: 2rem; margin-top: 1.4rem;
+      overflow-x: auto;
+    }
+    .erd {
+      display: flex; gap: 2.5rem; align-items: flex-start;
+      justify-content: center; flex-wrap: wrap; min-width: 600px;
+    }
+    .erd-table {
+      border: 1px solid var(--border); border-radius: 10px; overflow: hidden;
+      min-width: 170px; flex-shrink: 0;
+    }
+    .erd-th {
+      background: rgba(99,102,241,.15); border-bottom: 1px solid var(--border);
+      padding: .55rem 1rem; font-weight: 700; font-size: .85rem; color: var(--accent-lt);
+      text-align: center;
+    }
+    .erd-col {
+      padding: .4rem 1rem; font-family: monospace; font-size: .8rem;
+      border-bottom: 1px solid var(--border); display: flex; gap: .5rem; align-items: center;
+    }
+    .erd-col:last-child { border-bottom: none; }
+    .erd-col-name { color: var(--text); }
+    .erd-col-type { color: var(--muted); font-size: .73rem; margin-left: auto; }
+    .erd-pk { color: var(--purple); }
+    .erd-fk { color: var(--cyan); }
+
+    .erd-arrows {
+      display: flex; flex-direction: column; justify-content: center;
+      gap: .5rem; font-size: .8rem; color: var(--muted);
+      text-align: center; padding-top: 2rem;
+    }
+    .erd-rel { white-space: nowrap; }
+
+    /* REL MATRIX */
+    .rel-list { list-style: none; margin-top: 1.2rem; display: flex; flex-direction: column; gap: .7rem; }
+    .rel-item {
+      display: flex; align-items: flex-start; gap: 1rem;
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 10px; padding: .9rem 1.2rem;
+    }
+    .rel-from { font-family: monospace; font-size: .84rem; color: var(--cyan); white-space: nowrap; }
+    .rel-type { font-size: .75rem; font-weight: 700; color: var(--accent-lt); white-space: nowrap; padding: .2rem .5rem; background: rgba(99,102,241,.1); border-radius: 4px; }
+    .rel-to   { font-family: monospace; font-size: .84rem; color: var(--amber); white-space: nowrap; }
+    .rel-note { font-size: .82rem; color: var(--muted); margin-left: auto; }
+
+    /* INDEX LIST */
+    .index-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: .9rem; margin-top: 1.2rem; }
+    .index-card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 10px; padding: 1rem 1.2rem;
+    }
+    .index-table-label { font-size: .72rem; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+    .index-name { font-family: monospace; font-size: .85rem; color: var(--green); font-weight: 600; margin: .2rem 0; }
+    .index-cols { font-family: monospace; font-size: .8rem; color: var(--muted); }
+    .index-purpose { font-size: .8rem; color: var(--muted); margin-top: .3rem; }
+
+    code {
+      font-family: 'Cascadia Code', 'Fira Code', monospace;
+      background: rgba(255,255,255,.06); padding: .1rem .35rem;
+      border-radius: 4px; font-size: .85em;
+    }
+
+    footer { text-align: center; padding: 2rem 1rem; border-top: 1px solid var(--border); color: var(--muted); font-size: .82rem; }
+  </style>
+</head>
+<body>
+
+<nav>
+  <span class="nav-logo">⬡ MemoLink</span>
+  <div class="nav-links">
+    <a href="Overview.html">Overview</a>
+    <a href="Requirements Analysis.html">Requirements</a>
+    <a href="Database Design.html" class="active">Database</a>
+    <a href="API Endpoint Design.html">API</a>
+  </div>
+</nav>
+
+<div class="page-header">
+  <div class="section-label">Documentation</div>
+  <h1>Database Design</h1>
+  <p>Entity-Relationship model, table schemas, column constraints, relationships, and indexes for MemoLink's PostgreSQL database with pgvector.</p>
+</div>
+
+<div class="container">
+
+  <!-- ERD OVERVIEW -->
+  <section>
+    <div class="section-label">ERD</div>
+    <h2>Entity-Relationship Overview</h2>
+    <p>Five core tables: <code>users</code>, <code>notes</code>, <code>embeddings</code>, <code>conversations</code>, and <code>messages</code>. All user-scoped tables cascade-delete when the user is removed.</p>
+
+    <div class="erd-wrap">
+      <div class="erd">
+
+        <!-- users -->
+        <div class="erd-table">
+          <div class="erd-th">users</div>
+          <div class="erd-col"><span class="erd-pk erd-col-name">🔑 id</span><span class="erd-col-type">INTEGER</span></div>
+          <div class="erd-col"><span class="erd-col-name">email</span><span class="erd-col-type">VARCHAR</span></div>
+          <div class="erd-col"><span class="erd-col-name">password</span><span class="erd-col-type">VARCHAR</span></div>
+        </div>
+
+        <!-- notes -->
+        <div class="erd-table">
+          <div class="erd-th">notes</div>
+          <div class="erd-col"><span class="erd-pk erd-col-name">🔑 id</span><span class="erd-col-type">INTEGER</span></div>
+          <div class="erd-col"><span class="erd-fk erd-col-name">→ user_id</span><span class="erd-col-type">INTEGER</span></div>
+          <div class="erd-col"><span class="erd-col-name">title</span><span class="erd-col-type">VARCHAR(255)</span></div>
+          <div class="erd-col"><span class="erd-col-name">content</span><span class="erd-col-type">TEXT</span></div>
+          <div class="erd-col"><span class="erd-col-name">source</span><span class="erd-col-type">VARCHAR(255)</span></div>
+          <div class="erd-col"><span class="erd-col-name">created_at</span><span class="erd-col-type">TIMESTAMPTZ</span></div>
+        </div>
+
+        <!-- embeddings -->
+        <div class="erd-table">
+          <div class="erd-th">embeddings</div>
+          <div class="erd-col"><span class="erd-pk erd-col-name">🔑 id</span><span class="erd-col-type">INTEGER</span></div>
+          <div class="erd-col"><span class="erd-fk erd-col-name">→ note_id</span><span class="erd-col-type">INTEGER</span></div>
+          <div class="erd-col"><span class="erd-col-name">vector</span><span class="erd-col-type">VECTOR(1536)</span></div>
+        </div>
+
+        <!-- conversations -->
+        <div class="erd-table">
+          <div class="erd-th">conversations</div>
+          <div class="erd-col"><span class="erd-pk erd-col-name">🔑 id</span><span class="erd-col-type">INTEGER</span></div>
+          <div class="erd-col"><span class="erd-fk erd-col-name">→ user_id</span><span class="erd-col-type">INTEGER</span></div>
+          <div class="erd-col"><span class="erd-col-name">title</span><span class="erd-col-type">VARCHAR(255)</span></div>
+          <div class="erd-col"><span class="erd-col-name">created_at</span><span class="erd-col-type">TIMESTAMPTZ</span></div>
+        </div>
+
+        <!-- messages -->
+        <div class="erd-table">
+          <div class="erd-th">messages</div>
+          <div class="erd-col"><span class="erd-pk erd-col-name">🔑 id</span><span class="erd-col-type">INTEGER</span></div>
+          <div class="erd-col"><span class="erd-fk erd-col-name">→ conversation_id</span><span class="erd-col-type">INTEGER</span></div>
+          <div class="erd-col"><span class="erd-col-name">role</span><span class="erd-col-type">VARCHAR(20)</span></div>
+          <div class="erd-col"><span class="erd-col-name">content</span><span class="erd-col-type">TEXT</span></div>
+          <div class="erd-col"><span class="erd-col-name">created_at</span><span class="erd-col-type">TIMESTAMPTZ</span></div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <hr class="divider" />
+
+  <!-- TABLE: users -->
+  <section>
+    <div class="section-label">Table</div>
+    <h2>users</h2>
+    <p>Stores registered user accounts. The root entity — all other tables are scoped to a user via foreign keys.</p>
+    <div class="schema-card">
+      <div class="schema-header">
+        <span class="schema-icon">👤</span>
+        <span class="schema-name">users</span>
+        <span class="schema-desc">PostgreSQL table</span>
+      </div>
+      <table class="col-table">
+        <thead>
+          <tr><th>Column</th><th>Type</th><th>Constraints</th><th>Notes</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="col-name">id</td>
+            <td class="col-type">INTEGER</td>
+            <td><span class="badge-pk">PK</span><span class="badge-idx">INDEX</span></td>
+            <td class="col-notes">Auto-incrementing primary key</td>
+          </tr>
+          <tr>
+            <td class="col-name">email</td>
+            <td class="col-type">VARCHAR</td>
+            <td><span class="badge-uq">UNIQUE</span><span class="badge-nn">NOT NULL</span></td>
+            <td class="col-notes">Unique email address used for login</td>
+          </tr>
+          <tr>
+            <td class="col-name">password</td>
+            <td class="col-type">VARCHAR</td>
+            <td><span class="badge-nn">NOT NULL</span></td>
+            <td class="col-notes">Hashed password (bcrypt or passlib)</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <hr class="divider" />
+
+  <!-- TABLE: notes -->
+  <section>
+    <div class="section-label">Table</div>
+    <h2>notes</h2>
+    <p>Stores user-created notes. Each note is owned by one user and has at most one associated embedding (1-to-1).</p>
+    <div class="schema-card">
+      <div class="schema-header">
+        <span class="schema-icon">📝</span>
+        <span class="schema-name">notes</span>
+        <span class="schema-desc">PostgreSQL table</span>
+      </div>
+      <table class="col-table">
+        <thead>
+          <tr><th>Column</th><th>Type</th><th>Constraints</th><th>Notes</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="col-name">id</td>
+            <td class="col-type">INTEGER</td>
+            <td><span class="badge-pk">PK</span><span class="badge-idx">INDEX</span></td>
+            <td class="col-notes">Auto-incrementing primary key</td>
+          </tr>
+          <tr>
+            <td class="col-name">user_id</td>
+            <td class="col-type">INTEGER</td>
+            <td><span class="badge-fk">FK → users.id</span><span class="badge-nn">NOT NULL</span></td>
+            <td class="col-notes">CASCADE DELETE — removing user removes all notes</td>
+          </tr>
+          <tr>
+            <td class="col-name">title</td>
+            <td class="col-type">VARCHAR(255)</td>
+            <td>nullable</td>
+            <td class="col-notes">Optional display title for the note</td>
+          </tr>
+          <tr>
+            <td class="col-name">content</td>
+            <td class="col-type">TEXT</td>
+            <td><span class="badge-nn">NOT NULL</span></td>
+            <td class="col-notes">Full body text of the note — this is embedded</td>
+          </tr>
+          <tr>
+            <td class="col-name">source</td>
+            <td class="col-type">VARCHAR(255)</td>
+            <td>nullable</td>
+            <td class="col-notes">Optional label — e.g. "Lecture 3", "uploaded PDF filename"</td>
+          </tr>
+          <tr>
+            <td class="col-name">created_at</td>
+            <td class="col-type">TIMESTAMPTZ</td>
+            <td>server default: <code>now()</code></td>
+            <td class="col-notes">Timestamp of note creation (UTC)</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <hr class="divider" />
+
+  <!-- TABLE: embeddings -->
+  <section>
+    <div class="section-label">Table</div>
+    <h2>embeddings</h2>
+    <p>Stores the 1 536-dimensional vector embedding for each note. Uses the <code>pgvector</code> extension. One embedding per note (unique FK). Cosine similarity search runs against this table.</p>
+    <div class="schema-card">
+      <div class="schema-header">
+        <span class="schema-icon">🧠</span>
+        <span class="schema-name">embeddings</span>
+        <span class="schema-desc">pgvector table — requires <code>CREATE EXTENSION vector</code></span>
+      </div>
+      <table class="col-table">
+        <thead>
+          <tr><th>Column</th><th>Type</th><th>Constraints</th><th>Notes</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="col-name">id</td>
+            <td class="col-type">INTEGER</td>
+            <td><span class="badge-pk">PK</span><span class="badge-idx">INDEX</span></td>
+            <td class="col-notes">Auto-incrementing primary key</td>
+          </tr>
+          <tr>
+            <td class="col-name">note_id</td>
+            <td class="col-type">INTEGER</td>
+            <td><span class="badge-fk">FK → notes.id</span><span class="badge-uq">UNIQUE</span></td>
+            <td class="col-notes">CASCADE DELETE — one embedding per note maximum</td>
+          </tr>
+          <tr>
+            <td class="col-name">vector</td>
+            <td class="col-type">VECTOR(1536)</td>
+            <td></td>
+            <td class="col-notes">OpenAI text-embedding-ada-002 output — 1 536 float dimensions</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <hr class="divider" />
+
+  <!-- TABLE: conversations -->
+  <section>
+    <div class="section-label">Table</div>
+    <h2>conversations</h2>
+    <p>Represents a named chat session owned by a user. Contains one or more messages.</p>
+    <div class="schema-card">
+      <div class="schema-header">
+        <span class="schema-icon">💬</span>
+        <span class="schema-name">conversations</span>
+        <span class="schema-desc">PostgreSQL table</span>
+      </div>
+      <table class="col-table">
+        <thead>
+          <tr><th>Column</th><th>Type</th><th>Constraints</th><th>Notes</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="col-name">id</td>
+            <td class="col-type">INTEGER</td>
+            <td><span class="badge-pk">PK</span></td>
+            <td class="col-notes">Auto-incrementing primary key</td>
+          </tr>
+          <tr>
+            <td class="col-name">user_id</td>
+            <td class="col-type">INTEGER</td>
+            <td><span class="badge-fk">FK → users.id</span><span class="badge-nn">NOT NULL</span></td>
+            <td class="col-notes">Owner of this conversation</td>
+          </tr>
+          <tr>
+            <td class="col-name">title</td>
+            <td class="col-type">VARCHAR(255)</td>
+            <td>nullable</td>
+            <td class="col-notes">User-defined or auto-generated label</td>
+          </tr>
+          <tr>
+            <td class="col-name">created_at</td>
+            <td class="col-type">TIMESTAMPTZ</td>
+            <td>server default: <code>now()</code></td>
+            <td class="col-notes">Timestamp when session was created</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <hr class="divider" />
+
+  <!-- TABLE: messages -->
+  <section>
+    <div class="section-label">Table</div>
+    <h2>messages</h2>
+    <p>Stores individual chat messages (both user and AI) within a conversation. Supports paginated retrieval via <code>before_id</code> cursor.</p>
+    <div class="schema-card">
+      <div class="schema-header">
+        <span class="schema-icon">📨</span>
+        <span class="schema-name">messages</span>
+        <span class="schema-desc">PostgreSQL table</span>
+      </div>
+      <table class="col-table">
+        <thead>
+          <tr><th>Column</th><th>Type</th><th>Constraints</th><th>Notes</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="col-name">id</td>
+            <td class="col-type">INTEGER</td>
+            <td><span class="badge-pk">PK</span></td>
+            <td class="col-notes">Auto-incrementing primary key</td>
+          </tr>
+          <tr>
+            <td class="col-name">conversation_id</td>
+            <td class="col-type">INTEGER</td>
+            <td><span class="badge-fk">FK → conversations.id</span></td>
+            <td class="col-notes">CASCADE DELETE — messages deleted with conversation</td>
+          </tr>
+          <tr>
+            <td class="col-name">role</td>
+            <td class="col-type">VARCHAR(20)</td>
+            <td></td>
+            <td class="col-notes">Either <code>"user"</code> or <code>"assistant"</code></td>
+          </tr>
+          <tr>
+            <td class="col-name">content</td>
+            <td class="col-type">TEXT</td>
+            <td></td>
+            <td class="col-notes">Raw message text (Markdown supported in UI)</td>
+          </tr>
+          <tr>
+            <td class="col-name">created_at</td>
+            <td class="col-type">TIMESTAMPTZ</td>
+            <td>server default: <code>now()</code></td>
+            <td class="col-notes">Used for ordering and paginated cursor (before_id)</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <hr class="divider" />
+
+  <!-- RELATIONSHIPS -->
+  <section>
+    <div class="section-label">Relationships</div>
+    <h2>Table Relationships</h2>
+    <ul class="rel-list">
+      <li class="rel-item">
+        <span class="rel-from">users</span>
+        <span class="rel-type">1 → many</span>
+        <span class="rel-to">notes</span>
+        <span class="rel-note">A user owns many notes. notes.user_id → users.id (CASCADE DELETE)</span>
+      </li>
+      <li class="rel-item">
+        <span class="rel-from">notes</span>
+        <span class="rel-type">1 → 0..1</span>
+        <span class="rel-to">embeddings</span>
+        <span class="rel-note">Each note has at most one embedding. embeddings.note_id UNIQUE FK (CASCADE DELETE)</span>
+      </li>
+      <li class="rel-item">
+        <span class="rel-from">users</span>
+        <span class="rel-type">1 → many</span>
+        <span class="rel-to">conversations</span>
+        <span class="rel-note">A user owns many conversations. conversations.user_id → users.id</span>
+      </li>
+      <li class="rel-item">
+        <span class="rel-from">conversations</span>
+        <span class="rel-type">1 → many</span>
+        <span class="rel-to">messages</span>
+        <span class="rel-note">A conversation contains many messages. messages.conversation_id → conversations.id (CASCADE DELETE)</span>
+      </li>
+    </ul>
+  </section>
+
+  <hr class="divider" />
+
+  <!-- INDEXES -->
+  <section>
+    <div class="section-label">Performance</div>
+    <h2>Indexes</h2>
+    <div class="index-grid">
+      <div class="index-card">
+        <div class="index-table-label">users</div>
+        <div class="index-name">idx_users_id</div>
+        <div class="index-cols">users(id)</div>
+        <div class="index-purpose">Primary key index — auto-created</div>
+      </div>
+      <div class="index-card">
+        <div class="index-table-label">users</div>
+        <div class="index-name">idx_users_email_uq</div>
+        <div class="index-cols">users(email) UNIQUE</div>
+        <div class="index-purpose">Login lookups by email — uniqueness enforced here</div>
+      </div>
+      <div class="index-card">
+        <div class="index-table-label">notes</div>
+        <div class="index-name">idx_notes_id</div>
+        <div class="index-cols">notes(id)</div>
+        <div class="index-purpose">Primary key — auto-created</div>
+      </div>
+      <div class="index-card">
+        <div class="index-table-label">notes</div>
+        <div class="index-name">idx_notes_user_id</div>
+        <div class="index-cols">notes(user_id)</div>
+        <div class="index-purpose">List all notes for a user (frequent query)</div>
+      </div>
+      <div class="index-card">
+        <div class="index-table-label">embeddings</div>
+        <div class="index-name">idx_embeddings_id</div>
+        <div class="index-cols">embeddings(id)</div>
+        <div class="index-purpose">Primary key — auto-created</div>
+      </div>
+      <div class="index-card">
+        <div class="index-table-label">embeddings</div>
+        <div class="index-name">idx_embeddings_note_id_uq</div>
+        <div class="index-cols">embeddings(note_id) UNIQUE</div>
+        <div class="index-purpose">Enforces 1-to-1 note → embedding constraint</div>
+      </div>
+      <div class="index-card">
+        <div class="index-table-label">embeddings</div>
+        <div class="index-name">idx_embeddings_vector_ivfflat</div>
+        <div class="index-cols">embeddings(vector) ivfflat cosine</div>
+        <div class="index-purpose">Approximate nearest-neighbour search (pgvector ANN index)</div>
+      </div>
+      <div class="index-card">
+        <div class="index-table-label">conversations</div>
+        <div class="index-name">idx_conversations_user_id</div>
+        <div class="index-cols">conversations(user_id)</div>
+        <div class="index-purpose">List all conversations for a user</div>
+      </div>
+      <div class="index-card">
+        <div class="index-table-label">messages</div>
+        <div class="index-name">idx_messages_conversation_id</div>
+        <div class="index-cols">messages(conversation_id)</div>
+        <div class="index-purpose">Fetch all messages within a conversation</div>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<footer>MemoLink Capstone Project &mdash; 2026</footer>
+</body>
+</html>

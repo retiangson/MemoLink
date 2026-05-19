@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+env/
+
+# Secrets
+.env
+*.env
+
+# Node / Frontend
+memolink_web/node_modules/
+memolink_web/dist/
+memolink_web/.vite/
+
+# Editor
+.vscode/
+.idea/
+*.DS_Store
+
+# Logs
+*.log

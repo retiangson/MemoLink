@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -m uvicorn memolink_backend.main:app --reload)",
+      "Bash(pip install *)",
+      "Bash(ping -n 4 127.0.0.1)",
+      "Bash(npm install *)",
+      "Bash(npm run *)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Git\\\\Capstone Project\\\\MemoLink\\\\memolink_backend\" -Recurse -Directory)",
+      "Bash(Select-Object FullName)",
+      "Bash(Get-ChildItem C:\\\\Git\\\\Capstone Project\\\\MemoLink\\\\memolink_backend\\\\contracts\\\\ *)",
+      "Bash(python -m memolink_backend.seed)",
+      "Bash(python -c ' *)",
+      "Bash(curl *)",
+      "PowerShell(netstat *)",
+      "PowerShell(Stop-Process *)",
+      "Bash(python -c \"import pdfplumber; print\\('pdfplumber:', pdfplumber.__version__\\)\")",
+      "Bash(xargs grep -l \"note\")",
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('Login OK, token prefix:', d['access_token'][:20]+'...'\\)\")",
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('Notes created:', len\\(d\\)\\); print\\('Content preview:', d[0]['content'][:150] if d else 'none'\\)\")",
+      "Bash(python -c *)"
+    ]
+  }
+}

@@ -1,0 +1,43 @@
+from typing import Optional, List
+from pydantic import BaseModel
+
+
+class NoteCreateDTO(BaseModel):
+    user_id: Optional[int] = None
+    title: Optional[str] = None
+    content: str
+    source: Optional[str] = None
+
+
+class NoteResponseDTO(BaseModel):
+    id: int
+    user_id: int
+    title: Optional[str]
+    content: str
+    source: Optional[str]
+
+    class Config:
+        from_attributes = True
+
+
+class NoteGetDTO(BaseModel):
+    note_id: int
+
+
+class NoteListDTO(BaseModel):
+    user_id: Optional[int] = None
+
+
+class NoteUpdateDTO(BaseModel):
+    note_id: int
+    title: Optional[str] = None
+    content: Optional[str] = None
+
+
+class NoteDeleteDTO(BaseModel):
+    note_id: int
+
+
+class NoteSearchDTO(BaseModel):
+    vector: List[float]
+    top_k: int = 5

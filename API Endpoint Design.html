@@ -1,0 +1,775 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MemoLink — API Endpoint Design</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --accent:    #6366f1;
+      --accent-lt: #818cf8;
+      --bg:        #0f0f13;
+      --surface:   #16161d;
+      --card:      #1e1e2a;
+      --border:    #2a2a38;
+      --text:      #e2e8f0;
+      --muted:     #94a3b8;
+      --green:     #22c55e;
+      --red:       #f87171;
+      --cyan:      #22d3ee;
+      --amber:     #f59e0b;
+      --blue:      #60a5fa;
+    }
+
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: var(--bg); color: var(--text);
+      line-height: 1.7; min-height: 100vh;
+    }
+
+    nav {
+      position: sticky; top: 0; z-index: 100;
+      background: rgba(15,15,19,.85); backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 2rem; display: flex; align-items: center; gap: 1rem; height: 56px;
+    }
+    .nav-logo { font-weight: 700; font-size: 1.15rem; color: var(--accent-lt); letter-spacing: -.5px; }
+    .nav-links { display: flex; gap: .25rem; margin-left: auto; }
+    .nav-links a {
+      color: var(--muted); text-decoration: none; font-size: .85rem;
+      padding: .35rem .75rem; border-radius: 6px; transition: all .2s;
+    }
+    .nav-links a:hover { color: var(--text); background: var(--card); }
+    .nav-links a.active { color: var(--accent-lt); background: rgba(99,102,241,.12); }
+
+    .page-header { padding: 4rem 2rem 2.5rem; max-width: 900px; margin: 0 auto; }
+    .section-label {
+      font-size: .72rem; font-weight: 700; letter-spacing: .12em;
+      text-transform: uppercase; color: var(--accent-lt); margin-bottom: .6rem;
+    }
+    .page-header h1 {
+      font-size: clamp(1.8rem, 4vw, 2.8rem); font-weight: 800;
+      letter-spacing: -.03em;
+      background: linear-gradient(135deg, #e2e8f0 30%, var(--accent-lt));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .page-header p { color: var(--muted); margin-top: .75rem; font-size: .97rem; }
+
+    .container { max-width: 1060px; margin: 0 auto; padding: 0 2rem 4rem; }
+    section { margin-top: 3rem; }
+    h2 { font-size: 1.35rem; font-weight: 700; letter-spacing: -.02em; color: var(--text); margin-bottom: 1rem; }
+    p  { color: var(--muted); font-size: .93rem; margin-top: .4rem; }
+
+    .divider { border: none; border-top: 1px solid var(--border); margin: 2.5rem 0; }
+
+    /* METHOD BADGES */
+    .method {
+      display: inline-flex; align-items: center; justify-content: center;
+      font-size: .72rem; font-weight: 800; padding: .2rem .6rem;
+      border-radius: 5px; min-width: 52px; letter-spacing: .04em; flex-shrink: 0;
+    }
+    .m-post   { background: rgba(34,197,94,.12);  color: var(--green); }
+    .m-get    { background: rgba(96,165,250,.12);  color: var(--blue); }
+    .m-put    { background: rgba(245,158,11,.12);  color: var(--amber); }
+    .m-delete { background: rgba(248,113,113,.12); color: var(--red); }
+
+    /* ENDPOINT CARD */
+    .ep-group { margin-top: 1.5rem; display: flex; flex-direction: column; gap: 1rem; }
+    .ep-card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 12px; overflow: hidden;
+      transition: border-color .2s;
+    }
+    .ep-card:hover { border-color: rgba(99,102,241,.4); }
+    .ep-header {
+      display: flex; align-items: center; gap: .85rem;
+      padding: .9rem 1.4rem; cursor: pointer;
+      border-bottom: 1px solid transparent;
+    }
+    .ep-card.open .ep-header { border-bottom-color: var(--border); }
+    .ep-path {
+      font-family: 'Cascadia Code', 'Fira Code', monospace;
+      font-size: .88rem; color: var(--text); font-weight: 500;
+    }
+    .ep-summary { font-size: .82rem; color: var(--muted); margin-left: auto; }
+    .ep-toggle { font-size: .7rem; color: var(--muted); margin-left: .5rem; transition: transform .2s; }
+    .ep-card.open .ep-toggle { transform: rotate(180deg); }
+
+    .ep-body { padding: 1.2rem 1.4rem; display: none; }
+    .ep-card.open .ep-body { display: block; }
+
+    .ep-desc { color: var(--muted); font-size: .88rem; margin-bottom: 1rem; }
+
+    /* SCHEMA BOXES */
+    .schema-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: .8rem; }
+    @media(max-width: 640px) { .schema-row { grid-template-columns: 1fr; } }
+
+    .schema-box { background: var(--surface); border: 1px solid var(--border); border-radius: 9px; overflow: hidden; }
+    .schema-box-title {
+      padding: .4rem .9rem; font-size: .73rem; font-weight: 700;
+      letter-spacing: .06em; text-transform: uppercase; background: rgba(255,255,255,.03);
+      border-bottom: 1px solid var(--border); color: var(--muted);
+    }
+    pre {
+      padding: .9rem 1rem; font-size: .8rem; line-height: 1.6;
+      overflow-x: auto; color: var(--text);
+      font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+    }
+    .json-key   { color: var(--cyan); }
+    .json-str   { color: var(--green); }
+    .json-num   { color: var(--amber); }
+    .json-bool  { color: #c084fc; }
+    .json-null  { color: var(--muted); }
+    .json-type  { color: var(--muted); font-style: italic; }
+
+    code {
+      font-family: 'Cascadia Code', 'Fira Code', monospace;
+      background: rgba(255,255,255,.06); padding: .1rem .35rem;
+      border-radius: 4px; font-size: .85em;
+    }
+
+    /* QUICK TABLE */
+    .quick-table { width: 100%; border-collapse: collapse; font-size: .86rem; margin-top: 1.2rem; }
+    .quick-table th {
+      text-align: left; padding: .55rem 1rem;
+      border-bottom: 2px solid var(--border);
+      color: var(--muted); font-size: .75rem; text-transform: uppercase; letter-spacing: .06em;
+    }
+    .quick-table td { padding: .55rem 1rem; border-bottom: 1px solid var(--border); }
+    .quick-table tr:last-child td { border-bottom: none; }
+    .quick-table tr:hover td { background: rgba(255,255,255,.02); }
+
+    footer { text-align: center; padding: 2rem 1rem; border-top: 1px solid var(--border); color: var(--muted); font-size: .82rem; }
+  </style>
+</head>
+<body>
+
+<nav>
+  <span class="nav-logo">⬡ MemoLink</span>
+  <div class="nav-links">
+    <a href="Overview.html">Overview</a>
+    <a href="Requirements Analysis.html">Requirements</a>
+    <a href="Database Design.html">Database</a>
+    <a href="API Endpoint Design.html" class="active">API</a>
+  </div>
+</nav>
+
+<div class="page-header">
+  <div class="section-label">Documentation</div>
+  <h1>API Endpoint Design</h1>
+  <p>All REST endpoints for MemoLink's FastAPI backend — base URL <code>/api/v1</code>. Docs auto-generated at <code>/api/docs</code>.</p>
+</div>
+
+<div class="container">
+
+  <!-- OVERVIEW TABLE -->
+  <section>
+    <div class="section-label">Summary</div>
+    <h2>All Endpoints</h2>
+    <table class="quick-table">
+      <thead>
+        <tr><th>Method</th><th>Path</th><th>Description</th><th>Tag</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><span class="method m-post">POST</span></td><td><code>/auth/register</code></td><td>Register a new user</td><td>Auth</td></tr>
+        <tr><td><span class="method m-post">POST</span></td><td><code>/auth/login</code></td><td>Log in, return user record</td><td>Auth</td></tr>
+        <tr><td><span class="method m-post">POST</span></td><td><code>/notes</code></td><td>Create a note</td><td>Notes</td></tr>
+        <tr><td><span class="method m-post">POST</span></td><td><code>/notes/get</code></td><td>Get a single note by ID</td><td>Notes</td></tr>
+        <tr><td><span class="method m-post">POST</span></td><td><code>/notes/list</code></td><td>List all notes for a user</td><td>Notes</td></tr>
+        <tr><td><span class="method m-post">POST</span></td><td><code>/notes/update</code></td><td>Update note title / content</td><td>Notes</td></tr>
+        <tr><td><span class="method m-post">POST</span></td><td><code>/notes/delete</code></td><td>Delete a note</td><td>Notes</td></tr>
+        <tr><td><span class="method m-post">POST</span></td><td><code>/notes/search</code></td><td>Vector similarity search over notes</td><td>Notes</td></tr>
+        <tr><td><span class="method m-post">POST</span></td><td><code>/chat</code></td><td>Submit a prompt — returns AI answer + citations</td><td>Chat</td></tr>
+        <tr><td><span class="method m-post">POST</span></td><td><code>/chat/upload</code></td><td>Upload files + prompt in one request</td><td>Chat</td></tr>
+        <tr><td><span class="method m-post">POST</span></td><td><code>/conversation/list</code></td><td>List conversations for a user</td><td>Conversation</td></tr>
+        <tr><td><span class="method m-post">POST</span></td><td><code>/conversation/create</code></td><td>Create a new conversation session</td><td>Conversation</td></tr>
+        <tr><td><span class="method m-post">POST</span></td><td><code>/conversation/messages</code></td><td>Get paginated messages in a conversation</td><td>Conversation</td></tr>
+        <tr><td><span class="method m-post">POST</span></td><td><code>/conversation/rename</code></td><td>Rename a conversation</td><td>Conversation</td></tr>
+        <tr><td><span class="method m-post">POST</span></td><td><code>/conversation/delete</code></td><td>Delete a conversation</td><td>Conversation</td></tr>
+        <tr><td><span class="method m-post">POST</span></td><td><code>/conversation/delete-message</code></td><td>Delete a single message</td><td>Conversation</td></tr>
+        <tr><td><span class="method m-post">POST</span></td><td><code>/conversation/add-to-note</code></td><td>Save a message content as a new note</td><td>Conversation</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <hr class="divider" />
+
+  <!-- AUTH -->
+  <section>
+    <div class="section-label">Auth</div>
+    <h2>Authentication Endpoints</h2>
+    <div class="ep-group">
+
+      <!-- REGISTER -->
+      <div class="ep-card open" id="ep-register">
+        <div class="ep-header" onclick="toggle('ep-register')">
+          <span class="method m-post">POST</span>
+          <span class="ep-path">/api/v1/auth/register</span>
+          <span class="ep-summary">Register a new user account</span>
+          <span class="ep-toggle">▼</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">Creates a new user. Returns 400 if the email is already registered. Password is hashed before storage.</p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Request Body — RegisterDTO</div>
+              <pre>{
+  <span class="json-key">"email"</span>:    <span class="json-str">"user@example.com"</span>,
+  <span class="json-key">"password"</span>: <span class="json-str">"securepassword"</span>
+}</pre>
+            </div>
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200 — UserResponse</div>
+              <pre>{
+  <span class="json-key">"id"</span>:    <span class="json-num">1</span>,
+  <span class="json-key">"email"</span>: <span class="json-str">"user@example.com"</span>
+}</pre>
+            </div>
+          </div>
+          <div class="schema-row" style="margin-top:.8rem;">
+            <div class="schema-box">
+              <div class="schema-box-title">Error Responses</div>
+              <pre><span class="json-num">400</span> <span class="json-type">Email already registered</span>
+<span class="json-num">422</span> <span class="json-type">Validation error (missing fields)</span></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- LOGIN -->
+      <div class="ep-card open" id="ep-login">
+        <div class="ep-header" onclick="toggle('ep-login')">
+          <span class="method m-post">POST</span>
+          <span class="ep-path">/api/v1/auth/login</span>
+          <span class="ep-summary">Log in and return user record</span>
+          <span class="ep-toggle">▼</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">Verifies email + hashed password. Returns the user record whose <code>id</code> the client stores for scoped requests. Returns 401 on invalid credentials.</p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Request Body — LoginDTO</div>
+              <pre>{
+  <span class="json-key">"email"</span>:    <span class="json-str">"user@example.com"</span>,
+  <span class="json-key">"password"</span>: <span class="json-str">"securepassword"</span>
+}</pre>
+            </div>
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200 — UserResponse</div>
+              <pre>{
+  <span class="json-key">"id"</span>:    <span class="json-num">1</span>,
+  <span class="json-key">"email"</span>: <span class="json-str">"user@example.com"</span>
+}</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <hr class="divider" />
+
+  <!-- NOTES -->
+  <section>
+    <div class="section-label">Notes</div>
+    <h2>Notes Endpoints</h2>
+    <div class="ep-group">
+
+      <!-- CREATE NOTE -->
+      <div class="ep-card open" id="ep-note-create">
+        <div class="ep-header" onclick="toggle('ep-note-create')">
+          <span class="method m-post">POST</span>
+          <span class="ep-path">/api/v1/notes</span>
+          <span class="ep-summary">Create a new note + auto-embed</span>
+          <span class="ep-toggle">▼</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">Creates the note record and triggers embedding generation via the OpenAI embeddings API. The resulting vector is stored in the <code>embeddings</code> table.</p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Request Body — NoteCreateDTO</div>
+              <pre>{
+  <span class="json-key">"user_id"</span>: <span class="json-num">1</span>,
+  <span class="json-key">"title"</span>:   <span class="json-str">"Lecture 5 Summary"</span>,
+  <span class="json-key">"content"</span>: <span class="json-str">"RAG stands for..."</span>,
+  <span class="json-key">"source"</span>:  <span class="json-str">"lecture_5.pdf"</span>
+}</pre>
+            </div>
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200 — NoteResponseDTO</div>
+              <pre>{
+  <span class="json-key">"id"</span>:      <span class="json-num">42</span>,
+  <span class="json-key">"user_id"</span>: <span class="json-num">1</span>,
+  <span class="json-key">"title"</span>:   <span class="json-str">"Lecture 5 Summary"</span>,
+  <span class="json-key">"content"</span>: <span class="json-str">"RAG stands for..."</span>,
+  <span class="json-key">"source"</span>:  <span class="json-str">"lecture_5.pdf"</span>
+}</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- LIST NOTES -->
+      <div class="ep-card open" id="ep-note-list">
+        <div class="ep-header" onclick="toggle('ep-note-list')">
+          <span class="method m-post">POST</span>
+          <span class="ep-path">/api/v1/notes/list</span>
+          <span class="ep-summary">List all notes for a user</span>
+          <span class="ep-toggle">▼</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">Returns all notes owned by the given <code>user_id</code>, ordered by creation date descending.</p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Request Body — NoteListDTO</div>
+              <pre>{
+  <span class="json-key">"user_id"</span>: <span class="json-num">1</span>
+}</pre>
+            </div>
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200 — NoteResponseDTO[]</div>
+              <pre>[
+  {
+    <span class="json-key">"id"</span>:      <span class="json-num">42</span>,
+    <span class="json-key">"user_id"</span>: <span class="json-num">1</span>,
+    <span class="json-key">"title"</span>:   <span class="json-str">"Lecture 5"</span>,
+    <span class="json-key">"content"</span>: <span class="json-str">"..."</span>,
+    <span class="json-key">"source"</span>:  <span class="json-null">null</span>
+  }
+]</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- GET NOTE -->
+      <div class="ep-card" id="ep-note-get">
+        <div class="ep-header" onclick="toggle('ep-note-get')">
+          <span class="method m-post">POST</span>
+          <span class="ep-path">/api/v1/notes/get</span>
+          <span class="ep-summary">Retrieve a single note by ID</span>
+          <span class="ep-toggle">▼</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">Returns the full note record for the given <code>note_id</code>, or <code>null</code> if not found.</p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Request Body — NoteGetDTO</div>
+              <pre>{ <span class="json-key">"note_id"</span>: <span class="json-num">42</span> }</pre>
+            </div>
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200 — NoteResponseDTO | null</div>
+              <pre>{
+  <span class="json-key">"id"</span>: <span class="json-num">42</span>,
+  <span class="json-key">"user_id"</span>: <span class="json-num">1</span>,
+  <span class="json-key">"title"</span>: <span class="json-str">"Lecture 5"</span>,
+  <span class="json-key">"content"</span>: <span class="json-str">"..."</span>,
+  <span class="json-key">"source"</span>: <span class="json-null">null</span>
+}</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- UPDATE NOTE -->
+      <div class="ep-card" id="ep-note-update">
+        <div class="ep-header" onclick="toggle('ep-note-update')">
+          <span class="method m-post">POST</span>
+          <span class="ep-path">/api/v1/notes/update</span>
+          <span class="ep-summary">Update note title and/or content</span>
+          <span class="ep-toggle">▼</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">Partial update — only provided fields are changed. If <code>content</code> changes, the embedding is regenerated.</p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Request Body — NoteUpdateDTO</div>
+              <pre>{
+  <span class="json-key">"note_id"</span>: <span class="json-num">42</span>,
+  <span class="json-key">"title"</span>:   <span class="json-str">"Updated Title"</span>,
+  <span class="json-key">"content"</span>: <span class="json-str">"Updated body..."</span>
+}</pre>
+            </div>
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200 — NoteResponseDTO | null</div>
+              <pre><span class="json-type">Updated note or null if not found</span></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- DELETE NOTE -->
+      <div class="ep-card" id="ep-note-delete">
+        <div class="ep-header" onclick="toggle('ep-note-delete')">
+          <span class="method m-post">POST</span>
+          <span class="ep-path">/api/v1/notes/delete</span>
+          <span class="ep-summary">Delete a note (cascades to embedding)</span>
+          <span class="ep-toggle">▼</span>
+        </div>
+        <div class="ep-body">
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Request Body — NoteDeleteDTO</div>
+              <pre>{ <span class="json-key">"note_id"</span>: <span class="json-num">42</span> }</pre>
+            </div>
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200</div>
+              <pre>{ <span class="json-key">"ok"</span>: <span class="json-bool">true</span> }</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SEARCH NOTES -->
+      <div class="ep-card open" id="ep-note-search">
+        <div class="ep-header" onclick="toggle('ep-note-search')">
+          <span class="method m-post">POST</span>
+          <span class="ep-path">/api/v1/notes/search</span>
+          <span class="ep-summary">Vector similarity search over notes</span>
+          <span class="ep-toggle">▼</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">Accepts a pre-computed embedding vector and returns the top-K most similar notes using pgvector cosine similarity. Typically called internally by ChatService.</p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Request Body — NoteSearchDTO</div>
+              <pre>{
+  <span class="json-key">"vector"</span>: [<span class="json-num">0.0231</span>, <span class="json-num">-0.1142</span>, <span class="json-type">... 1536 dims</span>],
+  <span class="json-key">"top_k"</span>: <span class="json-num">5</span>
+}</pre>
+            </div>
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200 — NoteResponseDTO[]</div>
+              <pre>[
+  {
+    <span class="json-key">"id"</span>:      <span class="json-num">42</span>,
+    <span class="json-key">"title"</span>:   <span class="json-str">"Lecture 5"</span>,
+    <span class="json-key">"content"</span>: <span class="json-str">"..."</span>,
+    <span class="json-key">"source"</span>:  <span class="json-str">"lecture_5.pdf"</span>
+  }
+]</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <hr class="divider" />
+
+  <!-- CHAT -->
+  <section>
+    <div class="section-label">Chat / RAG</div>
+    <h2>Chat Endpoints</h2>
+    <div class="ep-group">
+
+      <!-- CHAT ASK -->
+      <div class="ep-card open" id="ep-chat">
+        <div class="ep-header" onclick="toggle('ep-chat')">
+          <span class="method m-post">POST</span>
+          <span class="ep-path">/api/v1/chat</span>
+          <span class="ep-summary">Submit prompt — RAG answer + citations</span>
+          <span class="ep-toggle">▼</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">
+            Core RAG endpoint. Flow:
+            1 — Embed the prompt via OpenAI ada-002.
+            2 — Retrieve top-K notes by cosine similarity.
+            3 — Build a context-augmented system prompt.
+            4 — Call GPT for the answer.
+            5 — Return answer + source citations.
+            Persists both the user message and the AI reply to the conversation.
+          </p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Request Body — ChatRequestDTO</div>
+              <pre>{
+  <span class="json-key">"user_id"</span>:         <span class="json-num">1</span>,
+  <span class="json-key">"conversation_id"</span>: <span class="json-num">7</span>,
+  <span class="json-key">"prompt"</span>:          <span class="json-str">"What is retrieval-augmented generation?"</span>,
+  <span class="json-key">"top_k"</span>:           <span class="json-num">5</span>
+}</pre>
+            </div>
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200 — ChatResponseDTO</div>
+              <pre>{
+  <span class="json-key">"answer"</span>: <span class="json-str">"RAG combines retrieval..."</span>,
+  <span class="json-key">"sources"</span>: [
+    {
+      <span class="json-key">"note_id"</span>: <span class="json-num">42</span>,
+      <span class="json-key">"title"</span>:   <span class="json-str">"Lecture 5"</span>,
+      <span class="json-key">"snippet"</span>: <span class="json-str">"RAG stands for..."</span>
+    }
+  ],
+  <span class="json-key">"attachments"</span>: [],
+  <span class="json-key">"message_id"</span>: <span class="json-num">103</span>
+}</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- CHAT UPLOAD -->
+      <div class="ep-card open" id="ep-chat-upload">
+        <div class="ep-header" onclick="toggle('ep-chat-upload')">
+          <span class="method m-post">POST</span>
+          <span class="ep-path">/api/v1/chat/upload</span>
+          <span class="ep-summary">Upload files + prompt in one multipart request</span>
+          <span class="ep-toggle">▼</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">
+            Accepts <code>multipart/form-data</code>. Extracts text from uploaded files (PDF, DOCX, TXT), embeds them as temporary notes, then runs the full RAG pipeline with the combined context. Attachments are returned in the response.
+          </p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Form Fields</div>
+              <pre><span class="json-key">conversation_id</span> <span class="json-type">integer  (required)</span>
+<span class="json-key">prompt</span>           <span class="json-type">string   (optional)</span>
+<span class="json-key">files</span>            <span class="json-type">file[]   (required, multipart)</span>
+<span class="json-type">Accepted: .txt, .pdf, .docx</span></pre>
+            </div>
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200 — ChatResponseDTO</div>
+              <pre>{
+  <span class="json-key">"answer"</span>: <span class="json-str">"Based on your document..."</span>,
+  <span class="json-key">"sources"</span>: [...],
+  <span class="json-key">"attachments"</span>: [
+    {
+      <span class="json-key">"filename"</span>:     <span class="json-str">"report.pdf"</span>,
+      <span class="json-key">"content_type"</span>: <span class="json-str">"application/pdf"</span>,
+      <span class="json-key">"size"</span>:         <span class="json-num">204800</span>
+    }
+  ],
+  <span class="json-key">"message_id"</span>: <span class="json-num">104</span>
+}</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <hr class="divider" />
+
+  <!-- CONVERSATIONS -->
+  <section>
+    <div class="section-label">Conversations</div>
+    <h2>Conversation Endpoints</h2>
+    <div class="ep-group">
+
+      <!-- LIST -->
+      <div class="ep-card open" id="ep-conv-list">
+        <div class="ep-header" onclick="toggle('ep-conv-list')">
+          <span class="method m-post">POST</span>
+          <span class="ep-path">/api/v1/conversation/list</span>
+          <span class="ep-summary">List all conversations for a user</span>
+          <span class="ep-toggle">▼</span>
+        </div>
+        <div class="ep-body">
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Request Body — UserID</div>
+              <pre>{ <span class="json-key">"user_id"</span>: <span class="json-num">1</span> }</pre>
+            </div>
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200 — Conversation[]</div>
+              <pre>[
+  {
+    <span class="json-key">"id"</span>:         <span class="json-num">7</span>,
+    <span class="json-key">"user_id"</span>:    <span class="json-num">1</span>,
+    <span class="json-key">"title"</span>:      <span class="json-str">"Study session"</span>,
+    <span class="json-key">"created_at"</span>: <span class="json-str">"2026-05-19T..."</span>
+  }
+]</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- CREATE -->
+      <div class="ep-card" id="ep-conv-create">
+        <div class="ep-header" onclick="toggle('ep-conv-create')">
+          <span class="method m-post">POST</span>
+          <span class="ep-path">/api/v1/conversation/create</span>
+          <span class="ep-summary">Create a new conversation session</span>
+          <span class="ep-toggle">▼</span>
+        </div>
+        <div class="ep-body">
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Request Body — CreateConvDTO</div>
+              <pre>{ <span class="json-key">"user_id"</span>: <span class="json-num">1</span> }</pre>
+            </div>
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200 — Conversation</div>
+              <pre>{ <span class="json-key">"id"</span>: <span class="json-num">8</span>, <span class="json-key">"user_id"</span>: <span class="json-num">1</span>, <span class="json-key">"title"</span>: <span class="json-null">null</span>, ... }</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- MESSAGES -->
+      <div class="ep-card open" id="ep-conv-messages">
+        <div class="ep-header" onclick="toggle('ep-conv-messages')">
+          <span class="method m-post">POST</span>
+          <span class="ep-path">/api/v1/conversation/messages</span>
+          <span class="ep-summary">Get paginated messages in a conversation</span>
+          <span class="ep-toggle">▼</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">Cursor-based pagination using <code>before_id</code>. Omit <code>before_id</code> to start from the most recent message. Set <code>limit</code> to control page size (default 10).</p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Request Body + Query Params</div>
+              <pre><span class="json-type">Body:</span>
+{ <span class="json-key">"conversation_id"</span>: <span class="json-num">7</span> }
+
+<span class="json-type">Query params:</span>
+?limit=<span class="json-num">10</span>&amp;before_id=<span class="json-num">103</span></pre>
+            </div>
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200 — Message[]</div>
+              <pre>[
+  {
+    <span class="json-key">"id"</span>:         <span class="json-num">102</span>,
+    <span class="json-key">"role"</span>:       <span class="json-str">"user"</span>,
+    <span class="json-key">"content"</span>:    <span class="json-str">"What is RAG?"</span>,
+    <span class="json-key">"created_at"</span>: <span class="json-str">"2026-05-19T..."</span>
+  },
+  {
+    <span class="json-key">"id"</span>:         <span class="json-num">103</span>,
+    <span class="json-key">"role"</span>:       <span class="json-str">"assistant"</span>,
+    <span class="json-key">"content"</span>:    <span class="json-str">"RAG combines..."</span>,
+    <span class="json-key">"created_at"</span>: <span class="json-str">"2026-05-19T..."</span>
+  }
+]</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RENAME -->
+      <div class="ep-card" id="ep-conv-rename">
+        <div class="ep-header" onclick="toggle('ep-conv-rename')">
+          <span class="method m-post">POST</span>
+          <span class="ep-path">/api/v1/conversation/rename</span>
+          <span class="ep-summary">Rename a conversation</span>
+          <span class="ep-toggle">▼</span>
+        </div>
+        <div class="ep-body">
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Request Body — RenameDTO</div>
+              <pre>{
+  <span class="json-key">"conversation_id"</span>: <span class="json-num">7</span>,
+  <span class="json-key">"title"</span>: <span class="json-str">"RAG Study Session"</span>
+}</pre>
+            </div>
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200</div>
+              <pre>{ <span class="json-key">"ok"</span>: <span class="json-bool">true</span> }</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- DELETE CONV -->
+      <div class="ep-card" id="ep-conv-delete">
+        <div class="ep-header" onclick="toggle('ep-conv-delete')">
+          <span class="method m-post">POST</span>
+          <span class="ep-path">/api/v1/conversation/delete</span>
+          <span class="ep-summary">Delete a conversation + all its messages</span>
+          <span class="ep-toggle">▼</span>
+        </div>
+        <div class="ep-body">
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Request Body — DeleteDTO</div>
+              <pre>{ <span class="json-key">"conversation_id"</span>: <span class="json-num">7</span> }</pre>
+            </div>
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200</div>
+              <pre>{ <span class="json-key">"ok"</span>: <span class="json-bool">true</span> }</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- DELETE MESSAGE -->
+      <div class="ep-card" id="ep-conv-delmsg">
+        <div class="ep-header" onclick="toggle('ep-conv-delmsg')">
+          <span class="method m-post">POST</span>
+          <span class="ep-path">/api/v1/conversation/delete-message</span>
+          <span class="ep-summary">Delete a single message by ID</span>
+          <span class="ep-toggle">▼</span>
+        </div>
+        <div class="ep-body">
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Request Body — DeleteMessageDTO</div>
+              <pre>{ <span class="json-key">"message_id"</span>: <span class="json-num">102</span> }</pre>
+            </div>
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200</div>
+              <pre>{ <span class="json-key">"ok"</span>: <span class="json-bool">true</span> }</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ADD TO NOTE -->
+      <div class="ep-card open" id="ep-conv-addnote">
+        <div class="ep-header" onclick="toggle('ep-conv-addnote')">
+          <span class="method m-post">POST</span>
+          <span class="ep-path">/api/v1/conversation/add-to-note</span>
+          <span class="ep-summary">Save a message's content as a new note</span>
+          <span class="ep-toggle">▼</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">Creates a new note from the provided content — typically used to save a useful AI reply back into the user's knowledge base. Triggers embedding generation for the new note.</p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Request Body — AddToNoteDTO</div>
+              <pre>{
+  <span class="json-key">"user_id"</span>: <span class="json-num">1</span>,
+  <span class="json-key">"content"</span>: <span class="json-str">"RAG combines retrieval..."</span>,
+  <span class="json-key">"title"</span>:   <span class="json-str">"AI answer: What is RAG?"</span>
+}</pre>
+            </div>
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200 — NoteResponseDTO</div>
+              <pre>{
+  <span class="json-key">"id"</span>:      <span class="json-num">55</span>,
+  <span class="json-key">"user_id"</span>: <span class="json-num">1</span>,
+  <span class="json-key">"title"</span>:   <span class="json-str">"AI answer: What is RAG?"</span>,
+  <span class="json-key">"content"</span>: <span class="json-str">"RAG combines..."</span>,
+  <span class="json-key">"source"</span>:  <span class="json-null">null</span>
+}</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+</div>
+
+<footer>MemoLink Capstone Project &mdash; 2026</footer>
+
+<script>
+  function toggle(id) {
+    const card = document.getElementById(id);
+    card.classList.toggle('open');
+  }
+</script>
+</body>
+</html>

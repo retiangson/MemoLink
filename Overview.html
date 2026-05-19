@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MemoLink — Project Overview</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --accent:    #6366f1;
+      --accent-lt: #818cf8;
+      --bg:        #0f0f13;
+      --surface:   #16161d;
+      --card:      #1e1e2a;
+      --border:    #2a2a38;
+      --text:      #e2e8f0;
+      --muted:     #94a3b8;
+      --green:     #22c55e;
+      --cyan:      #22d3ee;
+      --amber:     #f59e0b;
+    }
+
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.7;
+      min-height: 100vh;
+    }
+
+    /* ── NAV ── */
+    nav {
+      position: sticky; top: 0; z-index: 100;
+      background: rgba(15,15,19,.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 2rem;
+      display: flex; align-items: center; gap: 1rem; height: 56px;
+    }
+    .nav-logo { font-weight: 700; font-size: 1.15rem; color: var(--accent-lt); letter-spacing: -.5px; }
+    .nav-links { display: flex; gap: .25rem; margin-left: auto; }
+    .nav-links a {
+      color: var(--muted); text-decoration: none; font-size: .85rem;
+      padding: .35rem .75rem; border-radius: 6px; transition: all .2s;
+    }
+    .nav-links a:hover { color: var(--text); background: var(--card); }
+    .nav-links a.active { color: var(--accent-lt); background: rgba(99,102,241,.12); }
+
+    /* ── HERO ── */
+    .hero {
+      padding: 5rem 2rem 3.5rem;
+      max-width: 900px; margin: 0 auto; text-align: center;
+    }
+    .badge {
+      display: inline-flex; align-items: center; gap: .5rem;
+      background: rgba(99,102,241,.12); border: 1px solid rgba(99,102,241,.3);
+      color: var(--accent-lt); font-size: .78rem; font-weight: 600;
+      padding: .3rem .9rem; border-radius: 999px; margin-bottom: 1.5rem;
+      letter-spacing: .04em; text-transform: uppercase;
+    }
+    .hero h1 {
+      font-size: clamp(2.2rem, 5vw, 3.4rem);
+      font-weight: 800; line-height: 1.15; letter-spacing: -.03em;
+      background: linear-gradient(135deg, #e2e8f0 30%, var(--accent-lt));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .hero-sub {
+      margin-top: 1.1rem; font-size: 1.05rem; color: var(--muted);
+      max-width: 640px; margin-left: auto; margin-right: auto;
+    }
+    .pill-row { display: flex; flex-wrap: wrap; gap: .6rem; justify-content: center; margin-top: 1.8rem; }
+    .pill {
+      background: var(--card); border: 1px solid var(--border);
+      color: var(--text); font-size: .8rem; font-weight: 500;
+      padding: .3rem .85rem; border-radius: 999px;
+    }
+
+    /* ── MAIN GRID ── */
+    .container { max-width: 1060px; margin: 0 auto; padding: 0 2rem 4rem; }
+
+    section { margin-top: 3.5rem; }
+    .section-label {
+      font-size: .72rem; font-weight: 700; letter-spacing: .12em;
+      text-transform: uppercase; color: var(--accent-lt); margin-bottom: .6rem;
+    }
+    h2 { font-size: 1.55rem; font-weight: 700; letter-spacing: -.02em; color: var(--text); }
+    h3 { font-size: 1.05rem; font-weight: 600; color: var(--text); margin-bottom: .5rem; }
+    p  { color: var(--muted); font-size: .95rem; margin-top: .5rem; }
+
+    .divider { border: none; border-top: 1px solid var(--border); margin: 2.5rem 0; }
+
+    /* ── CARDS ── */
+    .card-grid { display: grid; gap: 1.1rem; margin-top: 1.5rem; }
+    .card-grid-2 { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+    .card-grid-3 { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+
+    .card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 12px; padding: 1.4rem 1.5rem;
+      transition: border-color .2s, transform .2s;
+    }
+    .card:hover { border-color: var(--accent); transform: translateY(-2px); }
+    .card-icon { font-size: 1.6rem; margin-bottom: .75rem; }
+
+    /* ── ARCH ── */
+    .arch-table {
+      width: 100%; border-collapse: collapse; margin-top: 1.4rem; font-size: .88rem;
+    }
+    .arch-table th {
+      text-align: left; padding: .65rem 1rem;
+      border-bottom: 1px solid var(--border);
+      color: var(--muted); font-weight: 600; font-size: .78rem;
+      text-transform: uppercase; letter-spacing: .06em;
+    }
+    .arch-table td { padding: .7rem 1rem; border-bottom: 1px solid var(--border); color: var(--muted); }
+    .arch-table tr:last-child td { border-bottom: none; }
+    .arch-table tr:hover td { color: var(--text); background: rgba(255,255,255,.02); }
+    .tag {
+      display: inline-block; font-size: .72rem; font-weight: 600;
+      padding: .18rem .55rem; border-radius: 4px; margin-right: .3rem;
+    }
+    .tag-py   { background: rgba(34,197,94,.12);  color: var(--green); }
+    .tag-ts   { background: rgba(34,211,238,.12);  color: var(--cyan); }
+    .tag-db   { background: rgba(245,158,11,.12);  color: var(--amber); }
+    .tag-ai   { background: rgba(99,102,241,.12);  color: var(--accent-lt); }
+
+    /* ── FLOW ── */
+    .flow { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; margin-top: 1.3rem; }
+    .flow-step {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 8px; padding: .55rem 1.1rem;
+      font-size: .82rem; font-weight: 500; color: var(--text);
+    }
+    .flow-arrow { color: var(--muted); font-size: 1rem; }
+
+    /* ── RESEARCH ── */
+    .research-box {
+      background: linear-gradient(135deg, rgba(99,102,241,.08), rgba(129,140,248,.04));
+      border: 1px solid rgba(99,102,241,.25);
+      border-radius: 14px; padding: 2rem 2.2rem; margin-top: 1.4rem;
+    }
+    .research-box blockquote {
+      font-size: 1rem; font-style: italic; color: var(--text); line-height: 1.75;
+    }
+
+    /* ── FOOTER ── */
+    footer {
+      text-align: center; padding: 2rem 1rem;
+      border-top: 1px solid var(--border);
+      color: var(--muted); font-size: .82rem;
+    }
+  </style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <span class="nav-logo">⬡ MemoLink</span>
+  <div class="nav-links">
+    <a href="Overview.html" class="active">Overview</a>
+    <a href="Requirements Analysis.html">Requirements</a>
+    <a href="Database Design.html">Database</a>
+    <a href="API Endpoint Design.html">API</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="badge">Capstone Project 2026</div>
+  <h1>MemoLink</h1>
+  <p class="hero-sub">
+    A context-aware AI companion for knowledge capture, contextual retrieval,
+    and task support in study and work settings.
+  </p>
+  <div class="pill-row">
+    <span class="pill">FastAPI</span>
+    <span class="pill">React + Vite</span>
+    <span class="pill">RAG</span>
+    <span class="pill">OpenAI Embeddings</span>
+    <span class="pill">Supabase / PostgreSQL</span>
+    <span class="pill">Clean Architecture</span>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="container">
+
+  <!-- RESEARCH TOPIC -->
+  <section>
+    <div class="section-label">Academic Research Topic</div>
+    <h2>Research Statement</h2>
+    <div class="research-box">
+      <blockquote>
+        "Design and Evaluation of a Context-Aware AI Companion for Knowledge Capture,
+        Contextual Retrieval, and Task Support in Study and Work Settings."
+      </blockquote>
+    </div>
+    <p style="margin-top:1rem;">
+      MemoLink is both a functional software product and an academic research artefact.
+      The system is evaluated against measurable criteria — retrieval relevance, answer
+      faithfulness, usability (SUS), and task completion time — to validate whether
+      AI-augmented note retrieval meaningfully reduces cognitive load.
+    </p>
+  </section>
+
+  <hr class="divider" />
+
+  <!-- WHAT IS MEMOLINK -->
+  <section>
+    <div class="section-label">Product</div>
+    <h2>What is MemoLink?</h2>
+    <p>
+      MemoLink lets users capture notes and documents, then interact with their own
+      knowledge base through a conversational AI interface powered by
+      Retrieval-Augmented Generation (RAG). Every answer is grounded in the user's
+      own stored notes, making responses traceable and faithful rather than
+      generically hallucinated.
+    </p>
+
+    <div class="card-grid card-grid-3" style="margin-top:1.8rem;">
+      <div class="card">
+        <div class="card-icon">📝</div>
+        <h3>Knowledge Capture</h3>
+        <p>Create, edit, upload, and organise notes and documents. Supports plain text and file uploads (PDF, DOCX, TXT).</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">🔍</div>
+        <h3>Contextual Retrieval</h3>
+        <p>Semantic vector search over stored notes using OpenAI text-embedding-ada-002 and pgvector similarity matching.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">💬</div>
+        <h3>Conversational AI</h3>
+        <p>Multi-turn chat sessions where every response cites the source notes that informed the answer.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">🗂️</div>
+        <h3>Conversation History</h3>
+        <p>Persistent, paginated conversation threads — rename, delete, or save AI replies back as notes.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">📎</div>
+        <h3>File-in-Chat Upload</h3>
+        <p>Attach files directly in the chat; MemoLink extracts, embeds, and queries them in real time.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">🔐</div>
+        <h3>User Accounts</h3>
+        <p>Registration and login with scoped data — each user sees only their own notes and conversations.</p>
+      </div>
+    </div>
+  </section>
+
+  <hr class="divider" />
+
+  <!-- ARCHITECTURE -->
+  <section>
+    <div class="section-label">Architecture</div>
+    <h2>System Architecture</h2>
+    <p>
+      MemoLink follows a strict three-layer Clean Architecture — API → Business → Domain —
+      combined with Domain-Driven Design and a manual Dependency Injection container.
+    </p>
+
+    <table class="arch-table" style="margin-top:1.6rem;">
+      <thead>
+        <tr>
+          <th>Layer</th>
+          <th>Package</th>
+          <th>Responsibility</th>
+          <th>Stack</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>API</strong></td>
+          <td><code>api/v1/</code></td>
+          <td>HTTP controllers — thin, no business logic</td>
+          <td><span class="tag tag-py">FastAPI</span></td>
+        </tr>
+        <tr>
+          <td><strong>Business</strong></td>
+          <td><code>business/services/</code></td>
+          <td>Application logic — chat, notes, auth, conversations</td>
+          <td><span class="tag tag-py">Python</span></td>
+        </tr>
+        <tr>
+          <td><strong>Domain</strong></td>
+          <td><code>domain/</code></td>
+          <td>ORM models, repository interfaces &amp; implementations</td>
+          <td><span class="tag tag-db">SQLAlchemy</span></td>
+        </tr>
+        <tr>
+          <td><strong>Contracts</strong></td>
+          <td><code>contracts/</code></td>
+          <td>Pydantic DTOs for request / response</td>
+          <td><span class="tag tag-py">Pydantic v2</span></td>
+        </tr>
+        <tr>
+          <td><strong>Core</strong></td>
+          <td><code>core/</code></td>
+          <td>DB engine, settings, security utilities</td>
+          <td><span class="tag tag-db">PostgreSQL</span></td>
+        </tr>
+        <tr>
+          <td><strong>DI</strong></td>
+          <td><code>bootstrap.py</code></td>
+          <td>Wires the dependency injection container</td>
+          <td><span class="tag tag-py">Python</span></td>
+        </tr>
+        <tr>
+          <td><strong>Frontend</strong></td>
+          <td><code>memolink_web/</code></td>
+          <td>SPA — chat UI, note editor, auth pages</td>
+          <td><span class="tag tag-ts">React</span><span class="tag tag-ts">TypeScript</span></td>
+        </tr>
+        <tr>
+          <td><strong>AI / Embeddings</strong></td>
+          <td><code>services/embedding_service</code></td>
+          <td>Converts text to vectors, calls OpenAI API</td>
+          <td><span class="tag tag-ai">OpenAI</span><span class="tag tag-db">pgvector</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <hr class="divider" />
+
+  <!-- RAG FLOW -->
+  <section>
+    <div class="section-label">Data Flow</div>
+    <h2>RAG Pipeline</h2>
+    <p>How a user question travels through MemoLink and becomes a grounded answer.</p>
+
+    <div class="flow">
+      <div class="flow-step">User submits prompt</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-step">Embed prompt → vector</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-step">pgvector cosine search</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-step">Top-K note chunks retrieved</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-step">Context + prompt → OpenAI GPT</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-step">Answer + source citations returned</div>
+    </div>
+
+    <div style="margin-top:1.4rem;">
+      <div class="flow">
+        <div class="flow-step">Note uploaded / created</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">Text extracted</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">Embed → 1 536-dim vector</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">Stored in <code>embeddings</code> table</div>
+      </div>
+    </div>
+  </section>
+
+  <hr class="divider" />
+
+  <!-- TECH STACK -->
+  <section>
+    <div class="section-label">Technology Stack</div>
+    <h2>Stack at a Glance</h2>
+    <div class="card-grid card-grid-2" style="margin-top:1.4rem;">
+      <div class="card">
+        <h3>Backend</h3>
+        <p><strong>FastAPI</strong> — async REST API framework<br/>
+           <strong>SQLAlchemy</strong> — ORM &amp; session management<br/>
+           <strong>Pydantic v2</strong> — data validation &amp; DTOs<br/>
+           <strong>Uvicorn</strong> — ASGI server<br/>
+           <strong>python-jose</strong> — JWT utilities<br/>
+           <strong>python-multipart</strong> — file upload handling</p>
+      </div>
+      <div class="card">
+        <h3>Frontend</h3>
+        <p><strong>React 18</strong> — component-based SPA<br/>
+           <strong>TypeScript</strong> — type-safe development<br/>
+           <strong>Vite</strong> — fast bundler &amp; dev server<br/>
+           <strong>Tailwind CSS</strong> — utility-first styling<br/>
+           <strong>React Router</strong> — client-side routing<br/>
+           <strong>Axios</strong> — HTTP client</p>
+      </div>
+      <div class="card">
+        <h3>Database &amp; Search</h3>
+        <p><strong>PostgreSQL</strong> — primary relational database<br/>
+           <strong>Supabase</strong> — hosted Postgres + pgvector<br/>
+           <strong>pgvector</strong> — cosine similarity search<br/>
+           <strong>VectorType(1536)</strong> — custom SQLAlchemy column</p>
+      </div>
+      <div class="card">
+        <h3>AI &amp; Embeddings</h3>
+        <p><strong>OpenAI GPT-4o</strong> — answer generation<br/>
+           <strong>text-embedding-ada-002</strong> — vector embeddings<br/>
+           <strong>RAG pattern</strong> — grounded retrieval<br/>
+           <strong>Top-K semantic search</strong> — relevant chunk selection</p>
+      </div>
+    </div>
+  </section>
+
+  <hr class="divider" />
+
+  <!-- DESIGN PRINCIPLES -->
+  <section>
+    <div class="section-label">Engineering</div>
+    <h2>Design Principles</h2>
+    <div class="card-grid card-grid-2" style="margin-top:1.4rem;">
+      <div class="card">
+        <h3>Clean Architecture</h3>
+        <p>Controllers depend only on service interfaces. No database calls in controllers. No business logic in repositories.</p>
+      </div>
+      <div class="card">
+        <h3>Domain-Driven Design</h3>
+        <p>Repositories encapsulate all persistence. The domain layer is framework-agnostic and testable in isolation.</p>
+      </div>
+      <div class="card">
+        <h3>Dependency Injection</h3>
+        <p><code>ServiceInstaller</code> binds interfaces to concrete implementations. Controllers resolve services through the container — not manually.</p>
+      </div>
+      <div class="card">
+        <h3>Testability</h3>
+        <p>All services depend on interfaces (Protocols). Repositories and the embedding service can be mocked independently.</p>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<footer>MemoLink Capstone Project &mdash; 2026</footer>
+</body>
+</html>

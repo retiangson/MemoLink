@@ -1,0 +1,9 @@
+text=auto
+*.cs text eol=crlf
+*.json text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.sh text eol=lf
+*.md text eol=lf
+*.env text eol=lf
+*.example text eol=lf

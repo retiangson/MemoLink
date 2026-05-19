@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MemoLink — Requirements Analysis</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --accent:    #6366f1;
+      --accent-lt: #818cf8;
+      --bg:        #0f0f13;
+      --surface:   #16161d;
+      --card:      #1e1e2a;
+      --border:    #2a2a38;
+      --text:      #e2e8f0;
+      --muted:     #94a3b8;
+      --green:     #22c55e;
+      --red:       #f87171;
+      --cyan:      #22d3ee;
+      --amber:     #f59e0b;
+    }
+
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: var(--bg); color: var(--text);
+      line-height: 1.7; min-height: 100vh;
+    }
+
+    nav {
+      position: sticky; top: 0; z-index: 100;
+      background: rgba(15,15,19,.85); backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 2rem; display: flex; align-items: center; gap: 1rem; height: 56px;
+    }
+    .nav-logo { font-weight: 700; font-size: 1.15rem; color: var(--accent-lt); letter-spacing: -.5px; }
+    .nav-links { display: flex; gap: .25rem; margin-left: auto; }
+    .nav-links a {
+      color: var(--muted); text-decoration: none; font-size: .85rem;
+      padding: .35rem .75rem; border-radius: 6px; transition: all .2s;
+    }
+    .nav-links a:hover { color: var(--text); background: var(--card); }
+    .nav-links a.active { color: var(--accent-lt); background: rgba(99,102,241,.12); }
+
+    .page-header {
+      padding: 4rem 2rem 2.5rem; max-width: 900px; margin: 0 auto;
+    }
+    .section-label {
+      font-size: .72rem; font-weight: 700; letter-spacing: .12em;
+      text-transform: uppercase; color: var(--accent-lt); margin-bottom: .6rem;
+    }
+    .page-header h1 {
+      font-size: clamp(1.8rem, 4vw, 2.8rem); font-weight: 800;
+      letter-spacing: -.03em;
+      background: linear-gradient(135deg, #e2e8f0 30%, var(--accent-lt));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .page-header p { color: var(--muted); margin-top: .75rem; font-size: .97rem; }
+
+    .container { max-width: 1060px; margin: 0 auto; padding: 0 2rem 4rem; }
+
+    section { margin-top: 3rem; }
+    h2 { font-size: 1.4rem; font-weight: 700; letter-spacing: -.02em; color: var(--text); margin-bottom: 1.1rem; }
+    h3 { font-size: 1rem; font-weight: 600; color: var(--text); margin-bottom: .45rem; }
+    p  { color: var(--muted); font-size: .93rem; margin-top: .4rem; }
+
+    .divider { border: none; border-top: 1px solid var(--border); margin: 2.5rem 0; }
+
+    /* REQ TABLE */
+    .req-table { width: 100%; border-collapse: collapse; font-size: .87rem; margin-top: 1.2rem; }
+    .req-table th {
+      text-align: left; padding: .6rem 1rem;
+      border-bottom: 2px solid var(--border);
+      color: var(--muted); font-weight: 600; font-size: .76rem;
+      text-transform: uppercase; letter-spacing: .06em;
+    }
+    .req-table td { padding: .7rem 1rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+    .req-table tr:hover td { background: rgba(255,255,255,.02); }
+    .req-table tr:last-child td { border-bottom: none; }
+    .req-id { font-family: monospace; font-size: .8rem; color: var(--accent-lt); white-space: nowrap; }
+    .req-text { color: var(--text); }
+    .req-priority, .req-cat { font-size: .76rem; font-weight: 600; padding: .2rem .55rem; border-radius: 4px; white-space: nowrap; }
+    .p-high   { background: rgba(248,113,113,.12); color: var(--red); }
+    .p-med    { background: rgba(245,158,11,.12);  color: var(--amber); }
+    .p-low    { background: rgba(34,197,94,.12);   color: var(--green); }
+    .c-func   { background: rgba(99,102,241,.12);  color: var(--accent-lt); }
+    .c-non    { background: rgba(34,211,238,.12);  color: var(--cyan); }
+
+    /* USE CASE */
+    .uc-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; margin-top: 1.2rem; }
+    .uc-card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 12px; padding: 1.3rem 1.4rem;
+      transition: border-color .2s;
+    }
+    .uc-card:hover { border-color: var(--accent); }
+    .uc-actor { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--accent-lt); margin-bottom: .35rem; }
+    .uc-title { font-weight: 600; font-size: .95rem; color: var(--text); }
+    .uc-desc { font-size: .84rem; color: var(--muted); margin-top: .35rem; }
+
+    /* STORY */
+    .story {
+      background: var(--card); border-left: 3px solid var(--accent);
+      border-radius: 0 10px 10px 0; padding: 1rem 1.4rem;
+      margin-bottom: .8rem; font-size: .9rem;
+    }
+    .story-as { color: var(--accent-lt); font-weight: 600; }
+    .story-so { color: var(--muted); font-style: italic; }
+
+    /* CONSTRAINT BOX */
+    .constraint-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: .9rem; margin-top: 1.2rem; }
+    .constraint {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 10px; padding: 1.1rem 1.2rem;
+    }
+    .constraint-icon { font-size: 1.3rem; margin-bottom: .5rem; }
+    .constraint h4 { font-size: .9rem; font-weight: 600; color: var(--text); }
+    .constraint p  { font-size: .82rem; margin-top: .3rem; }
+
+    footer { text-align: center; padding: 2rem 1rem; border-top: 1px solid var(--border); color: var(--muted); font-size: .82rem; }
+  </style>
+</head>
+<body>
+
+<nav>
+  <span class="nav-logo">⬡ MemoLink</span>
+  <div class="nav-links">
+    <a href="Overview.html">Overview</a>
+    <a href="Requirements Analysis.html" class="active">Requirements</a>
+    <a href="Database Design.html">Database</a>
+    <a href="API Endpoint Design.html">API</a>
+  </div>
+</nav>
+
+<div class="page-header">
+  <div class="section-label">Documentation</div>
+  <h1>Requirements Analysis</h1>
+  <p>Functional and non-functional requirements, use cases, and user stories for MemoLink.</p>
+</div>
+
+<div class="container">
+
+  <!-- FUNCTIONAL REQUIREMENTS -->
+  <section>
+    <div class="section-label">FR — Functional Requirements</div>
+    <h2>Functional Requirements</h2>
+    <table class="req-table">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Requirement</th>
+          <th>Priority</th>
+          <th>Category</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="req-id">FR-01</td>
+          <td class="req-text">Users must be able to register with an email and password.</td>
+          <td><span class="req-priority p-high">High</span></td>
+          <td><span class="req-cat c-func">Auth</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">FR-02</td>
+          <td class="req-text">Users must be able to log in with their credentials and receive a session token.</td>
+          <td><span class="req-priority p-high">High</span></td>
+          <td><span class="req-cat c-func">Auth</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">FR-03</td>
+          <td class="req-text">Each user's notes and conversations must be isolated — users cannot access each other's data.</td>
+          <td><span class="req-priority p-high">High</span></td>
+          <td><span class="req-cat c-func">Auth</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">FR-04</td>
+          <td class="req-text">Users must be able to create a new note with a title, body content, and optional source label.</td>
+          <td><span class="req-priority p-high">High</span></td>
+          <td><span class="req-cat c-func">Notes</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">FR-05</td>
+          <td class="req-text">Users must be able to list all their notes.</td>
+          <td><span class="req-priority p-high">High</span></td>
+          <td><span class="req-cat c-func">Notes</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">FR-06</td>
+          <td class="req-text">Users must be able to update the title and/or content of an existing note.</td>
+          <td><span class="req-priority p-med">Medium</span></td>
+          <td><span class="req-cat c-func">Notes</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">FR-07</td>
+          <td class="req-text">Users must be able to delete a note. Deletion must cascade to the associated embedding.</td>
+          <td><span class="req-priority p-high">High</span></td>
+          <td><span class="req-cat c-func">Notes</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">FR-08</td>
+          <td class="req-text">When a note is created or updated, the system must automatically generate and store a vector embedding for the note content.</td>
+          <td><span class="req-priority p-high">High</span></td>
+          <td><span class="req-cat c-func">AI/RAG</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">FR-09</td>
+          <td class="req-text">The chat endpoint must embed the user's prompt and retrieve the top-K most semantically similar notes using cosine similarity.</td>
+          <td><span class="req-priority p-high">High</span></td>
+          <td><span class="req-cat c-func">AI/RAG</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">FR-10</td>
+          <td class="req-text">The system must send the retrieved note context along with the user prompt to the LLM and return the generated answer.</td>
+          <td><span class="req-priority p-high">High</span></td>
+          <td><span class="req-cat c-func">AI/RAG</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">FR-11</td>
+          <td class="req-text">Each chat response must include a list of source citations (note_id, title, snippet) for transparency.</td>
+          <td><span class="req-priority p-high">High</span></td>
+          <td><span class="req-cat c-func">AI/RAG</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">FR-12</td>
+          <td class="req-text">Users must be able to upload files (PDF, DOCX, TXT) directly in the chat. The system must extract text, embed it, and include it in retrieval.</td>
+          <td><span class="req-priority p-high">High</span></td>
+          <td><span class="req-cat c-func">Files</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">FR-13</td>
+          <td class="req-text">Users must be able to create a conversation session, and all messages in that session must be persisted.</td>
+          <td><span class="req-priority p-high">High</span></td>
+          <td><span class="req-cat c-func">Conversations</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">FR-14</td>
+          <td class="req-text">Users must be able to list all their conversations.</td>
+          <td><span class="req-priority p-high">High</span></td>
+          <td><span class="req-cat c-func">Conversations</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">FR-15</td>
+          <td class="req-text">Users must be able to rename or delete a conversation.</td>
+          <td><span class="req-priority p-med">Medium</span></td>
+          <td><span class="req-cat c-func">Conversations</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">FR-16</td>
+          <td class="req-text">Conversation messages must be paginated — the client requests a limit and a cursor (before_id).</td>
+          <td><span class="req-priority p-med">Medium</span></td>
+          <td><span class="req-cat c-func">Conversations</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">FR-17</td>
+          <td class="req-text">Users must be able to save a chat AI response directly as a new note.</td>
+          <td><span class="req-priority p-med">Medium</span></td>
+          <td><span class="req-cat c-func">Conversations</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">FR-18</td>
+          <td class="req-text">Users must be able to delete individual messages from a conversation.</td>
+          <td><span class="req-priority p-low">Low</span></td>
+          <td><span class="req-cat c-func">Conversations</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <hr class="divider" />
+
+  <!-- NON-FUNCTIONAL REQUIREMENTS -->
+  <section>
+    <div class="section-label">NFR — Non-Functional Requirements</div>
+    <h2>Non-Functional Requirements</h2>
+    <table class="req-table">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Requirement</th>
+          <th>Priority</th>
+          <th>Category</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="req-id">NFR-01</td>
+          <td class="req-text">API response time for non-AI endpoints must be under 300 ms at p95 under normal load.</td>
+          <td><span class="req-priority p-high">High</span></td>
+          <td><span class="req-cat c-non">Performance</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">NFR-02</td>
+          <td class="req-text">AI chat responses must complete within 10 seconds under normal conditions (bounded by LLM latency).</td>
+          <td><span class="req-priority p-high">High</span></td>
+          <td><span class="req-cat c-non">Performance</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">NFR-03</td>
+          <td class="req-text">No API keys, secrets, or passwords may be committed to version control.</td>
+          <td><span class="req-priority p-high">High</span></td>
+          <td><span class="req-cat c-non">Security</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">NFR-04</td>
+          <td class="req-text">Passwords must be hashed before storage; plain-text credentials must never be persisted.</td>
+          <td><span class="req-priority p-high">High</span></td>
+          <td><span class="req-cat c-non">Security</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">NFR-05</td>
+          <td class="req-text">The system must follow Clean Architecture — controllers must not contain business or persistence logic.</td>
+          <td><span class="req-priority p-high">High</span></td>
+          <td><span class="req-cat c-non">Maintainability</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">NFR-06</td>
+          <td class="req-text">All services must implement interface protocols to support unit testing without a live database.</td>
+          <td><span class="req-priority p-med">Medium</span></td>
+          <td><span class="req-cat c-non">Testability</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">NFR-07</td>
+          <td class="req-text">The System Usability Scale (SUS) score for the frontend must reach ≥ 68 (above-average) in evaluation.</td>
+          <td><span class="req-priority p-high">High</span></td>
+          <td><span class="req-cat c-non">Usability</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">NFR-08</td>
+          <td class="req-text">The frontend must be accessible on desktop and mobile viewports without horizontal scroll.</td>
+          <td><span class="req-priority p-med">Medium</span></td>
+          <td><span class="req-cat c-non">Usability</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">NFR-09</td>
+          <td class="req-text">RAG answers must cite at least one source note; uncited answers are considered a system failure.</td>
+          <td><span class="req-priority p-high">High</span></td>
+          <td><span class="req-cat c-non">Faithfulness</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">NFR-10</td>
+          <td class="req-text">The system must be deployable with a single environment-variable file (.env) — no hard-coded configuration.</td>
+          <td><span class="req-priority p-med">Medium</span></td>
+          <td><span class="req-cat c-non">Portability</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <hr class="divider" />
+
+  <!-- USE CASES -->
+  <section>
+    <div class="section-label">UC — Use Cases</div>
+    <h2>Use Cases</h2>
+    <div class="uc-grid">
+      <div class="uc-card">
+        <div class="uc-actor">Actor: New User</div>
+        <div class="uc-title">UC-01 · Register</div>
+        <div class="uc-desc">User submits email + password. System validates uniqueness, hashes password, and creates account. Returns user record.</div>
+      </div>
+      <div class="uc-card">
+        <div class="uc-actor">Actor: Registered User</div>
+        <div class="uc-title">UC-02 · Login</div>
+        <div class="uc-desc">User submits credentials. System verifies hash. Returns user ID stored client-side for subsequent requests.</div>
+      </div>
+      <div class="uc-card">
+        <div class="uc-actor">Actor: Logged-in User</div>
+        <div class="uc-title">UC-03 · Create Note</div>
+        <div class="uc-desc">User writes a note. System stores it and asynchronously generates + stores a vector embedding for retrieval.</div>
+      </div>
+      <div class="uc-card">
+        <div class="uc-actor">Actor: Logged-in User</div>
+        <div class="uc-title">UC-04 · Upload File</div>
+        <div class="uc-desc">User uploads a file in chat. System extracts text, embeds it as a temporary note, and includes it in retrieval context.</div>
+      </div>
+      <div class="uc-card">
+        <div class="uc-actor">Actor: Logged-in User</div>
+        <div class="uc-title">UC-05 · Ask AI Question</div>
+        <div class="uc-desc">User types a question. System embeds it, retrieves top-K notes, sends context to LLM, returns answer + citations.</div>
+      </div>
+      <div class="uc-card">
+        <div class="uc-actor">Actor: Logged-in User</div>
+        <div class="uc-title">UC-06 · Browse Conversations</div>
+        <div class="uc-desc">User views all past sessions, selects one, and paginates through its message history.</div>
+      </div>
+      <div class="uc-card">
+        <div class="uc-actor">Actor: Logged-in User</div>
+        <div class="uc-title">UC-07 · Save AI Reply as Note</div>
+        <div class="uc-desc">User selects an AI message and saves it as a new note with a custom title for future retrieval.</div>
+      </div>
+      <div class="uc-card">
+        <div class="uc-actor">Actor: Logged-in User</div>
+        <div class="uc-title">UC-08 · Manage Notes</div>
+        <div class="uc-desc">User views, edits title/content, or deletes notes from their library. Deletion cascades to the embedding.</div>
+      </div>
+      <div class="uc-card">
+        <div class="uc-actor">Actor: Logged-in User</div>
+        <div class="uc-title">UC-09 · Rename / Delete Conversation</div>
+        <div class="uc-desc">User renames a conversation for easier identification, or deletes it along with all its messages.</div>
+      </div>
+    </div>
+  </section>
+
+  <hr class="divider" />
+
+  <!-- USER STORIES -->
+  <section>
+    <div class="section-label">US — User Stories</div>
+    <h2>User Stories</h2>
+
+    <div class="story">
+      <span class="req-id">US-01</span> &nbsp;
+      <span class="story-as">As a student,</span> I want to upload my lecture notes so that <span class="story-so">I can ask AI questions about them during revision.</span>
+    </div>
+    <div class="story">
+      <span class="req-id">US-02</span> &nbsp;
+      <span class="story-as">As a knowledge worker,</span> I want AI answers to cite the exact note they came from so that <span class="story-so">I can verify the source before acting on the information.</span>
+    </div>
+    <div class="story">
+      <span class="req-id">US-03</span> &nbsp;
+      <span class="story-as">As a user,</span> I want to create an account so that <span class="story-so">my notes are private and only accessible to me.</span>
+    </div>
+    <div class="story">
+      <span class="req-id">US-04</span> &nbsp;
+      <span class="story-as">As a researcher,</span> I want to save a useful AI response back as a note so that <span class="story-so">it becomes part of my searchable knowledge base.</span>
+    </div>
+    <div class="story">
+      <span class="req-id">US-05</span> &nbsp;
+      <span class="story-as">As a student,</span> I want to attach a PDF directly in the chat so that <span class="story-so">I can immediately ask questions about it without creating a note first.</span>
+    </div>
+    <div class="story">
+      <span class="req-id">US-06</span> &nbsp;
+      <span class="story-as">As a user,</span> I want to browse my conversation history and scroll back through old messages so that <span class="story-so">I can reference what the AI previously told me.</span>
+    </div>
+    <div class="story">
+      <span class="req-id">US-07</span> &nbsp;
+      <span class="story-as">As a power user,</span> I want to delete notes I no longer need so that <span class="story-so">irrelevant content stops appearing in my AI answers.</span>
+    </div>
+    <div class="story">
+      <span class="req-id">US-08</span> &nbsp;
+      <span class="story-as">As a user,</span> I want to rename my conversations so that <span class="story-so">I can identify them at a glance in the sidebar.</span>
+    </div>
+  </section>
+
+  <hr class="divider" />
+
+  <!-- CONSTRAINTS -->
+  <section>
+    <div class="section-label">Constraints &amp; Assumptions</div>
+    <h2>Constraints &amp; Assumptions</h2>
+    <div class="constraint-grid">
+      <div class="constraint">
+        <div class="constraint-icon">🔑</div>
+        <h4>OpenAI API Required</h4>
+        <p>Both embedding generation and answer generation depend on external OpenAI API access. Offline use is not supported.</p>
+      </div>
+      <div class="constraint">
+        <div class="constraint-icon">🗄️</div>
+        <h4>pgvector Extension</h4>
+        <p>The database must have the pgvector extension enabled. Supabase provides this out of the box.</p>
+      </div>
+      <div class="constraint">
+        <div class="constraint-icon">👤</div>
+        <h4>Single-Tenant Model</h4>
+        <p>MemoLink is designed for individual users. Team or multi-tenant sharing is out of scope for this capstone version.</p>
+      </div>
+      <div class="constraint">
+        <div class="constraint-icon">📄</div>
+        <h4>File Type Scope</h4>
+        <p>Supported upload formats: plain text (.txt), PDF (.pdf), and Word documents (.docx). Other formats are rejected.</p>
+      </div>
+      <div class="constraint">
+        <div class="constraint-icon">🧪</div>
+        <h4>Evaluation Data</h4>
+        <p>Evaluation uses only student-owned, publicly available, or participant-approved non-sensitive data. No private data.</p>
+      </div>
+      <div class="constraint">
+        <div class="constraint-icon">🌐</div>
+        <h4>Browser-Based Only</h4>
+        <p>The frontend is a web SPA. Native mobile apps are out of scope for this version.</p>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<footer>MemoLink Capstone Project &mdash; 2026</footer>
+</body>
+</html>
