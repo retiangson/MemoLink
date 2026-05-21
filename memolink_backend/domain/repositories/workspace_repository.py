@@ -4,6 +4,10 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from memolink_backend.domain.models.workspace import Workspace
 from memolink_backend.domain.models.reminder import Reminder
+from memolink_backend.domain.models.note import Note
+from memolink_backend.domain.models.embedding import Embedding
+from memolink_backend.domain.models.conversation import Conversation
+from memolink_backend.domain.models.message import Message
 
 
 class WorkspaceRepository:
@@ -71,9 +75,32 @@ class WorkspaceRepository:
         ws = self.get_by_id(workspace_id)
         if not ws:
             return False
+        self._delete_workspace_contents(workspace_id)
         ws.deleted_at = datetime.now(timezone.utc)
         self.db.commit()
         return True
+
+    def _delete_workspace_contents(self, workspace_id: int) -> None:
+        note_ids = [
+            note_id for (note_id,) in self.db.query(Note.id)
+            .filter(Note.workspace_id == workspace_id)
+            .all()
+        ]
+        conversation_ids = [
+            conversation_id for (conversation_id,) in self.db.query(Conversation.id)
+            .filter(Conversation.workspace_id == workspace_id)
+            .all()
+        ]
+
+        if note_ids:
+            self.db.query(Embedding).filter(Embedding.note_id.in_(note_ids)).delete(synchronize_session=False)
+            self.db.query(Note).filter(Note.id.in_(note_ids)).delete(synchronize_session=False)
+
+        if conversation_ids:
+            self.db.query(Message).filter(Message.conversation_id.in_(conversation_ids)).delete(synchronize_session=False)
+            self.db.query(Conversation).filter(Conversation.id.in_(conversation_ids)).delete(synchronize_session=False)
+
+        self.db.query(Reminder).filter(Reminder.workspace_id == workspace_id).delete(synchronize_session=False)
 
     def set_last_accessed(self, workspace_id: int) -> Optional[Workspace]:
         ws = self.get_by_id(workspace_id)
