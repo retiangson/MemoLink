@@ -21,3 +21,8 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
     id: int
     email: str
+
+
+class ChangePasswordDTO(BaseModel):
+    current_password: str
+    new_password: str

@@ -9,8 +9,8 @@ class ConversationRepository:
     def __init__(self, db: Session):
         self.db = db
 
-    def create_conversation(self, user_id: int, title: str | None = None) -> Conversation:
-        conv = Conversation(user_id=user_id, title=title)
+    def create_conversation(self, user_id: int, title: str | None = None, workspace_id: int | None = None) -> Conversation:
+        conv = Conversation(user_id=user_id, title=title, workspace_id=workspace_id)
         self.db.add(conv)
         self.db.commit()
         self.db.refresh(conv)
@@ -26,14 +26,15 @@ class ConversationRepository:
     def get_by_id(self, conv_id: int) -> Optional[Conversation]:
         return self.db.query(Conversation).filter(Conversation.id == conv_id).first()
 
-    def get_for_user(self, user_id: int) -> List[Conversation]:
-        return (
+    def get_for_user(self, user_id: int, workspace_id: int | None = None) -> List[Conversation]:
+        q = (
             self.db.query(Conversation)
             .options(joinedload(Conversation.messages))
             .filter(Conversation.user_id == user_id, Conversation.deleted_at == None)
-            .order_by(Conversation.id.desc())
-            .all()
         )
+        if workspace_id is not None:
+            q = q.filter(Conversation.workspace_id == workspace_id)
+        return q.order_by(Conversation.id.desc()).all()
 
     def get_trash_for_user(self, user_id: int) -> List[Conversation]:
         return (

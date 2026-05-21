@@ -1,6 +1,7 @@
 import json
 import re
 from datetime import date, timedelta
+from typing import Optional
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from openai import OpenAI
@@ -10,11 +11,14 @@ from memolink_backend.core.config import settings
 from memolink_backend.core.db import get_db
 from memolink_backend.domain.models.reminder import Reminder
 
+_HTML_TAG = re.compile(r"<[^>]+>")
+
 router = APIRouter(prefix="/suggest", tags=["suggest"])
 
 class SuggestRequest(BaseModel):
     title: str = ""
     content: str
+    workspace_id: Optional[int] = None
 
 
 def _normalise(text: str) -> str:
@@ -35,12 +39,15 @@ async def suggest(
     user_id: int = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    if not req.content.strip():
+    clean_content = _HTML_TAG.sub(" ", req.content)
+    clean_content = re.sub(r"\s+", " ", clean_content).strip()
+    if not clean_content:
         return {"suggestions": []}
 
-    existing = db.query(Reminder).filter(
-        Reminder.user_id == user_id, Reminder.done == False
-    ).all()
+    q = db.query(Reminder).filter(Reminder.user_id == user_id, Reminder.done == False)
+    if req.workspace_id is not None:
+        q = q.filter(Reminder.workspace_id == req.workspace_id)
+    existing = q.all()
     existing_norms = [_normalise(r.text) for r in existing]
 
     today_str = date.today().isoformat()
@@ -60,12 +67,13 @@ async def suggest(
                     "SKIP only truly generic filler like 'review your notes' or 'consider improving' — anything with a specific subject or action is worth keeping. "
                     f"Resolve relative dates ('today' = {today_str}, 'tomorrow' = {tomorrow_str}). "
                     "Parse DD-MM-YYYY and DD/MM/YYYY as YYYY-MM-DD. "
-                    "Return JSON: {{\"suggestions\": [{{\"text\": \"...\", \"due_date\": \"YYYY-MM-DD or null\", \"due_time\": \"HH:MM or null\"}}]}}"
+                    "For each suggestion, produce a short 'text' title (under 60 chars) and a 'description' with 1-2 sentences of context or detail from the note explaining why this task matters or what it involves. "
+                    "Return JSON: {{\"suggestions\": [{{\"text\": \"...\", \"description\": \"...\", \"due_date\": \"YYYY-MM-DD or null\", \"due_time\": \"HH:MM or null\"}}]}}"
                 ),
             },
             {
                 "role": "user",
-                "content": f"Title: {req.title or 'Untitled'}\n\nContent:\n{req.content[:2000]}",
+                "content": f"Title: {req.title or 'Untitled'}\n\nContent:\n{clean_content[:2000]}",
             },
         ],
         max_tokens=600,
@@ -85,6 +93,7 @@ async def suggest(
         if not isinstance(item, dict):
             continue
         text = str(item.get("text", "")).strip()
+        description = str(item.get("description", "")).strip() or None
         due_date = item.get("due_date") or None
         due_time = item.get("due_time") or None
         if isinstance(due_date, str) and not due_date.strip():
@@ -99,10 +108,10 @@ async def suggest(
         if any(_word_overlap(norm, ex) >= 0.8 for ex in existing_norms):
             continue
 
-        reminder = Reminder(user_id=user_id, text=text, type="ai", done=False, due_date=due_date, due_time=due_time)
+        reminder = Reminder(user_id=user_id, workspace_id=req.workspace_id, text=text, description=description, type="ai", done=False, due_date=due_date, due_time=due_time)
         db.add(reminder)
         db.flush()
-        saved.append({"id": reminder.id, "text": text, "due_date": due_date, "due_time": due_time})
+        saved.append({"id": reminder.id, "text": text, "description": description, "due_date": due_date, "due_time": due_time})
         existing_norms.append(norm)
 
     if saved:

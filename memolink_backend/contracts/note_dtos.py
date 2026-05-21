@@ -7,6 +7,7 @@ class NoteCreateDTO(BaseModel):
     title: Optional[str] = None
     content: str
     source: Optional[str] = None
+    workspace_id: Optional[int] = None
 
 
 class NoteResponseDTO(BaseModel):
@@ -15,6 +16,7 @@ class NoteResponseDTO(BaseModel):
     title: Optional[str]
     content: str
     source: Optional[str]
+    workspace_id: Optional[int] = None
 
     class Config:
         from_attributes = True
@@ -26,6 +28,7 @@ class NoteGetDTO(BaseModel):
 
 class NoteListDTO(BaseModel):
     user_id: Optional[int] = None
+    workspace_id: Optional[int] = None
 
 
 class NoteUpdateDTO(BaseModel):

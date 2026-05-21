@@ -14,11 +14,17 @@ import { RecycleBinModal } from "../components/RecycleBinModal";
 import { MessageList } from "../components/MessageList";
 import { ChatInput } from "../components/ChatInput";
 import { DeleteModal } from "../components/DeleteModal";
+import { SettingsModal } from "../components/SettingsModal";
+import { HelpModal } from "../components/HelpModal";
+import { WorkspaceManagerModal } from "../components/WorkspaceManagerModal";
 import { useSuggestions } from "../hooks/useSuggestions";
-import type { Conversation, Note } from "../types";
-import { TEMP_ID } from "../types";
+import type { Conversation, Note, Workspace } from "../types";
+import { TEMP_ID, convLabel } from "../types";
+import { useWorkspace } from "../hooks/useWorkspace";
 
-export function ChatPage({ user }: { user: User }) {
+type WorkspaceHook = ReturnType<typeof useWorkspace>;
+
+export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: WorkspaceHook }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [showNotes, setShowNotes] = useState(true);
   const [showConversations, setShowConversations] = useState(true);
@@ -28,22 +34,29 @@ export function ChatPage({ user }: { user: User }) {
   const [activeTabType, setActiveTabType] = useState<"chat" | "note">("chat");
   const [rightPanelOpen, setRightPanelOpen] = useState(true);
   const [recycleBinOpen, setRecycleBinOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
+  const [showWorkspaceManager, setShowWorkspaceManager] = useState(false);
 
-  const { notes, setNotes, addNote, saveNote, removeNote } = useNotes(user.id);
-  const suggestions = useSuggestions();
+  const activeWorkspaceId = workspaceHook.activeWorkspace?.id ?? null;
+
+  const { notes, setNotes, addNote, saveNote, removeNote } = useNotes(user.id, activeWorkspaceId);
+  const suggestions = useSuggestions(activeWorkspaceId);
   const editor = useNoteEditor();
   const recording = useRecording((text) => {
     editor.setNoteContentDraft((prev) => prev ? prev + `<p>${text}</p>` : `<p>${text}</p>`);
   });
-  const convs = useConversations();
+  const convs = useConversations(activeWorkspaceId);
   const chat = useChat({
     activeConversation: convs.activeConversation,
     setActiveConversation: convs.setActiveConversation,
     setConversations: convs.setConversations,
     bottomRef: convs.bottomRef,
+    workspaceId: activeWorkspaceId,
   });
 
-  useEffect(() => { convs.initConversations(); }, []);
+  useEffect(() => { convs.initConversations(activeWorkspaceId); }, [activeWorkspaceId]);
 
   // When all note tabs are closed, switch back to chat
   useEffect(() => {
@@ -53,7 +66,7 @@ export function ChatPage({ user }: { user: User }) {
   }, [editor.openNotes.length]);
 
   useEffect(() => {
-    const close = () => setMenuData(null);
+    const close = () => { setMenuData(null); setUserMenuOpen(false); };
     window.addEventListener("click", close);
     return () => window.removeEventListener("click", close);
   }, []);
@@ -113,7 +126,11 @@ export function ChatPage({ user }: { user: User }) {
 
   async function handleApplyNoteEdit(content: string, noteId: number | null) {
     const { marked } = await import("marked");
-    const html = await marked(content) as string;
+    const unwrapMarkdownFence = (value: string) => {
+      const match = value.trim().match(/^```(?:markdown|md)?\s*\n([\s\S]*?)\n```$/i);
+      return match ? match[1].trim() : value;
+    };
+    const html = await marked(unwrapMarkdownFence(content)) as string;
     if (noteId) {
       await updateNote(noteId, null, html);
       const fresh = await getNote(noteId);
@@ -174,15 +191,13 @@ export function ChatPage({ user }: { user: User }) {
   const urgentCount = todayItems.length;
 
   function handleGenerate() {
-    if (isNoteActive) {
-      suggestions.generateFromNote(editor.noteTitleDraft, editor.noteContentDraft);
-    } else if (convs.activeConversation?.messages.length) {
-      const content = convs.activeConversation.messages
-        .slice(-20)
-        .map((m) => `${m.role === "user" ? "User" : "Assistant"}: ${m.content}`)
-        .join("\n\n");
-      suggestions.generateFromNote(convs.activeConversation.title || "Conversation", content);
-    }
+    if (notes.length === 0) return;
+    const stripHtml = (html: string) => html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+    const combined = notes
+      .slice(0, 15)
+      .map((n) => `[${n.title?.trim() || "Untitled"}]\n${stripHtml(n.content)}`)
+      .join("\n\n");
+    suggestions.generateFromNote("Notes", combined);
   }
 
   return (
@@ -260,6 +275,21 @@ export function ChatPage({ user }: { user: User }) {
         }}
         onConversationMenu={(conv: Conversation, rect: DOMRect) => setMenuData({ type: "conversation", item: conv, top: rect.bottom + 4, left: rect.right - 160 })}
         onOpenRecycleBin={() => setRecycleBinOpen(true)}
+        onNotesUploaded={(uploaded) => {
+          const stripHtml = (html: string) => html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+          const combined = uploaded
+            .slice(0, 5)
+            .map((n: any) => `[${n.title?.trim() || "Untitled"}]\n${stripHtml(n.content || "")}`)
+            .join("\n\n");
+          if (combined.trim()) suggestions.generateFromNote("Uploaded Notes", combined);
+        }}
+        workspaces={workspaceHook.workspaces}
+        activeWorkspace={workspaceHook.activeWorkspace}
+        onSwitchWorkspace={async (ws: Workspace) => {
+          await workspaceHook.switchWorkspace(ws);
+          // useEffect on activeWorkspaceId re-runs initConversations, useNotes, useSuggestions automatically
+        }}
+        onManageWorkspaces={() => setShowWorkspaceManager(true)}
       />
 
       <div className="flex-1 flex flex-col h-full overflow-hidden">
@@ -284,7 +314,7 @@ export function ChatPage({ user }: { user: User }) {
                   <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3 shrink-0 opacity-70" fill="currentColor" viewBox="0 0 16 16">
                     <path d="M2.678 11.894a1 1 0 0 1 .287.801 11 11 0 0 1-.398 2c1.395-.323 2.247-.697 2.634-.893a1 1 0 0 1 .71-.074A8 8 0 0 0 8 14c3.996 0 7-2.807 7-6s-3.004-6-7-6-7 2.808-7 6c0 1.468.617 2.83 1.678 3.894z"/>
                   </svg>
-                  <span className="max-w-[120px] truncate">{chat.title || "New chat"}</span>
+                  <span className="max-w-[120px] truncate">{convLabel(chat)}</span>
                   <button
                     onClick={(e) => { e.stopPropagation(); handleCloseChat(chat.id); }}
                     className="text-gray-600 hover:text-gray-300 w-3.5 h-3.5 flex items-center justify-center rounded-sm hover:bg-[#2a2a38] transition leading-none"
@@ -349,13 +379,64 @@ export function ChatPage({ user }: { user: User }) {
                 </div>
               </div>
             )}
-            <span>{user.email}</span>
-            <button
-              onClick={() => { saveUser(null); window.location.reload(); }}
-              className="px-3 py-1 bg-red-600/20 border border-red-600/30 text-red-400 rounded-full hover:bg-red-600/30 transition"
-            >
-              Logout
-            </button>
+
+            {/* User avatar + dropdown */}
+            <div className="relative">
+              <button
+                onClick={(e) => { e.stopPropagation(); setUserMenuOpen((v) => !v); }}
+                className="flex items-center justify-center w-7 h-7 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white text-[11px] font-bold transition"
+                title={user.email}
+              >
+                {user.email.slice(0, 2).toUpperCase()}
+              </button>
+
+              {userMenuOpen && (
+                <div className="absolute right-0 top-full mt-2 z-[9999] w-52 rounded-xl bg-[#1e1e2a] border border-[#2a2a38] shadow-2xl py-1 overflow-hidden">
+                  {/* Email header */}
+                  <div className="px-3 py-2.5 border-b border-[#2a2a38]">
+                    <p className="text-[11px] text-gray-500 truncate">{user.email}</p>
+                  </div>
+
+                  {/* Settings */}
+                  <button
+                    onClick={() => { setUserMenuOpen(false); setShowSettings(true); }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-300 hover:bg-[#2a2a38] hover:text-white transition"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-gray-500" fill="currentColor" viewBox="0 0 16 16">
+                      <path d="M8 4.754a3.246 3.246 0 1 0 0 6.492 3.246 3.246 0 0 0 0-6.492M5.754 8a2.246 2.246 0 1 1 4.492 0 2.246 2.246 0 0 1-4.492 0"/>
+                      <path d="M9.796 1.343c-.527-1.79-3.065-1.79-3.592 0l-.094.319a.873.873 0 0 1-1.255.52l-.292-.16c-1.64-.892-3.433.902-2.54 2.541l.159.292a.873.873 0 0 1-.52 1.255l-.319.094c-1.79.527-1.79 3.065 0 3.592l.319.094a.873.873 0 0 1 .52 1.255l-.16.292c-.892 1.64.901 3.434 2.541 2.54l.292-.159a.873.873 0 0 1 1.255.52l.094.319c.527 1.79 3.065 1.79 3.592 0l.094-.319a.873.873 0 0 1 1.255-.52l.292.16c1.64.893 3.434-.902 2.54-2.541l-.159-.292a.873.873 0 0 1 .52-1.255l.319-.094c1.79-.527 1.79-3.065 0-3.592l-.319-.094a.873.873 0 0 1-.52-1.255l.16-.292c.893-1.64-.902-3.433-2.541-2.54l-.292.159a.873.873 0 0 1-1.255-.52zm-2.633.283c.246-.835 1.428-.835 1.674 0l.094.319a1.873 1.873 0 0 0 2.693 1.115l.291-.16c.764-.415 1.6.42 1.184 1.185l-.159.292a1.873 1.873 0 0 0 1.116 2.692l.318.094c.835.246.835 1.428 0 1.674l-.319.094a1.873 1.873 0 0 0-1.115 2.693l.16.291c.415.764-.42 1.6-1.185 1.184l-.291-.159a1.873 1.873 0 0 0-2.693 1.116l-.094.318c-.246.835-1.428.835-1.674 0l-.094-.319a1.873 1.873 0 0 0-2.692-1.115l-.292.16c-.764.415-1.6-.42-1.184-1.185l.159-.291A1.873 1.873 0 0 0 1.945 8.93l-.319-.094c-.835-.246-.835-1.428 0-1.674l.319-.094A1.873 1.873 0 0 0 3.06 4.375l-.16-.292c-.415-.764.42-1.6 1.185-1.184l.292.159a1.873 1.873 0 0 0 2.692-1.115z"/>
+                    </svg>
+                    Settings
+                  </button>
+
+                  {/* Help */}
+                  <button
+                    onClick={() => { setUserMenuOpen(false); setShowHelp(true); }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-300 hover:bg-[#2a2a38] hover:text-white transition"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-gray-500" fill="currentColor" viewBox="0 0 16 16">
+                      <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16"/>
+                      <path d="M5.255 5.786a.237.237 0 0 0 .241.247h.825c.138 0 .248-.113.266-.25.09-.656.54-1.134 1.342-1.134.686 0 1.314.343 1.314 1.168 0 .635-.374.927-.965 1.371-.673.489-1.206 1.06-1.168 1.987l.003.217a.25.25 0 0 0 .25.246h.811a.25.25 0 0 0 .25-.25v-.105c0-.718.273-.927 1.01-1.486.609-.463 1.244-.977 1.244-2.056 0-1.511-1.276-2.241-2.673-2.241-1.267 0-2.655.59-2.75 2.286m1.557 5.763c0 .533.425.927 1.01.927.609 0 1.028-.394 1.028-.927 0-.552-.42-.94-1.029-.94-.584 0-1.009.388-1.009.94"/>
+                    </svg>
+                    Help
+                  </button>
+
+                  <div className="border-t border-[#2a2a38] my-1" />
+
+                  {/* Sign Out */}
+                  <button
+                    onClick={() => { saveUser(null); window.location.reload(); }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-red-400 hover:bg-red-500/10 hover:text-red-300 transition"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="currentColor" viewBox="0 0 16 16">
+                      <path fillRule="evenodd" d="M10 12.5a.5.5 0 0 1-.5.5h-8a.5.5 0 0 1-.5-.5v-9a.5.5 0 0 1 .5-.5h8a.5.5 0 0 1 .5.5v2a.5.5 0 0 0 1 0v-2A1.5 1.5 0 0 0 9.5 2h-8A1.5 1.5 0 0 0 0 3.5v9A1.5 1.5 0 0 0 1.5 14h8a1.5 1.5 0 0 0 1.5-1.5v-2a.5.5 0 0 0-1 0z"/>
+                      <path fillRule="evenodd" d="M15.854 8.354a.5.5 0 0 0 0-.708l-3-3a.5.5 0 0 0-.708.708L14.293 7.5H5.5a.5.5 0 0 0 0 1h8.793l-2.147 2.146a.5.5 0 0 0 .708.708z"/>
+                    </svg>
+                    Sign Out
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -385,6 +466,7 @@ export function ChatPage({ user }: { user: User }) {
               <MessageList
                 messages={convs.activeConversation.messages}
                 loading={chat.loading}
+                streaming={chat.streaming}
                 activeConversation={convs.activeConversation}
                 messagesContainerRef={convs.messagesContainerRef}
                 bottomRef={convs.bottomRef}
@@ -400,7 +482,7 @@ export function ChatPage({ user }: { user: User }) {
             <ChatInput
               input={chat.input}
               setInput={chat.setInput}
-              loading={chat.loading}
+              loading={chat.loading || chat.streaming}
               pendingFiles={chat.pendingFiles}
               setPendingFiles={chat.setPendingFiles}
               textareaRef={chat.textareaRef}
@@ -419,10 +501,10 @@ export function ChatPage({ user }: { user: User }) {
         isGenerating={suggestions.isGenerating}
         onAddManual={suggestions.addManual}
         onToggleDone={suggestions.toggleDone}
+        onUpdate={suggestions.updateItem}
         onRemove={suggestions.remove}
         onClearDone={suggestions.clearDone}
         onGenerate={handleGenerate}
-        generateLabel={isNoteActive ? "current note" : "current chat"}
       />
 
       <DeleteModal
@@ -444,6 +526,19 @@ export function ChatPage({ user }: { user: User }) {
               return [{ ...conv, messages: [] }, ...p];
             });
           }}
+        />
+      )}
+
+      <SettingsModal show={showSettings} user={user} onClose={() => setShowSettings(false)} />
+      <HelpModal show={showHelp} onClose={() => setShowHelp(false)} />
+
+      {showWorkspaceManager && (
+        <WorkspaceManagerModal
+          workspaces={workspaceHook.workspaces}
+          activeWorkspace={workspaceHook.activeWorkspace}
+          onClose={() => setShowWorkspaceManager(false)}
+          onCreated={(ws) => workspaceHook.setWorkspaces((prev) => [...prev, ws])}
+          onDeleted={(id) => workspaceHook.setWorkspaces((prev) => prev.filter((w) => w.id !== id))}
         />
       )}
     </div>

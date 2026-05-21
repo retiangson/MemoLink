@@ -9,8 +9,8 @@ class NoteRepository:
     def __init__(self, db: Session):
         self.db = db
 
-    def create_note(self, user_id: int, title: str | None, content: str, source: str | None) -> Note:
-        note = Note(user_id=user_id, title=title, content=content, source=source)
+    def create_note(self, user_id: int, title: str | None, content: str, source: str | None, workspace_id: int | None = None) -> Note:
+        note = Note(user_id=user_id, title=title, content=content, source=source, workspace_id=workspace_id)
         self.db.add(note)
         self.db.flush()
         return note
@@ -30,13 +30,11 @@ class NoteRepository:
     def get_by_id(self, note_id: int) -> Optional[Note]:
         return self.db.query(Note).filter(Note.id == note_id).first()
 
-    def get_for_user(self, user_id: int) -> List[Note]:
-        return (
-            self.db.query(Note)
-            .filter(Note.user_id == user_id, Note.deleted_at == None)
-            .order_by(Note.id.desc())
-            .all()
-        )
+    def get_for_user(self, user_id: int, workspace_id: int | None = None) -> List[Note]:
+        q = self.db.query(Note).filter(Note.user_id == user_id, Note.deleted_at == None)
+        if workspace_id is not None:
+            q = q.filter(Note.workspace_id == workspace_id)
+        return q.order_by(Note.id.desc()).all()
 
     def get_trash_for_user(self, user_id: int) -> List[Note]:
         return (
@@ -83,17 +81,28 @@ class NoteRepository:
         self.db.commit()
         return True
 
-    def search_by_vector(self, query_vector: list[float], top_k: int = 5) -> List[Note]:
+    def search_by_vector(self, query_vector: list[float], top_k: int = 5, workspace_id: int | None = None) -> List[Note]:
         embedding_str = "[" + ",".join(str(x) for x in query_vector) + "]"
-        sql = text("""
-            SELECT n.id
-            FROM embeddings e
-            JOIN notes n ON n.id = e.note_id
-            WHERE n.deleted_at IS NULL
-            ORDER BY e.vector <-> vector(:embedding)
-            LIMIT :top_k
-        """)
-        rows = self.db.execute(sql, {"embedding": embedding_str, "top_k": top_k}).fetchall()
+        if workspace_id is not None:
+            sql = text("""
+                SELECT n.id
+                FROM embeddings e
+                JOIN notes n ON n.id = e.note_id
+                WHERE n.deleted_at IS NULL AND n.workspace_id = :workspace_id
+                ORDER BY e.vector <-> vector(:embedding)
+                LIMIT :top_k
+            """)
+            rows = self.db.execute(sql, {"embedding": embedding_str, "top_k": top_k, "workspace_id": workspace_id}).fetchall()
+        else:
+            sql = text("""
+                SELECT n.id
+                FROM embeddings e
+                JOIN notes n ON n.id = e.note_id
+                WHERE n.deleted_at IS NULL
+                ORDER BY e.vector <-> vector(:embedding)
+                LIMIT :top_k
+            """)
+            rows = self.db.execute(sql, {"embedding": embedding_str, "top_k": top_k}).fetchall()
         note_ids = [r[0] for r in rows]
         if not note_ids:
             return []

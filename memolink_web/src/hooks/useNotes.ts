@@ -2,15 +2,15 @@ import { useState, useEffect } from "react";
 import { listNotes, deleteNote, createNote, updateNote, getNote } from "../api/client";
 import type { Note } from "../types";
 
-export function useNotes(userId: number) {
+export function useNotes(userId: number, workspaceId?: number | null) {
   const [notes, setNotes] = useState<Note[]>([]);
 
   useEffect(() => {
-    listNotes().then(setNotes);
-  }, [userId]);
+    listNotes(workspaceId).then(setNotes);
+  }, [userId, workspaceId]);
 
   async function addNote(title: string, content: string): Promise<Note> {
-    const created = await createNote(title, content, "manual");
+    const created = await createNote(title, content, "manual", workspaceId);
     const fresh = await getNote(created.id);
     setNotes((p) => [fresh, ...p]);
     return fresh;

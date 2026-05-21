@@ -6,9 +6,9 @@ import {
 import type { Conversation, Message } from "../types";
 import { TEMP_ID } from "../types";
 
-interface OpenChat { id: number; title: string | null; }
+interface OpenChat { id: number; title: string | null; created_at?: string | null; }
 
-export function useConversations() {
+export function useConversations(workspaceId?: number | null) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConversation, setActiveConversation] = useState<Conversation | null>(null);
   const [openChats, setOpenChats] = useState<OpenChat[]>([]);
@@ -17,8 +17,8 @@ export function useConversations() {
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
-  function addOpenChat(id: number, title: string | null) {
-    setOpenChats((prev) => prev.find((c) => c.id === id) ? prev : [...prev, { id, title }]);
+  function addOpenChat(id: number, title: string | null, created_at?: string | null) {
+    setOpenChats((prev) => prev.find((c) => c.id === id) ? prev : [...prev, { id, title, created_at }]);
   }
 
   function closeChat(id: number) {
@@ -60,27 +60,28 @@ export function useConversations() {
     }
   }
 
-  async function initConversations() {
-    const convs = await getConversations();
+  async function initConversations(wsId?: number | null) {
+    const activeWsId = wsId !== undefined ? wsId : workspaceId;
+    const convs = await getConversations(activeWsId);
     if (Array.isArray(convs) && convs.length > 0) {
       const mapped: Conversation[] = convs
-        .map((c: any) => ({ id: c.id, title: c.title ?? null, messages: [] }))
+        .map((c: any) => ({ id: c.id, title: c.title ?? null, messages: [], created_at: c.created_at ?? null }))
         .sort((a: Conversation, b: Conversation) => b.id - a.id);
       setConversations(mapped);
-      setActiveConversation((prev) => prev ?? mapped[0]);
-      addOpenChat(mapped[0].id, mapped[0].title);
+      setActiveConversation(mapped[0]);
+      setOpenChats([{ id: mapped[0].id, title: mapped[0].title, created_at: mapped[0].created_at }]);
       await loadMessages(mapped[0].id);
     } else {
-      const created = await createConversation();
-      const newConv: Conversation = { id: created.id, title: null, messages: [] };
+      const created = await createConversation(activeWsId);
+      const newConv: Conversation = { id: created.id, title: null, messages: [], created_at: created.created_at ?? null };
       setConversations([newConv]);
-      setActiveConversation((prev) => prev ?? newConv);
-      addOpenChat(newConv.id, newConv.title);
+      setActiveConversation(newConv);
+      setOpenChats([{ id: newConv.id, title: newConv.title, created_at: newConv.created_at }]);
     }
   }
 
   async function handleSelectConversation(conv: Conversation) {
-    addOpenChat(conv.id, conv.title);
+    addOpenChat(conv.id, conv.title, conv.created_at);
     setActiveConversation(conv);
     await loadMessages(conv.id, false);
     requestAnimationFrame(() =>

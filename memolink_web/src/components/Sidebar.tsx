@@ -1,6 +1,8 @@
 import React from "react";
 import { UploadNotes } from "./UploadNotes";
-import type { Conversation, Note } from "../types";
+import { WorkspaceSelector } from "./WorkspaceSelector";
+import type { Conversation, Note, Workspace } from "../types";
+import { convLabel } from "../types";
 
 interface SidebarProps {
   open: boolean;
@@ -20,6 +22,11 @@ interface SidebarProps {
   onNewChat: () => void;
   onConversationMenu: (conv: Conversation, rect: DOMRect) => void;
   onOpenRecycleBin: () => void;
+  workspaces: Workspace[];
+  activeWorkspace: Workspace | null;
+  onSwitchWorkspace: (ws: Workspace) => void;
+  onManageWorkspaces: () => void;
+  onNotesUploaded?: (notes: any[]) => void;
 }
 
 export function Sidebar({
@@ -29,6 +36,8 @@ export function Sidebar({
   onNoteClick, onNewNote, onNoteMenu,
   onConversationClick, onNewChat, onConversationMenu,
   onOpenRecycleBin,
+  workspaces, activeWorkspace, onSwitchWorkspace, onManageWorkspaces,
+  onNotesUploaded,
 }: SidebarProps) {
   if (!open) return null;
 
@@ -46,8 +55,17 @@ export function Sidebar({
         <button onClick={onClose} className="text-gray-500 hover:text-gray-300 text-sm">✕</button>
       </div>
 
+      <div className="px-3 py-2.5 border-b border-[#1e1e2a]">
+        <WorkspaceSelector
+          workspaces={workspaces}
+          activeWorkspace={activeWorkspace}
+          onSwitch={onSwitchWorkspace}
+          onManage={onManageWorkspaces}
+        />
+      </div>
+
       <div className="px-3 py-3 border-b border-[#1e1e2a]">
-        <UploadNotes setNotes={setNotes} />
+        <UploadNotes setNotes={setNotes} workspaceId={activeWorkspace?.id} onUploaded={onNotesUploaded} />
       </div>
 
       <div className="border-b border-[#1e1e2a]">
@@ -109,7 +127,7 @@ export function Sidebar({
                   onClick={() => onConversationClick(conv)}
                   className={`flex items-center justify-between rounded-lg px-2 py-1.5 cursor-pointer transition group ${activeConversation?.id === conv.id ? "bg-[#1e1e2a] text-white" : "text-gray-400 hover:bg-[#1a1a24] hover:text-white"}`}
                 >
-                  <span className="truncate text-xs flex-1">{conv.title || `Chat ${conv.id}`}</span>
+                  <span className="truncate text-xs flex-1">{convLabel(conv)}</span>
                   <button
                     onClick={(e) => {
                       e.stopPropagation();

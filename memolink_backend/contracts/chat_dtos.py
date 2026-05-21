@@ -7,6 +7,8 @@ class ChatRequestDTO(BaseModel):
     conversation_id: Optional[int] = None
     prompt: str
     top_k: int = 5
+    workspace_id: Optional[int] = None
+    cross_workspace: bool = False
 
 
 class ChatAnswerSource(BaseModel):

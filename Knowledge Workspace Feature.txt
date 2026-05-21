@@ -1,0 +1,162 @@
+Update the existing MemoLink project documentation and implementation plan to add a new feature called “Knowledge Workspace”.
+
+Context:
+MemoLink is a context-aware AI companion for study and work. It currently supports user authentication, notes, embeddings, conversations, messages, file uploads, AI/RAG retrieval, chat responses with sources, and reminders. The current database design includes users, notes, embeddings, conversations, messages, and reminders. The backend uses FastAPI with REST endpoints under /api/v1, and the database uses PostgreSQL with pgvector.
+
+Feature Goal:
+Create a “Knowledge Workspace” feature that allows users to separate their knowledge, notes, conversations, reminders, uploaded files, and AI context by academic, professional, and personal categories.
+
+Examples of Knowledge Workspaces:
+
+Academic
+Math
+Science
+Capstone Research
+Internship
+Professional
+Claims System
+Finance System
+Personal Learning
+
+Functional Requirements:
+
+When a new user logs in for the first time and has no workspace, redirect the user to a first-time setup page.
+The first-time setup page must ask the user to create their first Knowledge Workspace.
+The workspace creation form must include:
+Workspace Name
+Workspace Type: Academic, Professional, Personal, Project, or Other
+Optional Description
+After creating the first workspace, the system must set it as the active workspace and redirect the user to the main dashboard.
+Existing users must load their last selected workspace by default after login.
+Add a workspace dropdown selector in the upper-left sidebar.
+The dropdown must show the active workspace name.
+The dropdown must allow the user to:
+Switch workspace
+Create a new workspace
+Edit workspace details
+View workspace alert status
+If a workspace has pending reminders, tasks, or unresolved alerts, show a small alert icon or badge beside the workspace name.
+When the user switches workspace, the visible notes, conversations, reminders, uploaded files, AI chat history, and retrieved knowledge must change based on the selected workspace.
+The AI assistant must only use the selected workspace context for RAG retrieval unless cross-workspace search is explicitly enabled.
+Workspace data must remain isolated per user.
+
+Database Update:
+Update the database design by adding a workspaces table.
+
+Suggested table:
+workspaces
+
+id
+user_id
+name
+type
+description
+is_default
+last_accessed_at
+created_at
+updated_at
+deleted_at
+
+Update existing user-scoped tables to include workspace_id:
+
+notes.workspace_id
+conversations.workspace_id
+reminders.workspace_id
+embeddings should remain linked to notes, but retrieval must respect the note’s workspace_id
+messages remain linked to conversations, and conversations must belong to a workspace
+
+Add indexes:
+
+user_id + name unique per user
+user_id + workspace_id for workspace-scoped queries
+workspace_id on notes, conversations, and reminders
+
+API Update:
+Add new Workspace endpoints under /api/v1/workspaces.
+
+Suggested endpoints:
+POST /api/v1/workspaces
+Create a new workspace.
+
+POST /api/v1/workspaces/list
+List all workspaces for the logged-in user, including alert count.
+
+POST /api/v1/workspaces/get
+Get one workspace by ID.
+
+POST /api/v1/workspaces/update
+Update workspace name, type, or description.
+
+POST /api/v1/workspaces/delete
+Soft-delete a workspace if it is not the user’s only workspace.
+
+POST /api/v1/workspaces/set-active
+Set the selected workspace as the user’s active workspace.
+
+POST /api/v1/workspaces/active
+Return the currently active workspace.
+
+Update existing endpoints so all note, chat, file upload, conversation, reminder, and RAG operations are workspace-aware.
+
+RAG / AI Behaviour:
+When the user asks a question, the system must retrieve only notes and uploaded content from the active workspace.
+The retrieved sources must still include note_id, title, snippet, and should also include workspace_id or workspace name for traceability.
+Do not mix Academic, Professional, Claims System, Finance System, or other workspaces unless the user explicitly enables cross-workspace search.
+
+Frontend UX:
+Add a clean workspace selector dropdown in the upper-left sidebar.
+The dropdown should show:
+
+Active workspace name
+List of available workspaces
+Alert badge beside workspaces with pending reminders or unresolved alerts
+“Create New Workspace” action
+“Manage Workspaces” action
+
+New-user onboarding page:
+Title: Create Your First Knowledge Workspace
+Subtitle: Organise your study, work, and personal knowledge into focused spaces.
+Placeholder examples:
+“Capstone Research”
+“Math”
+“Claims System”
+“Finance System”
+
+Primary button:
+Create Workspace
+
+Validation:
+
+Workspace name is required.
+Workspace name must be unique per user.
+A user must always have at least one workspace.
+The system must not allow deletion of the only remaining workspace.
+Workspace access must be restricted to the owner only.
+Soft-deleted workspaces must not appear in normal dropdown lists.
+
+Acceptance Criteria:
+
+A new user without a workspace is redirected to the workspace setup page.
+A user can create their first Knowledge Workspace.
+A user can create multiple workspaces.
+A user can switch active workspace using the upper-left dropdown.
+Notes, conversations, messages, reminders, uploaded files, and AI retrieval are filtered by active workspace.
+A workspace with pending reminders or alerts shows an alert icon or badge.
+The system remembers the last selected workspace after logout and login.
+Users cannot access another user’s workspace.
+Users cannot delete their only workspace.
+API, database, and frontend documentation are updated consistently.
+
+Output Required:
+Update the project design in a production-quality way. Provide:
+
+Updated functional requirements.
+Updated database schema.
+Updated API endpoint design.
+Updated user stories.
+Updated acceptance criteria.
+Any required migration notes.
+Any risks or edge cases.
+Clear explanation of how Knowledge Workspace improves MemoLink’s academic and professional use cases.
+
+Keep the implementation aligned with MemoLink’s current architecture, FastAPI backend, PostgreSQL + pgvector database, and browser-based SPA scope.

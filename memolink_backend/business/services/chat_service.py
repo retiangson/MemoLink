@@ -1,7 +1,8 @@
-from typing import List, Optional
+from typing import List, Iterator, Optional
 from fastapi import UploadFile
 from sqlalchemy.orm import Session
 from openai import OpenAI
+import json
 import re
 import base64
 import mimetypes
@@ -21,6 +22,28 @@ from memolink_backend.contracts.chat_dtos import ChatResponseDTO, ChatAnswerSour
 client = OpenAI(api_key=settings.openai_api_key)
 
 IMAGE_EXTS = {"png", "jpg", "jpeg", "gif", "webp"}
+
+_SYSTEM_PROMPT = (
+    "You are MemoLink, a context-aware AI knowledge assistant. "
+    "Answer questions using the user's personal notes when relevant. "
+    "Always be concise, grounded, and cite note sources where possible.\n\n"
+    "NOTE EDITING RULE: When the user explicitly asks you to format, improve, rewrite, "
+    "proofread, restructure, or edit a note or piece of text, return the complete revised "
+    "content inside <note_edit> XML tags. "
+    "Format the revised content as a well-structured document: "
+    "use # for the document title, ## for major sections, ### for subsections, "
+    "**bold** for key terms, bullet lists (- item) or numbered lists for enumerations, "
+    "and markdown tables (| col | col |) for structured data where appropriate. "
+    "The output should read like a professional Word document, not a wall of plain text. "
+    "If you can identify exactly which note is being edited from the context "
+    "(look for [NOTE <id>: <title>] references), include the note_id attribute: "
+    "<note_edit note_id=\"42\">...full revised content...</note_edit>. "
+    "If the note id is unknown, omit the attribute: "
+    "<note_edit>...full revised content...</note_edit>. "
+    "You may add a brief explanation before or after the tags. "
+    "IMPORTANT: Only use <note_edit> tags when the user is explicitly requesting a note edit. "
+    "Never use them for regular questions or answers."
+)
 
 
 def _is_image(filename: str, mime: str) -> bool:
@@ -47,77 +70,101 @@ class ChatService(IChatService):
 
         self.embedding = embedding_service or EmbeddingService()
 
-    def ask(self, dto: ChatRequestDTO) -> ChatResponseDTO:
+    def _build_chat_context(self, dto: ChatRequestDTO):
+        """Prepare conversation id, OpenAI messages list, and sources for a chat request."""
         user_text = (dto.prompt or "").strip()
-        if not user_text:
-            return ChatResponseDTO(answer="I didn't receive any message.", sources=[])
 
         if dto.conversation_id is None:
-            title = user_text[:50]
-            conv = self.repo_conv.create_conversation(dto.user_id, title)
+            conv = self.repo_conv.create_conversation(dto.user_id, user_text[:50], workspace_id=getattr(dto, "workspace_id", None))
             conversation_id = conv.id
         else:
             conversation_id = dto.conversation_id
 
         self.repo_conv.add_message(conversation_id, "user", user_text)
 
-        # Load history ascending for GPT context
         history = self.repo_conv.get_messages_paginated(conversation_id, limit=50, before_id=None)
-        history_asc = list(reversed(history))
-        message_history = [{"role": m.role, "content": m.content} for m in history_asc]
+        message_history = [{"role": m.role, "content": m.content} for m in reversed(history)]
 
-        # RAG retrieval
-        query_vec = self.embedding.embed_text(user_text)
-        notes = self.repo_notes.search_by_vector(query_vec, top_k=dto.top_k)
+        ws_filter = None if getattr(dto, "cross_workspace", False) else getattr(dto, "workspace_id", None)
+
+        # Always fetch all workspace notes so meta-queries ("summarize my notes") work correctly.
+        # For large workspaces (> 20 notes) also run vector search for the most relevant full content.
+        all_notes = self.repo_notes.get_for_user(dto.user_id, ws_filter) if dto.user_id else []
 
         sources: List[ChatAnswerSource] = []
         rag_blocks: List[str] = []
-        for n in notes:
-            sources.append(ChatAnswerSource(note_id=n.id, title=n.title, snippet=n.content[:200] + "..."))
-            plain_content = _HTML_TAG.sub(" ", n.content).strip()
-            rag_blocks.append(f"[NOTE {n.id}: {n.title or 'Untitled'}]\n{plain_content}")
 
-        system_msgs = [
-            {
-                "role": "system",
-                "content": (
-                    "You are MemoLink, a context-aware AI knowledge assistant. "
-                    "Answer questions using the user's personal notes when relevant. "
-                    "Always be concise, grounded, and cite note sources where possible.\n\n"
-                    "NOTE EDITING RULE: When the user explicitly asks you to format, improve, rewrite, "
-                    "proofread, restructure, or edit a note or piece of text, return the complete revised "
-                    "content inside <note_edit> XML tags. "
-                    "Format the revised content as a well-structured document: "
-                    "use # for the document title, ## for major sections, ### for subsections, "
-                    "**bold** for key terms, bullet lists (- item) or numbered lists for enumerations, "
-                    "and markdown tables (| col | col |) for structured data where appropriate. "
-                    "The output should read like a professional Word document, not a wall of plain text. "
-                    "If you can identify exactly which note is being edited from the context "
-                    "(look for [NOTE <id>: <title>] references), include the note_id attribute: "
-                    "<note_edit note_id=\"42\">...full revised content...</note_edit>. "
-                    "If the note id is unknown, omit the attribute: "
-                    "<note_edit>...full revised content...</note_edit>. "
-                    "You may add a brief explanation before or after the tags. "
-                    "IMPORTANT: Only use <note_edit> tags when the user is explicitly requesting a note edit. "
-                    "Never use them for regular questions or answers."
-                ),
-            }
-        ]
+        if len(all_notes) <= 20:
+            # Small workspace — include every note in full (up to 1 500 chars each)
+            for n in all_notes:
+                sources.append(ChatAnswerSource(note_id=n.id, title=n.title, snippet=n.content[:200] + "..."))
+                plain = _HTML_TAG.sub(" ", n.content).strip()
+                rag_blocks.append(f"[NOTE {n.id}: {n.title or 'Untitled'}]\n{plain[:1500]}")
+        else:
+            # Large workspace — note directory + vector-search for top relevant notes
+            note_dir = "\n".join(f"- [NOTE {n.id}] {n.title or 'Untitled'}" for n in all_notes)
+            rag_blocks.append(f"[NOTE DIRECTORY — {len(all_notes)} notes]\n{note_dir}")
+
+            try:
+                query_vec = self.embedding.embed_text(user_text)
+                top_notes = self.repo_notes.search_by_vector(query_vec, top_k=dto.top_k, workspace_id=ws_filter)
+            except Exception:
+                top_notes = all_notes[:dto.top_k]
+
+            if not top_notes:
+                top_notes = all_notes[:dto.top_k]
+
+            for n in top_notes:
+                sources.append(ChatAnswerSource(note_id=n.id, title=n.title, snippet=n.content[:200] + "..."))
+                plain = _HTML_TAG.sub(" ", n.content).strip()
+                rag_blocks.append(f"[NOTE {n.id}: {n.title or 'Untitled'}]\n{plain}")
+
+        system_msgs = [{"role": "system", "content": _SYSTEM_PROMPT}]
         if rag_blocks:
-            system_msgs.append({
-                "role": "system",
-                "content": "--- USER NOTES CONTEXT ---\n" + "\n\n".join(rag_blocks),
-            })
+            system_msgs.append({"role": "system", "content": "--- USER NOTES CONTEXT ---\n" + "\n\n".join(rag_blocks)})
+
+        return conversation_id, system_msgs + message_history, sources
+
+    def ask(self, dto: ChatRequestDTO) -> ChatResponseDTO:
+        user_text = (dto.prompt or "").strip()
+        if not user_text:
+            return ChatResponseDTO(answer="I didn't receive any message.", sources=[])
+
+        conversation_id, messages, sources = self._build_chat_context(dto)
 
         completion = client.chat.completions.create(
             model=settings.openai_chat_model,
-            messages=system_msgs + message_history,
+            messages=messages,
         )
         answer = completion.choices[0].message.content
-
         assistant_msg = self.repo_conv.add_message(conversation_id, "assistant", answer)
-
         return ChatResponseDTO(answer=answer, sources=sources, message_id=assistant_msg.id)
+
+    def ask_stream(self, dto: ChatRequestDTO) -> Iterator[str]:
+        """Yield SSE-formatted chunks. Each event is JSON: {"t":"<token>"} or {"done":true,"id":<int>}."""
+        user_text = (dto.prompt or "").strip()
+        if not user_text:
+            yield f"data: {json.dumps({'t': 'I did not receive any message.'})}\n\n"
+            yield f"data: {json.dumps({'done': True, 'id': None})}\n\n"
+            return
+
+        conversation_id, messages, _ = self._build_chat_context(dto)
+
+        stream = client.chat.completions.create(
+            model=settings.openai_chat_model,
+            messages=messages,
+            stream=True,
+        )
+
+        full_answer = ""
+        for chunk in stream:
+            delta = chunk.choices[0].delta.content or ""
+            if delta:
+                full_answer += delta
+                yield f"data: {json.dumps({'t': delta})}\n\n"
+
+        assistant_msg = self.repo_conv.add_message(conversation_id, "assistant", full_answer)
+        yield f"data: {json.dumps({'done': True, 'id': assistant_msg.id})}\n\n"
 
     async def handle_file_upload(
         self,

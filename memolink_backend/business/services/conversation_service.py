@@ -22,17 +22,17 @@ class ConversationService(IConversationService):
         self.note_repo: Optional[INoteRepository] = note_repo if note_repo is not None else (NoteRepository(db) if db else None)
         self.embedding = embedding_service or EmbeddingService()
 
-    def list_for_user(self, user_id: int) -> list[dict[str, Any]]:
-        convs = self.repo.get_for_user(user_id)
-        return [{"id": c.id, "title": c.title, "messages": []} for c in convs]
+    def list_for_user(self, user_id: int, workspace_id: int | None = None) -> list[dict[str, Any]]:
+        convs = self.repo.get_for_user(user_id, workspace_id)
+        return [{"id": c.id, "title": c.title, "messages": [], "created_at": c.created_at.isoformat() if c.created_at else None} for c in convs]
 
     def list_trash(self, user_id: int) -> list[dict[str, Any]]:
         convs = self.repo.get_trash_for_user(user_id)
         return [{"id": c.id, "title": c.title, "deleted_at": c.deleted_at} for c in convs]
 
-    def create(self, user_id: int, title: str | None = None) -> dict[str, Any]:
-        conv = self.repo.create_conversation(user_id, title)
-        return {"id": conv.id, "title": conv.title, "messages": []}
+    def create(self, user_id: int, title: str | None = None, workspace_id: int | None = None) -> dict[str, Any]:
+        conv = self.repo.create_conversation(user_id, title, workspace_id)
+        return {"id": conv.id, "title": conv.title, "messages": [], "created_at": conv.created_at.isoformat() if conv.created_at else None}
 
     def get_messages_paginated(self, conv_id: int, limit: int, before_id: int | None) -> list[dict[str, Any]]:
         messages = self.repo.get_messages_paginated(conv_id, limit, before_id)

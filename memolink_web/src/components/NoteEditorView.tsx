@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { RichNoteEditor } from "./RichNoteEditor";
 import { exportNote, EXPORT_FORMATS } from "../utils/noteExport";
 import type { ExportFormat } from "../utils/noteExport";
+import { VideoImportModal } from "./VideoImportModal";
 
 interface NoteEditorViewProps {
   noteKey: string | number;
@@ -45,6 +46,7 @@ export function NoteEditorView({
 }: NoteEditorViewProps) {
   const [showPicker, setShowPicker] = useState(false);
   const [showExport, setShowExport] = useState(false);
+  const [showVideoImport, setShowVideoImport] = useState(false);
   const [language, setLanguage] = useState("");
   const [exporting, setExporting] = useState<ExportFormat | null>(null);
 
@@ -186,6 +188,19 @@ export function NoteEditorView({
           </button>
         </div>
 
+        {/* Video Import */}
+        <button
+          onClick={() => setShowVideoImport(true)}
+          title="Import from video URL"
+          className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs text-gray-500 hover:text-red-400 hover:bg-red-400/10 border border-transparent hover:border-red-400/20 transition shrink-0"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M6.79 5.093A.5.5 0 0 0 6 5.5v5a.5.5 0 0 0 .79.407l3.5-2.5a.5.5 0 0 0 0-.814z"/>
+            <path d="M0 4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2zm2-1a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V4a1 1 0 0 0-1-1z"/>
+          </svg>
+          Video
+        </button>
+
         <span className="flex-1 text-center text-xs truncate px-1 italic">
           {isTranscribing
             ? <span className="text-indigo-400 animate-pulse">Transcribing…</span>
@@ -202,6 +217,16 @@ export function NoteEditorView({
           Save
         </button>
       </div>
+
+      {showVideoImport && (
+        <VideoImportModal
+          onClose={() => setShowVideoImport(false)}
+          onImport={(title, content) => {
+            if (!noteTitleDraft.trim()) setNoteTitleDraft(title);
+            setNoteContentDraft(content);
+          }}
+        />
+      )}
     </div>
   );
 }

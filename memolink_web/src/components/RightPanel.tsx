@@ -1,34 +1,30 @@
 import React, { useState } from "react";
 import type { SuggestionItem } from "../hooks/useSuggestions";
+import { ReminderDetailModal } from "./ReminderDetailModal";
+import { AddReminderModal } from "./AddReminderModal";
 
 interface RightPanelProps {
   open: boolean;
   onClose: () => void;
   items: SuggestionItem[];
   isGenerating: boolean;
-  onAddManual: (text: string) => void;
+  onAddManual: (text: string, description?: string | null, due_date?: string | null, due_time?: string | null) => void;
   onToggleDone: (id: number) => void;
+  onUpdate: (id: number, fields: { text: string; description: string | null; due_date: string | null; due_time: string | null; done: boolean }) => void;
   onRemove: (id: number) => void;
   onClearDone: () => void;
   onGenerate: () => void;
-  generateLabel: string;
 }
 
 export function RightPanel({
   open, onClose, items, isGenerating,
-  onAddManual, onToggleDone, onRemove, onClearDone,
-  onGenerate, generateLabel,
+  onAddManual, onToggleDone, onUpdate, onRemove, onClearDone,
+  onGenerate,
 }: RightPanelProps) {
-  const [input, setInput] = useState("");
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<SuggestionItem | null>(null);
 
   if (!open) return null;
-
-  function handleAdd() {
-    const trimmed = input.trim();
-    if (!trimmed) return;
-    onAddManual(trimmed);
-    setInput("");
-  }
 
   const _d = new Date();
   const today = `${_d.getFullYear()}-${String(_d.getMonth() + 1).padStart(2, "0")}-${String(_d.getDate()).padStart(2, "0")}`;
@@ -43,13 +39,13 @@ export function RightPanel({
           <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 text-indigo-400" fill="currentColor" viewBox="0 0 16 16">
             <path d="M2 6a6 6 0 1 1 10.174 4.31c-.203.196-.359.4-.453.619l-.762 1.769A.5.5 0 0 1 10.5 13h-5a.5.5 0 0 1-.46-.302l-.761-1.77a2 2 0 0 0-.453-.618A5.98 5.98 0 0 1 2 6m3 8.5a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 0 1l-.224.447a1 1 0 0 1-.894.553H6.618a1 1 0 0 1-.894-.553L5.5 15a.5.5 0 0 1-.5-.5"/>
           </svg>
-          <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">Suggestions & Reminders</span>
+          <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">Reminders</span>
         </div>
         <button onClick={onClose} className="text-gray-600 hover:text-gray-300 transition text-sm leading-none">✕</button>
       </div>
 
-      {/* Generate button */}
-      <div className="px-3 pt-3 pb-2 shrink-0">
+      {/* Action row: Generate + Add */}
+      <div className="px-3 pt-3 pb-3 border-b border-[#1e1e2a] shrink-0 flex flex-col gap-2">
         <button
           onClick={onGenerate}
           disabled={isGenerating}
@@ -68,30 +64,20 @@ export function RightPanel({
               <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3 shrink-0" fill="currentColor" viewBox="0 0 16 16">
                 <path d="M2 6a6 6 0 1 1 10.174 4.31c-.203.196-.359.4-.453.619l-.762 1.769A.5.5 0 0 1 10.5 13h-5a.5.5 0 0 1-.46-.302l-.761-1.77a2 2 0 0 0-.453-.618A5.98 5.98 0 0 1 2 6m3 8.5a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 0 1l-.224.447a1 1 0 0 1-.894.553H6.618a1 1 0 0 1-.894-.553L5.5 15a.5.5 0 0 1-.5-.5"/>
               </svg>
-              Generate from {generateLabel}
+              Generate from Notes
             </>
           )}
         </button>
-      </div>
 
-      {/* Add manual reminder */}
-      <div className="px-3 pb-3 border-b border-[#1e1e2a] shrink-0">
-        <div className="flex gap-2">
-          <input
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleAdd()}
-            placeholder="Add a reminder…"
-            className="flex-1 bg-[#1e1e2a] border border-[#2a2a38] rounded-lg px-3 py-1.5 text-xs text-gray-200 placeholder-gray-600 focus:outline-none focus:border-indigo-500 transition"
-          />
-          <button
-            onClick={handleAdd}
-            disabled={!input.trim()}
-            className="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-30 text-white rounded-lg text-xs transition"
-          >
-            +
-          </button>
-        </div>
+        <button
+          onClick={() => setShowAddModal(true)}
+          className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 border border-[#2a2a38] hover:border-[#3a3a4a] text-gray-500 hover:text-gray-300 rounded-lg text-xs transition"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+          </svg>
+          Add Reminder
+        </button>
       </div>
 
       {/* Items list */}
@@ -109,20 +95,24 @@ export function RightPanel({
 
         {items.map((item) => {
           const isToday = !item.done && item.due_date === today;
+          const isOverdue = !item.done && !!item.due_date && item.due_date < today;
           return (
             <div
               key={item.id}
-              className={`group flex items-start gap-2.5 p-2.5 rounded-xl border transition-all ${
+              onClick={() => setSelectedItem(item)}
+              className={`group flex items-start gap-2.5 p-2.5 rounded-xl border transition-all cursor-pointer ${
                 item.done
-                  ? "bg-[#0a0a0f]/60 border-[#1a1a22] opacity-50"
-                  : isToday
-                    ? "bg-[#1a1a10] border-amber-500/40 hover:border-amber-400/60"
-                    : "bg-[#1a1a24] border-[#2a2a38] hover:border-[#3a3a4a]"
+                  ? "bg-[#0a0a0f]/60 border-[#1a1a22] opacity-50 hover:opacity-70"
+                  : isOverdue
+                    ? "bg-[#1a0a0a] border-red-500/30 hover:border-red-400/50"
+                    : isToday
+                      ? "bg-[#1a1a10] border-amber-500/40 hover:border-amber-400/60"
+                      : "bg-[#1a1a24] border-[#2a2a38] hover:border-indigo-500/40"
               }`}
             >
               {/* Checkbox */}
               <button
-                onClick={() => onToggleDone(item.id)}
+                onClick={(e) => { e.stopPropagation(); onToggleDone(item.id); }}
                 className={`mt-0.5 w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${
                   item.done
                     ? "bg-indigo-600 border-indigo-600"
@@ -138,9 +128,14 @@ export function RightPanel({
 
               {/* Text + meta */}
               <div className="flex-1 min-w-0">
-                <p className={`text-xs leading-relaxed break-words ${item.done ? "line-through text-gray-600" : "text-gray-200"}`}>
+                <p className={`text-xs leading-snug break-words ${item.done ? "line-through text-gray-600" : "text-gray-200"}`}>
                   {item.text}
                 </p>
+                {item.description && (
+                  <p className={`text-[11px] mt-0.5 leading-snug break-words line-clamp-2 ${item.done ? "text-gray-700" : "text-gray-500"}`}>
+                    {item.description}
+                  </p>
+                )}
                 <div className="flex items-center gap-2 mt-1 flex-wrap">
                   {item.type === "ai" && (
                     <span className="inline-flex items-center gap-0.5 text-[10px] text-indigo-400/60 uppercase tracking-wider">
@@ -148,9 +143,12 @@ export function RightPanel({
                     </span>
                   )}
                   {item.due_date && (
-                    <span className={`text-[10px] ${isToday ? "text-amber-400 font-medium" : "text-gray-600"}`}>
-                      {isToday ? "⚠ Today" : item.due_date}
-                      {item.due_time && ` ${item.due_time}`}
+                    <span className={`text-[10px] ${
+                      isOverdue ? "text-red-400 font-medium" :
+                      isToday ? "text-amber-400 font-medium" : "text-gray-600"
+                    }`}>
+                      {isOverdue ? "⚠ Overdue" : isToday ? "⚠ Today" : item.due_date}
+                      {item.due_time && ` · ${item.due_time}`}
                     </span>
                   )}
                 </div>
@@ -158,8 +156,9 @@ export function RightPanel({
 
               {/* Remove */}
               <button
-                onClick={() => onRemove(item.id)}
+                onClick={(e) => { e.stopPropagation(); onRemove(item.id); }}
                 className="text-gray-700 hover:text-red-400 transition shrink-0 text-sm leading-none opacity-0 group-hover:opacity-100"
+                title="Delete"
               >
                 ×
               </button>
@@ -179,6 +178,23 @@ export function RightPanel({
           </button>
         </div>
       )}
+
+      {/* Add reminder popup */}
+      {showAddModal && (
+        <AddReminderModal
+          onClose={() => setShowAddModal(false)}
+          onAdd={(t, d, date, time) => onAddManual(t, d, date, time)}
+        />
+      )}
+
+      {/* Detail modal — keep up-to-date version of item from list */}
+      <ReminderDetailModal
+        item={selectedItem ? (items.find((i) => i.id === selectedItem.id) ?? selectedItem) : null}
+        onClose={() => setSelectedItem(null)}
+        onSave={(id, fields) => onUpdate(id, fields)}
+        onDelete={(id) => onRemove(id)}
+        onToggleDone={(id) => onToggleDone(id)}
+      />
     </div>
   );
 }

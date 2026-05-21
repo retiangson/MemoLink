@@ -3,9 +3,11 @@ import { uploadNotes } from "../api/chatApi";
 
 interface Props {
   setNotes?: React.Dispatch<React.SetStateAction<any[]>>;
+  workspaceId?: number | null;
+  onUploaded?: (notes: any[]) => void;
 }
 
-export function UploadNotes({ setNotes }: Props) {
+export function UploadNotes({ setNotes, workspaceId, onUploaded }: Props) {
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState("");
   const [failures, setFailures] = useState<{ filename: string; reason: string }[]>([]);
@@ -16,12 +18,13 @@ export function UploadNotes({ setNotes }: Props) {
     setStatus("Processing...");
     setFailures([]);
     try {
-      const result = await uploadNotes(files);
+      const result = await uploadNotes(files, workspaceId);
       const notes = result.notes ?? [];
       const failed = result.failed ?? [];
       setStatus(`${notes.length} note(s) imported${failed.length ? `, ${failed.length} failed` : ""}.`);
       setFailures(failed);
       if (setNotes && notes.length) setNotes((prev) => [...notes, ...prev]);
+      if (onUploaded && notes.length) onUploaded(notes);
     } catch {
       setStatus("Upload failed. Please try again.");
     } finally {
