@@ -1,0 +1,39 @@
+from memolink_backend.business.services.auth_service import AuthService
+from memolink_backend.business.services.chat_service import ChatService
+from memolink_backend.business.services.conversation_service import ConversationService
+from memolink_backend.business.services.note_service import NoteService
+from memolink_backend.business.services.embedding_service import EmbeddingService
+from memolink_backend.domain.repositories.conversation_repository import ConversationRepository
+from memolink_backend.domain.repositories.note_repository import NoteRepository
+from memolink_backend.domain.repositories.user_repository import UserRepository
+
+
+class ApiRequestContainer:
+    def __init__(self, db):
+        self._db = db
+
+    def auth(self):
+        return AuthService(db=self._db, user_repo=UserRepository(self._db))
+
+    def notes(self):
+        return NoteService(
+            db=self._db,
+            note_repo=NoteRepository(self._db),
+            embedding_service=None,
+        )
+
+    def conversations(self):
+        return ConversationService(
+            db=self._db,
+            conv_repo=ConversationRepository(self._db),
+            note_repo=NoteRepository(self._db),
+            embedding_service=EmbeddingService(),
+        )
+
+    def chat(self):
+        return ChatService(
+            db=self._db,
+            conv_repo=ConversationRepository(self._db),
+            note_repo=NoteRepository(self._db),
+            embedding_service=EmbeddingService(),
+        )

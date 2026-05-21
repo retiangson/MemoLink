@@ -1,5 +1,6 @@
 # Python
 __pycache__/
+.pytest_cache/
 *.py[cod]
 *.pyo
 *.pyd
@@ -10,6 +11,8 @@ build/
 .venv/
 venv/
 env/
+.testdeps/
+test_deps/
 
 # Secrets
 .env

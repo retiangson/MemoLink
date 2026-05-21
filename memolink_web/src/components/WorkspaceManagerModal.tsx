@@ -45,7 +45,10 @@ export function WorkspaceManagerModal({ workspaces, activeWorkspace, onClose, on
 
   async function handleDelete(ws: Workspace) {
     if (workspaces.length <= 1) { alert("You must keep at least one workspace."); return; }
-    if (!confirm(`Delete workspace "${ws.name}"? Notes and chats inside will be unassigned.`)) return;
+    const confirmed = window.prompt(
+      `Critical action: deleting "${ws.name}" will permanently delete all notes, chats, messages, reminders, and notifications in this workspace.\n\nType DELETE to confirm.`
+    );
+    if (confirmed !== "DELETE") return;
     try {
       await deleteWorkspace(ws.id);
       onDeleted(ws.id);
