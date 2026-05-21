@@ -73,6 +73,7 @@
     }
     .m-post   { background: rgba(34,197,94,.12);  color: var(--green); }
     .m-get    { background: rgba(96,165,250,.12);  color: var(--blue); }
+    .m-patch  { background: rgba(245,158,11,.12);  color: var(--amber); }
     .m-put    { background: rgba(245,158,11,.12);  color: var(--amber); }
     .m-delete { background: rgba(248,113,113,.12); color: var(--red); }
 
@@ -148,7 +149,7 @@
 <body>
 
 <nav>
-  <span class="nav-logo">⬡ MemoLink</span>
+  <span class="nav-logo">&#x2B21; MemoLink</span>
   <div class="nav-links">
     <a href="Overview.html">Overview</a>
     <a href="Requirements Analysis.html">Requirements</a>
@@ -176,6 +177,7 @@
       <tbody>
         <tr><td><span class="method m-post">POST</span></td><td><code>/auth/register</code></td><td>Register a new user</td><td>Auth</td></tr>
         <tr><td><span class="method m-post">POST</span></td><td><code>/auth/login</code></td><td>Log in, return user record</td><td>Auth</td></tr>
+        <tr><td><span class="method m-post">POST</span></td><td><code>/auth/change-password</code></td><td>Change password with current-password verification</td><td>Auth</td></tr>
         <tr><td><span class="method m-post">POST</span></td><td><code>/notes</code></td><td>Create a note</td><td>Notes</td></tr>
         <tr><td><span class="method m-post">POST</span></td><td><code>/notes/get</code></td><td>Get a single note by ID</td><td>Notes</td></tr>
         <tr><td><span class="method m-post">POST</span></td><td><code>/notes/list</code></td><td>List all notes for a user</td><td>Notes</td></tr>
@@ -183,7 +185,17 @@
         <tr><td><span class="method m-post">POST</span></td><td><code>/notes/delete</code></td><td>Delete a note</td><td>Notes</td></tr>
         <tr><td><span class="method m-post">POST</span></td><td><code>/notes/search</code></td><td>Vector similarity search over notes</td><td>Notes</td></tr>
         <tr><td><span class="method m-post">POST</span></td><td><code>/chat</code></td><td>Submit a prompt — returns AI answer + citations</td><td>Chat</td></tr>
+        <tr><td><span class="method m-post">POST</span></td><td><code>/chat/stream</code></td><td>Streaming AI response via SSE (text/event-stream)</td><td>Chat</td></tr>
         <tr><td><span class="method m-post">POST</span></td><td><code>/chat/upload</code></td><td>Upload files + prompt in one request</td><td>Chat</td></tr>
+        <tr><td><span class="method m-post">POST</span></td><td><code>/suggest</code></td><td>Generate AI reminder suggestions from notes</td><td>Suggest</td></tr>
+        <tr><td><span class="method m-get">GET</span></td><td><code>/reminders</code></td><td>List reminders for a user</td><td>Reminders</td></tr>
+        <tr><td><span class="method m-post">POST</span></td><td><code>/reminders</code></td><td>Create a manual reminder</td><td>Reminders</td></tr>
+        <tr><td><span class="method m-patch">PATCH</span></td><td><code>/reminders/{id}</code></td><td>Update a reminder (partial)</td><td>Reminders</td></tr>
+        <tr><td><span class="method m-delete">DELETE</span></td><td><code>/reminders/{id}</code></td><td>Delete a reminder</td><td>Reminders</td></tr>
+        <tr><td><span class="method m-post">POST</span></td><td><code>/transcribe</code></td><td>Transcribe audio/video file via Whisper</td><td>Transcribe</td></tr>
+        <tr><td><span class="method m-post">POST</span></td><td><code>/translate</code></td><td>Translate text to a target language</td><td>Translate</td></tr>
+        <tr><td><span class="method m-post">POST</span></td><td><code>/video/import</code></td><td>Import YouTube video captions by URL</td><td>Video</td></tr>
+        <tr><td><span class="method m-post">POST</span></td><td><code>/video/upload</code></td><td>Upload audio/video file for Whisper transcription</td><td>Video</td></tr>
         <tr><td><span class="method m-post">POST</span></td><td><code>/conversation/list</code></td><td>List conversations for a user</td><td>Conversation</td></tr>
         <tr><td><span class="method m-post">POST</span></td><td><code>/conversation/create</code></td><td>Create a new conversation session</td><td>Conversation</td></tr>
         <tr><td><span class="method m-post">POST</span></td><td><code>/conversation/messages</code></td><td>Get paginated messages in a conversation</td><td>Conversation</td></tr>
@@ -191,6 +203,13 @@
         <tr><td><span class="method m-post">POST</span></td><td><code>/conversation/delete</code></td><td>Delete a conversation</td><td>Conversation</td></tr>
         <tr><td><span class="method m-post">POST</span></td><td><code>/conversation/delete-message</code></td><td>Delete a single message</td><td>Conversation</td></tr>
         <tr><td><span class="method m-post">POST</span></td><td><code>/conversation/add-to-note</code></td><td>Save a message content as a new note</td><td>Conversation</td></tr>
+        <tr><td><span class="method m-post">POST</span></td><td><code>/workspaces</code></td><td>Create a new workspace</td><td>Workspaces</td></tr>
+        <tr><td><span class="method m-post">POST</span></td><td><code>/workspaces/list</code></td><td>List all workspaces for a user with alert counts</td><td>Workspaces</td></tr>
+        <tr><td><span class="method m-post">POST</span></td><td><code>/workspaces/get</code></td><td>Get a single workspace by ID</td><td>Workspaces</td></tr>
+        <tr><td><span class="method m-post">POST</span></td><td><code>/workspaces/update</code></td><td>Update workspace name, type, or description</td><td>Workspaces</td></tr>
+        <tr><td><span class="method m-post">POST</span></td><td><code>/workspaces/delete</code></td><td>Soft-delete a workspace (blocked if last workspace)</td><td>Workspaces</td></tr>
+        <tr><td><span class="method m-post">POST</span></td><td><code>/workspaces/set-active</code></td><td>Set the active workspace and update last_accessed_at</td><td>Workspaces</td></tr>
+        <tr><td><span class="method m-post">POST</span></td><td><code>/workspaces/active</code></td><td>Return the currently active workspace for a user</td><td>Workspaces</td></tr>
       </tbody>
     </table>
   </section>
@@ -209,10 +228,10 @@
           <span class="method m-post">POST</span>
           <span class="ep-path">/api/v1/auth/register</span>
           <span class="ep-summary">Register a new user account</span>
-          <span class="ep-toggle">▼</span>
+          <span class="ep-toggle">&#x25BC;</span>
         </div>
         <div class="ep-body">
-          <p class="ep-desc">Creates a new user. Returns 400 if the email is already registered. Password is hashed before storage.</p>
+          <p class="ep-desc">Creates a new user. Returns 400 if the email is already registered. Password is hashed with bcrypt (passlib) before storage.</p>
           <div class="schema-row">
             <div class="schema-box">
               <div class="schema-box-title">Request Body — RegisterDTO</div>
@@ -245,10 +264,10 @@
           <span class="method m-post">POST</span>
           <span class="ep-path">/api/v1/auth/login</span>
           <span class="ep-summary">Log in and return user record</span>
-          <span class="ep-toggle">▼</span>
+          <span class="ep-toggle">&#x25BC;</span>
         </div>
         <div class="ep-body">
-          <p class="ep-desc">Verifies email + hashed password. Returns the user record whose <code>id</code> the client stores for scoped requests. Returns 401 on invalid credentials.</p>
+          <p class="ep-desc">Verifies email + hashed password. Returns the user record whose <code>id</code> the client stores in localStorage key <code>memolink_user</code> for scoped requests. Returns 401 on invalid credentials.</p>
           <div class="schema-row">
             <div class="schema-box">
               <div class="schema-box-title">Request Body — LoginDTO</div>
@@ -263,6 +282,40 @@
   <span class="json-key">"id"</span>:    <span class="json-num">1</span>,
   <span class="json-key">"email"</span>: <span class="json-str">"user@example.com"</span>
 }</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- CHANGE PASSWORD -->
+      <div class="ep-card open" id="ep-change-pw">
+        <div class="ep-header" onclick="toggle('ep-change-pw')">
+          <span class="method m-post">POST</span>
+          <span class="ep-path">/api/v1/auth/change-password</span>
+          <span class="ep-summary">Change password with current-password verification</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">Verifies the supplied <code>current_password</code> against the stored bcrypt hash before updating. The new password must be at least 8 characters. Returns 401 if <code>current_password</code> is wrong, 400 if the new password fails length validation.</p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Request Body — ChangePasswordDTO</div>
+              <pre>{
+  <span class="json-key">"user_id"</span>:         <span class="json-num">1</span>,
+  <span class="json-key">"current_password"</span>: <span class="json-str">"oldpass123"</span>,
+  <span class="json-key">"new_password"</span>:     <span class="json-str">"newpass456"</span>
+}</pre>
+            </div>
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200</div>
+              <pre>{ <span class="json-key">"ok"</span>: <span class="json-bool">true</span> }</pre>
+            </div>
+          </div>
+          <div class="schema-row" style="margin-top:.8rem;">
+            <div class="schema-box">
+              <div class="schema-box-title">Error Responses</div>
+              <pre><span class="json-num">401</span> <span class="json-type">Current password incorrect</span>
+<span class="json-num">400</span> <span class="json-type">New password too short (&lt;8 chars)</span></pre>
             </div>
           </div>
         </div>
@@ -285,17 +338,17 @@
           <span class="method m-post">POST</span>
           <span class="ep-path">/api/v1/notes</span>
           <span class="ep-summary">Create a new note + auto-embed</span>
-          <span class="ep-toggle">▼</span>
+          <span class="ep-toggle">&#x25BC;</span>
         </div>
         <div class="ep-body">
-          <p class="ep-desc">Creates the note record and triggers embedding generation via the OpenAI embeddings API. The resulting vector is stored in the <code>embeddings</code> table.</p>
+          <p class="ep-desc">Creates the note record and triggers embedding generation via the OpenAI embeddings API. HTML is stripped before embedding. The resulting vector is stored in the <code>embeddings</code> table.</p>
           <div class="schema-row">
             <div class="schema-box">
               <div class="schema-box-title">Request Body — NoteCreateDTO</div>
               <pre>{
   <span class="json-key">"user_id"</span>: <span class="json-num">1</span>,
   <span class="json-key">"title"</span>:   <span class="json-str">"Lecture 5 Summary"</span>,
-  <span class="json-key">"content"</span>: <span class="json-str">"RAG stands for..."</span>,
+  <span class="json-key">"content"</span>: <span class="json-str">"&lt;p&gt;RAG stands for...&lt;/p&gt;"</span>,
   <span class="json-key">"source"</span>:  <span class="json-str">"lecture_5.pdf"</span>
 }</pre>
             </div>
@@ -305,7 +358,7 @@
   <span class="json-key">"id"</span>:      <span class="json-num">42</span>,
   <span class="json-key">"user_id"</span>: <span class="json-num">1</span>,
   <span class="json-key">"title"</span>:   <span class="json-str">"Lecture 5 Summary"</span>,
-  <span class="json-key">"content"</span>: <span class="json-str">"RAG stands for..."</span>,
+  <span class="json-key">"content"</span>: <span class="json-str">"&lt;p&gt;RAG stands for...&lt;/p&gt;"</span>,
   <span class="json-key">"source"</span>:  <span class="json-str">"lecture_5.pdf"</span>
 }</pre>
             </div>
@@ -319,10 +372,10 @@
           <span class="method m-post">POST</span>
           <span class="ep-path">/api/v1/notes/list</span>
           <span class="ep-summary">List all notes for a user</span>
-          <span class="ep-toggle">▼</span>
+          <span class="ep-toggle">&#x25BC;</span>
         </div>
         <div class="ep-body">
-          <p class="ep-desc">Returns all notes owned by the given <code>user_id</code>, ordered by creation date descending.</p>
+          <p class="ep-desc">Returns all non-deleted notes owned by the given <code>user_id</code>, ordered by creation date descending.</p>
           <div class="schema-row">
             <div class="schema-box">
               <div class="schema-box-title">Request Body — NoteListDTO</div>
@@ -352,7 +405,7 @@
           <span class="method m-post">POST</span>
           <span class="ep-path">/api/v1/notes/get</span>
           <span class="ep-summary">Retrieve a single note by ID</span>
-          <span class="ep-toggle">▼</span>
+          <span class="ep-toggle">&#x25BC;</span>
         </div>
         <div class="ep-body">
           <p class="ep-desc">Returns the full note record for the given <code>note_id</code>, or <code>null</code> if not found.</p>
@@ -381,17 +434,17 @@
           <span class="method m-post">POST</span>
           <span class="ep-path">/api/v1/notes/update</span>
           <span class="ep-summary">Update note title and/or content</span>
-          <span class="ep-toggle">▼</span>
+          <span class="ep-toggle">&#x25BC;</span>
         </div>
         <div class="ep-body">
-          <p class="ep-desc">Partial update — only provided fields are changed. If <code>content</code> changes, the embedding is regenerated.</p>
+          <p class="ep-desc">Partial update — only provided fields are changed. If <code>content</code> changes, the embedding is regenerated from the HTML-stripped plain text.</p>
           <div class="schema-row">
             <div class="schema-box">
               <div class="schema-box-title">Request Body — NoteUpdateDTO</div>
               <pre>{
   <span class="json-key">"note_id"</span>: <span class="json-num">42</span>,
   <span class="json-key">"title"</span>:   <span class="json-str">"Updated Title"</span>,
-  <span class="json-key">"content"</span>: <span class="json-str">"Updated body..."</span>
+  <span class="json-key">"content"</span>: <span class="json-str">"&lt;p&gt;Updated body...&lt;/p&gt;"</span>
 }</pre>
             </div>
             <div class="schema-box">
@@ -408,7 +461,7 @@
           <span class="method m-post">POST</span>
           <span class="ep-path">/api/v1/notes/delete</span>
           <span class="ep-summary">Delete a note (cascades to embedding)</span>
-          <span class="ep-toggle">▼</span>
+          <span class="ep-toggle">&#x25BC;</span>
         </div>
         <div class="ep-body">
           <div class="schema-row">
@@ -430,7 +483,7 @@
           <span class="method m-post">POST</span>
           <span class="ep-path">/api/v1/notes/search</span>
           <span class="ep-summary">Vector similarity search over notes</span>
-          <span class="ep-toggle">▼</span>
+          <span class="ep-toggle">&#x25BC;</span>
         </div>
         <div class="ep-body">
           <p class="ep-desc">Accepts a pre-computed embedding vector and returns the top-K most similar notes using pgvector cosine similarity. Typically called internally by ChatService.</p>
@@ -473,18 +526,19 @@
         <div class="ep-header" onclick="toggle('ep-chat')">
           <span class="method m-post">POST</span>
           <span class="ep-path">/api/v1/chat</span>
-          <span class="ep-summary">Submit prompt — RAG answer + citations</span>
-          <span class="ep-toggle">▼</span>
+          <span class="ep-summary">Submit prompt — RAG answer + citations (JSON)</span>
+          <span class="ep-toggle">&#x25BC;</span>
         </div>
         <div class="ep-body">
           <p class="ep-desc">
             Core RAG endpoint. Flow:
-            1 — Embed the prompt via OpenAI ada-002.
+            1 — Embed the prompt via OpenAI text-embedding-3-small.
             2 — Retrieve top-K notes by cosine similarity.
             3 — Build a context-augmented system prompt.
             4 — Call GPT for the answer.
             5 — Return answer + source citations.
             Persists both the user message and the AI reply to the conversation.
+            For real-time streaming use <code>/chat/stream</code> instead.
           </p>
           <div class="schema-row">
             <div class="schema-box">
@@ -515,13 +569,52 @@
         </div>
       </div>
 
+      <!-- CHAT STREAM -->
+      <div class="ep-card open" id="ep-chat-stream">
+        <div class="ep-header" onclick="toggle('ep-chat-stream')">
+          <span class="method m-post">POST</span>
+          <span class="ep-path">/api/v1/chat/stream</span>
+          <span class="ep-summary">Streaming AI response via SSE (text/event-stream)</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">
+            Same RAG pipeline as <code>/chat</code> but returns <code>Content-Type: text/event-stream</code>.
+            GPT is called with <code>stream=True</code>. Each token is forwarded immediately.
+            nginx must have <code>proxy_buffering off</code> and <code>X-Accel-Buffering: no</code> — both are set in <code>nginx.conf</code>.
+            The frontend displays a blinking cursor while streaming; the cursor disappears when <code>done</code> is received.
+          </p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Request Body — ChatRequestDTO</div>
+              <pre>{
+  <span class="json-key">"user_id"</span>:         <span class="json-num">1</span>,
+  <span class="json-key">"conversation_id"</span>: <span class="json-num">7</span>,
+  <span class="json-key">"prompt"</span>:          <span class="json-str">"Explain embeddings."</span>,
+  <span class="json-key">"top_k"</span>:           <span class="json-num">5</span>
+}</pre>
+            </div>
+            <div class="schema-box">
+              <div class="schema-box-title">SSE Event Stream</div>
+              <pre><span class="json-type">Content-Type: text/event-stream</span>
+
+<span class="json-str">data: {"t":"Embed"}</span>
+<span class="json-str">data: {"t":"dings"}</span>
+<span class="json-str">data: {"t":" are"}</span>
+<span class="json-type">... one event per token ...</span>
+<span class="json-str">data: {"done":true,"id":104}</span></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- CHAT UPLOAD -->
       <div class="ep-card open" id="ep-chat-upload">
         <div class="ep-header" onclick="toggle('ep-chat-upload')">
           <span class="method m-post">POST</span>
           <span class="ep-path">/api/v1/chat/upload</span>
           <span class="ep-summary">Upload files + prompt in one multipart request</span>
-          <span class="ep-toggle">▼</span>
+          <span class="ep-toggle">&#x25BC;</span>
         </div>
         <div class="ep-body">
           <p class="ep-desc">
@@ -559,6 +652,353 @@
 
   <hr class="divider" />
 
+  <!-- SUGGEST -->
+  <section>
+    <div class="section-label">Suggest</div>
+    <h2>AI Suggestion Endpoint</h2>
+    <div class="ep-group">
+
+      <div class="ep-card open" id="ep-suggest">
+        <div class="ep-header" onclick="toggle('ep-suggest')">
+          <span class="method m-post">POST</span>
+          <span class="ep-path">/api/v1/suggest</span>
+          <span class="ep-summary">Generate AI reminder suggestions from notes</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">
+            Strips HTML from the user's notes (up to 15), concatenates them, and sends the result to GPT with a reminder-extraction prompt.
+            GPT returns a JSON array of suggestions. Each suggestion is saved to the <code>reminders</code> table with <code>type="ai"</code>.
+            The endpoint only uses the user's own notes — no external context is injected.
+          </p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Request Body — SuggestDTO</div>
+              <pre>{
+  <span class="json-key">"user_id"</span>: <span class="json-num">1</span>,
+  <span class="json-key">"context"</span>: <span class="json-str">"study, work"</span>,
+  <span class="json-key">"source"</span>:  <span class="json-str">"notes"</span>
+}</pre>
+            </div>
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200 — SuggestResponse</div>
+              <pre>{
+  <span class="json-key">"suggestions"</span>: [
+    {
+      <span class="json-key">"text"</span>:        <span class="json-str">"Submit assignment 3"</span>,
+      <span class="json-key">"description"</span>: <span class="json-str">"Due based on Lecture 5 notes."</span>,
+      <span class="json-key">"due_date"</span>:    <span class="json-str">"2026-05-25"</span>,
+      <span class="json-key">"due_time"</span>:    <span class="json-str">"23:59"</span>
+    }
+  ]
+}</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <hr class="divider" />
+
+  <!-- REMINDERS -->
+  <section>
+    <div class="section-label">Reminders</div>
+    <h2>Reminders Endpoints</h2>
+    <div class="ep-group">
+
+      <!-- LIST REMINDERS -->
+      <div class="ep-card open" id="ep-rem-list">
+        <div class="ep-header" onclick="toggle('ep-rem-list')">
+          <span class="method m-get">GET</span>
+          <span class="ep-path">/api/v1/reminders?user_id=1</span>
+          <span class="ep-summary">List all reminders for a user</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">Returns all reminders (AI and manual) owned by <code>user_id</code>, ordered by <code>created_at</code> descending.</p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Query Params</div>
+              <pre><span class="json-key">user_id</span> <span class="json-type">integer (required)</span></pre>
+            </div>
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200 — Reminder[]</div>
+              <pre>[
+  {
+    <span class="json-key">"id"</span>:          <span class="json-num">1</span>,
+    <span class="json-key">"user_id"</span>:     <span class="json-num">1</span>,
+    <span class="json-key">"text"</span>:        <span class="json-str">"Submit assignment 3"</span>,
+    <span class="json-key">"description"</span>: <span class="json-str">"Due based on Lecture 5."</span>,
+    <span class="json-key">"done"</span>:        <span class="json-bool">false</span>,
+    <span class="json-key">"type"</span>:        <span class="json-str">"ai"</span>,
+    <span class="json-key">"due_date"</span>:    <span class="json-str">"2026-05-25"</span>,
+    <span class="json-key">"due_time"</span>:    <span class="json-str">"23:59"</span>,
+    <span class="json-key">"created_at"</span>:  <span class="json-str">"2026-05-20T..."</span>
+  }
+]</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- CREATE REMINDER -->
+      <div class="ep-card open" id="ep-rem-create">
+        <div class="ep-header" onclick="toggle('ep-rem-create')">
+          <span class="method m-post">POST</span>
+          <span class="ep-path">/api/v1/reminders</span>
+          <span class="ep-summary">Create a manual reminder</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">Creates a reminder with <code>type="manual"</code>. All fields except <code>user_id</code> and <code>text</code> are optional.</p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Request Body — ReminderCreateDTO</div>
+              <pre>{
+  <span class="json-key">"user_id"</span>:     <span class="json-num">1</span>,
+  <span class="json-key">"text"</span>:        <span class="json-str">"Read chapter 4"</span>,
+  <span class="json-key">"description"</span>: <span class="json-str">"Before Thursday's class."</span>,
+  <span class="json-key">"due_date"</span>:    <span class="json-str">"2026-05-22"</span>,
+  <span class="json-key">"due_time"</span>:    <span class="json-str">"09:00"</span>
+}</pre>
+            </div>
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200 — Reminder</div>
+              <pre>{
+  <span class="json-key">"id"</span>:   <span class="json-num">2</span>,
+  <span class="json-key">"type"</span>: <span class="json-str">"manual"</span>,
+  <span class="json-key">"done"</span>: <span class="json-bool">false</span>,
+  <span class="json-type">...all fields</span>
+}</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- UPDATE REMINDER -->
+      <div class="ep-card open" id="ep-rem-update">
+        <div class="ep-header" onclick="toggle('ep-rem-update')">
+          <span class="method m-patch">PATCH</span>
+          <span class="ep-path">/api/v1/reminders/{id}</span>
+          <span class="ep-summary">Update a reminder (partial)</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">Partial update — any combination of fields may be provided. Used by the reminder detail modal to edit title, description, date/time, and toggle the done flag.</p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Request Body — ReminderUpdateDTO (all optional)</div>
+              <pre>{
+  <span class="json-key">"text"</span>:        <span class="json-str">"Read chapter 5"</span>,
+  <span class="json-key">"description"</span>: <span class="json-str">"Updated context."</span>,
+  <span class="json-key">"done"</span>:        <span class="json-bool">true</span>,
+  <span class="json-key">"due_date"</span>:    <span class="json-str">"2026-05-23"</span>,
+  <span class="json-key">"due_time"</span>:    <span class="json-str">"10:00"</span>
+}</pre>
+            </div>
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200 — Reminder (updated)</div>
+              <pre><span class="json-type">Full updated reminder object</span></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- DELETE REMINDER -->
+      <div class="ep-card" id="ep-rem-delete">
+        <div class="ep-header" onclick="toggle('ep-rem-delete')">
+          <span class="method m-delete">DELETE</span>
+          <span class="ep-path">/api/v1/reminders/{id}</span>
+          <span class="ep-summary">Delete a reminder</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Path Param</div>
+              <pre><span class="json-key">id</span> <span class="json-type">integer — reminder ID</span></pre>
+            </div>
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200</div>
+              <pre>{ <span class="json-key">"ok"</span>: <span class="json-bool">true</span> }</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <hr class="divider" />
+
+  <!-- TRANSCRIBE -->
+  <section>
+    <div class="section-label">Transcribe</div>
+    <h2>Transcription Endpoint</h2>
+    <div class="ep-group">
+
+      <div class="ep-card open" id="ep-transcribe">
+        <div class="ep-header" onclick="toggle('ep-transcribe')">
+          <span class="method m-post">POST</span>
+          <span class="ep-path">/api/v1/transcribe</span>
+          <span class="ep-summary">Transcribe audio/video via OpenAI Whisper</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">Accepts a multipart <code>file</code> upload (MP4, M4A, WebM, MP3, WAV, MOV — maximum 25 MB). Sends the file to OpenAI Whisper and returns the plain-text transcript. Used internally by the note editor's Record button.</p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Form Fields</div>
+              <pre><span class="json-key">file</span>     <span class="json-type">audio/video file (required)</span>
+<span class="json-key">language</span> <span class="json-type">string (optional, BCP-47)</span>
+<span class="json-type">Max size: 25 MB</span></pre>
+            </div>
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200</div>
+              <pre>{
+  <span class="json-key">"text"</span>: <span class="json-str">"The meeting started at 9 AM..."</span>
+}</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <hr class="divider" />
+
+  <!-- TRANSLATE -->
+  <section>
+    <div class="section-label">Translate</div>
+    <h2>Translation Endpoint</h2>
+    <div class="ep-group">
+
+      <div class="ep-card open" id="ep-translate">
+        <div class="ep-header" onclick="toggle('ep-translate')">
+          <span class="method m-post">POST</span>
+          <span class="ep-path">/api/v1/translate</span>
+          <span class="ep-summary">Translate text to a target language</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">Sends the provided text to GPT with a translation instruction and returns the translated result. Useful for translating transcripts or notes.</p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Request Body — TranslateDTO</div>
+              <pre>{
+  <span class="json-key">"text"</span>:            <span class="json-str">"Hola mundo"</span>,
+  <span class="json-key">"target_language"</span>: <span class="json-str">"English"</span>
+}</pre>
+            </div>
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200</div>
+              <pre>{
+  <span class="json-key">"translated"</span>: <span class="json-str">"Hello world"</span>
+}</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <hr class="divider" />
+
+  <!-- VIDEO -->
+  <section>
+    <div class="section-label">Video</div>
+    <h2>Video Import Endpoints</h2>
+    <div class="ep-group">
+
+      <!-- VIDEO IMPORT URL -->
+      <div class="ep-card open" id="ep-video-import">
+        <div class="ep-header" onclick="toggle('ep-video-import')">
+          <span class="method m-post">POST</span>
+          <span class="ep-path">/api/v1/video/import</span>
+          <span class="ep-summary">Import YouTube captions by URL</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">
+            Accepts a YouTube video URL. Uses <code>YouTubeTranscriptApi()</code> (instantiated object, not static call) to fetch the available captions.
+            Returns the title and HTML-formatted transcript. No ffmpeg or yt-dlp is required — only caption data is fetched.
+            Returns <code>422 Unprocessable Entity</code> if the video has no captions available.
+          </p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Request Body — VideoImportDTO</div>
+              <pre>{
+  <span class="json-key">"url"</span>: <span class="json-str">"https://www.youtube.com/watch?v=abc123"</span>
+}</pre>
+            </div>
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200 — VideoImportResponse</div>
+              <pre>{
+  <span class="json-key">"title"</span>:   <span class="json-str">"Intro to Machine Learning"</span>,
+  <span class="json-key">"content"</span>: <span class="json-str">"&lt;p&gt;Welcome to this tutorial...&lt;/p&gt;"</span>,
+  <span class="json-key">"method"</span>:  <span class="json-str">"captions"</span>
+}</pre>
+            </div>
+          </div>
+          <div class="schema-row" style="margin-top:.8rem;">
+            <div class="schema-box">
+              <div class="schema-box-title">Error Responses</div>
+              <pre><span class="json-num">422</span> <span class="json-type">No captions available for this video</span>
+<span class="json-num">400</span> <span class="json-type">Invalid YouTube URL</span></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- VIDEO UPLOAD -->
+      <div class="ep-card open" id="ep-video-upload">
+        <div class="ep-header" onclick="toggle('ep-video-upload')">
+          <span class="method m-post">POST</span>
+          <span class="ep-path">/api/v1/video/upload</span>
+          <span class="ep-summary">Upload audio/video file — Whisper transcription</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">
+            Accepts a multipart <code>file</code> upload (MP4, M4A, WebM, MP3, WAV, MOV — maximum 25 MB).
+            Intended for Zoom, Teams, and Google Meet recordings.
+            Sends the file to OpenAI Whisper for transcription and wraps the result in HTML for direct insertion into the Tiptap note editor.
+          </p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Form Fields</div>
+              <pre><span class="json-key">file</span> <span class="json-type">audio/video file (required)</span>
+<span class="json-type">Accepted: .mp4 .m4a .webm .mp3 .wav .mov</span>
+<span class="json-type">Max size: 25 MB</span></pre>
+            </div>
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200 — VideoUploadResponse</div>
+              <pre>{
+  <span class="json-key">"title"</span>:   <span class="json-str">"recording.mp4"</span>,
+  <span class="json-key">"content"</span>: <span class="json-str">"&lt;p&gt;The meeting started...&lt;/p&gt;"</span>,
+  <span class="json-key">"method"</span>:  <span class="json-str">"whisper"</span>
+}</pre>
+            </div>
+          </div>
+          <div class="schema-row" style="margin-top:.8rem;">
+            <div class="schema-box">
+              <div class="schema-box-title">Error Responses</div>
+              <pre><span class="json-num">413</span> <span class="json-type">File exceeds 25 MB limit</span>
+<span class="json-num">415</span> <span class="json-type">Unsupported file type</span></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <hr class="divider" />
+
   <!-- CONVERSATIONS -->
   <section>
     <div class="section-label">Conversations</div>
@@ -571,7 +1011,7 @@
           <span class="method m-post">POST</span>
           <span class="ep-path">/api/v1/conversation/list</span>
           <span class="ep-summary">List all conversations for a user</span>
-          <span class="ep-toggle">▼</span>
+          <span class="ep-toggle">&#x25BC;</span>
         </div>
         <div class="ep-body">
           <div class="schema-row">
@@ -600,7 +1040,7 @@
           <span class="method m-post">POST</span>
           <span class="ep-path">/api/v1/conversation/create</span>
           <span class="ep-summary">Create a new conversation session</span>
-          <span class="ep-toggle">▼</span>
+          <span class="ep-toggle">&#x25BC;</span>
         </div>
         <div class="ep-body">
           <div class="schema-row">
@@ -622,7 +1062,7 @@
           <span class="method m-post">POST</span>
           <span class="ep-path">/api/v1/conversation/messages</span>
           <span class="ep-summary">Get paginated messages in a conversation</span>
-          <span class="ep-toggle">▼</span>
+          <span class="ep-toggle">&#x25BC;</span>
         </div>
         <div class="ep-body">
           <p class="ep-desc">Cursor-based pagination using <code>before_id</code>. Omit <code>before_id</code> to start from the most recent message. Set <code>limit</code> to control page size (default 10).</p>
@@ -662,7 +1102,7 @@
           <span class="method m-post">POST</span>
           <span class="ep-path">/api/v1/conversation/rename</span>
           <span class="ep-summary">Rename a conversation</span>
-          <span class="ep-toggle">▼</span>
+          <span class="ep-toggle">&#x25BC;</span>
         </div>
         <div class="ep-body">
           <div class="schema-row">
@@ -687,7 +1127,7 @@
           <span class="method m-post">POST</span>
           <span class="ep-path">/api/v1/conversation/delete</span>
           <span class="ep-summary">Delete a conversation + all its messages</span>
-          <span class="ep-toggle">▼</span>
+          <span class="ep-toggle">&#x25BC;</span>
         </div>
         <div class="ep-body">
           <div class="schema-row">
@@ -709,7 +1149,7 @@
           <span class="method m-post">POST</span>
           <span class="ep-path">/api/v1/conversation/delete-message</span>
           <span class="ep-summary">Delete a single message by ID</span>
-          <span class="ep-toggle">▼</span>
+          <span class="ep-toggle">&#x25BC;</span>
         </div>
         <div class="ep-body">
           <div class="schema-row">
@@ -731,7 +1171,7 @@
           <span class="method m-post">POST</span>
           <span class="ep-path">/api/v1/conversation/add-to-note</span>
           <span class="ep-summary">Save a message's content as a new note</span>
-          <span class="ep-toggle">▼</span>
+          <span class="ep-toggle">&#x25BC;</span>
         </div>
         <div class="ep-body">
           <p class="ep-desc">Creates a new note from the provided content — typically used to save a useful AI reply back into the user's knowledge base. Triggers embedding generation for the new note.</p>
@@ -759,6 +1199,282 @@
       </div>
 
     </div>
+  </section>
+
+
+  <hr class="divider" />
+
+  <!-- WORKSPACES -->
+  <section>
+    <div class="section-label">Workspaces</div>
+    <h2>Knowledge Workspace Endpoints</h2>
+    <p>All workspace operations require a <code>user_id</code> in the request body. The API enforces ownership — a user can only read or modify their own workspaces. Soft-deleted workspaces are excluded from all responses unless explicitly queried.</p>
+    <div class="ep-group">
+
+      <!-- CREATE WORKSPACE -->
+      <div class="ep-card open" id="ep-ws-create">
+        <div class="ep-header" onclick="toggle('ep-ws-create')">
+          <span class="method m-post">POST</span>
+          <span class="ep-path">/api/v1/workspaces</span>
+          <span class="ep-summary">Create a new Knowledge Workspace</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">Creates a workspace for the given user. Returns 400 if a workspace with the same name already exists for that user. The <code>type</code> field must be one of: <code>Academic</code>, <code>Professional</code>, <code>Personal</code>, <code>Project</code>, <code>Other</code>. If this is the user's first workspace, <code>is_default</code> is set to <code>true</code> automatically.</p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Request Body — WorkspaceCreateDTO</div>
+              <pre>{
+  <span class="json-key">"user_id"</span>:     <span class="json-num">1</span>,
+  <span class="json-key">"name"</span>:        <span class="json-str">"Capstone Research"</span>,
+  <span class="json-key">"type"</span>:        <span class="json-str">"Academic"</span>,
+  <span class="json-key">"description"</span>: <span class="json-str">"My MemoLink capstone project workspace."</span>
+}</pre>
+            </div>
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200 — WorkspaceResponseDTO</div>
+              <pre>{
+  <span class="json-key">"id"</span>:              <span class="json-num">1</span>,
+  <span class="json-key">"user_id"</span>:         <span class="json-num">1</span>,
+  <span class="json-key">"name"</span>:            <span class="json-str">"Capstone Research"</span>,
+  <span class="json-key">"type"</span>:            <span class="json-str">"Academic"</span>,
+  <span class="json-key">"description"</span>:    <span class="json-str">"My MemoLink capstone project workspace."</span>,
+  <span class="json-key">"is_default"</span>:     <span class="json-bool">true</span>,
+  <span class="json-key">"last_accessed_at"</span>: <span class="json-null">null</span>,
+  <span class="json-key">"created_at"</span>:     <span class="json-str">"2026-05-21T..."</span>,
+  <span class="json-key">"alert_count"</span>:    <span class="json-num">0</span>
+}</pre>
+            </div>
+          </div>
+          <div class="schema-row" style="margin-top:.8rem;">
+            <div class="schema-box">
+              <div class="schema-box-title">Error Responses</div>
+              <pre><span class="json-num">400</span> <span class="json-type">Workspace name already exists for this user</span>
+<span class="json-num">422</span> <span class="json-type">Validation error (missing or invalid type)</span></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- LIST WORKSPACES -->
+      <div class="ep-card open" id="ep-ws-list">
+        <div class="ep-header" onclick="toggle('ep-ws-list')">
+          <span class="method m-post">POST</span>
+          <span class="ep-path">/api/v1/workspaces/list</span>
+          <span class="ep-summary">List all workspaces for a user with alert counts</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">Returns all non-deleted workspaces owned by the given <code>user_id</code>, ordered by <code>last_accessed_at</code> descending (most recently used first). Each workspace includes an <code>alert_count</code> — the number of non-done reminders in that workspace — which drives the alert badge in the sidebar dropdown.</p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Request Body — WorkspaceListDTO</div>
+              <pre>{ <span class="json-key">"user_id"</span>: <span class="json-num">1</span> }</pre>
+            </div>
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200 — WorkspaceResponseDTO[]</div>
+              <pre>[
+  {
+    <span class="json-key">"id"</span>:              <span class="json-num">1</span>,
+    <span class="json-key">"name"</span>:            <span class="json-str">"Capstone Research"</span>,
+    <span class="json-key">"type"</span>:            <span class="json-str">"Academic"</span>,
+    <span class="json-key">"description"</span>:    <span class="json-str">"..."</span>,
+    <span class="json-key">"is_default"</span>:     <span class="json-bool">true</span>,
+    <span class="json-key">"last_accessed_at"</span>: <span class="json-str">"2026-05-21T..."</span>,
+    <span class="json-key">"alert_count"</span>:    <span class="json-num">3</span>
+  },
+  {
+    <span class="json-key">"id"</span>:              <span class="json-num">2</span>,
+    <span class="json-key">"name"</span>:            <span class="json-str">"Claims System"</span>,
+    <span class="json-key">"type"</span>:            <span class="json-str">"Professional"</span>,
+    <span class="json-key">"description"</span>:    <span class="json-null">null</span>,
+    <span class="json-key">"is_default"</span>:     <span class="json-bool">false</span>,
+    <span class="json-key">"last_accessed_at"</span>: <span class="json-str">"2026-05-20T..."</span>,
+    <span class="json-key">"alert_count"</span>:    <span class="json-num">0</span>
+  }
+]</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- GET WORKSPACE -->
+      <div class="ep-card" id="ep-ws-get">
+        <div class="ep-header" onclick="toggle('ep-ws-get')">
+          <span class="method m-post">POST</span>
+          <span class="ep-path">/api/v1/workspaces/get</span>
+          <span class="ep-summary">Get a single workspace by ID</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">Returns the full workspace record for the given <code>workspace_id</code>. Returns 403 if the workspace does not belong to the requesting user. Returns 404 if not found or soft-deleted.</p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Request Body — WorkspaceGetDTO</div>
+              <pre>{
+  <span class="json-key">"user_id"</span>:      <span class="json-num">1</span>,
+  <span class="json-key">"workspace_id"</span>: <span class="json-num">1</span>
+}</pre>
+            </div>
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200 — WorkspaceResponseDTO</div>
+              <pre><span class="json-type">Full workspace object (see /workspaces/list for shape)</span></pre>
+            </div>
+          </div>
+          <div class="schema-row" style="margin-top:.8rem;">
+            <div class="schema-box">
+              <div class="schema-box-title">Error Responses</div>
+              <pre><span class="json-num">403</span> <span class="json-type">Workspace does not belong to user</span>
+<span class="json-num">404</span> <span class="json-type">Workspace not found or deleted</span></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- UPDATE WORKSPACE -->
+      <div class="ep-card" id="ep-ws-update">
+        <div class="ep-header" onclick="toggle('ep-ws-update')">
+          <span class="method m-post">POST</span>
+          <span class="ep-path">/api/v1/workspaces/update</span>
+          <span class="ep-summary">Update workspace name, type, or description</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">Partial update — any combination of <code>name</code>, <code>type</code>, and <code>description</code> may be provided. Rejects a name change if the new name is already taken by another workspace belonging to the same user. Updates <code>updated_at</code> automatically.</p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Request Body — WorkspaceUpdateDTO</div>
+              <pre>{
+  <span class="json-key">"user_id"</span>:      <span class="json-num">1</span>,
+  <span class="json-key">"workspace_id"</span>: <span class="json-num">1</span>,
+  <span class="json-key">"name"</span>:        <span class="json-str">"Capstone 2026"</span>,
+  <span class="json-key">"type"</span>:        <span class="json-str">"Academic"</span>,
+  <span class="json-key">"description"</span>: <span class="json-str">"Updated description."</span>
+}</pre>
+            </div>
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200 — WorkspaceResponseDTO</div>
+              <pre><span class="json-type">Full updated workspace object</span></pre>
+            </div>
+          </div>
+          <div class="schema-row" style="margin-top:.8rem;">
+            <div class="schema-box">
+              <div class="schema-box-title">Error Responses</div>
+              <pre><span class="json-num">400</span> <span class="json-type">New name already exists for this user</span>
+<span class="json-num">403</span> <span class="json-type">Workspace does not belong to user</span>
+<span class="json-num">404</span> <span class="json-type">Workspace not found</span></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- DELETE WORKSPACE -->
+      <div class="ep-card" id="ep-ws-delete">
+        <div class="ep-header" onclick="toggle('ep-ws-delete')">
+          <span class="method m-post">POST</span>
+          <span class="ep-path">/api/v1/workspaces/delete</span>
+          <span class="ep-summary">Soft-delete a workspace (blocked if last workspace)</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">Sets <code>deleted_at</code> on the workspace. Returns 409 if this is the user's only remaining non-deleted workspace — users must always have at least one. The frontend must switch the active workspace to another before calling this endpoint if the deleted workspace was the active one.</p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Request Body — WorkspaceDeleteDTO</div>
+              <pre>{
+  <span class="json-key">"user_id"</span>:      <span class="json-num">1</span>,
+  <span class="json-key">"workspace_id"</span>: <span class="json-num">2</span>
+}</pre>
+            </div>
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200</div>
+              <pre>{ <span class="json-key">"ok"</span>: <span class="json-bool">true</span> }</pre>
+            </div>
+          </div>
+          <div class="schema-row" style="margin-top:.8rem;">
+            <div class="schema-box">
+              <div class="schema-box-title">Error Responses</div>
+              <pre><span class="json-num">409</span> <span class="json-type">Cannot delete the only remaining workspace</span>
+<span class="json-num">403</span> <span class="json-type">Workspace does not belong to user</span>
+<span class="json-num">404</span> <span class="json-type">Workspace not found</span></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SET ACTIVE WORKSPACE -->
+      <div class="ep-card open" id="ep-ws-set-active">
+        <div class="ep-header" onclick="toggle('ep-ws-set-active')">
+          <span class="method m-post">POST</span>
+          <span class="ep-path">/api/v1/workspaces/set-active</span>
+          <span class="ep-summary">Set the active workspace and update last_accessed_at</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">Records the user's active workspace selection. Updates <code>last_accessed_at</code> on the workspace row. The frontend stores the returned <code>workspace_id</code> alongside the user object in <code>localStorage</code> key <code>memolink_user</code> so it persists across page refreshes. On next login the client calls <code>/workspaces/active</code> to restore it.</p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Request Body — SetActiveDTO</div>
+              <pre>{
+  <span class="json-key">"user_id"</span>:      <span class="json-num">1</span>,
+  <span class="json-key">"workspace_id"</span>: <span class="json-num">1</span>
+}</pre>
+            </div>
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200 — WorkspaceResponseDTO</div>
+              <pre><span class="json-type">Full workspace object with updated last_accessed_at</span></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- GET ACTIVE WORKSPACE -->
+      <div class="ep-card open" id="ep-ws-active">
+        <div class="ep-header" onclick="toggle('ep-ws-active')">
+          <span class="method m-post">POST</span>
+          <span class="ep-path">/api/v1/workspaces/active</span>
+          <span class="ep-summary">Return the currently active workspace for a user</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">Returns the workspace with the most recent <code>last_accessed_at</code> for the given user. Used on login to restore the user's last workspace selection. If no <code>last_accessed_at</code> is set on any workspace, falls back to the workspace where <code>is_default = true</code>.</p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Request Body — ActiveWorkspaceDTO</div>
+              <pre>{ <span class="json-key">"user_id"</span>: <span class="json-num">1</span> }</pre>
+            </div>
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200 — WorkspaceResponseDTO</div>
+              <pre>{
+  <span class="json-key">"id"</span>:              <span class="json-num">1</span>,
+  <span class="json-key">"name"</span>:            <span class="json-str">"Capstone Research"</span>,
+  <span class="json-key">"type"</span>:            <span class="json-str">"Academic"</span>,
+  <span class="json-key">"is_default"</span>:     <span class="json-bool">true</span>,
+  <span class="json-key">"last_accessed_at"</span>: <span class="json-str">"2026-05-21T..."</span>,
+  <span class="json-key">"alert_count"</span>:    <span class="json-num">3</span>
+}</pre>
+            </div>
+          </div>
+          <div class="schema-row" style="margin-top:.8rem;">
+            <div class="schema-box">
+              <div class="schema-box-title">Error Responses</div>
+              <pre><span class="json-num">404</span> <span class="json-type">No workspace found for user (redirect to onboarding)</span></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <p style="margin-top:1.8rem;color:var(--muted);font-size:.9rem;">
+      <strong style="color:var(--text)">Workspace-aware existing endpoints:</strong>
+      All note, conversation, reminder, chat, and suggest endpoints now accept an optional
+      <code>workspace_id</code> field in their request bodies. When supplied, results are filtered
+      to that workspace. When omitted, the backend resolves the active workspace via
+      <code>/workspaces/active</code> logic. RAG retrieval (pgvector cosine search) is always
+      filtered to the active workspace unless <code>"cross_workspace": true</code> is passed in
+      the chat request body.
+    </p>
   </section>
 
 </div>

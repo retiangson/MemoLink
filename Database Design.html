@@ -172,7 +172,7 @@
 <body>
 
 <nav>
-  <span class="nav-logo">⬡ MemoLink</span>
+  <span class="nav-logo">&#x2B21; MemoLink</span>
   <div class="nav-links">
     <a href="Overview.html">Overview</a>
     <a href="Requirements Analysis.html">Requirements</a>
@@ -193,7 +193,7 @@
   <section>
     <div class="section-label">ERD</div>
     <h2>Entity-Relationship Overview</h2>
-    <p>Five core tables: <code>users</code>, <code>notes</code>, <code>embeddings</code>, <code>conversations</code>, and <code>messages</code>. All user-scoped tables cascade-delete when the user is removed.</p>
+    <p>Seven core tables: <code>users</code>, <code>workspaces</code>, <code>notes</code>, <code>embeddings</code>, <code>conversations</code>, <code>messages</code>, and <code>reminders</code>. All user-scoped tables cascade-delete when the user is removed. Notes, conversations, and workspaces carry a <code>deleted_at</code> column for soft-delete support. Notes, conversations, and reminders each carry a <code>workspace_id</code> foreign key so every piece of content is scoped to a workspace. Embeddings remain linked to notes; retrieval is workspace-scoped by joining through the note's <code>workspace_id</code>.</p>
 
     <div class="erd-wrap">
       <div class="erd">
@@ -201,46 +201,80 @@
         <!-- users -->
         <div class="erd-table">
           <div class="erd-th">users</div>
-          <div class="erd-col"><span class="erd-pk erd-col-name">🔑 id</span><span class="erd-col-type">INTEGER</span></div>
+          <div class="erd-col"><span class="erd-pk erd-col-name">&#x1F511; id</span><span class="erd-col-type">INTEGER</span></div>
           <div class="erd-col"><span class="erd-col-name">email</span><span class="erd-col-type">VARCHAR</span></div>
           <div class="erd-col"><span class="erd-col-name">password</span><span class="erd-col-type">VARCHAR</span></div>
+        </div>
+
+        <!-- workspaces -->
+        <div class="erd-table">
+          <div class="erd-th">workspaces</div>
+          <div class="erd-col"><span class="erd-pk erd-col-name">&#x1F511; id</span><span class="erd-col-type">INTEGER</span></div>
+          <div class="erd-col"><span class="erd-fk erd-col-name">&rarr; user_id</span><span class="erd-col-type">INTEGER</span></div>
+          <div class="erd-col"><span class="erd-col-name">name</span><span class="erd-col-type">VARCHAR(100)</span></div>
+          <div class="erd-col"><span class="erd-col-name">type</span><span class="erd-col-type">VARCHAR(30)</span></div>
+          <div class="erd-col"><span class="erd-col-name">description</span><span class="erd-col-type">TEXT</span></div>
+          <div class="erd-col"><span class="erd-col-name">is_default</span><span class="erd-col-type">BOOLEAN</span></div>
+          <div class="erd-col"><span class="erd-col-name">last_accessed_at</span><span class="erd-col-type">TIMESTAMPTZ</span></div>
+          <div class="erd-col"><span class="erd-col-name">created_at</span><span class="erd-col-type">TIMESTAMPTZ</span></div>
+          <div class="erd-col"><span class="erd-col-name">updated_at</span><span class="erd-col-type">TIMESTAMPTZ</span></div>
+          <div class="erd-col"><span class="erd-col-name">deleted_at</span><span class="erd-col-type">TIMESTAMPTZ</span></div>
         </div>
 
         <!-- notes -->
         <div class="erd-table">
           <div class="erd-th">notes</div>
-          <div class="erd-col"><span class="erd-pk erd-col-name">🔑 id</span><span class="erd-col-type">INTEGER</span></div>
-          <div class="erd-col"><span class="erd-fk erd-col-name">→ user_id</span><span class="erd-col-type">INTEGER</span></div>
+          <div class="erd-col"><span class="erd-pk erd-col-name">&#x1F511; id</span><span class="erd-col-type">INTEGER</span></div>
+          <div class="erd-col"><span class="erd-fk erd-col-name">&rarr; user_id</span><span class="erd-col-type">INTEGER</span></div>
+          <div class="erd-col"><span class="erd-fk erd-col-name">&rarr; workspace_id</span><span class="erd-col-type">INTEGER</span></div>
           <div class="erd-col"><span class="erd-col-name">title</span><span class="erd-col-type">VARCHAR(255)</span></div>
           <div class="erd-col"><span class="erd-col-name">content</span><span class="erd-col-type">TEXT</span></div>
           <div class="erd-col"><span class="erd-col-name">source</span><span class="erd-col-type">VARCHAR(255)</span></div>
           <div class="erd-col"><span class="erd-col-name">created_at</span><span class="erd-col-type">TIMESTAMPTZ</span></div>
+          <div class="erd-col"><span class="erd-col-name">deleted_at</span><span class="erd-col-type">TIMESTAMPTZ</span></div>
         </div>
 
         <!-- embeddings -->
         <div class="erd-table">
           <div class="erd-th">embeddings</div>
-          <div class="erd-col"><span class="erd-pk erd-col-name">🔑 id</span><span class="erd-col-type">INTEGER</span></div>
-          <div class="erd-col"><span class="erd-fk erd-col-name">→ note_id</span><span class="erd-col-type">INTEGER</span></div>
+          <div class="erd-col"><span class="erd-pk erd-col-name">&#x1F511; id</span><span class="erd-col-type">INTEGER</span></div>
+          <div class="erd-col"><span class="erd-fk erd-col-name">&rarr; note_id</span><span class="erd-col-type">INTEGER</span></div>
           <div class="erd-col"><span class="erd-col-name">vector</span><span class="erd-col-type">VECTOR(1536)</span></div>
         </div>
 
         <!-- conversations -->
         <div class="erd-table">
           <div class="erd-th">conversations</div>
-          <div class="erd-col"><span class="erd-pk erd-col-name">🔑 id</span><span class="erd-col-type">INTEGER</span></div>
-          <div class="erd-col"><span class="erd-fk erd-col-name">→ user_id</span><span class="erd-col-type">INTEGER</span></div>
+          <div class="erd-col"><span class="erd-pk erd-col-name">&#x1F511; id</span><span class="erd-col-type">INTEGER</span></div>
+          <div class="erd-col"><span class="erd-fk erd-col-name">&rarr; user_id</span><span class="erd-col-type">INTEGER</span></div>
+          <div class="erd-col"><span class="erd-fk erd-col-name">&rarr; workspace_id</span><span class="erd-col-type">INTEGER</span></div>
           <div class="erd-col"><span class="erd-col-name">title</span><span class="erd-col-type">VARCHAR(255)</span></div>
           <div class="erd-col"><span class="erd-col-name">created_at</span><span class="erd-col-type">TIMESTAMPTZ</span></div>
+          <div class="erd-col"><span class="erd-col-name">deleted_at</span><span class="erd-col-type">TIMESTAMPTZ</span></div>
         </div>
 
         <!-- messages -->
         <div class="erd-table">
           <div class="erd-th">messages</div>
-          <div class="erd-col"><span class="erd-pk erd-col-name">🔑 id</span><span class="erd-col-type">INTEGER</span></div>
-          <div class="erd-col"><span class="erd-fk erd-col-name">→ conversation_id</span><span class="erd-col-type">INTEGER</span></div>
+          <div class="erd-col"><span class="erd-pk erd-col-name">&#x1F511; id</span><span class="erd-col-type">INTEGER</span></div>
+          <div class="erd-col"><span class="erd-fk erd-col-name">&rarr; conversation_id</span><span class="erd-col-type">INTEGER</span></div>
           <div class="erd-col"><span class="erd-col-name">role</span><span class="erd-col-type">VARCHAR(20)</span></div>
           <div class="erd-col"><span class="erd-col-name">content</span><span class="erd-col-type">TEXT</span></div>
+          <div class="erd-col"><span class="erd-col-name">created_at</span><span class="erd-col-type">TIMESTAMPTZ</span></div>
+        </div>
+
+        <!-- reminders -->
+        <div class="erd-table">
+          <div class="erd-th">reminders</div>
+          <div class="erd-col"><span class="erd-pk erd-col-name">&#x1F511; id</span><span class="erd-col-type">INTEGER</span></div>
+          <div class="erd-col"><span class="erd-fk erd-col-name">&rarr; user_id</span><span class="erd-col-type">INTEGER</span></div>
+          <div class="erd-col"><span class="erd-fk erd-col-name">&rarr; workspace_id</span><span class="erd-col-type">INTEGER</span></div>
+          <div class="erd-col"><span class="erd-col-name">text</span><span class="erd-col-type">VARCHAR(500)</span></div>
+          <div class="erd-col"><span class="erd-col-name">description</span><span class="erd-col-type">TEXT</span></div>
+          <div class="erd-col"><span class="erd-col-name">done</span><span class="erd-col-type">BOOLEAN</span></div>
+          <div class="erd-col"><span class="erd-col-name">type</span><span class="erd-col-type">VARCHAR(20)</span></div>
+          <div class="erd-col"><span class="erd-col-name">due_date</span><span class="erd-col-type">VARCHAR(50)</span></div>
+          <div class="erd-col"><span class="erd-col-name">due_time</span><span class="erd-col-type">VARCHAR(10)</span></div>
           <div class="erd-col"><span class="erd-col-name">created_at</span><span class="erd-col-type">TIMESTAMPTZ</span></div>
         </div>
 
@@ -257,7 +291,7 @@
     <p>Stores registered user accounts. The root entity — all other tables are scoped to a user via foreign keys.</p>
     <div class="schema-card">
       <div class="schema-header">
-        <span class="schema-icon">👤</span>
+        <span class="schema-icon">&#x1F464;</span>
         <span class="schema-name">users</span>
         <span class="schema-desc">PostgreSQL table</span>
       </div>
@@ -282,7 +316,90 @@
             <td class="col-name">password</td>
             <td class="col-type">VARCHAR</td>
             <td><span class="badge-nn">NOT NULL</span></td>
-            <td class="col-notes">Hashed password (bcrypt or passlib)</td>
+            <td class="col-notes">Hashed password (bcrypt via passlib)</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <hr class="divider" />
+
+  <!-- TABLE: workspaces -->
+  <section>
+    <div class="section-label">Table</div>
+    <h2>workspaces</h2>
+    <p>Organises a user's knowledge into named, typed containers. Every note, conversation, and reminder belongs to a workspace. Workspaces are soft-deleted via <code>deleted_at</code> — a user must always have at least one non-deleted workspace. The <code>is_default</code> flag marks the workspace created during first-time onboarding. <code>last_accessed_at</code> is updated each time the user activates the workspace and is used to auto-select it on the next login.</p>
+    <div class="schema-card">
+      <div class="schema-header">
+        <span class="schema-icon">&#x1F5C2;&#xFE0F;</span>
+        <span class="schema-name">workspaces</span>
+        <span class="schema-desc">PostgreSQL table — created at startup via ALTER TABLE IF NOT EXISTS</span>
+      </div>
+      <table class="col-table">
+        <thead>
+          <tr><th>Column</th><th>Type</th><th>Constraints</th><th>Notes</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="col-name">id</td>
+            <td class="col-type">INTEGER</td>
+            <td><span class="badge-pk">PK</span><span class="badge-idx">INDEX</span></td>
+            <td class="col-notes">Auto-incrementing primary key</td>
+          </tr>
+          <tr>
+            <td class="col-name">user_id</td>
+            <td class="col-type">INTEGER</td>
+            <td><span class="badge-fk">FK &rarr; users.id</span><span class="badge-nn">NOT NULL</span></td>
+            <td class="col-notes">Owner of this workspace — CASCADE DELETE when user is removed</td>
+          </tr>
+          <tr>
+            <td class="col-name">name</td>
+            <td class="col-type">VARCHAR(100)</td>
+            <td><span class="badge-nn">NOT NULL</span><span class="badge-uq">UNIQUE per user</span></td>
+            <td class="col-notes">Display label — e.g. "Capstone Research", "Claims System". Unique within the user's workspaces (enforced by composite unique index on user_id + name).</td>
+          </tr>
+          <tr>
+            <td class="col-name">type</td>
+            <td class="col-type">VARCHAR(30)</td>
+            <td><span class="badge-nn">NOT NULL</span></td>
+            <td class="col-notes">One of: <code>Academic</code>, <code>Professional</code>, <code>Personal</code>, <code>Project</code>, <code>Other</code></td>
+          </tr>
+          <tr>
+            <td class="col-name">description</td>
+            <td class="col-type">TEXT</td>
+            <td>nullable</td>
+            <td class="col-notes">Optional freeform description — shown in the workspace management panel</td>
+          </tr>
+          <tr>
+            <td class="col-name">is_default</td>
+            <td class="col-type">BOOLEAN</td>
+            <td>default: <code>false</code></td>
+            <td class="col-notes">Marks the workspace created during first-time onboarding. Only one workspace per user should have this set to true at any time.</td>
+          </tr>
+          <tr>
+            <td class="col-name">last_accessed_at</td>
+            <td class="col-type">TIMESTAMPTZ</td>
+            <td>nullable</td>
+            <td class="col-notes">Updated each time the user activates this workspace. Used to restore the last active workspace on next login.</td>
+          </tr>
+          <tr>
+            <td class="col-name">created_at</td>
+            <td class="col-type">TIMESTAMPTZ</td>
+            <td>server default: <code>now()</code></td>
+            <td class="col-notes">Timestamp when workspace was created (UTC)</td>
+          </tr>
+          <tr>
+            <td class="col-name">updated_at</td>
+            <td class="col-type">TIMESTAMPTZ</td>
+            <td>server default: <code>now()</code></td>
+            <td class="col-notes">Updated when name, type, or description changes</td>
+          </tr>
+          <tr>
+            <td class="col-name">deleted_at</td>
+            <td class="col-type">TIMESTAMPTZ</td>
+            <td>nullable</td>
+            <td class="col-notes">Soft-delete timestamp — non-null means the workspace is hidden. The API blocks deletion if this would leave the user with zero active workspaces.</td>
           </tr>
         </tbody>
       </table>
@@ -295,10 +412,10 @@
   <section>
     <div class="section-label">Table</div>
     <h2>notes</h2>
-    <p>Stores user-created notes. Each note is owned by one user and has at most one associated embedding (1-to-1).</p>
+    <p>Stores user-created notes. Each note is owned by one user, scoped to one workspace, and has at most one associated embedding (1-to-1). Soft-deleted rows have a non-null <code>deleted_at</code> and are excluded from retrieval. The RAG pipeline filters embeddings through this table's <code>workspace_id</code> to enforce workspace-scoped retrieval.</p>
     <div class="schema-card">
       <div class="schema-header">
-        <span class="schema-icon">📝</span>
+        <span class="schema-icon">&#x1F4DD;</span>
         <span class="schema-name">notes</span>
         <span class="schema-desc">PostgreSQL table</span>
       </div>
@@ -316,8 +433,14 @@
           <tr>
             <td class="col-name">user_id</td>
             <td class="col-type">INTEGER</td>
-            <td><span class="badge-fk">FK → users.id</span><span class="badge-nn">NOT NULL</span></td>
+            <td><span class="badge-fk">FK &rarr; users.id</span><span class="badge-nn">NOT NULL</span></td>
             <td class="col-notes">CASCADE DELETE — removing user removes all notes</td>
+          </tr>
+          <tr>
+            <td class="col-name">workspace_id</td>
+            <td class="col-type">INTEGER</td>
+            <td><span class="badge-fk">FK &rarr; workspaces.id</span><span class="badge-nn">NOT NULL</span><span class="badge-idx">INDEX</span></td>
+            <td class="col-notes">Scopes this note to a workspace. CASCADE DELETE — removing a workspace removes its notes. Added via ALTER TABLE IF NOT EXISTS at startup.</td>
           </tr>
           <tr>
             <td class="col-name">title</td>
@@ -329,19 +452,25 @@
             <td class="col-name">content</td>
             <td class="col-type">TEXT</td>
             <td><span class="badge-nn">NOT NULL</span></td>
-            <td class="col-notes">Full body text of the note — this is embedded</td>
+            <td class="col-notes">Full body text of the note (HTML from Tiptap editor) — stripped before embedding</td>
           </tr>
           <tr>
             <td class="col-name">source</td>
             <td class="col-type">VARCHAR(255)</td>
             <td>nullable</td>
-            <td class="col-notes">Optional label — e.g. "Lecture 3", "uploaded PDF filename"</td>
+            <td class="col-notes">Optional label — e.g. "Lecture 3", "uploaded PDF filename", "youtube: &lt;title&gt;"</td>
           </tr>
           <tr>
             <td class="col-name">created_at</td>
             <td class="col-type">TIMESTAMPTZ</td>
             <td>server default: <code>now()</code></td>
             <td class="col-notes">Timestamp of note creation (UTC)</td>
+          </tr>
+          <tr>
+            <td class="col-name">deleted_at</td>
+            <td class="col-type">TIMESTAMPTZ</td>
+            <td>nullable</td>
+            <td class="col-notes">Soft-delete timestamp — non-null means the note is deleted. Added via ALTER TABLE IF NOT EXISTS at startup.</td>
           </tr>
         </tbody>
       </table>
@@ -357,7 +486,7 @@
     <p>Stores the 1 536-dimensional vector embedding for each note. Uses the <code>pgvector</code> extension. One embedding per note (unique FK). Cosine similarity search runs against this table.</p>
     <div class="schema-card">
       <div class="schema-header">
-        <span class="schema-icon">🧠</span>
+        <span class="schema-icon">&#x1F9E0;</span>
         <span class="schema-name">embeddings</span>
         <span class="schema-desc">pgvector table — requires <code>CREATE EXTENSION vector</code></span>
       </div>
@@ -375,14 +504,14 @@
           <tr>
             <td class="col-name">note_id</td>
             <td class="col-type">INTEGER</td>
-            <td><span class="badge-fk">FK → notes.id</span><span class="badge-uq">UNIQUE</span></td>
+            <td><span class="badge-fk">FK &rarr; notes.id</span><span class="badge-uq">UNIQUE</span></td>
             <td class="col-notes">CASCADE DELETE — one embedding per note maximum</td>
           </tr>
           <tr>
             <td class="col-name">vector</td>
             <td class="col-type">VECTOR(1536)</td>
             <td></td>
-            <td class="col-notes">OpenAI text-embedding-ada-002 output — 1 536 float dimensions</td>
+            <td class="col-notes">OpenAI text-embedding-3-small output — 1 536 float dimensions</td>
           </tr>
         </tbody>
       </table>
@@ -395,10 +524,10 @@
   <section>
     <div class="section-label">Table</div>
     <h2>conversations</h2>
-    <p>Represents a named chat session owned by a user. Contains one or more messages.</p>
+    <p>Represents a named chat session owned by a user, scoped to a workspace. Contains one or more messages. Soft-deleted via <code>deleted_at</code>. When a user switches workspaces the conversation list is filtered by the active <code>workspace_id</code>.</p>
     <div class="schema-card">
       <div class="schema-header">
-        <span class="schema-icon">💬</span>
+        <span class="schema-icon">&#x1F4AC;</span>
         <span class="schema-name">conversations</span>
         <span class="schema-desc">PostgreSQL table</span>
       </div>
@@ -416,8 +545,14 @@
           <tr>
             <td class="col-name">user_id</td>
             <td class="col-type">INTEGER</td>
-            <td><span class="badge-fk">FK → users.id</span><span class="badge-nn">NOT NULL</span></td>
+            <td><span class="badge-fk">FK &rarr; users.id</span><span class="badge-nn">NOT NULL</span></td>
             <td class="col-notes">Owner of this conversation</td>
+          </tr>
+          <tr>
+            <td class="col-name">workspace_id</td>
+            <td class="col-type">INTEGER</td>
+            <td><span class="badge-fk">FK &rarr; workspaces.id</span><span class="badge-nn">NOT NULL</span><span class="badge-idx">INDEX</span></td>
+            <td class="col-notes">Scopes this conversation to a workspace. Added via ALTER TABLE IF NOT EXISTS at startup.</td>
           </tr>
           <tr>
             <td class="col-name">title</td>
@@ -430,6 +565,12 @@
             <td class="col-type">TIMESTAMPTZ</td>
             <td>server default: <code>now()</code></td>
             <td class="col-notes">Timestamp when session was created</td>
+          </tr>
+          <tr>
+            <td class="col-name">deleted_at</td>
+            <td class="col-type">TIMESTAMPTZ</td>
+            <td>nullable</td>
+            <td class="col-notes">Soft-delete timestamp — non-null means conversation is hidden. Added via ALTER TABLE IF NOT EXISTS at startup.</td>
           </tr>
         </tbody>
       </table>
@@ -445,7 +586,7 @@
     <p>Stores individual chat messages (both user and AI) within a conversation. Supports paginated retrieval via <code>before_id</code> cursor.</p>
     <div class="schema-card">
       <div class="schema-header">
-        <span class="schema-icon">📨</span>
+        <span class="schema-icon">&#x1F4E8;</span>
         <span class="schema-name">messages</span>
         <span class="schema-desc">PostgreSQL table</span>
       </div>
@@ -463,7 +604,7 @@
           <tr>
             <td class="col-name">conversation_id</td>
             <td class="col-type">INTEGER</td>
-            <td><span class="badge-fk">FK → conversations.id</span></td>
+            <td><span class="badge-fk">FK &rarr; conversations.id</span></td>
             <td class="col-notes">CASCADE DELETE — messages deleted with conversation</td>
           </tr>
           <tr>
@@ -491,6 +632,89 @@
 
   <hr class="divider" />
 
+  <!-- TABLE: reminders -->
+  <section>
+    <div class="section-label">Table</div>
+    <h2>reminders</h2>
+    <p>Stores AI-generated and manually added reminders for each user, scoped to a workspace. The table is added at startup via <code>ALTER TABLE ... IF NOT EXISTS</code> migration so existing deployments are upgraded automatically. AI reminders are derived from the notes of the active workspace only. The workspace alert badge counts pending (non-done) reminders per workspace.</p>
+    <div class="schema-card">
+      <div class="schema-header">
+        <span class="schema-icon">&#x23F0;</span>
+        <span class="schema-name">reminders</span>
+        <span class="schema-desc">PostgreSQL table — migrated at startup</span>
+      </div>
+      <table class="col-table">
+        <thead>
+          <tr><th>Column</th><th>Type</th><th>Constraints</th><th>Notes</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="col-name">id</td>
+            <td class="col-type">INTEGER</td>
+            <td><span class="badge-pk">PK</span><span class="badge-idx">INDEX</span></td>
+            <td class="col-notes">Auto-incrementing primary key</td>
+          </tr>
+          <tr>
+            <td class="col-name">user_id</td>
+            <td class="col-type">INTEGER</td>
+            <td><span class="badge-fk">FK &rarr; users.id</span><span class="badge-nn">NOT NULL</span></td>
+            <td class="col-notes">Owner of this reminder — cascade delete when user is removed</td>
+          </tr>
+          <tr>
+            <td class="col-name">workspace_id</td>
+            <td class="col-type">INTEGER</td>
+            <td><span class="badge-fk">FK &rarr; workspaces.id</span><span class="badge-nn">NOT NULL</span><span class="badge-idx">INDEX</span></td>
+            <td class="col-notes">Scopes this reminder to a workspace. The Reminders panel only shows reminders for the active workspace. Counted for workspace alert badges. Added via ALTER TABLE IF NOT EXISTS at startup.</td>
+          </tr>
+          <tr>
+            <td class="col-name">text</td>
+            <td class="col-type">VARCHAR(500)</td>
+            <td><span class="badge-nn">NOT NULL</span></td>
+            <td class="col-notes">Short reminder title — AI instructions cap this at 60 characters</td>
+          </tr>
+          <tr>
+            <td class="col-name">description</td>
+            <td class="col-type">TEXT</td>
+            <td>nullable</td>
+            <td class="col-notes">One-to-two sentence context — populated by AI suggestions, optional for manual entries</td>
+          </tr>
+          <tr>
+            <td class="col-name">done</td>
+            <td class="col-type">BOOLEAN</td>
+            <td>default: <code>false</code></td>
+            <td class="col-notes">Completion flag — toggled from the reminder detail modal</td>
+          </tr>
+          <tr>
+            <td class="col-name">type</td>
+            <td class="col-type">VARCHAR(20)</td>
+            <td></td>
+            <td class="col-notes">Either <code>"ai"</code> (generated by GPT) or <code>"manual"</code> (user-added)</td>
+          </tr>
+          <tr>
+            <td class="col-name">due_date</td>
+            <td class="col-type">VARCHAR(50)</td>
+            <td>nullable</td>
+            <td class="col-notes">ISO date string YYYY-MM-DD — optional, set by AI or user</td>
+          </tr>
+          <tr>
+            <td class="col-name">due_time</td>
+            <td class="col-type">VARCHAR(10)</td>
+            <td>nullable</td>
+            <td class="col-notes">Time string HH:MM — optional, set by AI or user</td>
+          </tr>
+          <tr>
+            <td class="col-name">created_at</td>
+            <td class="col-type">TIMESTAMPTZ</td>
+            <td>server default: <code>now()</code></td>
+            <td class="col-notes">Timestamp when reminder was created (UTC)</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <hr class="divider" />
+
   <!-- RELATIONSHIPS -->
   <section>
     <div class="section-label">Relationships</div>
@@ -498,27 +722,57 @@
     <ul class="rel-list">
       <li class="rel-item">
         <span class="rel-from">users</span>
-        <span class="rel-type">1 → many</span>
-        <span class="rel-to">notes</span>
-        <span class="rel-note">A user owns many notes. notes.user_id → users.id (CASCADE DELETE)</span>
+        <span class="rel-type">1 &rarr; many</span>
+        <span class="rel-to">workspaces</span>
+        <span class="rel-note">A user owns many workspaces. workspaces.user_id &rarr; users.id (CASCADE DELETE). Soft-delete via deleted_at. At least one non-deleted workspace per user is enforced at the API layer.</span>
       </li>
       <li class="rel-item">
-        <span class="rel-from">notes</span>
-        <span class="rel-type">1 → 0..1</span>
-        <span class="rel-to">embeddings</span>
-        <span class="rel-note">Each note has at most one embedding. embeddings.note_id UNIQUE FK (CASCADE DELETE)</span>
+        <span class="rel-from">workspaces</span>
+        <span class="rel-type">1 &rarr; many</span>
+        <span class="rel-to">notes</span>
+        <span class="rel-note">A workspace contains many notes. notes.workspace_id &rarr; workspaces.id (CASCADE DELETE). RAG retrieval is filtered by this FK.</span>
+      </li>
+      <li class="rel-item">
+        <span class="rel-from">workspaces</span>
+        <span class="rel-type">1 &rarr; many</span>
+        <span class="rel-to">conversations</span>
+        <span class="rel-note">A workspace contains many conversations. conversations.workspace_id &rarr; workspaces.id. Conversation list is filtered by active workspace.</span>
+      </li>
+      <li class="rel-item">
+        <span class="rel-from">workspaces</span>
+        <span class="rel-type">1 &rarr; many</span>
+        <span class="rel-to">reminders</span>
+        <span class="rel-note">A workspace contains many reminders. reminders.workspace_id &rarr; workspaces.id. Pending reminder count drives the workspace alert badge.</span>
       </li>
       <li class="rel-item">
         <span class="rel-from">users</span>
-        <span class="rel-type">1 → many</span>
+        <span class="rel-type">1 &rarr; many</span>
+        <span class="rel-to">notes</span>
+        <span class="rel-note">A user owns many notes (via user_id). notes.user_id &rarr; users.id (CASCADE DELETE). Soft-delete via deleted_at.</span>
+      </li>
+      <li class="rel-item">
+        <span class="rel-from">notes</span>
+        <span class="rel-type">1 &rarr; 0..1</span>
+        <span class="rel-to">embeddings</span>
+        <span class="rel-note">Each note has at most one embedding. embeddings.note_id UNIQUE FK (CASCADE DELETE). Workspace scope is inherited through the note.</span>
+      </li>
+      <li class="rel-item">
+        <span class="rel-from">users</span>
+        <span class="rel-type">1 &rarr; many</span>
         <span class="rel-to">conversations</span>
-        <span class="rel-note">A user owns many conversations. conversations.user_id → users.id</span>
+        <span class="rel-note">A user owns many conversations (via user_id). conversations.user_id &rarr; users.id. Soft-delete via deleted_at.</span>
       </li>
       <li class="rel-item">
         <span class="rel-from">conversations</span>
-        <span class="rel-type">1 → many</span>
+        <span class="rel-type">1 &rarr; many</span>
         <span class="rel-to">messages</span>
-        <span class="rel-note">A conversation contains many messages. messages.conversation_id → conversations.id (CASCADE DELETE)</span>
+        <span class="rel-note">A conversation contains many messages. messages.conversation_id &rarr; conversations.id (CASCADE DELETE)</span>
+      </li>
+      <li class="rel-item">
+        <span class="rel-from">users</span>
+        <span class="rel-type">1 &rarr; many</span>
+        <span class="rel-to">reminders</span>
+        <span class="rel-note">A user owns many reminders (AI-generated and manual). reminders.user_id &rarr; users.id (CASCADE DELETE)</span>
       </li>
     </ul>
   </section>
@@ -564,7 +818,7 @@
         <div class="index-table-label">embeddings</div>
         <div class="index-name">idx_embeddings_note_id_uq</div>
         <div class="index-cols">embeddings(note_id) UNIQUE</div>
-        <div class="index-purpose">Enforces 1-to-1 note → embedding constraint</div>
+        <div class="index-purpose">Enforces 1-to-1 note &rarr; embedding constraint</div>
       </div>
       <div class="index-card">
         <div class="index-table-label">embeddings</div>
@@ -584,7 +838,108 @@
         <div class="index-cols">messages(conversation_id)</div>
         <div class="index-purpose">Fetch all messages within a conversation</div>
       </div>
+      <div class="index-card">
+        <div class="index-table-label">reminders</div>
+        <div class="index-name">idx_reminders_user_id</div>
+        <div class="index-cols">reminders(user_id)</div>
+        <div class="index-purpose">List all reminders for a user (Reminders panel query)</div>
+      </div>
+      <div class="index-card">
+        <div class="index-table-label">workspaces</div>
+        <div class="index-name">idx_workspaces_user_id</div>
+        <div class="index-cols">workspaces(user_id)</div>
+        <div class="index-purpose">List all workspaces for a user (dropdown population)</div>
+      </div>
+      <div class="index-card">
+        <div class="index-table-label">workspaces</div>
+        <div class="index-name">idx_workspaces_user_name_uq</div>
+        <div class="index-cols">workspaces(user_id, name) UNIQUE</div>
+        <div class="index-purpose">Enforces workspace name uniqueness per user</div>
+      </div>
+      <div class="index-card">
+        <div class="index-table-label">notes</div>
+        <div class="index-name">idx_notes_workspace_id</div>
+        <div class="index-cols">notes(workspace_id)</div>
+        <div class="index-purpose">Workspace-scoped note listing and RAG retrieval filter</div>
+      </div>
+      <div class="index-card">
+        <div class="index-table-label">notes</div>
+        <div class="index-name">idx_notes_user_workspace</div>
+        <div class="index-cols">notes(user_id, workspace_id)</div>
+        <div class="index-purpose">Composite filter for user + workspace note queries</div>
+      </div>
+      <div class="index-card">
+        <div class="index-table-label">conversations</div>
+        <div class="index-name">idx_conversations_workspace_id</div>
+        <div class="index-cols">conversations(workspace_id)</div>
+        <div class="index-purpose">Workspace-scoped conversation list</div>
+      </div>
+      <div class="index-card">
+        <div class="index-table-label">reminders</div>
+        <div class="index-name">idx_reminders_workspace_id</div>
+        <div class="index-cols">reminders(workspace_id)</div>
+        <div class="index-purpose">Workspace-scoped reminder list and alert badge count</div>
+      </div>
     </div>
+  </section>
+
+  <hr class="divider" />
+
+  <!-- MIGRATION NOTES -->
+  <section>
+    <div class="section-label">Migration</div>
+    <h2>Migration Notes — Knowledge Workspace</h2>
+    <p>The following changes are applied at application startup via <code>ALTER TABLE ... IF NOT EXISTS</code> so existing deployments upgrade automatically without data loss.</p>
+    <div class="schema-card" style="margin-top:1.4rem;">
+      <div class="schema-header">
+        <span class="schema-icon">&#x1F4CB;</span>
+        <span class="schema-name">Startup migration steps</span>
+        <span class="schema-desc">Applied in order — idempotent</span>
+      </div>
+      <table class="col-table">
+        <thead>
+          <tr><th>Step</th><th>SQL Operation</th><th>Notes</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="col-name">1</td>
+            <td class="col-notes"><code>CREATE TABLE IF NOT EXISTS workspaces (...)</code></td>
+            <td class="col-notes">Creates the workspaces table on first boot</td>
+          </tr>
+          <tr>
+            <td class="col-name">2</td>
+            <td class="col-notes"><code>CREATE UNIQUE INDEX IF NOT EXISTS idx_workspaces_user_name_uq ON workspaces(user_id, name)</code></td>
+            <td class="col-notes">Enforces unique workspace names per user</td>
+          </tr>
+          <tr>
+            <td class="col-name">3</td>
+            <td class="col-notes"><code>ALTER TABLE notes ADD COLUMN IF NOT EXISTS workspace_id INTEGER REFERENCES workspaces(id)</code></td>
+            <td class="col-notes">Existing notes get <code>workspace_id = NULL</code> initially; a backfill step assigns them to a default workspace</td>
+          </tr>
+          <tr>
+            <td class="col-name">4</td>
+            <td class="col-notes"><code>ALTER TABLE conversations ADD COLUMN IF NOT EXISTS workspace_id INTEGER REFERENCES workspaces(id)</code></td>
+            <td class="col-notes">Same backfill pattern as notes</td>
+          </tr>
+          <tr>
+            <td class="col-name">5</td>
+            <td class="col-notes"><code>ALTER TABLE reminders ADD COLUMN IF NOT EXISTS workspace_id INTEGER REFERENCES workspaces(id)</code></td>
+            <td class="col-notes">Same backfill pattern as notes</td>
+          </tr>
+          <tr>
+            <td class="col-name">6</td>
+            <td class="col-notes">Backfill: for each existing user, create a default workspace named "My Workspace" (type: Other), then set <code>workspace_id</code> on all their orphaned rows</td>
+            <td class="col-notes">Run once — safe to skip if workspace_id is already populated</td>
+          </tr>
+          <tr>
+            <td class="col-name">7</td>
+            <td class="col-notes"><code>CREATE INDEX IF NOT EXISTS</code> for all new workspace-scoped indexes</td>
+            <td class="col-notes">All indexes listed in the Indexes section above</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="margin-top:1rem;"><strong style="color:var(--text)">Risk:</strong> Existing users with data but no workspace will have a synthetic "My Workspace" auto-created on first login. This is transparent to the user — they see their existing notes, conversations, and reminders already organised under one workspace and can rename or restructure from there.</p>
   </section>
 
 </div>

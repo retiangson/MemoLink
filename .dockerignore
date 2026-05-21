@@ -1,0 +1,11 @@
+.env
+__pycache__
+**/__pycache__
+*.pyc
+*.pyo
+.git
+.gitignore
+memolink_web
+*.html
+CLAUDE.md
+README.md

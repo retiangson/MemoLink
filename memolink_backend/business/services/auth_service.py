@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 
 from memolink_backend.domain.repositories.user_repository import UserRepository
 from memolink_backend.domain.interfaces.i_user_repository import IUserRepository
-from memolink_backend.contracts.auth_dtos import RegisterDTO, LoginDTO, TokenResponse
+from memolink_backend.contracts.auth_dtos import RegisterDTO, LoginDTO, TokenResponse, ChangePasswordDTO
 from memolink_backend.business.interfaces.i_auth_service import IAuthService
 from memolink_backend.core.security import hash_password, verify_password, create_access_token
 
@@ -31,3 +31,11 @@ class AuthService(IAuthService):
             raise ValueError("Invalid email or password")
         token = create_access_token(user.id, user.email)
         return TokenResponse(access_token=token, id=user.id, email=user.email)
+
+    def change_password(self, user_id: int, dto: ChangePasswordDTO) -> None:
+        user = self.repo.get_by_id(user_id)
+        if not user or not verify_password(dto.current_password, user.password):
+            raise ValueError("Current password is incorrect")
+        if len(dto.new_password) < 8:
+            raise ValueError("New password must be at least 8 characters")
+        self.repo.update_password(user_id, hash_password(dto.new_password))

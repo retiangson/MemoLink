@@ -20,7 +20,7 @@ class NoteService(INoteService):
         self.embedding_service = embedding_service
 
     def create_note(self, dto: NoteCreateDTO) -> NoteResponseDTO:
-        note = self.repo.create_note(user_id=dto.user_id, title=dto.title, content=dto.content, source=dto.source)
+        note = self.repo.create_note(user_id=dto.user_id, title=dto.title, content=dto.content, source=dto.source, workspace_id=getattr(dto, "workspace_id", None))
         if self.embedding_service and self.db:
             try:
                 with self.db.begin_nested():  # savepoint — rolls back only embedding on failure
@@ -37,8 +37,8 @@ class NoteService(INoteService):
         note = self.repo.get_by_id(note_id)
         return NoteResponseDTO.model_validate(note) if note else None
 
-    def list_notes(self, user_id: int) -> List[NoteResponseDTO]:
-        return [NoteResponseDTO.model_validate(n) for n in self.repo.get_for_user(user_id)]
+    def list_notes(self, user_id: int, workspace_id: int | None = None) -> List[NoteResponseDTO]:
+        return [NoteResponseDTO.model_validate(n) for n in self.repo.get_for_user(user_id, workspace_id)]
 
     def list_trash(self, user_id: int) -> List[dict[str, Any]]:
         notes = self.repo.get_trash_for_user(user_id)

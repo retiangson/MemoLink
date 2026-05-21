@@ -12,14 +12,14 @@ api.interceptors.request.use((config) => {
 });
 
 // Notes
-export async function createNote(title: string | null, content: string, source: string | null = null) {
-  return (await api.post("/notes", { title, content, source })).data;
+export async function createNote(title: string | null, content: string, source: string | null = null, workspace_id?: number | null) {
+  return (await api.post("/notes", { title, content, source, workspace_id: workspace_id ?? null })).data;
 }
 export async function getNote(note_id: number) {
   return (await api.post("/notes/get", { note_id })).data;
 }
-export async function listNotes() {
-  return (await api.post("/notes/list")).data;
+export async function listNotes(workspace_id?: number | null) {
+  return (await api.post("/notes/list", { workspace_id: workspace_id ?? null })).data;
 }
 export async function updateNote(note_id: number, title?: string | null, content?: string | null) {
   return (await api.post("/notes/update", { note_id, title: title ?? null, content: content ?? null })).data;
@@ -35,4 +35,9 @@ export async function restoreNote(note_id: number) {
 }
 export async function permanentDeleteNote(note_id: number) {
   return (await api.post("/notes/permanent-delete", { note_id })).data;
+}
+
+// Auth
+export async function changePassword(current_password: string, new_password: string) {
+  return (await api.post("/auth/change-password", { current_password, new_password })).data;
 }

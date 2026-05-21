@@ -8,6 +8,7 @@ import "../styles/markdown.css";
 interface Props {
   role: "user" | "assistant";
   content: string;
+  streaming?: boolean;
   onAdd?: (text: string) => void;
   onDelete?: () => void;
   onApplyEdit?: (content: string, noteId: number | null) => void;
@@ -37,7 +38,7 @@ function parseNoteEdit(content: string): {
   };
 }
 
-export default function ChatBubble({ role, content, onAdd, onDelete, onApplyEdit, hasOpenNote }: Props) {
+export default function ChatBubble({ role, content, streaming, onAdd, onDelete, onApplyEdit, hasOpenNote }: Props) {
   const isUser = role === "user";
   const [copied, setCopied] = useState(false);
   const [showLangPicker, setShowLangPicker] = useState(false);
@@ -128,7 +129,17 @@ export default function ChatBubble({ role, content, onAdd, onDelete, onApplyEdit
           ${isUser ? "bg-[#2F2F3F]/80 text-gray-100" : "text-white"}`}
       >
         {/* Pre-edit text (or full content if no edit block) */}
-        {pre && <MarkdownRenderer>{pre}</MarkdownRenderer>}
+        {pre && (
+          <span>
+            <MarkdownRenderer>{pre}</MarkdownRenderer>
+            {streaming && (
+              <span className="inline-block w-[2px] h-[1em] bg-indigo-400 ml-0.5 align-middle animate-[blink_0.8s_step-end_infinite]" />
+            )}
+          </span>
+        )}
+        {!pre && streaming && (
+          <span className="inline-block w-[2px] h-[1em] bg-indigo-400 align-middle animate-[blink_0.8s_step-end_infinite]" />
+        )}
 
         {/* Note edit block */}
         {edit && (

@@ -145,6 +145,18 @@
       font-size: 1rem; font-style: italic; color: var(--text); line-height: 1.75;
     }
 
+    /* ── DEPLOY BOX ── */
+    .deploy-box {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 12px; padding: 1.5rem 1.8rem; margin-top: 1.4rem;
+    }
+    .deploy-box pre {
+      font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+      font-size: .85rem; color: var(--cyan); margin-top: .8rem;
+      background: rgba(255,255,255,.04); border: 1px solid var(--border);
+      border-radius: 8px; padding: .9rem 1.1rem; overflow-x: auto;
+    }
+
     /* ── FOOTER ── */
     footer {
       text-align: center; padding: 2rem 1rem;
@@ -157,7 +169,7 @@
 
 <!-- NAV -->
 <nav>
-  <span class="nav-logo">⬡ MemoLink</span>
+  <span class="nav-logo">&#x2B21; MemoLink</span>
   <div class="nav-links">
     <a href="Overview.html" class="active">Overview</a>
     <a href="Requirements Analysis.html">Requirements</a>
@@ -181,6 +193,9 @@
     <span class="pill">OpenAI Embeddings</span>
     <span class="pill">Supabase / PostgreSQL</span>
     <span class="pill">Clean Architecture</span>
+    <span class="pill">Docker / nginx</span>
+    <span class="pill">SSE Streaming</span>
+    <span class="pill">Knowledge Workspaces</span>
   </div>
 </div>
 
@@ -221,34 +236,59 @@
 
     <div class="card-grid card-grid-3" style="margin-top:1.8rem;">
       <div class="card">
-        <div class="card-icon">📝</div>
+        <div class="card-icon">&#x1F4DD;</div>
         <h3>Knowledge Capture</h3>
-        <p>Create, edit, upload, and organise notes and documents. Supports plain text and file uploads (PDF, DOCX, TXT).</p>
+        <p>Create, edit, upload, and organise notes and documents. Rich Tiptap editor with formatting toolbar, Record, Export, and Video Import buttons.</p>
       </div>
       <div class="card">
-        <div class="card-icon">🔍</div>
+        <div class="card-icon">&#x1F50D;</div>
         <h3>Contextual Retrieval</h3>
-        <p>Semantic vector search over stored notes using OpenAI text-embedding-ada-002 and pgvector similarity matching.</p>
+        <p>Semantic vector search over stored notes using OpenAI text-embedding-3-small and pgvector cosine similarity matching.</p>
       </div>
       <div class="card">
-        <div class="card-icon">💬</div>
+        <div class="card-icon">&#x1F4AC;</div>
         <h3>Conversational AI</h3>
-        <p>Multi-turn chat sessions where every response cites the source notes that informed the answer.</p>
+        <p>Multi-turn chat sessions where every response cites the source notes that informed the answer. Tokens stream to the client in real time via SSE with a blinking cursor.</p>
       </div>
       <div class="card">
-        <div class="card-icon">🗂️</div>
+        <div class="card-icon">&#x1F5C2;&#xFE0F;</div>
         <h3>Conversation History</h3>
-        <p>Persistent, paginated conversation threads — rename, delete, or save AI replies back as notes.</p>
+        <p>Persistent, paginated conversation threads — rename, soft-delete, or save AI replies back as notes.</p>
       </div>
       <div class="card">
-        <div class="card-icon">📎</div>
+        <div class="card-icon">&#x1F4CE;</div>
         <h3>File-in-Chat Upload</h3>
         <p>Attach files directly in the chat; MemoLink extracts, embeds, and queries them in real time.</p>
       </div>
       <div class="card">
-        <div class="card-icon">🔐</div>
+        <div class="card-icon">&#x1F510;</div>
         <h3>User Accounts</h3>
-        <p>Registration and login with scoped data — each user sees only their own notes and conversations.</p>
+        <p>Registration and login with scoped data. User menu (avatar initials) with Settings, Help, and Sign Out. Change password with current-password verification.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">&#x1F4E1;</div>
+        <h3>Streaming AI</h3>
+        <p>Chat responses stream token-by-token via Server-Sent Events (<code>POST /api/chat/stream</code>). nginx disables buffering so chunks reach the browser instantly.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">&#x1F3A4;</div>
+        <h3>Voice Input</h3>
+        <p>Mic button in ChatInput triggers the <code>useRecording</code> hook — speech is transcribed and inserted as the prompt without typing.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">&#x23F0;</div>
+        <h3>Reminders &amp; AI Suggestions</h3>
+        <p>Right-sidebar Reminders panel with AI-generated and manual reminders. AI suggestions are derived from the user's notes only — GPT returns title, description, due date, and due time.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">&#x1F3AC;</div>
+        <h3>Video Import</h3>
+        <p>YouTube URL tab fetches captions via <code>youtube-transcript-api</code>. Upload File tab accepts MP4/M4A/WebM/MP3/WAV/MOV up to 25 MB and transcribes via OpenAI Whisper.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">&#x1F5C2;&#xFE0F;</div>
+        <h3>Knowledge Workspaces</h3>
+        <p>Organise notes, conversations, reminders, and AI context into named, typed workspaces — Academic, Professional, Personal, Project, or Other. RAG retrieval is scoped to the active workspace. An alert badge flags workspaces with pending reminders. First-time users are onboarded with a guided workspace creation flow.</p>
       </div>
     </div>
   </section>
@@ -260,7 +300,7 @@
     <div class="section-label">Architecture</div>
     <h2>System Architecture</h2>
     <p>
-      MemoLink follows a strict three-layer Clean Architecture — API → Business → Domain —
+      MemoLink follows a strict three-layer Clean Architecture — API &rarr; Business &rarr; Domain —
       combined with Domain-Driven Design and a manual Dependency Injection container.
     </p>
 
@@ -283,7 +323,7 @@
         <tr>
           <td><strong>Business</strong></td>
           <td><code>business/services/</code></td>
-          <td>Application logic — chat, notes, auth, conversations</td>
+          <td>Application logic — chat, notes, auth, conversations, reminders, video, workspaces</td>
           <td><span class="tag tag-py">Python</span></td>
         </tr>
         <tr>
@@ -313,7 +353,7 @@
         <tr>
           <td><strong>Frontend</strong></td>
           <td><code>memolink_web/</code></td>
-          <td>SPA — chat UI, note editor, auth pages</td>
+          <td>SPA — chat UI, note editor, reminders panel, auth pages</td>
           <td><span class="tag tag-ts">React</span><span class="tag tag-ts">TypeScript</span></td>
         </tr>
         <tr>
@@ -321,6 +361,12 @@
           <td><code>services/embedding_service</code></td>
           <td>Converts text to vectors, calls OpenAI API</td>
           <td><span class="tag tag-ai">OpenAI</span><span class="tag tag-db">pgvector</span></td>
+        </tr>
+        <tr>
+          <td><strong>Deployment</strong></td>
+          <td><code>docker-compose.yml</code></td>
+          <td>Backend + frontend containers orchestrated; nginx proxies /api/ and disables SSE buffering</td>
+          <td><span class="tag tag-db">Docker</span><span class="tag tag-py">nginx</span></td>
         </tr>
       </tbody>
     </table>
@@ -332,31 +378,46 @@
   <section>
     <div class="section-label">Data Flow</div>
     <h2>RAG Pipeline</h2>
-    <p>How a user question travels through MemoLink and becomes a grounded answer.</p>
+    <p>How a user question travels through MemoLink and becomes a grounded answer. The streaming path replaces the final step with an SSE event stream.</p>
 
     <div class="flow">
       <div class="flow-step">User submits prompt</div>
-      <span class="flow-arrow">→</span>
-      <div class="flow-step">Embed prompt → vector</div>
-      <span class="flow-arrow">→</span>
-      <div class="flow-step">pgvector cosine search</div>
-      <span class="flow-arrow">→</span>
+      <span class="flow-arrow">&rarr;</span>
+      <div class="flow-step">Embed prompt &rarr; vector</div>
+      <span class="flow-arrow">&rarr;</span>
+      <div class="flow-step">pgvector cosine search <em>(workspace-scoped)</em></div>
+      <span class="flow-arrow">&rarr;</span>
       <div class="flow-step">Top-K note chunks retrieved</div>
-      <span class="flow-arrow">→</span>
-      <div class="flow-step">Context + prompt → OpenAI GPT</div>
-      <span class="flow-arrow">→</span>
-      <div class="flow-step">Answer + source citations returned</div>
+      <span class="flow-arrow">&rarr;</span>
+      <div class="flow-step">Context + prompt &rarr; OpenAI GPT</div>
+      <span class="flow-arrow">&rarr;</span>
+      <div class="flow-step">Answer streamed via SSE / returned as JSON</div>
     </div>
 
     <div style="margin-top:1.4rem;">
       <div class="flow">
         <div class="flow-step">Note uploaded / created</div>
-        <span class="flow-arrow">→</span>
-        <div class="flow-step">Text extracted</div>
-        <span class="flow-arrow">→</span>
-        <div class="flow-step">Embed → 1 536-dim vector</div>
-        <span class="flow-arrow">→</span>
+        <span class="flow-arrow">&rarr;</span>
+        <div class="flow-step">Text extracted (strip HTML)</div>
+        <span class="flow-arrow">&rarr;</span>
+        <div class="flow-step">Embed &rarr; 1 536-dim vector</div>
+        <span class="flow-arrow">&rarr;</span>
         <div class="flow-step">Stored in <code>embeddings</code> table</div>
+      </div>
+    </div>
+
+    <div style="margin-top:1.4rem;">
+      <p style="margin-bottom:.5rem;"><strong style="color:var(--text)">SSE Streaming path</strong> (<code>POST /api/chat/stream</code>)</p>
+      <div class="flow">
+        <div class="flow-step">Same RAG retrieval</div>
+        <span class="flow-arrow">&rarr;</span>
+        <div class="flow-step">GPT stream=True</div>
+        <span class="flow-arrow">&rarr;</span>
+        <div class="flow-step"><code>data: {"t":"&lt;token&gt;"}</code> per chunk</div>
+        <span class="flow-arrow">&rarr;</span>
+        <div class="flow-step"><code>data: {"done":true,"id":&lt;msg_id&gt;}</code></div>
+        <span class="flow-arrow">&rarr;</span>
+        <div class="flow-step">Blinking cursor in UI</div>
       </div>
     </div>
   </section>
@@ -370,12 +431,13 @@
     <div class="card-grid card-grid-2" style="margin-top:1.4rem;">
       <div class="card">
         <h3>Backend</h3>
-        <p><strong>FastAPI</strong> — async REST API framework<br/>
+        <p><strong>FastAPI</strong> — async REST API + SSE streaming<br/>
            <strong>SQLAlchemy</strong> — ORM &amp; session management<br/>
            <strong>Pydantic v2</strong> — data validation &amp; DTOs<br/>
            <strong>Uvicorn</strong> — ASGI server<br/>
            <strong>python-jose</strong> — JWT utilities<br/>
-           <strong>python-multipart</strong> — file upload handling</p>
+           <strong>python-multipart</strong> — file upload handling<br/>
+           <strong>passlib (bcrypt)</strong> — password hashing</p>
       </div>
       <div class="card">
         <h3>Frontend</h3>
@@ -383,6 +445,7 @@
            <strong>TypeScript</strong> — type-safe development<br/>
            <strong>Vite</strong> — fast bundler &amp; dev server<br/>
            <strong>Tailwind CSS</strong> — utility-first styling<br/>
+           <strong>Tiptap</strong> — rich note editor<br/>
            <strong>React Router</strong> — client-side routing<br/>
            <strong>Axios</strong> — HTTP client</p>
       </div>
@@ -391,15 +454,54 @@
         <p><strong>PostgreSQL</strong> — primary relational database<br/>
            <strong>Supabase</strong> — hosted Postgres + pgvector<br/>
            <strong>pgvector</strong> — cosine similarity search<br/>
-           <strong>VectorType(1536)</strong> — custom SQLAlchemy column</p>
+           <strong>VectorType(1536)</strong> — custom SQLAlchemy column<br/>
+           <strong>reminders table</strong> — migrated at startup via ALTER TABLE IF NOT EXISTS</p>
       </div>
       <div class="card">
-        <h3>AI &amp; Embeddings</h3>
-        <p><strong>OpenAI GPT-4o</strong> — answer generation<br/>
-           <strong>text-embedding-ada-002</strong> — vector embeddings<br/>
+        <h3>AI &amp; Media</h3>
+        <p><strong>OpenAI GPT-4o</strong> — answer generation (streaming)<br/>
+           <strong>text-embedding-3-small</strong> — vector embeddings<br/>
+           <strong>OpenAI Whisper</strong> — audio/video transcription<br/>
+           <strong>youtube-transcript-api</strong> — YouTube caption extraction<br/>
            <strong>RAG pattern</strong> — grounded retrieval<br/>
            <strong>Top-K semantic search</strong> — relevant chunk selection</p>
       </div>
+      <div class="card">
+        <h3>Deployment</h3>
+        <p><strong>Docker</strong> — Python 3.11-slim backend image<br/>
+           <strong>Docker</strong> — Node build + nginx frontend image<br/>
+           <strong>docker-compose.yml</strong> — single-command orchestration<br/>
+           <strong>nginx.conf</strong> — proxies /api/ to backend, disables buffering for SSE</p>
+      </div>
+    </div>
+  </section>
+
+  <hr class="divider" />
+
+  <!-- DEPLOYMENT -->
+  <section>
+    <div class="section-label">Deployment</div>
+    <h2>Docker Compose Deployment</h2>
+    <p>
+      MemoLink ships with a complete Docker Compose configuration. The entire stack —
+      FastAPI backend, React/nginx frontend, and all configuration — is brought up with
+      a single command after copying the environment file.
+    </p>
+    <div class="deploy-box">
+      <p style="color:var(--text);font-size:.92rem;margin-bottom:.2rem;">
+        <strong>Prerequisites:</strong> Docker Desktop installed; <code>.env</code> file populated from <code>.env.example</code>.
+      </p>
+      <pre>cp .env.example .env        # fill in OPENAI_API_KEY, DATABASE_URL
+docker compose up --build   # builds and starts backend + frontend</pre>
+      <p style="margin-top:.9rem;font-size:.88rem;">
+        The backend container runs on port 8000 behind the nginx reverse proxy.
+        nginx forwards all <code>/api/</code> requests to FastAPI and sets
+        <code>X-Accel-Buffering: no</code> and <code>proxy_buffering off</code>
+        so SSE tokens flow through without delay. The frontend is served as
+        a static bundle on port 80. No ffmpeg or external media tools are required
+        in production — YouTube captions are fetched directly via HTTP and Whisper
+        runs inside the backend container.
+      </p>
     </div>
   </section>
 

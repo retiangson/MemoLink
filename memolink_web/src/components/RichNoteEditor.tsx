@@ -24,9 +24,38 @@ function isHtml(s: string) {
   return /^\s*</.test(s);
 }
 
+function looksLikeMarkdown(s: string) {
+  return /(^|\n)\s{0,3}#{1,6}\s+\S/.test(s) ||
+    /(^|\n)\s{0,3}[-*]\s+\S/.test(s) ||
+    /(^|\n)\s{0,3}\d+\.\s+\S/.test(s) ||
+    /(\*\*|__)[^*_]+(\*\*|__)/.test(s) ||
+    /(^|\n)\s{0,3}>\s+\S/.test(s);
+}
+
+function unwrapMarkdownFence(s: string) {
+  const match = s.trim().match(/^```(?:markdown|md)?\s*\n([\s\S]*?)\n```$/i);
+  return match ? match[1].trim() : s;
+}
+
+function hasRichHtmlStructure(s: string) {
+  return /<(h[1-6]|ul|ol|li|strong|em|blockquote|pre|code|table|thead|tbody|tr|th|td)\b/i.test(s);
+}
+
 async function toHtml(content: string): Promise<string> {
   if (!content.trim()) return "";
-  if (isHtml(content)) return content;
+  const unwrapped = unwrapMarkdownFence(content);
+  if (unwrapped !== content) return (await marked(unwrapped)) as string;
+  if (isHtml(content)) {
+    const doc = new DOMParser().parseFromString(content, "text/html");
+    const code = doc.body.querySelector("pre > code");
+    if (code && code.textContent && looksLikeMarkdown(code.textContent)) {
+      return (await marked(unwrapMarkdownFence(code.textContent))) as string;
+    }
+    if (hasRichHtmlStructure(content)) return content;
+    const text = doc.body.textContent ?? "";
+    if (looksLikeMarkdown(text)) return (await marked(text)) as string;
+    return content;
+  }
   return (await marked(content)) as string;
 }
 

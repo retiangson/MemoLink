@@ -1,10 +1,16 @@
+from typing import Optional
 from fastapi import APIRouter, Depends
+from pydantic import BaseModel
 from memolink_backend.di.request_container import RequestContainer, get_request_container
 from memolink_backend.core.security import get_current_user
 from memolink_backend.contracts.note_dtos import (
     NoteCreateDTO, NoteGetDTO, NoteListDTO, NoteUpdateDTO,
     NoteDeleteDTO, NoteSearchDTO, NoteResponseDTO,
 )
+
+
+class NoteListRequest(BaseModel):
+    workspace_id: Optional[int] = None
 
 router = APIRouter(prefix="/notes", tags=["notes"])
 
@@ -29,10 +35,11 @@ def get_note(
 
 @router.post("/list")
 def list_notes(
+    req: NoteListRequest = NoteListRequest(),
     current_user_id: int = Depends(get_current_user),
     c: RequestContainer = Depends(get_request_container),
 ):
-    return c.notes().list_notes(current_user_id)
+    return c.notes().list_notes(current_user_id, req.workspace_id)
 
 
 @router.post("/update", response_model=NoteResponseDTO | None)

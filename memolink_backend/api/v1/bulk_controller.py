@@ -1,5 +1,5 @@
-from fastapi import APIRouter, UploadFile, File, Depends
-from typing import List
+from fastapi import APIRouter, UploadFile, File, Form, Depends
+from typing import List, Optional
 from memolink_backend.di.request_container import RequestContainer, get_request_container
 from memolink_backend.core.security import get_current_user
 from memolink_backend.contracts.note_dtos import NoteCreateDTO
@@ -18,6 +18,7 @@ def _text_to_html(text: str) -> str:
 @router.post("/bulk")
 async def bulk_upload(
     files: List[UploadFile] = File(...),
+    workspace_id: Optional[int] = Form(None),
     current_user_id: int = Depends(get_current_user),
     c: RequestContainer = Depends(get_request_container),
 ):
@@ -37,7 +38,7 @@ async def bulk_upload(
             # Convert plain text to HTML paragraphs; leave HTML content as-is
             html_content = text if text.strip().startswith("<") else _text_to_html(text)
 
-            dto = NoteCreateDTO(user_id=current_user_id, title=filename, content=html_content, source=filename)
+            dto = NoteCreateDTO(user_id=current_user_id, title=filename, content=html_content, source=filename, workspace_id=workspace_id)
             note = c.notes().create_note(dto)
             created.append(note)
         except Exception as exc:

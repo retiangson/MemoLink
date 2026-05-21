@@ -24,6 +24,8 @@
     "clsx": "^2.1.1",
     "docx": "^9.6.1",
     "highlight.js": "^11.11.1",
+    "html-to-docx": "^1.8.0",
+    "html2pdf.js": "^0.14.0",
     "katex": "^0.16.25",
     "marked": "^17.0.0",
     "react": "^18.3.1",

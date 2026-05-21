@@ -125,7 +125,7 @@
 <body>
 
 <nav>
-  <span class="nav-logo">⬡ MemoLink</span>
+  <span class="nav-logo">&#x2B21; MemoLink</span>
   <div class="nav-links">
     <a href="Overview.html">Overview</a>
     <a href="Requirements Analysis.html" class="active">Requirements</a>
@@ -264,6 +264,114 @@
           <td><span class="req-priority p-low">Low</span></td>
           <td><span class="req-cat c-func">Conversations</span></td>
         </tr>
+        <tr>
+          <td class="req-id">FR-19</td>
+          <td class="req-text">The system must support streaming AI responses via Server-Sent Events (SSE). Tokens must reach the client incrementally with a blinking cursor in the UI.</td>
+          <td><span class="req-priority p-high">High</span></td>
+          <td><span class="req-cat c-func">AI/RAG</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">FR-20</td>
+          <td class="req-text">The chat input must include a microphone button that captures voice input via the <code>useRecording</code> hook and transcribes it as the user's prompt.</td>
+          <td><span class="req-priority p-med">Medium</span></td>
+          <td><span class="req-cat c-func">Chat</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">FR-21</td>
+          <td class="req-text">The system must provide a Reminders panel (right sidebar) supporting AI-generated and manual reminders. Each reminder has a title, description, due date, due time, type, and done flag.</td>
+          <td><span class="req-priority p-high">High</span></td>
+          <td><span class="req-cat c-func">Reminders</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">FR-22</td>
+          <td class="req-text">AI reminder suggestions must be generated exclusively from the user's stored notes (up to 15, HTML-stripped), returning text, description, due_date, and due_time from GPT.</td>
+          <td><span class="req-priority p-high">High</span></td>
+          <td><span class="req-cat c-func">Reminders</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">FR-23</td>
+          <td class="req-text">The note editor must support importing YouTube video captions via URL. The system fetches captions using <code>youtube-transcript-api</code> and inserts them as note content. A clear error is returned when no captions are available.</td>
+          <td><span class="req-priority p-high">High</span></td>
+          <td><span class="req-cat c-func">Video</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">FR-24</td>
+          <td class="req-text">The note editor must support uploading audio/video files (MP4, M4A, WebM, MP3, WAV, MOV up to 25 MB) and transcribing them via OpenAI Whisper for use as note content.</td>
+          <td><span class="req-priority p-high">High</span></td>
+          <td><span class="req-cat c-func">Video</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">FR-25</td>
+          <td class="req-text">Users must be able to change their password from the Settings panel by providing their current password and a new password (minimum 8 characters). The current password must be verified before the change is applied.</td>
+          <td><span class="req-priority p-med">Medium</span></td>
+          <td><span class="req-cat c-func">Auth</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">FR-26</td>
+          <td class="req-text">The entire MemoLink stack must be deployable via <code>docker compose up --build</code> using only a populated <code>.env</code> file — no manual server configuration required.</td>
+          <td><span class="req-priority p-med">Medium</span></td>
+          <td><span class="req-cat c-func">Ops</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">FR-27</td>
+          <td class="req-text">A new user who has no Knowledge Workspace must be redirected to a first-time workspace setup page immediately after login. The main dashboard must not be accessible until at least one workspace exists.</td>
+          <td><span class="req-priority p-high">High</span></td>
+          <td><span class="req-cat c-func">Workspaces</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">FR-28</td>
+          <td class="req-text">The workspace creation form must collect: Workspace Name (required, unique per user), Workspace Type (Academic, Professional, Personal, Project, or Other), and an optional Description.</td>
+          <td><span class="req-priority p-high">High</span></td>
+          <td><span class="req-cat c-func">Workspaces</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">FR-29</td>
+          <td class="req-text">After the first workspace is created, the system must mark it as the default workspace, set it as the active workspace in the user's session, and redirect the user to the main dashboard.</td>
+          <td><span class="req-priority p-high">High</span></td>
+          <td><span class="req-cat c-func">Workspaces</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">FR-30</td>
+          <td class="req-text">Returning users must have their last selected workspace loaded automatically after login. The <code>last_accessed_at</code> timestamp on the workspace record is updated each time the user activates that workspace.</td>
+          <td><span class="req-priority p-high">High</span></td>
+          <td><span class="req-cat c-func">Workspaces</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">FR-31</td>
+          <td class="req-text">A workspace selector dropdown must appear in the upper-left sidebar. It must display the active workspace name and allow the user to: switch to another workspace, create a new workspace, edit the active workspace's name/type/description, and view alert status.</td>
+          <td><span class="req-priority p-high">High</span></td>
+          <td><span class="req-cat c-func">Workspaces</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">FR-32</td>
+          <td class="req-text">If a workspace has at least one pending (incomplete) reminder or unresolved alert, a visible badge or icon must appear beside its name in the workspace dropdown.</td>
+          <td><span class="req-priority p-med">Medium</span></td>
+          <td><span class="req-cat c-func">Workspaces</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">FR-33</td>
+          <td class="req-text">When the active workspace changes, all visible content — notes list, conversation list, reminders panel, file uploads, and AI chat history — must update to show only data that belongs to the newly selected workspace.</td>
+          <td><span class="req-priority p-high">High</span></td>
+          <td><span class="req-cat c-func">Workspaces</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">FR-34</td>
+          <td class="req-text">The RAG pipeline must restrict vector similarity search to notes and uploaded files that belong to the active workspace. Cross-workspace retrieval must not occur unless the user explicitly enables it.</td>
+          <td><span class="req-priority p-high">High</span></td>
+          <td><span class="req-cat c-func">Workspaces</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">FR-35</td>
+          <td class="req-text">Each RAG source citation must include the <code>workspace_id</code> (or workspace name) of the note it came from, alongside the existing <code>note_id</code>, title, and snippet fields, to support traceability across workspaces when cross-workspace search is enabled.</td>
+          <td><span class="req-priority p-med">Medium</span></td>
+          <td><span class="req-cat c-func">Workspaces</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">FR-36</td>
+          <td class="req-text">The system must not allow a user to delete their only remaining workspace. Soft-deletion is used — deleted workspaces are hidden from the dropdown but remain in the database. A workspace may only be soft-deleted when the user owns at least two active workspaces.</td>
+          <td><span class="req-priority p-high">High</span></td>
+          <td><span class="req-cat c-func">Workspaces</span></td>
+        </tr>
       </tbody>
     </table>
   </section>
@@ -292,7 +400,7 @@
         </tr>
         <tr>
           <td class="req-id">NFR-02</td>
-          <td class="req-text">AI chat responses must complete within 10 seconds under normal conditions (bounded by LLM latency).</td>
+          <td class="req-text">AI chat responses must complete within 10 seconds under normal conditions (bounded by LLM latency). Streaming must deliver the first token within 2 seconds.</td>
           <td><span class="req-priority p-high">High</span></td>
           <td><span class="req-cat c-non">Performance</span></td>
         </tr>
@@ -322,7 +430,7 @@
         </tr>
         <tr>
           <td class="req-id">NFR-07</td>
-          <td class="req-text">The System Usability Scale (SUS) score for the frontend must reach ≥ 68 (above-average) in evaluation.</td>
+          <td class="req-text">The System Usability Scale (SUS) score for the frontend must reach &ge; 68 (above-average) in evaluation.</td>
           <td><span class="req-priority p-high">High</span></td>
           <td><span class="req-cat c-non">Usability</span></td>
         </tr>
@@ -344,6 +452,12 @@
           <td><span class="req-priority p-med">Medium</span></td>
           <td><span class="req-cat c-non">Portability</span></td>
         </tr>
+        <tr>
+          <td class="req-id">NFR-11</td>
+          <td class="req-text">The system must be fully deployable via <code>docker compose up</code> with only <code>.env</code> configuration — no ffmpeg, yt-dlp, or other host-level tool installations required.</td>
+          <td><span class="req-priority p-med">Medium</span></td>
+          <td><span class="req-cat c-non">Portability</span></td>
+        </tr>
       </tbody>
     </table>
   </section>
@@ -357,48 +471,103 @@
     <div class="uc-grid">
       <div class="uc-card">
         <div class="uc-actor">Actor: New User</div>
-        <div class="uc-title">UC-01 · Register</div>
+        <div class="uc-title">UC-01 &middot; Register</div>
         <div class="uc-desc">User submits email + password. System validates uniqueness, hashes password, and creates account. Returns user record.</div>
       </div>
       <div class="uc-card">
         <div class="uc-actor">Actor: Registered User</div>
-        <div class="uc-title">UC-02 · Login</div>
+        <div class="uc-title">UC-02 &middot; Login</div>
         <div class="uc-desc">User submits credentials. System verifies hash. Returns user ID stored client-side for subsequent requests.</div>
       </div>
       <div class="uc-card">
         <div class="uc-actor">Actor: Logged-in User</div>
-        <div class="uc-title">UC-03 · Create Note</div>
-        <div class="uc-desc">User writes a note. System stores it and asynchronously generates + stores a vector embedding for retrieval.</div>
+        <div class="uc-title">UC-03 &middot; Create Note</div>
+        <div class="uc-desc">User writes a note in the Tiptap rich editor. System stores it and asynchronously generates + stores a vector embedding for retrieval.</div>
       </div>
       <div class="uc-card">
         <div class="uc-actor">Actor: Logged-in User</div>
-        <div class="uc-title">UC-04 · Upload File</div>
+        <div class="uc-title">UC-04 &middot; Upload File</div>
         <div class="uc-desc">User uploads a file in chat. System extracts text, embeds it as a temporary note, and includes it in retrieval context.</div>
       </div>
       <div class="uc-card">
         <div class="uc-actor">Actor: Logged-in User</div>
-        <div class="uc-title">UC-05 · Ask AI Question</div>
-        <div class="uc-desc">User types a question. System embeds it, retrieves top-K notes, sends context to LLM, returns answer + citations.</div>
+        <div class="uc-title">UC-05 &middot; Ask AI Question</div>
+        <div class="uc-desc">User types a question. System embeds it, retrieves top-K notes, sends context to LLM, returns answer + citations. Tokens stream to the UI in real time.</div>
       </div>
       <div class="uc-card">
         <div class="uc-actor">Actor: Logged-in User</div>
-        <div class="uc-title">UC-06 · Browse Conversations</div>
+        <div class="uc-title">UC-06 &middot; Browse Conversations</div>
         <div class="uc-desc">User views all past sessions, selects one, and paginates through its message history.</div>
       </div>
       <div class="uc-card">
         <div class="uc-actor">Actor: Logged-in User</div>
-        <div class="uc-title">UC-07 · Save AI Reply as Note</div>
+        <div class="uc-title">UC-07 &middot; Save AI Reply as Note</div>
         <div class="uc-desc">User selects an AI message and saves it as a new note with a custom title for future retrieval.</div>
       </div>
       <div class="uc-card">
         <div class="uc-actor">Actor: Logged-in User</div>
-        <div class="uc-title">UC-08 · Manage Notes</div>
+        <div class="uc-title">UC-08 &middot; Manage Notes</div>
         <div class="uc-desc">User views, edits title/content, or deletes notes from their library. Deletion cascades to the embedding.</div>
       </div>
       <div class="uc-card">
         <div class="uc-actor">Actor: Logged-in User</div>
-        <div class="uc-title">UC-09 · Rename / Delete Conversation</div>
+        <div class="uc-title">UC-09 &middot; Rename / Delete Conversation</div>
         <div class="uc-desc">User renames a conversation for easier identification, or deletes it along with all its messages.</div>
+      </div>
+      <div class="uc-card">
+        <div class="uc-actor">Actor: Logged-in User</div>
+        <div class="uc-title">UC-10 &middot; Voice Input Chat</div>
+        <div class="uc-desc">User taps the mic button in ChatInput. The <code>useRecording</code> hook captures audio, the system transcribes it, and inserts the text as the prompt — no typing required.</div>
+      </div>
+      <div class="uc-card">
+        <div class="uc-actor">Actor: Logged-in User</div>
+        <div class="uc-title">UC-11 &middot; Import YouTube Video</div>
+        <div class="uc-desc">User pastes a YouTube URL in the Video Import modal. System fetches captions via <code>youtube-transcript-api</code> and inserts the transcript as note HTML content. Returns a 422 error if no captions are available.</div>
+      </div>
+      <div class="uc-card">
+        <div class="uc-actor">Actor: Logged-in User</div>
+        <div class="uc-title">UC-12 &middot; Upload Meeting Recording</div>
+        <div class="uc-desc">User drags an MP4/M4A/WebM/MP3/WAV/MOV file (up to 25 MB) onto the Upload File tab. System sends it to OpenAI Whisper for transcription and inserts the result as note content.</div>
+      </div>
+      <div class="uc-card">
+        <div class="uc-actor">Actor: Logged-in User</div>
+        <div class="uc-title">UC-13 &middot; Generate Reminders from Notes</div>
+        <div class="uc-desc">User clicks &ldquo;Suggest&rdquo; in the Reminders panel. System strips HTML, concatenates up to 15 notes, sends them to GPT, and returns AI-generated reminders with title, description, due date, and due time.</div>
+      </div>
+      <div class="uc-card">
+        <div class="uc-actor">Actor: Logged-in User</div>
+        <div class="uc-title">UC-14 &middot; Change Password</div>
+        <div class="uc-desc">User opens Settings from the avatar dropdown menu, enters their current password and a new password (&ge; 8 chars). System verifies the current password before applying the change.</div>
+      </div>
+      <div class="uc-card">
+        <div class="uc-actor">Actor: New User</div>
+        <div class="uc-title">UC-15 &middot; Create First Workspace</div>
+        <div class="uc-desc">After registration or first login, user is redirected to the workspace setup page. User provides a name, selects a type (Academic, Professional, Personal, Project, or Other), and optionally adds a description. The system creates the workspace, marks it as default and active, then redirects to the dashboard.</div>
+      </div>
+      <div class="uc-card">
+        <div class="uc-actor">Actor: Logged-in User</div>
+        <div class="uc-title">UC-16 &middot; Switch Active Workspace</div>
+        <div class="uc-desc">User clicks the workspace dropdown in the upper-left sidebar and selects a different workspace. All visible notes, conversations, reminders, and AI context immediately update to reflect the chosen workspace. The selection is persisted as the user's last accessed workspace.</div>
+      </div>
+      <div class="uc-card">
+        <div class="uc-actor">Actor: Logged-in User</div>
+        <div class="uc-title">UC-17 &middot; Create Additional Workspace</div>
+        <div class="uc-desc">User selects "Create New Workspace" from the workspace dropdown. The creation form appears. On submission the new workspace is saved, set as the active workspace, and the dropdown updates to reflect the change.</div>
+      </div>
+      <div class="uc-card">
+        <div class="uc-actor">Actor: Logged-in User</div>
+        <div class="uc-title">UC-18 &middot; Edit Workspace</div>
+        <div class="uc-desc">User selects "Manage Workspaces" from the dropdown and edits the name, type, or description of any of their workspaces. Changes are persisted and the dropdown label updates immediately if the active workspace is edited.</div>
+      </div>
+      <div class="uc-card">
+        <div class="uc-actor">Actor: Logged-in User</div>
+        <div class="uc-title">UC-19 &middot; Delete Workspace</div>
+        <div class="uc-desc">User attempts to delete a workspace. The system rejects deletion if it is the user's only remaining workspace. On success, the workspace is soft-deleted, removed from the dropdown, and the user is switched to another active workspace.</div>
+      </div>
+      <div class="uc-card">
+        <div class="uc-actor">Actor: Logged-in User</div>
+        <div class="uc-title">UC-20 &middot; View Workspace Alerts</div>
+        <div class="uc-desc">User opens the workspace dropdown. Workspaces with at least one pending reminder or unresolved alert display a badge. User can switch to the alerted workspace to review the outstanding items in the Reminders panel.</div>
       </div>
     </div>
   </section>
@@ -442,6 +611,50 @@
       <span class="req-id">US-08</span> &nbsp;
       <span class="story-as">As a user,</span> I want to rename my conversations so that <span class="story-so">I can identify them at a glance in the sidebar.</span>
     </div>
+    <div class="story">
+      <span class="req-id">US-09</span> &nbsp;
+      <span class="story-as">As a user on a slow connection,</span> I want AI responses to stream token-by-token so that <span class="story-so">I can start reading the answer before it has fully arrived.</span>
+    </div>
+    <div class="story">
+      <span class="req-id">US-10</span> &nbsp;
+      <span class="story-as">As a student in a lecture,</span> I want to speak my question aloud so that <span class="story-so">I can interact with the AI without interrupting my note-taking.</span>
+    </div>
+    <div class="story">
+      <span class="req-id">US-11</span> &nbsp;
+      <span class="story-as">As a professional,</span> I want to import a YouTube tutorial URL so that <span class="story-so">its transcript is instantly searchable in my knowledge base.</span>
+    </div>
+    <div class="story">
+      <span class="req-id">US-12</span> &nbsp;
+      <span class="story-as">As a remote worker,</span> I want to upload a Zoom recording so that <span class="story-so">the meeting content is transcribed and available for AI retrieval.</span>
+    </div>
+    <div class="story">
+      <span class="req-id">US-13</span> &nbsp;
+      <span class="story-as">As a busy student,</span> I want the system to suggest reminders from my notes automatically so that <span class="story-so">I do not miss deadlines embedded in my study material.</span>
+    </div>
+    <div class="story">
+      <span class="req-id">US-14</span> &nbsp;
+      <span class="story-as">As a student,</span> I want to keep my Capstone Research notes in a separate workspace from my Math notes so that <span class="story-so">AI answers never mix context from different subjects.</span>
+    </div>
+    <div class="story">
+      <span class="req-id">US-15</span> &nbsp;
+      <span class="story-as">As a professional,</span> I want a dedicated Claims System workspace so that <span class="story-so">my work AI context never bleeds into my personal study notes.</span>
+    </div>
+    <div class="story">
+      <span class="req-id">US-16</span> &nbsp;
+      <span class="story-as">As a new user,</span> I want to be guided to create my first workspace right after signing up so that <span class="story-so">I always have an organised space before I start adding notes.</span>
+    </div>
+    <div class="story">
+      <span class="req-id">US-17</span> &nbsp;
+      <span class="story-as">As a returning user,</span> I want the system to automatically reopen my last-used workspace so that <span class="story-so">I can continue exactly where I left off without manually re-selecting it.</span>
+    </div>
+    <div class="story">
+      <span class="req-id">US-18</span> &nbsp;
+      <span class="story-as">As a user managing multiple projects,</span> I want reminders and AI suggestions scoped to my active workspace so that <span class="story-so">I only see tasks relevant to what I am currently working on.</span>
+    </div>
+    <div class="story">
+      <span class="req-id">US-19</span> &nbsp;
+      <span class="story-as">As a knowledge worker,</span> I want a badge to alert me when a workspace has pending reminders so that <span class="story-so">I can quickly switch to it and address outstanding tasks without forgetting them.</span>
+    </div>
   </section>
 
   <hr class="divider" />
@@ -452,34 +665,54 @@
     <h2>Constraints &amp; Assumptions</h2>
     <div class="constraint-grid">
       <div class="constraint">
-        <div class="constraint-icon">🔑</div>
+        <div class="constraint-icon">&#x1F511;</div>
         <h4>OpenAI API Required</h4>
         <p>Both embedding generation and answer generation depend on external OpenAI API access. Offline use is not supported.</p>
       </div>
       <div class="constraint">
-        <div class="constraint-icon">🗄️</div>
+        <div class="constraint-icon">&#x1F5C4;&#xFE0F;</div>
         <h4>pgvector Extension</h4>
         <p>The database must have the pgvector extension enabled. Supabase provides this out of the box.</p>
       </div>
       <div class="constraint">
-        <div class="constraint-icon">👤</div>
+        <div class="constraint-icon">&#x1F464;</div>
         <h4>Single-Tenant Model</h4>
         <p>MemoLink is designed for individual users. Team or multi-tenant sharing is out of scope for this capstone version.</p>
       </div>
       <div class="constraint">
-        <div class="constraint-icon">📄</div>
+        <div class="constraint-icon">&#x1F4C4;</div>
         <h4>File Type Scope</h4>
-        <p>Supported upload formats: plain text (.txt), PDF (.pdf), and Word documents (.docx). Other formats are rejected.</p>
+        <p>Chat uploads: plain text (.txt), PDF (.pdf), Word (.docx). Video uploads: MP4, M4A, WebM, MP3, WAV, MOV (max 25 MB).</p>
       </div>
       <div class="constraint">
-        <div class="constraint-icon">🧪</div>
+        <div class="constraint-icon">&#x1F9EA;</div>
         <h4>Evaluation Data</h4>
         <p>Evaluation uses only student-owned, publicly available, or participant-approved non-sensitive data. No private data.</p>
       </div>
       <div class="constraint">
-        <div class="constraint-icon">🌐</div>
+        <div class="constraint-icon">&#x1F310;</div>
         <h4>Browser-Based Only</h4>
         <p>The frontend is a web SPA. Native mobile apps are out of scope for this version.</p>
+      </div>
+      <div class="constraint">
+        <div class="constraint-icon">&#x1F3AC;</div>
+        <h4>YouTube Caption Dependency</h4>
+        <p>Video import via YouTube URL requires the video to have captions (auto-generated or manual). Videos without captions return a 422 error. No ffmpeg or yt-dlp is used.</p>
+      </div>
+      <div class="constraint">
+        <div class="constraint-icon">&#x1F4E4;</div>
+        <h4>25 MB Upload Limit</h4>
+        <p>Audio and video file uploads are capped at 25 MB — the OpenAI Whisper API limit. Files exceeding this are rejected before transcription.</p>
+      </div>
+      <div class="constraint">
+        <div class="constraint-icon">&#x1F5C2;&#xFE0F;</div>
+        <h4>Workspace Minimum</h4>
+        <p>Every user must have at least one workspace at all times. The system blocks deletion of the last remaining workspace and always enforces workspace-scoped data access at the API layer.</p>
+      </div>
+      <div class="constraint">
+        <div class="constraint-icon">&#x1F512;</div>
+        <h4>Workspace Ownership</h4>
+        <p>Workspaces are strictly user-owned. Cross-user workspace access is not permitted. Team or workspace-sharing is out of scope for this capstone version.</p>
       </div>
     </div>
   </section>

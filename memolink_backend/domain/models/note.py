@@ -8,6 +8,7 @@ class Note(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    workspace_id = Column(Integer, ForeignKey("workspaces.id", ondelete="SET NULL"), nullable=True, index=True)
     title = Column(String(255), nullable=True)
     content = Column(Text, nullable=False)
     source = Column(String(255), nullable=True)

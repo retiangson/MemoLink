@@ -8,6 +8,11 @@ class UserID(BaseModel):
 
 class CreateConvDTO(BaseModel):
     user_id: Optional[int] = None
+    workspace_id: Optional[int] = None
+
+
+class ListConvDTO(BaseModel):
+    workspace_id: Optional[int] = None
 
 
 class ConvID(BaseModel):

@@ -1,10 +1,10 @@
 import { api } from "./client";
 
-export async function getConversations() {
-  return (await api.post("/conversation/list")).data;
+export async function getConversations(workspace_id?: number | null) {
+  return (await api.post("/conversation/list", { workspace_id: workspace_id ?? null })).data;
 }
-export async function createConversation() {
-  return (await api.post("/conversation/create")).data;
+export async function createConversation(workspace_id?: number | null) {
+  return (await api.post("/conversation/create", { workspace_id: workspace_id ?? null })).data;
 }
 export async function getConversationMessagesPaginated(conversationId: number, limit = 10, beforeId?: number) {
   const query = beforeId ? `?limit=${limit}&before_id=${beforeId}` : `?limit=${limit}`;

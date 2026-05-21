@@ -20,6 +20,8 @@ from memolink_backend.api.v1 import (
     translate_controller,
     suggest_controller,
     reminder_controller,
+    video_controller,
+    workspace_controller,
 )
 
 # Register all models so SQLAlchemy sees them
@@ -29,6 +31,7 @@ import memolink_backend.domain.models.embedding        # noqa: F401
 import memolink_backend.domain.models.conversation     # noqa: F401
 import memolink_backend.domain.models.message          # noqa: F401
 import memolink_backend.domain.models.reminder         # noqa: F401
+import memolink_backend.domain.models.workspace        # noqa: F401
 
 with engine.connect() as _conn:
     _conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
@@ -37,6 +40,25 @@ with engine.connect() as _conn:
     _conn.execute(text("ALTER TABLE conversations ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ"))
     _conn.execute(text("ALTER TABLE reminders ADD COLUMN IF NOT EXISTS due_date VARCHAR(50)"))
     _conn.execute(text("ALTER TABLE reminders ADD COLUMN IF NOT EXISTS due_time VARCHAR(10)"))
+    _conn.execute(text("ALTER TABLE reminders ADD COLUMN IF NOT EXISTS description TEXT"))
+    # Knowledge Workspace migrations
+    _conn.execute(text("""
+        CREATE TABLE IF NOT EXISTS workspaces (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            name VARCHAR(100) NOT NULL,
+            type VARCHAR(30) NOT NULL DEFAULT 'Other',
+            description TEXT,
+            is_default BOOLEAN NOT NULL DEFAULT FALSE,
+            last_accessed_at TIMESTAMPTZ,
+            created_at TIMESTAMPTZ DEFAULT now(),
+            updated_at TIMESTAMPTZ DEFAULT now(),
+            deleted_at TIMESTAMPTZ
+        )
+    """))
+    _conn.execute(text("ALTER TABLE notes ADD COLUMN IF NOT EXISTS workspace_id INTEGER REFERENCES workspaces(id) ON DELETE SET NULL"))
+    _conn.execute(text("ALTER TABLE conversations ADD COLUMN IF NOT EXISTS workspace_id INTEGER REFERENCES workspaces(id) ON DELETE SET NULL"))
+    _conn.execute(text("ALTER TABLE reminders ADD COLUMN IF NOT EXISTS workspace_id INTEGER REFERENCES workspaces(id) ON DELETE SET NULL"))
     _conn.commit()
 
 Base.metadata.create_all(bind=engine)
@@ -73,3 +95,5 @@ app.include_router(transcribe_controller.router, prefix="/api")
 app.include_router(translate_controller.router, prefix="/api")
 app.include_router(suggest_controller.router, prefix="/api")
 app.include_router(reminder_controller.router, prefix="/api")
+app.include_router(video_controller.router, prefix="/api")
+app.include_router(workspace_controller.router, prefix="/api")

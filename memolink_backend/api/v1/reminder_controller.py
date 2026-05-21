@@ -11,30 +11,38 @@ router = APIRouter(prefix="/reminders", tags=["reminders"])
 
 def _serialize(r: Reminder) -> dict:
     return {
-        "id": r.id, "text": r.text, "type": r.type,
-        "done": r.done, "due_date": r.due_date, "due_time": r.due_time,
+        "id": r.id, "text": r.text, "description": r.description,
+        "type": r.type, "done": r.done,
+        "due_date": r.due_date, "due_time": r.due_time,
     }
 
 
 class CreateReminderRequest(BaseModel):
     text: str
+    description: Optional[str] = None
+    due_date: Optional[str] = None
+    due_time: Optional[str] = None
+    workspace_id: Optional[int] = None
+
+
+class UpdateReminderRequest(BaseModel):
+    done: Optional[bool] = None
+    text: Optional[str] = None
+    description: Optional[str] = None
     due_date: Optional[str] = None
     due_time: Optional[str] = None
 
 
-class UpdateReminderRequest(BaseModel):
-    done: bool
-
-
 @router.get("")
-def list_reminders(user_id: int = Depends(get_current_user), db: Session = Depends(get_db)):
-    reminders = (
-        db.query(Reminder)
-        .filter(Reminder.user_id == user_id)
-        .order_by(Reminder.created_at.desc())
-        .all()
-    )
-    return [_serialize(r) for r in reminders]
+def list_reminders(
+    user_id: int = Depends(get_current_user),
+    workspace_id: Optional[int] = None,
+    db: Session = Depends(get_db),
+):
+    q = db.query(Reminder).filter(Reminder.user_id == user_id)
+    if workspace_id is not None:
+        q = q.filter(Reminder.workspace_id == workspace_id)
+    return [_serialize(r) for r in q.order_by(Reminder.created_at.desc()).all()]
 
 
 @router.post("")
@@ -45,7 +53,9 @@ def create_reminder(
 ):
     reminder = Reminder(
         user_id=user_id,
+        workspace_id=req.workspace_id,
         text=req.text,
+        description=req.description or None,
         type="manual",
         done=False,
         due_date=req.due_date or None,
@@ -67,9 +77,18 @@ def update_reminder(
     reminder = db.query(Reminder).filter(Reminder.id == reminder_id, Reminder.user_id == user_id).first()
     if not reminder:
         raise HTTPException(status_code=404, detail="Reminder not found")
-    reminder.done = req.done
+    if req.done is not None:
+        reminder.done = req.done
+    if req.text is not None:
+        reminder.text = req.text
+    if req.description is not None:
+        reminder.description = req.description or None
+    if req.due_date is not None:
+        reminder.due_date = req.due_date or None
+    if req.due_time is not None:
+        reminder.due_time = req.due_time or None
     db.commit()
-    return {"id": reminder.id, "done": reminder.done}
+    return _serialize(reminder)
 
 
 @router.delete("/{reminder_id}")

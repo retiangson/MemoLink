@@ -5,6 +5,7 @@ import type { Conversation, Message } from "../types";
 interface MessageListProps {
   messages: Message[];
   loading: boolean;
+  streaming: boolean;
   activeConversation: Conversation | null;
   messagesContainerRef: React.RefObject<HTMLDivElement | null>;
   bottomRef: React.RefObject<HTMLDivElement | null>;
@@ -17,7 +18,7 @@ interface MessageListProps {
 }
 
 export function MessageList({
-  messages, loading, activeConversation,
+  messages, loading, streaming, activeConversation,
   messagesContainerRef, bottomRef,
   onLoadOlder, onAddToNotes, onDeleteMessage, onDropFiles,
   onApplyNoteEdit, hasOpenNote,
@@ -31,17 +32,21 @@ export function MessageList({
       onDrop={(e) => { e.preventDefault(); onDropFiles(Array.from(e.dataTransfer.files)); }}
     >
       <div className="max-w-[740px] mx-auto flex flex-col gap-4">
-        {messages.map((msg, idx) => (
-          <ChatBubble
-            key={msg.id}
-            role={msg.role}
-            content={msg.content}
-            onAdd={msg.role === "assistant" ? (text) => onAddToNotes(text) : undefined}
-            onDelete={() => onDeleteMessage(msg.id, msg.content, idx)}
-            onApplyEdit={msg.role === "assistant" ? onApplyNoteEdit : undefined}
-            hasOpenNote={hasOpenNote}
-          />
-        ))}
+        {messages.map((msg, idx) => {
+          const isStreamingMsg = streaming && idx === messages.length - 1 && msg.role === "assistant";
+          return (
+            <ChatBubble
+              key={msg.id}
+              role={msg.role}
+              content={msg.content}
+              streaming={isStreamingMsg}
+              onAdd={!isStreamingMsg && msg.role === "assistant" ? (text) => onAddToNotes(text) : undefined}
+              onDelete={!isStreamingMsg ? () => onDeleteMessage(msg.id, msg.content, idx) : undefined}
+              onApplyEdit={!isStreamingMsg && msg.role === "assistant" ? onApplyNoteEdit : undefined}
+              hasOpenNote={hasOpenNote}
+            />
+          );
+        })}
         {loading && <ChatBubble role="assistant" content="Thinking…" />}
         <div ref={bottomRef} />
       </div>

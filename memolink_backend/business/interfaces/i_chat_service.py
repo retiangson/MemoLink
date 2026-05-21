@@ -1,8 +1,9 @@
-from typing import Protocol, List
+from typing import Protocol, List, Iterator
 from fastapi import UploadFile
 from memolink_backend.contracts.chat_dtos import ChatRequestDTO, ChatResponseDTO
 
 
 class IChatService(Protocol):
     def ask(self, dto: ChatRequestDTO) -> ChatResponseDTO: ...
+    def ask_stream(self, dto: ChatRequestDTO) -> Iterator[str]: ...
     async def handle_file_upload(self, conversation_id: int, prompt: str, files: List[UploadFile]) -> ChatResponseDTO: ...

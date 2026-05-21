@@ -28,3 +28,8 @@ html, body {
 .markdown-body {
   color: #E8E8E8 !important;
 }
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}

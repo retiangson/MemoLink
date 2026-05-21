@@ -1,7 +1,8 @@
 from typing import Protocol
-from memolink_backend.contracts.auth_dtos import RegisterDTO, LoginDTO, TokenResponse
+from memolink_backend.contracts.auth_dtos import RegisterDTO, LoginDTO, TokenResponse, ChangePasswordDTO
 
 
 class IAuthService(Protocol):
     def register(self, dto: RegisterDTO) -> TokenResponse: ...
     def login(self, dto: LoginDTO) -> TokenResponse: ...
+    def change_password(self, user_id: int, dto: ChangePasswordDTO) -> None: ...

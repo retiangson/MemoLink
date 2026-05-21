@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends
 from memolink_backend.di.request_container import RequestContainer, get_request_container
 from memolink_backend.core.security import get_current_user
 from memolink_backend.contracts.conversation_dtos import (
-    CreateConvDTO, ConvID, RenameDTO, DeleteDTO, DeleteMessageDTO, AddToNoteDTO,
+    CreateConvDTO, ListConvDTO, ConvID, RenameDTO, DeleteDTO, DeleteMessageDTO, AddToNoteDTO,
 )
 
 router = APIRouter(prefix="/conversation", tags=["conversation"])
@@ -10,18 +10,20 @@ router = APIRouter(prefix="/conversation", tags=["conversation"])
 
 @router.post("/list")
 def list_conversations(
+    dto: ListConvDTO = ListConvDTO(),
     current_user_id: int = Depends(get_current_user),
     c: RequestContainer = Depends(get_request_container),
 ):
-    return c.conversations().list_for_user(current_user_id)
+    return c.conversations().list_for_user(current_user_id, dto.workspace_id)
 
 
 @router.post("/create")
 def create_conversation(
+    dto: CreateConvDTO = CreateConvDTO(),
     current_user_id: int = Depends(get_current_user),
     c: RequestContainer = Depends(get_request_container),
 ):
-    return c.conversations().create(current_user_id)
+    return c.conversations().create(current_user_id, workspace_id=dto.workspace_id)
 
 
 @router.post("/messages")
