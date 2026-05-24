@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import type { SuggestionItem } from "../hooks/useSuggestions";
 import { ReminderDetailModal } from "./ReminderDetailModal";
 import { AddReminderModal } from "./AddReminderModal";
+import { buildGoogleCalendarUrl } from "../utils/reminderUtils";
 
 interface RightPanelProps {
   open: boolean;
@@ -14,12 +15,14 @@ interface RightPanelProps {
   onRemove: (id: number) => void;
   onClearDone: () => void;
   onGenerate: () => void;
+  notificationPermission: NotificationPermission;
+  onRequestNotificationPermission: () => void;
 }
 
 export function RightPanel({
   open, onClose, items, isGenerating,
   onAddManual, onToggleDone, onUpdate, onRemove, onClearDone,
-  onGenerate,
+  onGenerate, notificationPermission, onRequestNotificationPermission,
 }: RightPanelProps) {
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState<SuggestionItem | null>(null);
@@ -41,7 +44,36 @@ export function RightPanel({
           </svg>
           <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">Reminders</span>
         </div>
-        <button onClick={onClose} className="text-gray-600 hover:text-gray-300 transition text-sm leading-none">✕</button>
+        <div className="flex items-center gap-1.5">
+          {/* Notification bell */}
+          <button
+            onClick={notificationPermission === "granted" ? undefined : onRequestNotificationPermission}
+            title={
+              notificationPermission === "granted" ? "Browser alerts enabled" :
+              notificationPermission === "denied" ? "Notifications blocked — enable in browser settings" :
+              "Enable browser alerts for due reminders"
+            }
+            className={`w-6 h-6 flex items-center justify-center rounded-md transition ${
+              notificationPermission === "granted"
+                ? "text-amber-400 cursor-default"
+                : notificationPermission === "denied"
+                  ? "text-gray-700 cursor-not-allowed"
+                  : "text-gray-600 hover:text-amber-400 hover:bg-[#2a2a38]"
+            }`}
+          >
+            {notificationPermission === "denied" ? (
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 16 16">
+                <path d="M5.388 1.17A4.001 4.001 0 0 1 12 5c0 .588.0 2.197.459 3.742c.316 1.508.52 2.16.52 2.16l.831.831a1 1 0 0 1-.707 1.707H9a2 2 0 0 1-4 0H1.5a1 1 0 0 1-.707-1.707l.5-.5M13.5 2.5l-11 11"/>
+                <path d="M13.646.354a.5.5 0 0 0-.707 0l-12 12a.5.5 0 0 0 .707.707l12-12a.5.5 0 0 0 0-.707"/>
+              </svg>
+            ) : (
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 16 16">
+                <path d="M8 16a2 2 0 0 0 2-2H6a2 2 0 0 0 2 2M8 1.918l-.797.161A4 4 0 0 0 4 6c0 .628-.134 2.197-.459 3.742-.16.767-.376 1.566-.663 2.258h10.244c-.287-.692-.502-1.49-.663-2.258C12.134 8.197 12 6.628 12 6a4 4 0 0 0-3.203-3.92zM14.22 12c.223.447.481.801.78 1H1c.299-.199.557-.553.78-1C2.68 10.2 3 6.88 3 6c0-2.42 1.72-4.44 4.005-4.901a1 1 0 1 1 1.99 0A5 5 0 0 1 13 6c0 .88.32 4.2 1.22 6"/>
+              </svg>
+            )}
+          </button>
+          <button onClick={onClose} className="text-gray-600 hover:text-gray-300 transition text-sm leading-none">✕</button>
+        </div>
       </div>
 
       {/* Action row: Generate + Add */}
@@ -154,14 +186,30 @@ export function RightPanel({
                 </div>
               </div>
 
-              {/* Remove */}
-              <button
-                onClick={(e) => { e.stopPropagation(); onRemove(item.id); }}
-                className="text-gray-700 hover:text-red-400 transition shrink-0 text-sm leading-none opacity-0 group-hover:opacity-100"
-                title="Delete"
-              >
-                ×
-              </button>
+              {/* Actions */}
+              <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition">
+                {item.due_date && (
+                  <a
+                    href={buildGoogleCalendarUrl(item.text, item.description, item.due_date, item.due_time)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    title="Add to Google Calendar"
+                    className="w-5 h-5 flex items-center justify-center text-gray-700 hover:text-indigo-400 transition"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" fill="currentColor" viewBox="0 0 16 16">
+                      <path d="M3.5 0a.5.5 0 0 1 .5.5V1h8V.5a.5.5 0 0 1 1 0V1h1a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2h1V.5a.5.5 0 0 1 .5-.5M1 4v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V4z"/>
+                    </svg>
+                  </a>
+                )}
+                <button
+                  onClick={(e) => { e.stopPropagation(); onRemove(item.id); }}
+                  className="w-5 h-5 flex items-center justify-center text-gray-700 hover:text-red-400 transition text-sm leading-none"
+                  title="Delete"
+                >
+                  ×
+                </button>
+              </div>
             </div>
           );
         })}

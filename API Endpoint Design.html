@@ -155,6 +155,7 @@
     <a href="Requirements Analysis.html">Requirements</a>
     <a href="Database Design.html">Database</a>
     <a href="API Endpoint Design.html" class="active">API</a>
+    <a href="Deployment.html">Deployment</a>
   </div>
 </nav>
 
@@ -178,22 +179,26 @@
         <tr><td><span class="method m-post">POST</span></td><td><code>/auth/register</code></td><td>Register a new user</td><td>Auth</td></tr>
         <tr><td><span class="method m-post">POST</span></td><td><code>/auth/login</code></td><td>Log in, return user record</td><td>Auth</td></tr>
         <tr><td><span class="method m-post">POST</span></td><td><code>/auth/change-password</code></td><td>Change password with current-password verification</td><td>Auth</td></tr>
+        <tr><td><span class="method m-post">POST</span></td><td><code>/auth/forgot-password</code></td><td>Request a password-reset email link</td><td>Auth</td></tr>
+        <tr><td><span class="method m-post">POST</span></td><td><code>/auth/reset-password</code></td><td>Reset password using a JWT reset token</td><td>Auth</td></tr>
         <tr><td><span class="method m-post">POST</span></td><td><code>/notes</code></td><td>Create a note</td><td>Notes</td></tr>
         <tr><td><span class="method m-post">POST</span></td><td><code>/notes/get</code></td><td>Get a single note by ID</td><td>Notes</td></tr>
         <tr><td><span class="method m-post">POST</span></td><td><code>/notes/list</code></td><td>List all notes for a user</td><td>Notes</td></tr>
         <tr><td><span class="method m-post">POST</span></td><td><code>/notes/update</code></td><td>Update note title / content</td><td>Notes</td></tr>
         <tr><td><span class="method m-post">POST</span></td><td><code>/notes/delete</code></td><td>Delete a note</td><td>Notes</td></tr>
         <tr><td><span class="method m-post">POST</span></td><td><code>/notes/search</code></td><td>Vector similarity search over notes</td><td>Notes</td></tr>
-        <tr><td><span class="method m-post">POST</span></td><td><code>/chat</code></td><td>Submit a prompt — returns AI answer + citations</td><td>Chat</td></tr>
-        <tr><td><span class="method m-post">POST</span></td><td><code>/chat/stream</code></td><td>Streaming AI response via SSE (text/event-stream)</td><td>Chat</td></tr>
+        <tr><td><span class="method m-post">POST</span></td><td><code>/notes/bulk</code></td><td>Bulk upload files — rich format preserved (DOCX/PDF/PPTX with images)</td><td>Notes</td></tr>
+        <tr><td><span class="method m-post">POST</span></td><td><code>/chat</code></td><td>Submit a prompt — returns AI answer + citations (supports <code>model</code>, <code>web_search</code>)</td><td>Chat</td></tr>
+        <tr><td><span class="method m-post">POST</span></td><td><code>/chat/stream</code></td><td>Streaming AI response via SSE — supports model selection, web search, image generation</td><td>Chat</td></tr>
         <tr><td><span class="method m-post">POST</span></td><td><code>/chat/upload</code></td><td>Upload files + prompt in one request</td><td>Chat</td></tr>
+        <tr><td><span class="method m-post">POST</span></td><td><code>/chat/agent/stream</code></td><td>Agentic chat with tool-call SSE events</td><td>Chat</td></tr>
         <tr><td><span class="method m-post">POST</span></td><td><code>/suggest</code></td><td>Generate AI reminder suggestions from notes</td><td>Suggest</td></tr>
         <tr><td><span class="method m-get">GET</span></td><td><code>/reminders</code></td><td>List reminders for a user</td><td>Reminders</td></tr>
         <tr><td><span class="method m-post">POST</span></td><td><code>/reminders</code></td><td>Create a manual reminder</td><td>Reminders</td></tr>
         <tr><td><span class="method m-patch">PATCH</span></td><td><code>/reminders/{id}</code></td><td>Update a reminder (partial)</td><td>Reminders</td></tr>
         <tr><td><span class="method m-delete">DELETE</span></td><td><code>/reminders/{id}</code></td><td>Delete a reminder</td><td>Reminders</td></tr>
         <tr><td><span class="method m-post">POST</span></td><td><code>/transcribe</code></td><td>Transcribe audio/video file via Whisper</td><td>Transcribe</td></tr>
-        <tr><td><span class="method m-post">POST</span></td><td><code>/translate</code></td><td>Translate text to a target language</td><td>Translate</td></tr>
+        <tr><td><span class="method m-post">POST</span></td><td><code>/translate</code></td><td>Translate text — Gemini quality loop, returns accuracy score and model</td><td>Translate</td></tr>
         <tr><td><span class="method m-post">POST</span></td><td><code>/video/import</code></td><td>Import YouTube video captions by URL</td><td>Video</td></tr>
         <tr><td><span class="method m-post">POST</span></td><td><code>/video/upload</code></td><td>Upload audio/video file for Whisper transcription</td><td>Video</td></tr>
         <tr><td><span class="method m-post">POST</span></td><td><code>/conversation/list</code></td><td>List conversations for a user</td><td>Conversation</td></tr>
@@ -210,6 +215,16 @@
         <tr><td><span class="method m-post">POST</span></td><td><code>/workspaces/delete</code></td><td>Soft-delete a workspace (blocked if last workspace)</td><td>Workspaces</td></tr>
         <tr><td><span class="method m-post">POST</span></td><td><code>/workspaces/set-active</code></td><td>Set the active workspace and update last_accessed_at</td><td>Workspaces</td></tr>
         <tr><td><span class="method m-post">POST</span></td><td><code>/workspaces/active</code></td><td>Return the currently active workspace for a user</td><td>Workspaces</td></tr>
+        <tr><td><span class="method m-post">POST</span></td><td><code>/feedback</code></td><td>Submit a bug report or suggestion (authenticated)</td><td>Feedback</td></tr>
+        <tr><td><span class="method m-get">GET</span></td><td><code>/features</code></td><td>Get feature flags filtered by caller's access level (authenticated)</td><td>Features</td></tr>
+        <tr><td><span class="method m-post">POST</span></td><td><code>/research/stream</code></td><td>Run research-mode pipeline, access-level gated (SSE stream)</td><td>Research</td></tr>
+        <tr><td><span class="method m-get">GET</span></td><td><code>/admin/feedback</code></td><td>List feedback with optional type &amp; status filters (admin only)</td><td>Admin</td></tr>
+        <tr><td><span class="method m-patch">PATCH</span></td><td><code>/admin/feedback/{id}</code></td><td>Update feedback status (admin only)</td><td>Admin</td></tr>
+        <tr><td><span class="method m-get">GET</span></td><td><code>/admin/users</code></td><td>List all users with roles and access levels (admin only)</td><td>Admin</td></tr>
+        <tr><td><span class="method m-patch">PATCH</span></td><td><code>/admin/users/{id}/role</code></td><td>Promote or demote user admin status (admin only)</td><td>Admin</td></tr>
+        <tr><td><span class="method m-patch">PATCH</span></td><td><code>/admin/users/{id}/level</code></td><td>Set user access level: regular, plus, or pro (admin only)</td><td>Admin</td></tr>
+        <tr><td><span class="method m-get">GET</span></td><td><code>/admin/features</code></td><td>Get all feature flags (admin only)</td><td>Admin</td></tr>
+        <tr><td><span class="method m-put">PUT</span></td><td><code>/admin/features</code></td><td>Update one or more feature flags (admin only)</td><td>Admin</td></tr>
       </tbody>
     </table>
   </section>
@@ -316,6 +331,70 @@
               <div class="schema-box-title">Error Responses</div>
               <pre><span class="json-num">401</span> <span class="json-type">Current password incorrect</span>
 <span class="json-num">400</span> <span class="json-type">New password too short (&lt;8 chars)</span></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- FORGOT PASSWORD -->
+      <div class="ep-card open" id="ep-forgot-pw">
+        <div class="ep-header" onclick="toggle('ep-forgot-pw')">
+          <span class="method m-post">POST</span>
+          <span class="ep-path">/api/v1/auth/forgot-password</span>
+          <span class="ep-summary">Request a password-reset email link</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">
+            Accepts an email address and, if a matching account exists, generates a signed JWT reset token with a 1-hour expiry and a <code>purpose:"reset"</code> claim. The reset link (<code>FRONTEND_URL/login?reset_token=&lt;token&gt;</code>) is sent to the user's address via SMTP. If SMTP is not configured the link is printed to the server console. The endpoint <strong>always returns HTTP 200</strong> regardless of whether the email is registered — this prevents email enumeration attacks.
+          </p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Request Body — ForgotPasswordDTO</div>
+              <pre>{
+  <span class="json-key">"email"</span>: <span class="json-str">"user@example.com"</span>
+}</pre>
+            </div>
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200 (always)</div>
+              <pre>{
+  <span class="json-key">"message"</span>: <span class="json-str">"If that email is registered, a reset link has been sent."</span>
+}</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RESET PASSWORD -->
+      <div class="ep-card open" id="ep-reset-pw">
+        <div class="ep-header" onclick="toggle('ep-reset-pw')">
+          <span class="method m-post">POST</span>
+          <span class="ep-path">/api/v1/auth/reset-password</span>
+          <span class="ep-summary">Reset password using a JWT reset token</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">Verifies the supplied JWT token (signature, expiry, and <code>purpose:"reset"</code> claim). On success, hashes the new password with bcrypt and persists it. Returns 400 if the token has expired, or 401 if the token is structurally invalid or the purpose claim does not match.</p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Request Body — ResetPasswordDTO</div>
+              <pre>{
+  <span class="json-key">"token"</span>:        <span class="json-str">"eyJhbGciOiJIUzI1NiIsInR5..."</span>,
+  <span class="json-key">"new_password"</span>: <span class="json-str">"newSecurePass123"</span>
+}</pre>
+            </div>
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200</div>
+              <pre>{
+  <span class="json-key">"message"</span>: <span class="json-str">"Password reset successful."</span>
+}</pre>
+            </div>
+          </div>
+          <div class="schema-row" style="margin-top:.8rem;">
+            <div class="schema-box">
+              <div class="schema-box-title">Error Responses</div>
+              <pre><span class="json-num">400</span> <span class="json-type">Token has expired (past 1-hour window)</span>
+<span class="json-num">401</span> <span class="json-type">Invalid token signature or wrong purpose claim</span></pre>
             </div>
           </div>
         </div>
@@ -510,6 +589,50 @@
         </div>
       </div>
 
+      <!-- BULK UPLOAD -->
+      <div class="ep-card open" id="ep-note-bulk">
+        <div class="ep-header" onclick="toggle('ep-note-bulk')">
+          <span class="method m-post">POST</span>
+          <span class="ep-path">/api/v1/notes/bulk</span>
+          <span class="ep-summary">Bulk upload files — rich formatting preserved</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">
+            Accepts one or more file uploads (DOCX, PDF, PPTX, TXT) as <code>multipart/form-data</code> and creates one note per file.
+            Uses <code>extract_formatted_html()</code> instead of plain text extraction to preserve rich document structure:
+            <br/><br/>
+            <strong>DOCX</strong> — headings (H1–H4 from paragraph style names), bold/italic/underline inline runs, bullet and numbered lists, tables (with <code>&lt;th&gt;</code> header rows), embedded images as base64 <code>&lt;img&gt;</code> tags; paragraphs and tables interleaved in document order.
+            <br/>
+            <strong>PDF</strong> — word-level extraction via pdfplumber; headings inferred by font-size ratio (≥ 1.5× body → H1; ≥ 1.3× → H2; ≥ 1.15× or bold+short → H3); bold text detected by fontname.
+            <br/>
+            <strong>PPTX</strong> — slide title → <code>&lt;h2&gt;</code>; content items → <code>&lt;ul&gt;</code> with indent levels; slide separator → <code>&lt;hr&gt;</code>; picture shapes extracted as base64 <code>&lt;img&gt;</code> tags.
+            <br/><br/>
+            Each created note is automatically embedded for RAG retrieval.
+          </p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Form Fields</div>
+              <pre><span class="json-key">user_id</span>      <span class="json-type">integer  (required)</span>
+<span class="json-key">workspace_id</span> <span class="json-type">integer  (optional)</span>
+<span class="json-key">files</span>        <span class="json-type">file[]   (required, multipart)</span>
+<span class="json-type">Accepted: .docx .pdf .pptx .txt</span></pre>
+            </div>
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200 — NoteResponseDTO[]</div>
+              <pre>[
+  {
+    <span class="json-key">"id"</span>:      <span class="json-num">60</span>,
+    <span class="json-key">"title"</span>:   <span class="json-str">"report.docx"</span>,
+    <span class="json-key">"content"</span>: <span class="json-str">"&lt;h1&gt;Executive Summary&lt;/h1&gt;&lt;p&gt;...&lt;/p&gt;"</span>,
+    <span class="json-key">"source"</span>:  <span class="json-str">"report.docx"</span>
+  }
+]</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
     </div>
   </section>
 
@@ -533,10 +656,11 @@
           <p class="ep-desc">
             Core RAG endpoint. Flow:
             1 — Embed the prompt via OpenAI text-embedding-3-small.
-            2 — Retrieve top-K notes by cosine similarity.
-            3 — Build a context-augmented system prompt.
-            4 — Call GPT for the answer.
-            5 — Return answer + source citations.
+            2 — Retrieve top-K notes by cosine similarity (workspace-scoped).
+            3 — Optionally query Brave Search API and inject results as system context (when <code>web_search: true</code>).
+            4 — Detect image-generation intent and call DALL-E 3 if triggered.
+            5 — Call the selected model (GPT or Gemini) for the answer.
+            6 — Return answer + source citations + model used.
             Persists both the user message and the AI reply to the conversation.
             For real-time streaming use <code>/chat/stream</code> instead.
           </p>
@@ -547,7 +671,9 @@
   <span class="json-key">"user_id"</span>:         <span class="json-num">1</span>,
   <span class="json-key">"conversation_id"</span>: <span class="json-num">7</span>,
   <span class="json-key">"prompt"</span>:          <span class="json-str">"What is retrieval-augmented generation?"</span>,
-  <span class="json-key">"top_k"</span>:           <span class="json-num">5</span>
+  <span class="json-key">"top_k"</span>:           <span class="json-num">5</span>,
+  <span class="json-key">"model"</span>:           <span class="json-str">"gpt-4o-mini"</span>,
+  <span class="json-key">"web_search"</span>:      <span class="json-bool">false</span>
 }</pre>
             </div>
             <div class="schema-box">
@@ -562,7 +688,8 @@
     }
   ],
   <span class="json-key">"attachments"</span>: [],
-  <span class="json-key">"message_id"</span>: <span class="json-num">103</span>
+  <span class="json-key">"message_id"</span>: <span class="json-num">103</span>,
+  <span class="json-key">"model"</span>: <span class="json-str">"gpt-4o-mini"</span>
 }</pre>
             </div>
           </div>
@@ -580,7 +707,9 @@
         <div class="ep-body">
           <p class="ep-desc">
             Same RAG pipeline as <code>/chat</code> but returns <code>Content-Type: text/event-stream</code>.
-            GPT is called with <code>stream=True</code>. Each token is forwarded immediately.
+            The selected model is called with <code>stream=True</code>. Each token is forwarded immediately.
+            Supports optional web search context injection (<code>web_search: true</code>) and multi-model selection via the <code>model</code> field.
+            When an image-generation intent is detected, yields "🎨 Generating your image…" first, then the base64 image tag.
             nginx must have <code>proxy_buffering off</code> and <code>X-Accel-Buffering: no</code> — both are set in <code>nginx.conf</code>.
             The frontend displays a blinking cursor while streaming; the cursor disappears when <code>done</code> is received.
           </p>
@@ -591,7 +720,9 @@
   <span class="json-key">"user_id"</span>:         <span class="json-num">1</span>,
   <span class="json-key">"conversation_id"</span>: <span class="json-num">7</span>,
   <span class="json-key">"prompt"</span>:          <span class="json-str">"Explain embeddings."</span>,
-  <span class="json-key">"top_k"</span>:           <span class="json-num">5</span>
+  <span class="json-key">"top_k"</span>:           <span class="json-num">5</span>,
+  <span class="json-key">"model"</span>:           <span class="json-str">"gemini-2.0-flash"</span>,
+  <span class="json-key">"web_search"</span>:      <span class="json-bool">true</span>
 }</pre>
             </div>
             <div class="schema-box">
@@ -602,7 +733,7 @@
 <span class="json-str">data: {"t":"dings"}</span>
 <span class="json-str">data: {"t":" are"}</span>
 <span class="json-type">... one event per token ...</span>
-<span class="json-str">data: {"done":true,"id":104}</span></pre>
+<span class="json-str">data: {"done":true,"id":104,"model":"gemini-2.0-flash"}</span></pre>
             </div>
           </div>
         </div>
@@ -642,6 +773,47 @@
   ],
   <span class="json-key">"message_id"</span>: <span class="json-num">104</span>
 }</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- AGENT STREAM -->
+      <div class="ep-card open" id="ep-chat-agent">
+        <div class="ep-header" onclick="toggle('ep-chat-agent')">
+          <span class="method m-post">POST</span>
+          <span class="ep-path">/api/v1/chat/agent/stream</span>
+          <span class="ep-summary">Agentic chat with tool-call SSE events</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">
+            Agentic variant of the streaming chat endpoint. Bypasses the standard RAG pipeline and uses tool-use capabilities. The SSE stream emits three event types in sequence:
+            (1) <code>{"tool_call": "&lt;name&gt;", "label": "&lt;display text&gt;"}</code> — rendered as status chips while a tool is executing;
+            (2) <code>{"tool_result": "&lt;result&gt;", "ok": true}</code> — signals tool completion;
+            (3) regular <code>{"t": "&lt;token&gt;"}</code> events for the final answer.
+            The frontend "Agent" toggle switches <code>streamChat()</code> to <code>streamAgentChat()</code> which targets this endpoint.
+          </p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Request Body — AgentChatDTO</div>
+              <pre>{
+  <span class="json-key">"conversation_id"</span>: <span class="json-num">7</span>,
+  <span class="json-key">"prompt"</span>:          <span class="json-str">"Search and summarise the latest on RAG."</span>,
+  <span class="json-key">"workspace_id"</span>:   <span class="json-num">1</span>,
+  <span class="json-key">"model"</span>:           <span class="json-str">"gpt-4o-mini"</span>
+}</pre>
+            </div>
+            <div class="schema-box">
+              <div class="schema-box-title">SSE Event Stream</div>
+              <pre><span class="json-type">Content-Type: text/event-stream</span>
+
+<span class="json-str">data: {"tool_call":"web_search","label":"Searching the web..."}</span>
+<span class="json-str">data: {"tool_result":"...","ok":true}</span>
+<span class="json-str">data: {"t":"Here"}</span>
+<span class="json-str">data: {"t":" is"}</span>
+<span class="json-type">... token events ...</span>
+<span class="json-str">data: {"done":true,"id":110,"model":"gpt-4o-mini"}</span></pre>
             </div>
           </div>
         </div>
@@ -884,7 +1056,17 @@
           <span class="ep-toggle">&#x25BC;</span>
         </div>
         <div class="ep-body">
-          <p class="ep-desc">Sends the provided text to GPT with a translation instruction and returns the translated result. Useful for translating transcripts or notes.</p>
+          <p class="ep-desc">
+            Translates text using a multi-round quality loop:
+            (1) Gemini 2.0 Flash Lite performs the initial translation;
+            (2) the result is back-translated to the source language;
+            (3) GPT scores semantic similarity (0–100);
+            (4) if the score is below 85, the feedback is fed back to Gemini for a refined translation — this repeats for up to 3 rounds.
+            A 1.2-second sleep is applied between API calls to avoid burst-rate detection.
+            If Gemini hits a rate limit the entire pipeline falls back to GPT-4o-mini.
+            For Māori translations a hint is injected specifying correct macron usage (ā ē ī ō ū) and natural fluency.
+            The <code>accuracy</code> field in the response is the final similarity score; it is <code>null</code> when the fallback model is used without a scoring round.
+          </p>
           <div class="schema-row">
             <div class="schema-box">
               <div class="schema-box-title">Request Body — TranslateDTO</div>
@@ -896,8 +1078,19 @@
             <div class="schema-box">
               <div class="schema-box-title">Response 200</div>
               <pre>{
-  <span class="json-key">"translated"</span>: <span class="json-str">"Hello world"</span>
+  <span class="json-key">"translation"</span>: <span class="json-str">"Hello world"</span>,
+  <span class="json-key">"accuracy"</span>:    <span class="json-num">92</span>,
+  <span class="json-key">"model"</span>:       <span class="json-str">"gemini-2.0-flash-lite"</span>
 }</pre>
+            </div>
+          </div>
+          <div class="schema-row" style="margin-top:.8rem;">
+            <div class="schema-box">
+              <div class="schema-box-title">Accuracy colour-coding in UI</div>
+              <pre><span class="json-num">&ge; 85</span>  <span class="json-type">Green  — high confidence</span>
+<span class="json-num">&ge; 70</span>  <span class="json-type">Amber  — acceptable</span>
+<span class="json-num">&lt; 70</span>   <span class="json-type">Red    — low confidence</span>
+<span class="json-null">null</span>   <span class="json-type">No score (GPT fallback path)</span></pre>
             </div>
           </div>
         </div>
@@ -1475,6 +1668,419 @@
       filtered to the active workspace unless <code>"cross_workspace": true</code> is passed in
       the chat request body.
     </p>
+  </section>
+
+  <hr class="divider" />
+
+  <!-- FEEDBACK -->
+  <section>
+    <div class="section-label">Feedback</div>
+    <h2>Feedback Endpoint</h2>
+    <div class="ep-group">
+
+      <div class="ep-card open" id="ep-feedback-submit">
+        <div class="ep-header" onclick="toggle('ep-feedback-submit')">
+          <span class="method m-post">POST</span>
+          <span class="ep-path">/api/v1/feedback</span>
+          <span class="ep-summary">Submit a bug report or feature suggestion</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">Accepts a <code>type</code> (<code>"bug"</code> or <code>"suggestion"</code>) and a non-empty <code>message</code>. The authenticated user's ID and email are resolved from the JWT. The record is stored in the <code>feedback</code> table with <code>status="open"</code>. If SMTP is configured, an email notification is sent to the admin address.</p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Request Body — FeedbackCreateDTO</div>
+              <pre>{
+  <span class="json-key">"type"</span>:    <span class="json-str">"bug"</span>,
+  <span class="json-key">"message"</span>: <span class="json-str">"The translation button disappears on mobile viewport."</span>
+}</pre>
+            </div>
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200</div>
+              <pre>{
+  <span class="json-key">"id"</span>:         <span class="json-num">1</span>,
+  <span class="json-key">"type"</span>:       <span class="json-str">"bug"</span>,
+  <span class="json-key">"message"</span>:    <span class="json-str">"The translation button..."</span>,
+  <span class="json-key">"status"</span>:     <span class="json-str">"open"</span>,
+  <span class="json-key">"created_at"</span>: <span class="json-str">"2026-05-24T..."</span>
+}</pre>
+            </div>
+          </div>
+          <div class="schema-row" style="margin-top:.8rem;">
+            <div class="schema-box">
+              <div class="schema-box-title">Error Responses</div>
+              <pre><span class="json-num">401</span> <span class="json-type">Not authenticated</span>
+<span class="json-num">422</span> <span class="json-type">Missing or invalid type/message</span></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <hr class="divider" />
+
+  <!-- FEATURES -->
+  <section>
+    <div class="section-label">Features</div>
+    <h2>Feature Flags Endpoint</h2>
+    <div class="ep-group">
+
+      <div class="ep-card open" id="ep-features-get">
+        <div class="ep-header" onclick="toggle('ep-features-get')">
+          <span class="method m-get">GET</span>
+          <span class="ep-path">/api/v1/features</span>
+          <span class="ep-summary">Get all feature flags (authenticated users)</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">Returns feature flag key-value pairs from the <code>feature_flags</code> table. For non-admin users the endpoint enforces access-level gating: each feature whose <code>*_min_level</code> flag exceeds the caller's JWT <code>access_level</code> has its <code>*_enabled</code> flag overridden to <code>"false"</code> before the response is returned. Admins always receive the raw flag values. The frontend calls this on login to show/hide feature buttons and enforce the default model.</p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">No Request Body</div>
+              <pre><span class="json-type">Bearer token in Authorization header</span></pre>
+            </div>
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200 — FeatureFlagsResponse</div>
+              <pre>{
+  <span class="json-key">"web_search_enabled"</span>:         <span class="json-str">"true"</span>,
+  <span class="json-key">"agent_mode_enabled"</span>:         <span class="json-str">"true"</span>,
+  <span class="json-key">"model_selection_enabled"</span>:    <span class="json-str">"true"</span>,
+  <span class="json-key">"image_generation_enabled"</span>:   <span class="json-str">"true"</span>,
+  <span class="json-key">"translation_enabled"</span>:        <span class="json-str">"true"</span>,
+  <span class="json-key">"file_upload_enabled"</span>:        <span class="json-str">"true"</span>,
+  <span class="json-key">"research_mode_enabled"</span>:      <span class="json-str">"false"</span>,
+  <span class="json-key">"default_model"</span>:              <span class="json-str">"gpt-4o-mini"</span>,
+  <span class="json-key">"default_language"</span>:           <span class="json-str">"English"</span>,
+  <span class="json-key">"web_search_min_level"</span>:        <span class="json-str">"regular"</span>,
+  <span class="json-key">"agent_mode_min_level"</span>:        <span class="json-str">"regular"</span>,
+  <span class="json-key">"model_selection_min_level"</span>:   <span class="json-str">"regular"</span>,
+  <span class="json-key">"image_generation_min_level"</span>:  <span class="json-str">"regular"</span>,
+  <span class="json-key">"translation_min_level"</span>:       <span class="json-str">"regular"</span>,
+  <span class="json-key">"file_upload_min_level"</span>:       <span class="json-str">"regular"</span>,
+  <span class="json-key">"research_mode_min_level"</span>:     <span class="json-str">"plus"</span>
+}</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- POST /research/stream -->
+      <div class="ep-card open" id="ep-research-stream">
+        <div class="ep-header" onclick="toggle('ep-research-stream')">
+          <span class="method m-post">POST</span>
+          <span class="ep-path">/api/v1/research/stream</span>
+          <span class="ep-summary">Run research-mode pipeline, access-level gated (SSE stream)</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">Triggers the research pipeline for a user query. Before streaming begins the backend validates two conditions: (1) <code>research_mode_enabled</code> is not <code>"false"</code> and (2) the caller's JWT <code>access_level</code> meets or exceeds <code>research_mode_min_level</code>. Failure on either check returns HTTP 403. On success the endpoint streams a cited, multi-source answer via Server-Sent Events using the same SSE format as the main chat stream.</p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Request Body — ResearchStreamDTO</div>
+              <pre>{
+  <span class="json-key">"query"</span>:           <span class="json-str">"Latest findings on RAG evaluation"</span>,
+  <span class="json-key">"conversation_id"</span>: <span class="json-num">42</span>
+}</pre>
+            </div>
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200 — SSE Stream</div>
+              <pre><span class="json-type">text/event-stream</span>
+
+data: <span class="json-str">"RAG (Retrieval-Augmented Generation)"</span>
+data: <span class="json-str">" was introduced..."</span>
+data: <span class="json-str">[DONE]</span></pre>
+            </div>
+          </div>
+          <div class="schema-row" style="margin-top:.8rem;">
+            <div class="schema-box">
+              <div class="schema-box-title">Error Responses</div>
+              <pre><span class="json-num">401</span> <span class="json-type">Not authenticated</span>
+<span class="json-num">403</span> <span class="json-type">Research Mode disabled or access level too low</span></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <hr class="divider" />
+
+  <!-- ADMIN -->
+  <section>
+    <div class="section-label">Admin</div>
+    <h2>Admin Endpoints</h2>
+    <p>All admin endpoints require a valid JWT with <code>is_admin: true</code>. Non-admin requests receive HTTP 403 from the <code>get_current_admin</code> FastAPI dependency. The first registered user is auto-promoted to admin on startup.</p>
+    <div class="ep-group">
+
+      <!-- ADMIN GET FEEDBACK -->
+      <div class="ep-card open" id="ep-admin-feedback-list">
+        <div class="ep-header" onclick="toggle('ep-admin-feedback-list')">
+          <span class="method m-get">GET</span>
+          <span class="ep-path">/api/v1/admin/feedback</span>
+          <span class="ep-summary">List all feedback with optional filters (admin only)</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">Returns all feedback entries, optionally filtered by <code>type</code> (<code>bug</code>, <code>suggestion</code>, or <code>all</code>) and <code>status</code> (<code>open</code>, <code>read</code>, <code>resolved</code>, or <code>all</code>). Results are ordered by <code>created_at</code> descending.</p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Query Params</div>
+              <pre><span class="json-key">type</span>   <span class="json-type">string (optional, default "all")</span>
+<span class="json-key">status</span> <span class="json-type">string (optional, default "all")</span></pre>
+            </div>
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200 — FeedbackEntry[]</div>
+              <pre>[
+  {
+    <span class="json-key">"id"</span>:         <span class="json-num">1</span>,
+    <span class="json-key">"user_id"</span>:    <span class="json-num">3</span>,
+    <span class="json-key">"user_email"</span>: <span class="json-str">"user@example.com"</span>,
+    <span class="json-key">"type"</span>:       <span class="json-str">"bug"</span>,
+    <span class="json-key">"message"</span>:    <span class="json-str">"Translation button disappears..."</span>,
+    <span class="json-key">"status"</span>:     <span class="json-str">"open"</span>,
+    <span class="json-key">"created_at"</span>: <span class="json-str">"2026-05-24T..."</span>
+  }
+]</pre>
+            </div>
+          </div>
+          <div class="schema-row" style="margin-top:.8rem;">
+            <div class="schema-box">
+              <div class="schema-box-title">Error Responses</div>
+              <pre><span class="json-num">403</span> <span class="json-type">Not an admin</span></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ADMIN PATCH FEEDBACK -->
+      <div class="ep-card open" id="ep-admin-feedback-update">
+        <div class="ep-header" onclick="toggle('ep-admin-feedback-update')">
+          <span class="method m-patch">PATCH</span>
+          <span class="ep-path">/api/v1/admin/feedback/{id}</span>
+          <span class="ep-summary">Update feedback status (admin only)</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">Updates the <code>status</code> field of a feedback entry. Valid values: <code>"open"</code>, <code>"read"</code>, <code>"resolved"</code>. Returns 404 if the feedback entry does not exist.</p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Path Param + Request Body</div>
+              <pre><span class="json-key">id</span> <span class="json-type">integer — feedback entry ID</span>
+
+{
+  <span class="json-key">"status"</span>: <span class="json-str">"resolved"</span>
+}</pre>
+            </div>
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200 — FeedbackEntry (updated)</div>
+              <pre><span class="json-type">Full updated feedback object</span></pre>
+            </div>
+          </div>
+          <div class="schema-row" style="margin-top:.8rem;">
+            <div class="schema-box">
+              <div class="schema-box-title">Error Responses</div>
+              <pre><span class="json-num">403</span> <span class="json-type">Not an admin</span>
+<span class="json-num">404</span> <span class="json-type">Feedback entry not found</span></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ADMIN GET USERS -->
+      <div class="ep-card open" id="ep-admin-users-list">
+        <div class="ep-header" onclick="toggle('ep-admin-users-list')">
+          <span class="method m-get">GET</span>
+          <span class="ep-path">/api/v1/admin/users</span>
+          <span class="ep-summary">List all users with roles (admin only)</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">Returns all registered users including their <code>id</code>, <code>email</code>, <code>is_admin</code> status, and <code>access_level</code> tier. Ordered by <code>id</code> ascending. Used by the Users tab in the Admin Panel where admins can promote/demote roles and change access levels.</p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">No Request Body</div>
+              <pre><span class="json-type">Bearer token (admin) required</span></pre>
+            </div>
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200 — AdminUserEntry[]</div>
+              <pre>[
+  {
+    <span class="json-key">"id"</span>:            <span class="json-num">1</span>,
+    <span class="json-key">"email"</span>:         <span class="json-str">"admin@example.com"</span>,
+    <span class="json-key">"is_admin"</span>:      <span class="json-bool">true</span>,
+    <span class="json-key">"access_level"</span>:  <span class="json-str">"pro"</span>
+  },
+  {
+    <span class="json-key">"id"</span>:            <span class="json-num">2</span>,
+    <span class="json-key">"email"</span>:         <span class="json-str">"user@example.com"</span>,
+    <span class="json-key">"is_admin"</span>:      <span class="json-bool">false</span>,
+    <span class="json-key">"access_level"</span>:  <span class="json-str">"regular"</span>
+  }
+]</pre>
+            </div>
+          </div>
+          <div class="schema-row" style="margin-top:.8rem;">
+            <div class="schema-box">
+              <div class="schema-box-title">Error Responses</div>
+              <pre><span class="json-num">403</span> <span class="json-type">Not an admin</span></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ADMIN PATCH USER ROLE -->
+      <div class="ep-card open" id="ep-admin-users-role">
+        <div class="ep-header" onclick="toggle('ep-admin-users-role')">
+          <span class="method m-patch">PATCH</span>
+          <span class="ep-path">/api/v1/admin/users/{id}/role</span>
+          <span class="ep-summary">Promote or demote user admin status (admin only)</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">Sets <code>is_admin</code> on the target user. Passing <code>true</code> promotes the user to admin; passing <code>false</code> demotes them. An admin cannot demote themselves. Returns 404 if the user does not exist.</p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Path Param + Request Body</div>
+              <pre><span class="json-key">id</span> <span class="json-type">integer — target user ID</span>
+
+{
+  <span class="json-key">"is_admin"</span>: <span class="json-bool">true</span>
+}</pre>
+            </div>
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200 — AdminUserEntry (updated)</div>
+              <pre>{
+  <span class="json-key">"id"</span>:       <span class="json-num">2</span>,
+  <span class="json-key">"email"</span>:    <span class="json-str">"user@example.com"</span>,
+  <span class="json-key">"is_admin"</span>: <span class="json-bool">true</span>
+}</pre>
+            </div>
+          </div>
+          <div class="schema-row" style="margin-top:.8rem;">
+            <div class="schema-box">
+              <div class="schema-box-title">Error Responses</div>
+              <pre><span class="json-num">403</span> <span class="json-type">Not an admin / cannot demote self</span>
+<span class="json-num">404</span> <span class="json-type">User not found</span></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ADMIN PATCH USER LEVEL -->
+      <div class="ep-card open" id="ep-admin-users-level">
+        <div class="ep-header" onclick="toggle('ep-admin-users-level')">
+          <span class="method m-patch">PATCH</span>
+          <span class="ep-path">/api/v1/admin/users/{id}/level</span>
+          <span class="ep-summary">Set user access level: regular, plus, or pro (admin only)</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">Updates the <code>access_level</code> column of the target user. Accepted values are <code>"regular"</code>, <code>"plus"</code>, and <code>"pro"</code>. The change is persisted immediately but the user must re-login before their JWT reflects the new level — the old token remains valid with the old level until it expires. Returns 400 for an invalid level string, 404 if the user is not found.</p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Path Param + Request Body</div>
+              <pre><span class="json-key">id</span> <span class="json-type">integer — target user ID</span>
+
+{
+  <span class="json-key">"level"</span>: <span class="json-str">"plus"</span>
+}</pre>
+            </div>
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200</div>
+              <pre>{
+  <span class="json-key">"ok"</span>: <span class="json-bool">true</span>
+}</pre>
+            </div>
+          </div>
+          <div class="schema-row" style="margin-top:.8rem;">
+            <div class="schema-box">
+              <div class="schema-box-title">Error Responses</div>
+              <pre><span class="json-num">400</span> <span class="json-type">Invalid level (not regular/plus/pro)</span>
+<span class="json-num">403</span> <span class="json-type">Not an admin</span>
+<span class="json-num">404</span> <span class="json-type">User not found</span></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ADMIN GET FEATURES -->
+      <div class="ep-card open" id="ep-admin-features-get">
+        <div class="ep-header" onclick="toggle('ep-admin-features-get')">
+          <span class="method m-get">GET</span>
+          <span class="ep-path">/api/v1/admin/features</span>
+          <span class="ep-summary">Get all feature flags with metadata (admin only)</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">Returns all rows from the <code>feature_flags</code> table including the <code>updated_at</code> timestamp for each flag. Provides more detail than the user-facing <code>GET /api/features</code> endpoint. Used by the Feature Flags tab in the Admin Panel.</p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">No Request Body</div>
+              <pre><span class="json-type">Bearer token (admin) required</span></pre>
+            </div>
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200 — FeatureFlagEntry[]</div>
+              <pre>[
+  {
+    <span class="json-key">"key"</span>:        <span class="json-str">"web_search_enabled"</span>,
+    <span class="json-key">"value"</span>:      <span class="json-str">"true"</span>,
+    <span class="json-key">"updated_at"</span>: <span class="json-str">"2026-05-24T..."</span>
+  },
+  {
+    <span class="json-key">"key"</span>:        <span class="json-str">"default_model"</span>,
+    <span class="json-key">"value"</span>:      <span class="json-str">"gpt-4o-mini"</span>,
+    <span class="json-key">"updated_at"</span>: <span class="json-str">"2026-05-24T..."</span>
+  }
+]</pre>
+            </div>
+          </div>
+          <div class="schema-row" style="margin-top:.8rem;">
+            <div class="schema-box">
+              <div class="schema-box-title">Error Responses</div>
+              <pre><span class="json-num">403</span> <span class="json-type">Not an admin</span></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ADMIN PUT FEATURES -->
+      <div class="ep-card open" id="ep-admin-features-put">
+        <div class="ep-header" onclick="toggle('ep-admin-features-put')">
+          <span class="method m-put">PUT</span>
+          <span class="ep-path">/api/v1/admin/features</span>
+          <span class="ep-summary">Update one or more feature flags (admin only)</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">Accepts a partial or full map of flag key-value pairs. Each provided key is upserted into the <code>feature_flags</code> table and <code>updated_at</code> is refreshed. Unknown keys are rejected with 422. Changes take effect immediately for all new user sessions — no application restart required.</p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Request Body — FeatureFlagsUpdateDTO</div>
+              <pre>{
+  <span class="json-key">"web_search_enabled"</span>:      <span class="json-str">"false"</span>,
+  <span class="json-key">"default_model"</span>:           <span class="json-str">"gpt-4o"</span>,
+  <span class="json-key">"image_generation_enabled"</span>: <span class="json-str">"true"</span>
+}</pre>
+            </div>
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200 — FeatureFlagEntry[] (all flags)</div>
+              <pre><span class="json-type">Full updated list of all feature flag entries</span></pre>
+            </div>
+          </div>
+          <div class="schema-row" style="margin-top:.8rem;">
+            <div class="schema-box">
+              <div class="schema-box-title">Error Responses</div>
+              <pre><span class="json-num">403</span> <span class="json-type">Not an admin</span>
+<span class="json-num">422</span> <span class="json-type">Unknown flag key or invalid value format</span></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
   </section>
 
 </div>

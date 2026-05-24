@@ -41,3 +41,8 @@ export async function permanentDeleteNote(note_id: number) {
 export async function changePassword(current_password: string, new_password: string) {
   return (await api.post("/auth/change-password", { current_password, new_password })).data;
 }
+
+// Feedback
+export async function submitFeedback(type: "bug" | "suggestion", message: string): Promise<{ ok: boolean }> {
+  return (await api.post("/feedback", { type, message })).data;
+}

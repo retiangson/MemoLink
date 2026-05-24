@@ -11,6 +11,9 @@ class RequestContainer:
         self.domain = DomainInstaller(db)
         self.services = ServiceInstaller(self.domain)
 
+    def agent(self):
+        return self.services.get_agent_service()
+
     def notes(self):
         return self.services.get_note_service()
 
@@ -22,6 +25,9 @@ class RequestContainer:
 
     def auth(self):
         return self.services.get_auth_service()
+
+    def research(self):
+        return self.services.get_research_service()
 
 
 def get_request_container(db: Session = Depends(get_db)) -> RequestContainer:

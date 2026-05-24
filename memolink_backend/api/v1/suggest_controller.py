@@ -13,6 +13,54 @@ from memolink_backend.domain.models.reminder import Reminder
 
 _HTML_TAG = re.compile(r"<[^>]+>")
 
+
+def _normalize_date(val: str) -> Optional[str]:
+    """Normalize various date formats to YYYY-MM-DD. Returns None if unparseable."""
+    val = val.strip()
+    if re.match(r"^\d{4}-\d{2}-\d{2}$", val):
+        return val
+    # DD-MM-YYYY or DD/MM/YYYY
+    m = re.match(r"^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$", val)
+    if m:
+        day, month, year = m.groups()
+        return f"{year}-{month.zfill(2)}-{day.zfill(2)}"
+    return None
+
+
+def _normalize_time(val: str) -> Optional[str]:
+    """Normalize various time formats to 24-hour HH:MM. Returns None if unparseable."""
+    val = val.strip()
+    # Already HH:MM
+    if re.match(r"^\d{2}:\d{2}$", val):
+        return val
+    # HH:MM:SS → strip seconds
+    m = re.match(r"^(\d{2}):(\d{2}):\d{2}$", val)
+    if m:
+        return f"{m.group(1)}:{m.group(2)}"
+    # 11:00 PM / 11:00 AM
+    m = re.match(r"^(\d{1,2}):(\d{2})\s*(AM|PM)$", val, re.IGNORECASE)
+    if m:
+        h, mn, ampm = int(m.group(1)), m.group(2), m.group(3).upper()
+        if ampm == "PM" and h != 12:
+            h += 12
+        elif ampm == "AM" and h == 12:
+            h = 0
+        return f"{h:02d}:{mn}"
+    # 11PM / 11AM
+    m = re.match(r"^(\d{1,2})\s*(AM|PM)$", val, re.IGNORECASE)
+    if m:
+        h, ampm = int(m.group(1)), m.group(2).upper()
+        if ampm == "PM" and h != 12:
+            h += 12
+        elif ampm == "AM" and h == 12:
+            h = 0
+        return f"{h:02d}:00"
+    # H:MM without AM/PM — treat as 24-hour
+    m = re.match(r"^(\d{1,2}):(\d{2})$", val)
+    if m:
+        return f"{int(m.group(1)):02d}:{m.group(2)}"
+    return None
+
 router = APIRouter(prefix="/suggest", tags=["suggest"])
 
 class SuggestRequest(BaseModel):
@@ -66,9 +114,10 @@ async def suggest(
                     "Include: meetings, appointments, deadlines, and concrete tasks with a named subject (e.g. 'Update RA document', 'Fix DB issue'). "
                     "SKIP only truly generic filler like 'review your notes' or 'consider improving' — anything with a specific subject or action is worth keeping. "
                     f"Resolve relative dates ('today' = {today_str}, 'tomorrow' = {tomorrow_str}). "
-                    "Parse DD-MM-YYYY and DD/MM/YYYY as YYYY-MM-DD. "
+                    "IMPORTANT: Always convert dates to YYYY-MM-DD format (e.g. DD-MM-YYYY '15-05-2026' → '2026-05-15'). "
+                    "IMPORTANT: Always convert times to 24-hour HH:MM format (e.g. '11PM' → '23:00', '2:30 PM' → '14:30', '9 AM' → '09:00'). "
                     "For each suggestion, produce a short 'text' title (under 60 chars) and a 'description' with 1-2 sentences of context or detail from the note explaining why this task matters or what it involves. "
-                    "Return JSON: {{\"suggestions\": [{{\"text\": \"...\", \"description\": \"...\", \"due_date\": \"YYYY-MM-DD or null\", \"due_time\": \"HH:MM or null\"}}]}}"
+                    "Return JSON: {{\"suggestions\": [{{\"text\": \"...\", \"description\": \"...\", \"due_date\": \"YYYY-MM-DD or null\", \"due_time\": \"24-hour HH:MM or null\"}}]}}"
                 ),
             },
             {
@@ -94,12 +143,10 @@ async def suggest(
             continue
         text = str(item.get("text", "")).strip()
         description = str(item.get("description", "")).strip() or None
-        due_date = item.get("due_date") or None
-        due_time = item.get("due_time") or None
-        if isinstance(due_date, str) and not due_date.strip():
-            due_date = None
-        if isinstance(due_time, str) and not due_time.strip():
-            due_time = None
+        raw_date = item.get("due_date")
+        raw_time = item.get("due_time")
+        due_date = _normalize_date(str(raw_date)) if isinstance(raw_date, str) and raw_date.strip() else None
+        due_time = _normalize_time(str(raw_time)) if isinstance(raw_time, str) and raw_time.strip() else None
         if not text:
             continue
 

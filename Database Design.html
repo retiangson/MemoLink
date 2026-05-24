@@ -178,6 +178,7 @@
     <a href="Requirements Analysis.html">Requirements</a>
     <a href="Database Design.html" class="active">Database</a>
     <a href="API Endpoint Design.html">API</a>
+    <a href="Deployment.html">Deployment</a>
   </div>
 </nav>
 
@@ -193,7 +194,9 @@
   <section>
     <div class="section-label">ERD</div>
     <h2>Entity-Relationship Overview</h2>
-    <p>Seven core tables: <code>users</code>, <code>workspaces</code>, <code>notes</code>, <code>embeddings</code>, <code>conversations</code>, <code>messages</code>, and <code>reminders</code>. All user-scoped tables cascade-delete when the user is removed. Notes, conversations, and workspaces carry a <code>deleted_at</code> column for soft-delete support. Notes, conversations, and reminders each carry a <code>workspace_id</code> foreign key so every piece of content is scoped to a workspace. Embeddings remain linked to notes; retrieval is workspace-scoped by joining through the note's <code>workspace_id</code>.</p>
+    <p>Nine core tables: <code>users</code>, <code>workspaces</code>, <code>notes</code>, <code>embeddings</code>, <code>conversations</code>, <code>messages</code>, <code>reminders</code>, <code>feature_flags</code>, and <code>feedback</code>. All user-scoped tables cascade-delete when the user is removed. Notes, conversations, and workspaces carry a <code>deleted_at</code> column for soft-delete support. Notes, conversations, and reminders each carry a <code>workspace_id</code> foreign key so every piece of content is scoped to a workspace. Embeddings remain linked to notes; retrieval is workspace-scoped by joining through the note's <code>workspace_id</code>.</p>
+  <p style="margin-top:.7rem;"><strong style="color:var(--text)">Schema stability for most new features:</strong> AI image generation (with fallback chain), multi-model chat, translation, web search, agent mode, and password reset are all stateless at the database layer — they require no additional tables or columns. Generated images are embedded as base64 data URLs inside the existing <code>messages.content</code> TEXT column (base64 is stripped from context before OpenAI calls to prevent token overflow). Model attribution is carried in the SSE stream and rendered client-side. Rich HTML from bulk file upload is stored in <code>notes.content</code>, which already accepts arbitrary HTML including embedded <code>&lt;img&gt;</code> tags.</p>
+  <p style="margin-top:.7rem;"><strong style="color:var(--text)">New tables for admin features:</strong> The <code>feature_flags</code> table stores system-wide feature toggles, defaults, and per-feature minimum access levels. The <code>feedback</code> table stores user-submitted bug reports and suggestions. The <code>users</code> table gains an <code>is_admin BOOLEAN</code> column and an <code>access_level VARCHAR</code> column (<code>'regular'</code> | <code>'plus'</code> | <code>'pro'</code>). JWT tokens embed both <code>is_admin</code> and <code>access_level</code> claims; the <code>get_current_user_info</code> dependency decodes them for stateless access-level enforcement without a DB lookup on every request.</p>
 
     <div class="erd-wrap">
       <div class="erd">
@@ -204,6 +207,8 @@
           <div class="erd-col"><span class="erd-pk erd-col-name">&#x1F511; id</span><span class="erd-col-type">INTEGER</span></div>
           <div class="erd-col"><span class="erd-col-name">email</span><span class="erd-col-type">VARCHAR</span></div>
           <div class="erd-col"><span class="erd-col-name">password</span><span class="erd-col-type">VARCHAR</span></div>
+          <div class="erd-col"><span class="erd-col-name">is_admin</span><span class="erd-col-type">BOOLEAN</span></div>
+          <div class="erd-col"><span class="erd-col-name">access_level</span><span class="erd-col-type">VARCHAR</span></div>
         </div>
 
         <!-- workspaces -->
@@ -278,6 +283,26 @@
           <div class="erd-col"><span class="erd-col-name">created_at</span><span class="erd-col-type">TIMESTAMPTZ</span></div>
         </div>
 
+        <!-- feature_flags -->
+        <div class="erd-table">
+          <div class="erd-th">feature_flags</div>
+          <div class="erd-col"><span class="erd-pk erd-col-name">&#x1F511; key</span><span class="erd-col-type">VARCHAR(100)</span></div>
+          <div class="erd-col"><span class="erd-col-name">value</span><span class="erd-col-type">TEXT</span></div>
+          <div class="erd-col"><span class="erd-col-name">updated_at</span><span class="erd-col-type">TIMESTAMPTZ</span></div>
+        </div>
+
+        <!-- feedback -->
+        <div class="erd-table">
+          <div class="erd-th">feedback</div>
+          <div class="erd-col"><span class="erd-pk erd-col-name">&#x1F511; id</span><span class="erd-col-type">INTEGER</span></div>
+          <div class="erd-col"><span class="erd-fk erd-col-name">&rarr; user_id</span><span class="erd-col-type">INTEGER</span></div>
+          <div class="erd-col"><span class="erd-col-name">user_email</span><span class="erd-col-type">VARCHAR</span></div>
+          <div class="erd-col"><span class="erd-col-name">type</span><span class="erd-col-type">VARCHAR(20)</span></div>
+          <div class="erd-col"><span class="erd-col-name">message</span><span class="erd-col-type">TEXT</span></div>
+          <div class="erd-col"><span class="erd-col-name">status</span><span class="erd-col-type">VARCHAR(20)</span></div>
+          <div class="erd-col"><span class="erd-col-name">created_at</span><span class="erd-col-type">TIMESTAMPTZ</span></div>
+        </div>
+
       </div>
     </div>
   </section>
@@ -288,7 +313,7 @@
   <section>
     <div class="section-label">Table</div>
     <h2>users</h2>
-    <p>Stores registered user accounts. The root entity — all other tables are scoped to a user via foreign keys.</p>
+    <p>Stores registered user accounts. The root entity — all other tables are scoped to a user via foreign keys. The <code>is_admin</code> column controls access to admin-only API endpoints; the first registered user is auto-promoted to admin on application startup. The <code>access_level</code> column (<code>'regular'</code> / <code>'plus'</code> / <code>'pro'</code>) gates premium features; admins can change any user's level via <code>PATCH /api/admin/users/{id}/level</code>. Both <code>is_admin</code> and <code>access_level</code> are embedded in the JWT so feature enforcement is stateless.</p>
     <div class="schema-card">
       <div class="schema-header">
         <span class="schema-icon">&#x1F464;</span>
@@ -317,6 +342,18 @@
             <td class="col-type">VARCHAR</td>
             <td><span class="badge-nn">NOT NULL</span></td>
             <td class="col-notes">Hashed password (bcrypt via passlib)</td>
+          </tr>
+          <tr>
+            <td class="col-name">is_admin</td>
+            <td class="col-type">BOOLEAN</td>
+            <td>default: <code>false</code></td>
+            <td class="col-notes">Admin flag — when <code>true</code>, the user can access admin-only API endpoints and the Admin Panel UI. The first registered user is promoted to admin automatically on startup. Admins can promote or demote other users via <code>PATCH /api/admin/users/{id}/role</code>. Admin status bypasses all access-level checks. Added via ALTER TABLE IF NOT EXISTS at startup.</td>
+          </tr>
+          <tr>
+            <td class="col-name">access_level</td>
+            <td class="col-type">VARCHAR</td>
+            <td><span class="badge-nn">NOT NULL</span> default: <code>'regular'</code></td>
+            <td class="col-notes">Subscription tier: <code>'regular'</code>, <code>'plus'</code>, or <code>'pro'</code>. Controls which feature-flag-gated features the user can access. Admins change it via <code>PATCH /api/admin/users/{id}/level</code>. Embedded in the JWT on login — level changes require the user to re-login to take effect. Added via <code>ALTER TABLE users ADD COLUMN IF NOT EXISTS access_level VARCHAR NOT NULL DEFAULT 'regular'</code> at startup.</td>
           </tr>
         </tbody>
       </table>
@@ -452,7 +489,7 @@
             <td class="col-name">content</td>
             <td class="col-type">TEXT</td>
             <td><span class="badge-nn">NOT NULL</span></td>
-            <td class="col-notes">Full body text of the note (HTML from Tiptap editor) — stripped before embedding</td>
+            <td class="col-notes">Full body HTML of the note (from Tiptap editor or bulk import). May contain headings, bold/italic/underline, lists, tables, and base64-embedded <code>&lt;img&gt;</code> tags from file import or editor paste. HTML is stripped before embedding generation.</td>
           </tr>
           <tr>
             <td class="col-name">source</td>
@@ -584,6 +621,7 @@
     <div class="section-label">Table</div>
     <h2>messages</h2>
     <p>Stores individual chat messages (both user and AI) within a conversation. Supports paginated retrieval via <code>before_id</code> cursor.</p>
+    <p style="margin-top:.6rem;"><strong style="color:var(--text)">Content format note:</strong> The <code>content</code> column stores free-form text which may contain Markdown, LaTeX, or — for AI image generation responses — a Markdown image tag embedding a base64 data URL (e.g. <code>![image](data:image/png;base64,...)</code>). Base64-embedded images are persistent and do not expire. For AI image replies, the content also includes DALL-E's revised prompt appended after the image. Translation responses are stored as plain text. No schema change is required for these content types — the <code>TEXT</code> column accommodates them without length restriction.</p>
     <div class="schema-card">
       <div class="schema-header">
         <span class="schema-icon">&#x1F4E8;</span>
@@ -617,7 +655,7 @@
             <td class="col-name">content</td>
             <td class="col-type">TEXT</td>
             <td></td>
-            <td class="col-notes">Raw message text (Markdown supported in UI)</td>
+            <td class="col-notes">Message body — Markdown and LaTeX supported. AI image generation replies include a Markdown <code>![image](data:image/...;base64,...)</code> tag with an embedded base64 data URL. Translation responses are stored as plain text. All content types are handled by the TEXT column without schema changes.</td>
           </tr>
           <tr>
             <td class="col-name">created_at</td>
@@ -715,6 +753,112 @@
 
   <hr class="divider" />
 
+  <!-- TABLE: feature_flags -->
+  <section>
+    <div class="section-label">Table</div>
+    <h2>feature_flags</h2>
+    <p>Stores system-wide feature toggles and string defaults. Each row is a key-value pair with an <code>updated_at</code> timestamp. The table is seeded with 8 default entries on application startup if they do not already exist. Admins read and write this table via the Feature Flags tab in the Admin Panel. All authenticated users can read the current flags via <code>GET /api/features</code>.</p>
+    <div class="schema-card">
+      <div class="schema-header">
+        <span class="schema-icon">&#x1F3F3;&#xFE0F;</span>
+        <span class="schema-name">feature_flags</span>
+        <span class="schema-desc">PostgreSQL table — seeded at startup</span>
+      </div>
+      <table class="col-table">
+        <thead>
+          <tr><th>Column</th><th>Type</th><th>Constraints</th><th>Notes</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="col-name">key</td>
+            <td class="col-type">VARCHAR(100)</td>
+            <td><span class="badge-pk">PK</span><span class="badge-nn">NOT NULL</span></td>
+            <td class="col-notes">Flag identifier — primary key. Default keys: <code>web_search_enabled</code>, <code>agent_mode_enabled</code>, <code>model_selection_enabled</code>, <code>image_generation_enabled</code>, <code>translation_enabled</code>, <code>file_upload_enabled</code>, <code>default_model</code>, <code>default_language</code>.</td>
+          </tr>
+          <tr>
+            <td class="col-name">value</td>
+            <td class="col-type">TEXT</td>
+            <td><span class="badge-nn">NOT NULL</span></td>
+            <td class="col-notes">Flag value as a string. Boolean flags use <code>"true"</code> or <code>"false"</code>. String flags (e.g. <code>default_model</code>) store the model identifier directly, e.g. <code>"gpt-4o-mini"</code>.</td>
+          </tr>
+          <tr>
+            <td class="col-name">updated_at</td>
+            <td class="col-type">TIMESTAMPTZ</td>
+            <td>server default: <code>now()</code></td>
+            <td class="col-notes">Timestamp of the most recent update to this flag. Updated each time an admin writes the flag via the API.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <hr class="divider" />
+
+  <!-- TABLE: feedback -->
+  <section>
+    <div class="section-label">Table</div>
+    <h2>feedback</h2>
+    <p>Stores bug reports and feature suggestions submitted by authenticated users. Each entry has a type (<code>bug</code> or <code>suggestion</code>), the submitting user's ID and email (denormalised for quick admin display), a message body, and a status lifecycle managed by admins. Optionally, an SMTP notification is sent to the admin when a new entry is created.</p>
+    <div class="schema-card">
+      <div class="schema-header">
+        <span class="schema-icon">&#x1F41B;</span>
+        <span class="schema-name">feedback</span>
+        <span class="schema-desc">PostgreSQL table — created at startup</span>
+      </div>
+      <table class="col-table">
+        <thead>
+          <tr><th>Column</th><th>Type</th><th>Constraints</th><th>Notes</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="col-name">id</td>
+            <td class="col-type">INTEGER</td>
+            <td><span class="badge-pk">PK</span><span class="badge-idx">INDEX</span></td>
+            <td class="col-notes">Auto-incrementing primary key</td>
+          </tr>
+          <tr>
+            <td class="col-name">user_id</td>
+            <td class="col-type">INTEGER</td>
+            <td><span class="badge-fk">FK &rarr; users.id</span><span class="badge-nn">NOT NULL</span></td>
+            <td class="col-notes">The user who submitted the report. CASCADE DELETE — removing a user removes their feedback.</td>
+          </tr>
+          <tr>
+            <td class="col-name">user_email</td>
+            <td class="col-type">VARCHAR</td>
+            <td><span class="badge-nn">NOT NULL</span></td>
+            <td class="col-notes">Denormalised copy of the submitter's email at the time of submission — retained for admin display even if the user's email changes.</td>
+          </tr>
+          <tr>
+            <td class="col-name">type</td>
+            <td class="col-type">VARCHAR(20)</td>
+            <td><span class="badge-nn">NOT NULL</span></td>
+            <td class="col-notes">Either <code>"bug"</code> or <code>"suggestion"</code>. Used by the admin filter in the Feedback tab.</td>
+          </tr>
+          <tr>
+            <td class="col-name">message</td>
+            <td class="col-type">TEXT</td>
+            <td><span class="badge-nn">NOT NULL</span></td>
+            <td class="col-notes">The full text of the report or suggestion as submitted by the user.</td>
+          </tr>
+          <tr>
+            <td class="col-name">status</td>
+            <td class="col-type">VARCHAR(20)</td>
+            <td>default: <code>"open"</code></td>
+            <td class="col-notes">Admin-managed lifecycle: <code>"open"</code> (new), <code>"read"</code> (acknowledged), <code>"resolved"</code> (actioned). Updated via <code>PATCH /api/admin/feedback/{id}</code>.</td>
+          </tr>
+          <tr>
+            <td class="col-name">created_at</td>
+            <td class="col-type">TIMESTAMPTZ</td>
+            <td>server default: <code>now()</code></td>
+            <td class="col-notes">Timestamp when the feedback was submitted (UTC). Used for ordering in the admin view.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <hr class="divider" />
+
   <!-- RELATIONSHIPS -->
   <section>
     <div class="section-label">Relationships</div>
@@ -773,6 +917,18 @@
         <span class="rel-type">1 &rarr; many</span>
         <span class="rel-to">reminders</span>
         <span class="rel-note">A user owns many reminders (AI-generated and manual). reminders.user_id &rarr; users.id (CASCADE DELETE)</span>
+      </li>
+      <li class="rel-item">
+        <span class="rel-from">users</span>
+        <span class="rel-type">1 &rarr; many</span>
+        <span class="rel-to">feedback</span>
+        <span class="rel-note">A user may submit many feedback entries. feedback.user_id &rarr; users.id (CASCADE DELETE). user_email is denormalised for admin display.</span>
+      </li>
+      <li class="rel-item">
+        <span class="rel-from">feature_flags</span>
+        <span class="rel-type">standalone</span>
+        <span class="rel-to">—</span>
+        <span class="rel-note">feature_flags has no foreign keys. It is a global key-value configuration table not scoped to any user or workspace. All authenticated users can read; only admins can write.</span>
       </li>
     </ul>
   </section>
@@ -880,6 +1036,30 @@
         <div class="index-cols">reminders(workspace_id)</div>
         <div class="index-purpose">Workspace-scoped reminder list and alert badge count</div>
       </div>
+      <div class="index-card">
+        <div class="index-table-label">feedback</div>
+        <div class="index-name">idx_feedback_user_id</div>
+        <div class="index-cols">feedback(user_id)</div>
+        <div class="index-purpose">List all feedback by a specific user</div>
+      </div>
+      <div class="index-card">
+        <div class="index-table-label">feedback</div>
+        <div class="index-name">idx_feedback_status</div>
+        <div class="index-cols">feedback(status)</div>
+        <div class="index-purpose">Admin filter by status (open / read / resolved)</div>
+      </div>
+      <div class="index-card">
+        <div class="index-table-label">feedback</div>
+        <div class="index-name">idx_feedback_type</div>
+        <div class="index-cols">feedback(type)</div>
+        <div class="index-purpose">Admin filter by type (bug / suggestion)</div>
+      </div>
+      <div class="index-card">
+        <div class="index-table-label">feature_flags</div>
+        <div class="index-name">feature_flags_pkey</div>
+        <div class="index-cols">feature_flags(key) PRIMARY KEY</div>
+        <div class="index-purpose">O(1) lookup of a flag by key name — auto-created from PK</div>
+      </div>
     </div>
   </section>
 
@@ -888,8 +1068,8 @@
   <!-- MIGRATION NOTES -->
   <section>
     <div class="section-label">Migration</div>
-    <h2>Migration Notes — Knowledge Workspace</h2>
-    <p>The following changes are applied at application startup via <code>ALTER TABLE ... IF NOT EXISTS</code> so existing deployments upgrade automatically without data loss.</p>
+    <h2>Migration Notes — Knowledge Workspace &amp; Admin Features</h2>
+    <p>The following changes are applied at application startup via <code>ALTER TABLE ... IF NOT EXISTS</code> or <code>CREATE TABLE IF NOT EXISTS</code> so existing deployments upgrade automatically without data loss.</p>
     <div class="schema-card" style="margin-top:1.4rem;">
       <div class="schema-header">
         <span class="schema-icon">&#x1F4CB;</span>
@@ -936,10 +1116,36 @@
             <td class="col-notes"><code>CREATE INDEX IF NOT EXISTS</code> for all new workspace-scoped indexes</td>
             <td class="col-notes">All indexes listed in the Indexes section above</td>
           </tr>
+          <tr>
+            <td class="col-name">8</td>
+            <td class="col-notes"><code>ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin BOOLEAN DEFAULT false</code></td>
+            <td class="col-notes">Adds the admin flag to the users table. Existing users get <code>false</code>; the first user is promoted via a startup check.</td>
+          </tr>
+          <tr>
+            <td class="col-name">9</td>
+            <td class="col-notes"><code>CREATE TABLE IF NOT EXISTS feature_flags (key VARCHAR(100) PRIMARY KEY, value TEXT NOT NULL, updated_at TIMESTAMPTZ DEFAULT now())</code></td>
+            <td class="col-notes">Creates the feature flags table. Default rows are inserted with <code>INSERT ... ON CONFLICT DO NOTHING</code> so existing customised values are preserved.</td>
+          </tr>
+          <tr>
+            <td class="col-name">10</td>
+            <td class="col-notes"><code>CREATE TABLE IF NOT EXISTS feedback (id SERIAL PRIMARY KEY, user_id INTEGER REFERENCES users(id), user_email VARCHAR NOT NULL, type VARCHAR(20) NOT NULL, message TEXT NOT NULL, status VARCHAR(20) DEFAULT 'open', created_at TIMESTAMPTZ DEFAULT now())</code></td>
+            <td class="col-notes">Creates the feedback table for bug reports and suggestions.</td>
+          </tr>
+          <tr>
+            <td class="col-name">11</td>
+            <td class="col-notes"><code>CREATE INDEX IF NOT EXISTS</code> for feedback(user_id), feedback(status), feedback(type)</td>
+            <td class="col-notes">Supports admin filtering queries on the Feedback tab.</td>
+          </tr>
+          <tr>
+            <td class="col-name">12</td>
+            <td class="col-notes">First-user admin promotion: if no user has <code>is_admin = true</code>, set <code>is_admin = true</code> for the user with the lowest <code>id</code></td>
+            <td class="col-notes">Idempotent — safe to run on every startup; skipped if an admin already exists.</td>
+          </tr>
         </tbody>
       </table>
     </div>
-    <p style="margin-top:1rem;"><strong style="color:var(--text)">Risk:</strong> Existing users with data but no workspace will have a synthetic "My Workspace" auto-created on first login. This is transparent to the user — they see their existing notes, conversations, and reminders already organised under one workspace and can rename or restructure from there.</p>
+    <p style="margin-top:1rem;"><strong style="color:var(--text)">Risk (workspaces):</strong> Existing users with data but no workspace will have a synthetic "My Workspace" auto-created on first login. This is transparent to the user — they see their existing notes, conversations, and reminders already organised under one workspace and can rename or restructure from there.</p>
+    <p style="margin-top:.7rem;"><strong style="color:var(--text)">Risk (admin):</strong> Existing deployments will automatically promote the user with the lowest ID to admin on the next startup. This is expected and intentional. Admins can immediately use the Admin Panel to promote or demote other users.</p>
   </section>
 
 </div>

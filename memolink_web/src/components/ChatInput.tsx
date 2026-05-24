@@ -11,11 +11,24 @@ interface ChatInputProps {
   attachmentInputRef: React.RefObject<HTMLInputElement | null>;
   onSend: () => void;
   autoResize: () => void;
+  webSearch: boolean;
+  onToggleWebSearch: () => void;
+  agentMode: boolean;
+  onToggleAgentMode: () => void;
+  researchMode: boolean;
+  onToggleResearchMode: () => void;
+  flags?: {
+    web_search_enabled: boolean;
+    agent_mode_enabled: boolean;
+    file_upload_enabled: boolean;
+    research_mode_enabled: boolean;
+  };
 }
 
 export function ChatInput({
   input, setInput, loading, pendingFiles, setPendingFiles,
   textareaRef, attachmentInputRef, onSend, autoResize,
+  webSearch, onToggleWebSearch, agentMode, onToggleAgentMode, researchMode, onToggleResearchMode, flags,
 }: ChatInputProps) {
   const [showLangPicker, setShowLangPicker] = useState(false);
 
@@ -141,27 +154,86 @@ export function ChatInput({
           <div className="flex items-center justify-between px-3 pb-3 pt-1">
             {/* Left side — attachment */}
             <div className="flex items-center gap-1">
-              <input
-                type="file"
-                multiple
-                hidden
-                ref={attachmentInputRef}
-                onChange={(e) => {
-                  if (e.target.files) {
-                    setPendingFiles((p) => [...p, ...Array.from(e.target.files!)]);
-                    e.target.value = "";
-                  }
-                }}
-              />
-              <button
-                onClick={() => attachmentInputRef.current?.click()}
-                title="Attach file"
-                className="w-8 h-8 rounded-xl flex items-center justify-center text-gray-500 hover:text-gray-200 hover:bg-[#252533] transition"
+              {(!flags || flags.file_upload_enabled) && (
+                <>
+                  <input
+                    type="file"
+                    multiple
+                    hidden
+                    ref={attachmentInputRef}
+                    onChange={(e) => {
+                      if (e.target.files) {
+                        setPendingFiles((p) => [...p, ...Array.from(e.target.files!)]);
+                        e.target.value = "";
+                      }
+                    }}
+                  />
+                  <button
+                    onClick={() => attachmentInputRef.current?.click()}
+                    title="Attach file"
+                    className="w-8 h-8 rounded-xl flex items-center justify-center text-gray-500 hover:text-gray-200 hover:bg-[#252533] transition"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                    </svg>
+                  </button>
+                </>
+              )}
+
+              {/* Web search toggle */}
+              {(!flags || flags.web_search_enabled) && (
+                <button
+                  onClick={onToggleWebSearch}
+                  title={webSearch ? "Web search on — click to disable" : "Enable web search"}
+                  className={`flex items-center gap-1.5 px-2.5 h-8 rounded-xl text-xs font-medium transition ${
+                    webSearch
+                      ? "bg-sky-500/15 border border-sky-500/40 text-sky-400 hover:bg-sky-500/25"
+                      : "text-gray-500 hover:text-gray-200 hover:bg-[#252533]"
+                  }`}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <circle cx="12" cy="12" r="10" />
+                    <path strokeLinecap="round" d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+                  </svg>
+                  {webSearch && <span>Web</span>}
+                </button>
+              )}
+
+              {/* Agent mode toggle */}
+              {(!flags || flags.agent_mode_enabled) && (
+                <button
+                  onClick={onToggleAgentMode}
+                  title={agentMode ? "Agent mode on — AI can create notes, add reminders, and more" : "Enable Agent mode"}
+                  className={`flex items-center gap-1.5 px-2.5 h-8 rounded-xl text-xs font-medium transition ${
+                    agentMode
+                      ? "bg-violet-500/15 border border-violet-500/40 text-violet-400 hover:bg-violet-500/25"
+                      : "text-gray-500 hover:text-gray-200 hover:bg-[#252533]"
+                  }`}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 shrink-0" fill="currentColor" viewBox="0 0 16 16">
+                    <path d="M6 12.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 0 1h-3a.5.5 0 0 1-.5-.5M3 8.062C3 6.76 4.235 5.765 5.53 5.886a26.6 26.6 0 0 0 4.94 0C11.765 5.765 13 6.76 13 8.062v1.157a.93.93 0 0 1-.765.935c-.845.147-2.34.346-4.235.346s-3.39-.2-4.235-.346A.93.93 0 0 1 3 9.219zm4.542-.827a.25.25 0 0 0-.217.068l-.92.9a25 25 0 0 1-1.871-.183.25.25 0 0 0-.068.495c.55.076 1.232.149 2.02.193a.25.25 0 0 0 .189-.071l.754-.736.847 1.71a.25.25 0 0 0 .404.062l.932-.97a25 25 0 0 0 1.922-.188.25.25 0 0 0-.068-.495c-.538.074-1.207.145-1.98.189a.25.25 0 0 0-.166.076l-.754.785-.842-1.7a.25.25 0 0 0-.182-.134"/>
+                    <path d="M8 1.783C7.015.936 5.587.81 4.287.94c-1.514.153-3.042.672-3.994 1.105A.5.5 0 0 0 0 2.5v11a.5.5 0 0 0 .707.455c.882-.4 2.303-.881 3.68-1.02 1.409-.142 2.59.087 3.223.877a.5.5 0 0 0 .78 0c.633-.79 1.814-1.019 3.222-.877 1.378.139 2.8.62 3.681 1.02A.5.5 0 0 0 16 13.5v-11a.5.5 0 0 0-.293-.455c-.952-.433-2.48-.952-3.994-1.105C10.413.809 8.985.936 8 1.783"/>
+                  </svg>
+                  {agentMode && <span>Agent</span>}
+                </button>
+              )}
+
+              {/* Research mode toggle */}
+              {(!flags || flags.research_mode_enabled) && <button
+                onClick={onToggleResearchMode}
+                title={researchMode ? "Research mode on — deep multi-source analysis with academic papers" : "Enable Research mode"}
+                className={`flex items-center gap-1.5 px-2.5 h-8 rounded-xl text-xs font-medium transition ${
+                  researchMode
+                    ? "bg-emerald-500/15 border border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/25"
+                    : "text-gray-500 hover:text-gray-200 hover:bg-[#252533]"
+                }`}
               >
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 shrink-0" fill="currentColor" viewBox="0 0 16 16">
+                  <path d="M14.5 3a.5.5 0 0 1 .5.5v9a.5.5 0 0 1-.5.5h-13a.5.5 0 0 1-.5-.5v-9a.5.5 0 0 1 .5-.5zm-13-1A1.5 1.5 0 0 0 0 3.5v9A1.5 1.5 0 0 0 1.5 14h13a1.5 1.5 0 0 0 1.5-1.5v-9A1.5 1.5 0 0 0 14.5 2z"/>
+                  <path d="M3 5.5a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 0 1h-9a.5.5 0 0 1-.5-.5M3 8a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 0 1h-9A.5.5 0 0 1 3 8m0 2.5a.5.5 0 0 1 .5-.5h6a.5.5 0 0 1 0 1h-6a.5.5 0 0 1-.5-.5"/>
                 </svg>
-              </button>
+                {researchMode && <span>Research</span>}
+              </button>}
 
               {/* Recording status label */}
               {isActive && (

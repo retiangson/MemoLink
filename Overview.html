@@ -175,6 +175,7 @@
     <a href="Requirements Analysis.html">Requirements</a>
     <a href="Database Design.html">Database</a>
     <a href="API Endpoint Design.html">API</a>
+    <a href="Deployment.html">Deployment</a>
   </div>
 </nav>
 
@@ -196,6 +197,14 @@
     <span class="pill">Docker / nginx</span>
     <span class="pill">SSE Streaming</span>
     <span class="pill">Knowledge Workspaces</span>
+    <span class="pill">DALL-E 3</span>
+    <span class="pill">Gemini</span>
+    <span class="pill">Multi-Model</span>
+    <span class="pill">Web Search</span>
+    <span class="pill">Brave API</span>
+    <span class="pill">Admin Panel</span>
+    <span class="pill">Feature Flags</span>
+    <span class="pill">Bug Reports</span>
   </div>
 </div>
 
@@ -290,6 +299,66 @@
         <h3>Knowledge Workspaces</h3>
         <p>Organise notes, conversations, reminders, and AI context into named, typed workspaces — Academic, Professional, Personal, Project, or Other. RAG retrieval is scoped to the active workspace. An alert badge flags workspaces with pending reminders. First-time users are onboarded with a guided workspace creation flow.</p>
       </div>
+      <div class="card">
+        <div class="card-icon">&#x1F3A8;</div>
+        <h3>AI Image Generation</h3>
+        <p>Type <code>/image &lt;prompt&gt;</code> or use natural language triggers ("draw me a …", "generate an image of …"). MemoLink calls DALL-E 3 and streams the image as a base64 data URL inside the chat — no expiry, no CDN dependency. Attribution shows "replied by DALL-E 3".</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">&#x1F310;</div>
+        <h3>Multi-Language Translation</h3>
+        <p>Translation uses a Gemini 2.0 Flash Lite quality loop: initial translation → back-translate → GPT scores similarity (0–100) → up to 3 refinement rounds if score &lt; 85. The chat bubble shows the model name and accuracy score, colour-coded green/amber/red.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">&#x1F916;</div>
+        <h3>Model Selection</h3>
+        <p>The Settings modal lets users choose their chat model across three providers — <strong>OpenAI</strong> (GPT-4o, GPT-4o Mini, GPT-4 Turbo, GPT-3.5 Turbo), <strong>Google Gemini</strong> (2.0 Flash, 2.0 Flash Lite, 1.5 Flash 8B, 1.5 Pro), and <strong>DeepSeek</strong> (DeepSeek V3, R1, Coder). Every AI reply shows a "replied by [Model]" attribution badge.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">&#x1F50E;</div>
+        <h3>Web Search</h3>
+        <p>A globe icon in ChatInput toggles Brave Search context per message. Top web results are injected as a system context block before the LLM call, giving answers real-time grounding beyond the user's notes. Requires <code>BRAVE_SEARCH_API_KEY</code>.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">&#x1F4C4;</div>
+        <h3>Rich File Import</h3>
+        <p>Bulk upload preserves formatting: DOCX headings (H1–H4), bold/italic/underline, bullet and numbered lists, tables (with header rows), and embedded images. PDF infers headings by font-size ratio. PPTX maps slide titles to H2 and content to lists. Images are embedded as base64 <code>&lt;img&gt;</code> tags.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">&#x1F511;</div>
+        <h3>Password Reset</h3>
+        <p>The LoginPage includes a "Forgot password?" flow. The backend sends a signed JWT reset link (1-hour expiry) via SMTP, with a console fallback when SMTP is not configured. The reset token is detected from the <code>?reset_token=</code> URL parameter.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">&#x1F9EA;</div>
+        <h3>Agent Mode</h3>
+        <p>An "Agent" toggle in ChatInput switches to <code>streamAgentChat()</code>, which calls <code>POST /api/chat/agent/stream</code>. The SSE stream emits <code>tool_call</code> status chips and <code>tool_result</code> completion events before the final answer tokens, enabling multi-step agentic reasoning.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">&#x1F6E1;&#xFE0F;</div>
+        <h3>Admin Panel</h3>
+        <p>Full-screen overlay accessible from the user menu (admin only). Three tabs: <strong>Feedback</strong> (view and manage bug reports/suggestions), <strong>Feature Flags</strong> (toggle features, set default model/language, configure per-feature minimum access levels via Regular/Plus/Pro tabs), and <strong>Users</strong> (promote/demote admin status, change access level). The first registered user is auto-promoted to admin on startup.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">&#x1F3F3;&#xFE0F;</div>
+        <h3>Feature Flags</h3>
+        <p>System-wide flags stored in the <code>feature_flags</code> table: web search, agent mode, model selection, image generation, translation, file upload, research mode, default model, and default language. Each feature also has a <code>*_min_level</code> flag (<code>regular</code> / <code>plus</code> / <code>pro</code>) that controls the minimum access tier required. Admins configure both toggles and minimum levels via the Admin Panel; the frontend fetches them on login and hides disabled controls accordingly.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">&#x1F3C5;</div>
+        <h3>Access Levels</h3>
+        <p>Three user tiers — <strong>Regular</strong>, <strong>Plus</strong>, and <strong>Pro</strong> — gate access to premium features. Admins assign tiers per user via the Users tab. The tier is embedded in the JWT (<code>access_level</code> claim) and validated stateless on each API call. The <code>GET /api/features</code> endpoint automatically masks disabled features based on the caller's level. Research Mode, for example, can be set to require Plus or Pro.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">&#x1F4DA;</div>
+        <h3>Research Mode</h3>
+        <p>A dedicated research pipeline activated by the "Research" toggle in ChatInput. Calls <code>POST /api/research/stream</code>; the backend validates the user's access level against the <code>research_mode_min_level</code> flag before running a multi-source web search + RAG synthesis pipeline that returns a cited, structured answer via SSE streaming.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">&#x1F41B;</div>
+        <h3>Bug Reports &amp; Suggestions</h3>
+        <p>Users submit bug reports or feature suggestions via <strong>Help &rarr; Report Bug / Suggestion</strong>. Reports are stored in the <code>feedback</code> table with a status lifecycle (<code>open</code> &rarr; <code>read</code> &rarr; <code>resolved</code>). An optional SMTP notification is sent to the admin on new submissions. Admins filter and manage feedback in the Admin Panel.</p>
+      </div>
     </div>
   </section>
 
@@ -323,7 +392,7 @@
         <tr>
           <td><strong>Business</strong></td>
           <td><code>business/services/</code></td>
-          <td>Application logic — chat, notes, auth, conversations, reminders, video, workspaces</td>
+          <td>Application logic — chat, notes, auth, conversations, reminders, video, workspaces, admin, feature flags, feedback</td>
           <td><span class="tag tag-py">Python</span></td>
         </tr>
         <tr>
@@ -361,6 +430,30 @@
           <td><code>services/embedding_service</code></td>
           <td>Converts text to vectors, calls OpenAI API</td>
           <td><span class="tag tag-ai">OpenAI</span><span class="tag tag-db">pgvector</span></td>
+        </tr>
+        <tr>
+          <td><strong>Translation</strong></td>
+          <td><code>business/services/translate_service</code></td>
+          <td>Gemini 2.0 Flash Lite initial translation → back-translate → GPT similarity score (0–100) → up to 3 refinement rounds; falls back to GPT-4o-mini on rate limit</td>
+          <td><span class="tag tag-ai">Gemini</span><span class="tag tag-ai">OpenAI</span></td>
+        </tr>
+        <tr>
+          <td><strong>Image Generation</strong></td>
+          <td><code>business/services/chat_service</code></td>
+          <td>Detects image-intent phrases; tries gpt-image-2 → gpt-image-1 → DALL-E 3 → DALL-E 2 → Pollinations.ai; streams base64 result; strips base64 from RAG context to avoid token overflow</td>
+          <td><span class="tag tag-ai">DALL-E 3</span></td>
+        </tr>
+        <tr>
+          <td><strong>Admin &amp; Feature Flags</strong></td>
+          <td><code>api/v1/admin_controller</code>, <code>api/v1/features_controller</code></td>
+          <td>Admin-only endpoints (403 via get_current_admin); feature flag reads/writes with per-feature min_level flags; access level management (PATCH /admin/users/{id}/level); GET /features filters flags by caller's access_level; JWT embeds is_admin + access_level claims</td>
+          <td><span class="tag tag-py">FastAPI</span></td>
+        </tr>
+        <tr>
+          <td><strong>Feedback</strong></td>
+          <td><code>api/v1/feedback_controller</code></td>
+          <td>Stores bug reports and suggestions in feedback table; optional SMTP notification; admin status management (open/read/resolved)</td>
+          <td><span class="tag tag-py">Python</span></td>
         </tr>
         <tr>
           <td><strong>Deployment</strong></td>
@@ -411,13 +504,15 @@
       <div class="flow">
         <div class="flow-step">Same RAG retrieval</div>
         <span class="flow-arrow">&rarr;</span>
-        <div class="flow-step">GPT stream=True</div>
+        <div class="flow-step">[Optional] Brave Search context injected</div>
+        <span class="flow-arrow">&rarr;</span>
+        <div class="flow-step">Selected model stream=True</div>
         <span class="flow-arrow">&rarr;</span>
         <div class="flow-step"><code>data: {"t":"&lt;token&gt;"}</code> per chunk</div>
         <span class="flow-arrow">&rarr;</span>
-        <div class="flow-step"><code>data: {"done":true,"id":&lt;msg_id&gt;}</code></div>
+        <div class="flow-step"><code>data: {"done":true,"id":&lt;msg_id&gt;,"model":"gpt-4o-mini"}</code></div>
         <span class="flow-arrow">&rarr;</span>
-        <div class="flow-step">Blinking cursor in UI</div>
+        <div class="flow-step">Blinking cursor in UI — attribution badge rendered</div>
       </div>
     </div>
   </section>
@@ -455,14 +550,22 @@
            <strong>Supabase</strong> — hosted Postgres + pgvector<br/>
            <strong>pgvector</strong> — cosine similarity search<br/>
            <strong>VectorType(1536)</strong> — custom SQLAlchemy column<br/>
-           <strong>reminders table</strong> — migrated at startup via ALTER TABLE IF NOT EXISTS</p>
+           <strong>reminders table</strong> — migrated at startup via ALTER TABLE IF NOT EXISTS<br/>
+           <strong>feature_flags table</strong> — feature toggles + *_min_level flags seeded on startup<br/>
+           <strong>feedback table</strong> — bug reports and suggestions with status lifecycle<br/>
+           <strong>users.is_admin</strong> — boolean column; first user auto-promoted<br/>
+           <strong>users.access_level</strong> — VARCHAR ('regular'|'plus'|'pro'); default 'regular'</p>
       </div>
       <div class="card">
         <h3>AI &amp; Media</h3>
-        <p><strong>OpenAI GPT-4o</strong> — answer generation (streaming)<br/>
+        <p><strong>OpenAI GPT-4o / GPT-4o-mini</strong> — answer generation (streaming)<br/>
+           <strong>Gemini 2.0 Flash / Flash Lite / 1.5 Pro / 1.5 Flash 8B</strong> — alternative chat models &amp; translation<br/>
+           <strong>DeepSeek V3 / R1 / Coder</strong> — code-focused alternative chat models<br/>
+           <strong>DALL-E 3</strong> — AI image generation (1024&times;1024, base64)<br/>
            <strong>text-embedding-3-small</strong> — vector embeddings<br/>
            <strong>OpenAI Whisper</strong> — audio/video transcription<br/>
            <strong>youtube-transcript-api</strong> — YouTube caption extraction<br/>
+           <strong>Brave Search API</strong> — optional per-message web context<br/>
            <strong>RAG pattern</strong> — grounded retrieval<br/>
            <strong>Top-K semantic search</strong> — relevant chunk selection</p>
       </div>

@@ -21,8 +21,19 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
     id: int
     email: str
+    is_admin: bool = False
+    access_level: str = "regular"
 
 
 class ChangePasswordDTO(BaseModel):
     current_password: str
+    new_password: str
+
+
+class ForgotPasswordDTO(BaseModel):
+    email: str
+
+
+class ResetPasswordDTO(BaseModel):
+    token: str
     new_password: str

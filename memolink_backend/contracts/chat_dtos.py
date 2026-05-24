@@ -9,6 +9,8 @@ class ChatRequestDTO(BaseModel):
     top_k: int = 5
     workspace_id: Optional[int] = None
     cross_workspace: bool = False
+    model: Optional[str] = None
+    web_search: bool = False
 
 
 class ChatAnswerSource(BaseModel):

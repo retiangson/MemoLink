@@ -52,6 +52,25 @@ export function useNoteEditor() {
     }
   }
 
+  function reorderNotes(from: number, to: number) {
+    if (from === to) return;
+    setOpenNotes((prev) => {
+      const next = [...prev];
+      const [item] = next.splice(from, 1);
+      next.splice(to, 0, item);
+      return next;
+    });
+    const cur = activeIdxRef.current;
+    if (cur === from) setActiveIndex(to);
+    else if (from < to && cur > from && cur <= to) setActiveIndex(cur - 1);
+    else if (from > to && cur >= to && cur < from) setActiveIndex(cur + 1);
+  }
+
+  function closeAllNotes() {
+    setOpenNotes([]);
+    setActiveIndex(0);
+  }
+
   function closeNote(index?: number) {
     const idx = index ?? activeIdxRef.current;
     setOpenNotes((prev) => {
@@ -154,7 +173,7 @@ export function useNoteEditor() {
     noteContentDraft, setNoteContentDraft,
     isNoteDirty,
     noteTab, setNoteTab,
-    openNote, closeNote, closeNoteById, updateActiveNote, syncNoteById, discardChanges, applyFormat,
+    openNote, closeNote, closeNoteById, closeAllNotes, reorderNotes, updateActiveNote, syncNoteById, discardChanges, applyFormat,
     selectedNote: active?.note ?? null,
   };
 }

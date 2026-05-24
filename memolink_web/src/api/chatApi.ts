@@ -1,12 +1,12 @@
 import { api, API_BASE } from "./client";
 import { getToken } from "../utils/auth";
 
-export async function sendChat(conversation_id: number, prompt: string, top_k = 5, workspace_id?: number | null) {
-  return (await api.post("/chat", { conversation_id, prompt, top_k, workspace_id: workspace_id ?? null })).data;
+export async function sendChat(conversation_id: number, prompt: string, top_k = 5, workspace_id?: number | null, model?: string | null) {
+  return (await api.post("/chat", { conversation_id, prompt, top_k, workspace_id: workspace_id ?? null, model: model ?? null })).data;
 }
 
 /** Async generator that yields parsed SSE events from /chat/stream. */
-export async function* streamChat(conversation_id: number, prompt: string, top_k = 5, workspace_id?: number | null) {
+export async function* streamChat(conversation_id: number, prompt: string, top_k = 5, workspace_id?: number | null, model?: string | null, web_search = false) {
   const token = getToken();
   const res = await fetch(`${API_BASE}/chat/stream`, {
     method: "POST",
@@ -14,7 +14,7 @@ export async function* streamChat(conversation_id: number, prompt: string, top_k
       "Content-Type": "application/json",
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
-    body: JSON.stringify({ conversation_id, prompt, top_k, workspace_id: workspace_id ?? null }),
+    body: JSON.stringify({ conversation_id, prompt, top_k, workspace_id: workspace_id ?? null, model: model ?? null, web_search }),
   });
 
   if (!res.ok || !res.body) throw new Error(`Stream error: ${res.status}`);
@@ -31,7 +31,47 @@ export async function* streamChat(conversation_id: number, prompt: string, top_k
     buf = lines.pop() ?? "";
     for (const line of lines) {
       if (line.startsWith("data: ")) {
-        yield JSON.parse(line.slice(6)) as { t?: string; done?: boolean; id?: number | null };
+        yield JSON.parse(line.slice(6)) as { t?: string; replace?: string; done?: boolean; id?: number | null; model?: string; tool_call?: string; label?: string; tool_result?: string; ok?: boolean; image_generating?: boolean };
+      }
+    }
+  }
+}
+
+export async function* streamAgentChat(conversation_id: number, prompt: string, workspace_id?: number | null, model?: string | null) {
+  const token = getToken();
+  const res = await fetch(`${API_BASE}/chat/agent/stream`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ conversation_id, prompt, workspace_id: workspace_id ?? null, model: model ?? null }),
+  });
+
+  if (!res.ok || !res.body) throw new Error(`Agent stream error: ${res.status}`);
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += decoder.decode(value, { stream: true });
+    const lines = buf.split("\n");
+    buf = lines.pop() ?? "";
+    for (const line of lines) {
+      if (line.startsWith("data: ")) {
+        yield JSON.parse(line.slice(6)) as {
+          t?: string;
+          done?: boolean;
+          id?: number | null;
+          model?: string;
+          tool_call?: string;
+          label?: string;
+          tool_result?: string;
+          ok?: boolean;
+        };
       }
     }
   }
@@ -59,8 +99,43 @@ export async function generateSuggestions(
   return (await api.post("/suggest", { title, content, workspace_id: workspace_id ?? null })).data;
 }
 
-export async function translateText(text: string, targetLanguage = "English"): Promise<{ translation: string }> {
+export async function translateText(text: string, targetLanguage = "English"): Promise<{ translation: string; accuracy: number | null; model: string }> {
   return (await api.post("/translate", { text, target_language: targetLanguage })).data;
+}
+
+export async function* streamResearch(conversation_id: number, prompt: string, workspace_id?: number | null, model?: string | null) {
+  const token = getToken();
+  const res = await fetch(`${API_BASE}/research/stream`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ conversation_id, prompt, workspace_id: workspace_id ?? null, model: model ?? null }),
+  });
+
+  if (!res.ok || !res.body) throw new Error(`Research stream error: ${res.status}`);
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += decoder.decode(value, { stream: true });
+    const lines = buf.split("\n");
+    buf = lines.pop() ?? "";
+    for (const line of lines) {
+      if (line.startsWith("data: ")) {
+        yield JSON.parse(line.slice(6)) as {
+          t?: string; done?: boolean; id?: number | null; model?: string;
+          tool_call?: string; label?: string; tool_result?: string; ok?: boolean;
+          replace?: string; image_generating?: boolean;
+        };
+      }
+    }
+  }
 }
 
 export async function uploadChat(conversationId: number, prompt: string, files: File[]) {
