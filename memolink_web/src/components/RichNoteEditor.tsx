@@ -45,19 +45,18 @@ function hasRichHtmlStructure(s: string) {
 
 async function toHtml(content: string): Promise<string> {
   if (!content.trim()) return "";
+
+  // Unwrap explicit markdown fence blocks
   const unwrapped = unwrapMarkdownFence(content);
   if (unwrapped !== content) return (await marked(unwrapped)) as string;
-  if (isHtml(content)) {
-    const doc = new DOMParser().parseFromString(content, "text/html");
-    const code = doc.body.querySelector("pre > code");
-    if (code && code.textContent && looksLikeMarkdown(code.textContent)) {
-      return (await marked(unwrapMarkdownFence(code.textContent))) as string;
-    }
-    if (hasRichHtmlStructure(content)) return content;
-    const text = doc.body.textContent ?? "";
-    if (looksLikeMarkdown(text)) return (await marked(text)) as string;
-    return content;
-  }
+
+  // Markdown takes priority — convert via marked even if mixed with some HTML
+  if (looksLikeMarkdown(content)) return (await marked(content)) as string;
+
+  // Rich HTML from TipTap or sanitizer — use as-is
+  if (isHtml(content) && hasRichHtmlStructure(content)) return content;
+
+  // Fallback — try marked
   return (await marked(content)) as string;
 }
 
