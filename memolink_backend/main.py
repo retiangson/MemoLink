@@ -149,3 +149,8 @@ app.include_router(feedback_controller.router, prefix="/api")
 app.include_router(admin_controller.router, prefix="/api")
 app.include_router(features_controller.router, prefix="/api")
 app.include_router(research_controller.router, prefix="/api")
+
+# AWS Lambda handler — only active when running inside Lambda
+if os.getenv("AWS_LAMBDA_FUNCTION_NAME"):
+    from mangum import Mangum
+    handler = Mangum(app, lifespan="off")

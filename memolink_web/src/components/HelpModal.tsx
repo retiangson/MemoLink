@@ -52,7 +52,7 @@ const CONTENT: Record<string, React.ReactNode> = {
       <p>Workspaces keep your notes, conversations, and reminders completely separate. Switch between them from the workspace selector in the top bar.</p>
       <ul className="space-y-2">
         {[
-          "Create a workspace for each subject, project, or client — AI answers never mix content across workspaces.",
+          "Create a workspace for each subject, project, or client - AI answers never mix content across workspaces.",
           "The last-used workspace is restored automatically when you log back in.",
           "Each workspace has its own conversation list and note library.",
           "Delete a workspace to cascade-remove all its notes, conversations, and reminders.",
@@ -66,13 +66,13 @@ const CONTENT: Record<string, React.ReactNode> = {
 
   chat: (
     <div className="space-y-3 text-sm text-gray-400 leading-relaxed">
-      <p>MemoLink uses <span className="text-white">Retrieval-Augmented Generation (RAG)</span> — every AI answer is grounded in the notes you've uploaded to the current workspace. Sources are cited below the reply.</p>
+      <p>MemoLink uses <span className="text-white">Retrieval-Augmented Generation (RAG)</span> - every AI answer is grounded in the notes you've uploaded to the current workspace. Sources are cited below the reply.</p>
       <ul className="space-y-2">
         {[
           "Start a new conversation from the sidebar. Conversations are scoped to the active workspace.",
           "Responses stream token-by-token so you can start reading before the reply is complete.",
           "Each AI reply shows a \"replied by [model]\" attribution badge (if enabled by admin).",
-          "Save any AI reply as a note with the ⊕ button — it becomes searchable in future chats.",
+          "Save any AI reply as a note with the ⊕ button - it becomes searchable in future chats.",
           "Delete individual messages with the trash icon.",
           "Rename a conversation by clicking its title in the sidebar.",
           "Deleted conversations go to the Recycle Bin and can be restored.",
@@ -91,7 +91,7 @@ const CONTENT: Record<string, React.ReactNode> = {
         {[
           "Create a note from the sidebar or by saving an AI message.",
           "The rich editor supports headings (H1–H4), bold, italic, underline, bullet and numbered lists, checklists, tables, and code blocks.",
-          "Paste a screenshot directly into the editor — images are embedded as base64 and stored inline.",
+          "Paste a screenshot directly into the editor - images are embedded as base64 and stored inline.",
           "Record a voice memo with the microphone button; transcription is automatic via OpenAI Whisper.",
           "Deleted notes go to the Recycle Bin (bell icon in sidebar) and can be restored or permanently deleted.",
           "AI answers retrieve the most relevant chunks from your notes using semantic search.",
@@ -108,10 +108,10 @@ const CONTENT: Record<string, React.ReactNode> = {
         <p className="text-xs font-semibold text-indigo-300 mb-2 uppercase tracking-wider">Document Import</p>
         <ul className="space-y-2">
           {[
-            "PDF — headings inferred from font-size ratio; plain text extracted.",
-            "DOCX — H1–H4 headings, bold, italic, underline, bullet and numbered lists, tables, and embedded images preserved.",
-            "PPTX — slide titles become H2, slide content becomes lists.",
-            "TXT — plain text imported as-is.",
+            "PDF - headings inferred from font-size ratio; plain text extracted.",
+            "DOCX - H1–H4 headings, bold, italic, underline, bullet and numbered lists, tables, and embedded images preserved.",
+            "PPTX - slide titles become H2, slide content becomes lists.",
+            "TXT - plain text imported as-is.",
             "Bulk upload: drag multiple files into the Upload Notes panel; each becomes a separate note.",
           ].map((item, i) => (
             <li key={i} className="flex gap-2"><span className="text-indigo-500 shrink-0 mt-0.5">•</span><span>{item}</span></li>
@@ -122,8 +122,8 @@ const CONTENT: Record<string, React.ReactNode> = {
         <p className="text-xs font-semibold text-indigo-300 mb-2 uppercase tracking-wider">Video & Audio Import</p>
         <ul className="space-y-2">
           {[
-            "Paste a YouTube URL — the transcript is extracted via YouTube Caption API and saved as a note.",
-            "Upload a video or audio file (MP4, M4A, WebM, MOV, MP3, WAV — max 25 MB) for Whisper transcription.",
+            "Paste a YouTube URL - the transcript is extracted via YouTube Caption API and saved as a note.",
+            "Upload a video or audio file (MP4, M4A, WebM, MOV, MP3, WAV - max 25 MB) for Whisper transcription.",
             "Upload a Zoom recording or lecture capture; the transcript is saved as a searchable note.",
           ].map((item, i) => (
             <li key={i} className="flex gap-2"><span className="text-indigo-500 shrink-0 mt-0.5">•</span><span>{item}</span></li>
@@ -146,7 +146,7 @@ const CONTENT: Record<string, React.ReactNode> = {
         },
         {
           title: "Research Mode",
-          desc: "The Research toggle runs a dedicated multi-source pipeline — web search + your notes — and returns a cited, structured answer. Requires Plus or higher access level (configurable by admin).",
+          desc: "The Research toggle runs a dedicated multi-source pipeline - web search + your notes - and returns a cited, structured answer. Requires Plus or higher access level (configurable by admin).",
         },
         {
           title: "Image Generation",
@@ -195,7 +195,7 @@ const CONTENT: Record<string, React.ReactNode> = {
           {
             provider: "Google Gemini",
             models: ["Gemini 2.0 Flash", "Gemini 2.0 Flash Lite", "Gemini 1.5 Flash 8B", "Gemini 1.5 Pro"],
-            note: "Free tier — rate limits may apply. Falls back to GPT-4o Mini on quota exceeded.",
+            note: "Free tier - rate limits may apply. Falls back to GPT-4o Mini on quota exceeded.",
           },
           {
             provider: "DeepSeek",
@@ -222,12 +222,12 @@ const CONTENT: Record<string, React.ReactNode> = {
         {[
           "Press Enter to send a message; Shift+Enter for a new line.",
           "Drag files directly onto the chat area to attach them without clicking the attachment button.",
-          "Save a useful AI reply as a note immediately — it becomes searchable context for future chats.",
+          "Save a useful AI reply as a note immediately - it becomes searchable context for future chats.",
           "Use specific, descriptive workspace names (e.g. \"COMP301 Capstone\") for cleaner AI context isolation.",
-          "If an AI answer misses something, upload the relevant document and ask again — retrieval improves instantly.",
+          "If an AI answer misses something, upload the relevant document and ask again - retrieval improves instantly.",
           "Research Mode works best for broad questions; use regular chat for quick note look-ups.",
-          "The default model set by the admin applies when model selection is disabled — check Settings to see what's available to you.",
-          "Reminders → Suggest scans only the active workspace — switch workspaces to suggest from different note sets.",
+          "The default model set by the admin applies when model selection is disabled - check Settings to see what's available to you.",
+          "Reminders → Suggest scans only the active workspace - switch workspaces to suggest from different note sets.",
           "Paste a YouTube video URL in the Upload Notes panel to instantly transcribe and import it.",
         ].map((item, i) => (
           <li key={i} className="flex gap-2"><span className="text-indigo-500 shrink-0 mt-0.5">•</span><span>{item}</span></li>
@@ -301,7 +301,7 @@ export function HelpModal({ show, onClose }: HelpModalProps) {
         {/* Footer */}
         <div className="px-6 py-3 border-t border-[#2a2a38] shrink-0">
           <p className="text-[11px] text-gray-700 text-center">
-            MemoLink — AI Knowledge Companion &nbsp;·&nbsp; Capstone Project
+            MemoLink - AI Knowledge Companion &nbsp;·&nbsp; Capstone Project
           </p>
         </div>
       </div>
