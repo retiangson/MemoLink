@@ -18,6 +18,7 @@ DEFAULT_FLAGS: Dict[str, str] = {
     "translation_enabled": "true",
     "file_upload_enabled": "true",
     "research_mode_enabled": "true",
+    "model_attribution_enabled": "true",
     "default_model": "gpt-4o-mini",
     "default_language": "English",
     # Minimum access level required per feature
@@ -28,6 +29,7 @@ DEFAULT_FLAGS: Dict[str, str] = {
     "translation_min_level": "regular",
     "file_upload_min_level": "regular",
     "research_mode_min_level": "regular",
+    "model_attribution_min_level": "regular",
 }
 
 VALID_LEVELS = {"regular", "plus", "pro"}
@@ -42,7 +44,7 @@ def list_feedback(
     admin_id: int = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
-    q = "SELECT id, user_id, user_email, type, message, status, created_at FROM feedback WHERE 1=1"
+    q = "SELECT id, user_id, user_email, type, title, message, status, created_at FROM feedback WHERE 1=1"
     params: dict = {}
     if type != "all":
         q += " AND type = :type"
@@ -54,7 +56,7 @@ def list_feedback(
     rows = db.execute(text(q), params).fetchall()
     return {"items": [
         {"id": r[0], "user_id": r[1], "user_email": r[2], "type": r[3],
-         "message": r[4], "status": r[5], "created_at": str(r[6])}
+         "title": r[4], "message": r[5], "status": r[6], "created_at": str(r[7])}
         for r in rows
     ]}
 

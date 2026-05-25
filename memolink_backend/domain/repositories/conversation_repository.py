@@ -16,8 +16,8 @@ class ConversationRepository:
         self.db.refresh(conv)
         return conv
 
-    def add_message(self, conv_id: int, role: str, content: str) -> Message:
-        msg = Message(conversation_id=conv_id, role=role, content=content)
+    def add_message(self, conv_id: int, role: str, content: str, model: str | None = None) -> Message:
+        msg = Message(conversation_id=conv_id, role=role, content=content, model=model)
         self.db.add(msg)
         self.db.commit()
         self.db.refresh(msg)

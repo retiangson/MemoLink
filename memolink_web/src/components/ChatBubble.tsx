@@ -26,6 +26,7 @@ interface Props {
   onApplyEdit?: (content: string, noteId: number | null) => void;
   hasOpenNote?: boolean;
   translationEnabled?: boolean;
+  modelAttributionEnabled?: boolean;
 }
 
 const TRANSLATE_LANGUAGES = [
@@ -74,7 +75,7 @@ function ImageGeneratingSpinner() {
   );
 }
 
-export default function ChatBubble({ role, content, model, streaming, onAdd, onDelete, onApplyEdit, hasOpenNote, translationEnabled = true }: Props) {
+export default function ChatBubble({ role, content, model, streaming, onAdd, onDelete, onApplyEdit, hasOpenNote, translationEnabled = true, modelAttributionEnabled = true }: Props) {
   const isUser = role === "user";
   const [copied, setCopied] = useState(false);
   const [showLangPicker, setShowLangPicker] = useState(false);
@@ -304,7 +305,7 @@ export default function ChatBubble({ role, content, model, streaming, onAdd, onD
             </button>
           )}
         </div>
-        {model && !streaming && (
+        {modelAttributionEnabled && model && !streaming && (
           <p className="text-[10px] text-gray-700 select-none">replied by {modelLabel(model)}</p>
         )}
         </div>

@@ -18,13 +18,14 @@ _TYPE_LABELS = {"bug": "Bug Report", "suggestion": "Suggestion"}
 
 class FeedbackRequest(BaseModel):
     type: str   # "bug" | "suggestion"
+    title: str
     message: str
 
 
 @router.post("")
 def submit_feedback(req: FeedbackRequest, user_id: int = Depends(get_current_user), db: Session = Depends(get_db)):
     label = _TYPE_LABELS.get(req.type, req.type.capitalize())
-    logger.info("[Feedback] %s from user #%s: %s", label, user_id, req.message[:300])
+    logger.info("[Feedback] %s from user #%s: %s — %s", label, user_id, req.title[:100], req.message[:300])
 
     # Get user email for storage
     user_row = db.execute(text("SELECT email FROM users WHERE id = :uid"), {"uid": user_id}).fetchone()
@@ -32,8 +33,8 @@ def submit_feedback(req: FeedbackRequest, user_id: int = Depends(get_current_use
 
     # Save to DB
     db.execute(
-        text("INSERT INTO feedback (user_id, user_email, type, message) VALUES (:uid, :email, :type, :msg)"),
-        {"uid": user_id, "email": user_email, "type": req.type, "msg": req.message},
+        text("INSERT INTO feedback (user_id, user_email, type, title, message) VALUES (:uid, :email, :type, :title, :msg)"),
+        {"uid": user_id, "email": user_email, "type": req.type, "title": req.title, "msg": req.message},
     )
     db.commit()
 
@@ -42,10 +43,10 @@ def submit_feedback(req: FeedbackRequest, user_id: int = Depends(get_current_use
         try:
             from_addr = settings.smtp_from or settings.smtp_user
             msg = email.mime.multipart.MIMEMultipart()
-            msg["Subject"] = f"[MemoLink] {label} — user #{user_id}"
+            msg["Subject"] = f"[MemoLink] {label} — {req.title}"
             msg["From"] = from_addr
             msg["To"] = from_addr
-            body = f"Type: {label}\nUser: {user_email} (#{user_id})\n\n--- Message ---\n{req.message}"
+            body = f"Type: {label}\nUser: {user_email} (#{user_id})\nTitle: {req.title}\n\n--- Description ---\n{req.message}"
             msg.attach(email.mime.text.MIMEText(body, "plain"))
             with smtplib.SMTP(settings.smtp_host, settings.smtp_port) as smtp:
                 smtp.ehlo()

@@ -7,6 +7,7 @@ export interface FeedbackItem {
   user_id: number | null;
   user_email: string | null;
   type: "bug" | "suggestion";
+  title: string;
   message: string;
   status: "open" | "read" | "resolved";
   created_at: string;
@@ -27,6 +28,7 @@ export type FeatureFlags = {
   translation_enabled: boolean;
   file_upload_enabled: boolean;
   research_mode_enabled: boolean;
+  model_attribution_enabled: boolean;
   default_model: string;
   default_language: string;
   web_search_min_level: AccessLevel;
@@ -36,6 +38,7 @@ export type FeatureFlags = {
   translation_min_level: AccessLevel;
   file_upload_min_level: AccessLevel;
   research_mode_min_level: AccessLevel;
+  model_attribution_min_level: AccessLevel;
 };
 
 export function parseFlags(raw: Record<string, string>): FeatureFlags {
@@ -47,6 +50,7 @@ export function parseFlags(raw: Record<string, string>): FeatureFlags {
     translation_enabled: raw.translation_enabled !== "false",
     file_upload_enabled: raw.file_upload_enabled !== "false",
     research_mode_enabled: raw.research_mode_enabled !== "false",
+    model_attribution_enabled: raw.model_attribution_enabled !== "false",
     default_model: raw.default_model ?? "gpt-4o-mini",
     default_language: raw.default_language ?? "English",
     web_search_min_level: (raw.web_search_min_level ?? "regular") as AccessLevel,
@@ -56,6 +60,7 @@ export function parseFlags(raw: Record<string, string>): FeatureFlags {
     translation_min_level: (raw.translation_min_level ?? "regular") as AccessLevel,
     file_upload_min_level: (raw.file_upload_min_level ?? "regular") as AccessLevel,
     research_mode_min_level: (raw.research_mode_min_level ?? "regular") as AccessLevel,
+    model_attribution_min_level: (raw.model_attribution_min_level ?? "regular") as AccessLevel,
   };
 }
 
@@ -95,6 +100,7 @@ export async function updateAdminFeatures(flags: FeatureFlags): Promise<FeatureF
     translation_enabled: String(flags.translation_enabled),
     file_upload_enabled: String(flags.file_upload_enabled),
     research_mode_enabled: String(flags.research_mode_enabled),
+    model_attribution_enabled: String(flags.model_attribution_enabled),
     default_model: flags.default_model,
     default_language: flags.default_language,
     web_search_min_level: flags.web_search_min_level,
@@ -104,6 +110,7 @@ export async function updateAdminFeatures(flags: FeatureFlags): Promise<FeatureF
     translation_min_level: flags.translation_min_level,
     file_upload_min_level: flags.file_upload_min_level,
     research_mode_min_level: flags.research_mode_min_level,
+    model_attribution_min_level: flags.model_attribution_min_level,
   };
   const res = await api.put("/admin/features", { flags: raw });
   return parseFlags(res.data.flags);

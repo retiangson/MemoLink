@@ -276,5 +276,5 @@ class AgentService:
             full_answer = f"⚠ Agent error: {str(e)}"
             yield f"data: {json.dumps({'t': full_answer})}\n\n"
 
-        assistant_msg = self.conv_repo.add_message(conversation_id, "assistant", full_answer)
+        assistant_msg = self.conv_repo.add_message(conversation_id, "assistant", full_answer, model=model)
         yield f"data: {json.dumps({'done': True, 'id': assistant_msg.id, 'model': model})}\n\n"
