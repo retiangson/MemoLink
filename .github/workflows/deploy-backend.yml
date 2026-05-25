@@ -98,5 +98,12 @@ jobs:
           aws lambda wait function-updated \
             --function-name ${{ secrets.LAMBDA_FUNCTION_NAME }}
 
+      - name: Set Lambda timeout and memory
+        run: |
+          aws lambda update-function-configuration \
+            --function-name ${{ secrets.LAMBDA_FUNCTION_NAME }} \
+            --timeout 30 \
+            --memory-size 512
+
       - name: Print deployed image
         run: echo "Deployed ${{ steps.build.outputs.image_uri }} to Lambda"
