@@ -57,18 +57,11 @@ async function normalizeToHtml(content: string): Promise<string> {
   const unwrapped = unwrapMarkdownFence(content);
   if (unwrapped !== content) return (await marked(unwrapped)) as string;
 
-  if (/^\s*</.test(content)) {
-    const doc = new DOMParser().parseFromString(content, "text/html");
-    const code = doc.body.querySelector("pre > code");
-    if (code?.textContent && looksLikeMarkdown(code.textContent)) {
-      return (await marked(unwrapMarkdownFence(code.textContent))) as string;
-    }
-    if (hasRichHtmlStructure(content)) return content;
+  // Markdown takes priority — convert via marked even if content contains some HTML
+  if (looksLikeMarkdown(content)) return (await marked(content)) as string;
 
-    const text = doc.body.textContent ?? "";
-    if (looksLikeMarkdown(text)) return (await marked(text)) as string;
-    return content;
-  }
+  // Rich HTML from TipTap — use as-is
+  if (/^\s*</.test(content) && hasRichHtmlStructure(content)) return content;
 
   return (await marked(content)) as string;
 }
