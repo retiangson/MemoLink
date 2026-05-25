@@ -3,10 +3,6 @@ name: Deploy Backend to AWS Lambda
 on:
   push:
     branches: [main]
-    paths:
-      - "memolink_backend/**"
-      - "requirements.txt"
-      - "Dockerfile"
 
 env:
   ECR_REPOSITORY: memolink-backend
