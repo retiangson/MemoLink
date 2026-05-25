@@ -213,5 +213,5 @@ class ResearchService:
             full_answer += err
             yield self._event({"t": err})
 
-        assistant_msg = self.repo_conv.add_message(conversation_id, "assistant", full_answer)
+        assistant_msg = self.repo_conv.add_message(conversation_id, "assistant", full_answer, model=model)
         yield self._event({"done": True, "id": assistant_msg.id, "model": model})

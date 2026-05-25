@@ -16,6 +16,7 @@ import { ChatInput } from "../components/ChatInput";
 import { DeleteModal } from "../components/DeleteModal";
 import { SettingsModal } from "../components/SettingsModal";
 import { HelpModal } from "../components/HelpModal";
+import { FeedbackModal } from "../components/FeedbackModal";
 import { WorkspaceManagerModal } from "../components/WorkspaceManagerModal";
 import { useSuggestions } from "../hooks/useSuggestions";
 import { useReminderNotifications } from "../hooks/useReminderNotifications";
@@ -24,6 +25,7 @@ import type { Conversation, Note, Workspace } from "../types";
 import { TEMP_ID, convLabel } from "../types";
 import { useWorkspace } from "../hooks/useWorkspace";
 import { useFeatureFlags } from "../hooks/useFeatureFlags";
+import { fetchAdminFeedback } from "../api/adminApi";
 import { AdminPage } from "./AdminPage";
 
 type WorkspaceHook = ReturnType<typeof useWorkspace>;
@@ -43,6 +45,8 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
   const [showHelp, setShowHelp] = useState(false);
   const [showWorkspaceManager, setShowWorkspaceManager] = useState(false);
   const [showAdmin, setShowAdmin] = useState(false);
+  const [showFeedback, setShowFeedback] = useState(false);
+  const [openFeedbackCount, setOpenFeedbackCount] = useState(0);
   const [selectedModel, setSelectedModel] = useState<string>(getSavedModel);
   const { flags } = useFeatureFlags();
 
@@ -65,6 +69,16 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
       setSelectedModel(flags.default_model);
     }
   }, [flags.model_selection_enabled, flags.default_model]);
+
+  // Fetch open feedback count for admins (badge on avatar)
+  async function refreshFeedbackCount() {
+    if (!user.is_admin) return;
+    try {
+      const items = await fetchAdminFeedback("all", "open");
+      setOpenFeedbackCount(items.length);
+    } catch { /* ignore */ }
+  }
+  useEffect(() => { refreshFeedbackCount(); }, []);
 
   const activeWorkspaceId = workspaceHook.activeWorkspace?.id ?? null;
 
@@ -240,6 +254,12 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
   );
 
   const isNoteActive = activeTabType === "note" && editor.openNotes.length > 0;
+
+  const _LEVEL_ORDER: Record<string, number> = { regular: 0, plus: 1, pro: 2 };
+  const _userLevel = user.access_level ?? "regular";
+  const modelAttributionEnabled =
+    flags.model_attribution_enabled &&
+    _LEVEL_ORDER[_userLevel] >= _LEVEL_ORDER[flags.model_attribution_min_level ?? "regular"];
 
   const _d = new Date();
   const today = `${_d.getFullYear()}-${String(_d.getMonth() + 1).padStart(2, "0")}-${String(_d.getDate()).padStart(2, "0")}`;
@@ -476,10 +496,15 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
             <div className="relative">
               <button
                 onClick={(e) => { e.stopPropagation(); setUserMenuOpen((v) => !v); }}
-                className="flex items-center justify-center w-7 h-7 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white text-[11px] font-bold transition"
+                className="relative flex items-center justify-center w-7 h-7 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white text-[11px] font-bold transition"
                 title={user.email}
               >
                 {user.email.slice(0, 2).toUpperCase()}
+                {user.is_admin && openFeedbackCount > 0 && (
+                  <span className="absolute -top-1 -right-1 min-w-[14px] h-[14px] px-0.5 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center leading-none pointer-events-none">
+                    {openFeedbackCount > 99 ? "99+" : openFeedbackCount}
+                  </span>
+                )}
               </button>
 
               {userMenuOpen && (
@@ -523,8 +548,24 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                         <path d="M8 1a2 2 0 0 1 2 2v4H6V3a2 2 0 0 1 2-2m3 6V3a3 3 0 0 0-6 0v4a2 2 0 0 0-2 2v5a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2"/>
                       </svg>
                       Admin Panel
+                      {openFeedbackCount > 0 && (
+                        <span className="ml-auto min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center leading-none">
+                          {openFeedbackCount > 99 ? "99+" : openFeedbackCount}
+                        </span>
+                      )}
                     </button>
                   )}
+
+                  {/* Send Feedback */}
+                  <button
+                    onClick={() => { setUserMenuOpen(false); setShowFeedback(true); }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-300 hover:bg-[#2a2a38] hover:text-white transition"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-gray-500 shrink-0" fill="currentColor" viewBox="0 0 16 16">
+                      <path d="M14 1a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H4.414A2 2 0 0 0 3 11.586l-2 2V2a1 1 0 0 1 1-1zM2 0a2 2 0 0 0-2 2v12.793a.5.5 0 0 0 .854.353l2.853-2.853A1 1 0 0 1 4.414 12H14a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2z"/>
+                    </svg>
+                    Send Feedback
+                  </button>
 
                   <div className="border-t border-[#2a2a38] my-1" />
 
@@ -582,6 +623,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                 onApplyNoteEdit={handleApplyNoteEdit}
                 hasOpenNote={isNoteActive}
                 translationEnabled={flags.translation_enabled}
+                modelAttributionEnabled={modelAttributionEnabled}
               />
               </div>
             </main>
@@ -646,6 +688,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
 
       <SettingsModal show={showSettings} user={user} onClose={() => setShowSettings(false)} selectedModel={selectedModel} onModelChange={handleModelChange} modelSelectionEnabled={flags.model_selection_enabled} />
       <HelpModal show={showHelp} onClose={() => setShowHelp(false)} />
+      <FeedbackModal show={showFeedback} onClose={() => setShowFeedback(false)} />
 
       {showWorkspaceManager && (
         <WorkspaceManagerModal
@@ -657,7 +700,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
         />
       )}
 
-      {showAdmin && <AdminPage onClose={() => setShowAdmin(false)} currentUserId={user.id} />}
+      {showAdmin && <AdminPage onClose={() => { setShowAdmin(false); refreshFeedbackCount(); }} currentUserId={user.id} />}
     </div>
   );
 }

@@ -66,6 +66,9 @@ if os.getenv("MEMOLINK_SKIP_DB_BOOTSTRAP") != "1":
         _conn.execute(text("ALTER TABLE reminders ADD COLUMN IF NOT EXISTS workspace_id INTEGER REFERENCES workspaces(id) ON DELETE SET NULL"))
         # Admin system migrations
         _conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT FALSE"))
+        _conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS access_level VARCHAR NOT NULL DEFAULT 'regular'"))
+        _conn.execute(text("ALTER TABLE messages ADD COLUMN IF NOT EXISTS model VARCHAR(100)"))
+        _conn.execute(text("ALTER TABLE feedback ADD COLUMN IF NOT EXISTS title VARCHAR(200)"))
         _conn.execute(text("""
             CREATE TABLE IF NOT EXISTS feedback (
                 id SERIAL PRIMARY KEY,
@@ -89,7 +92,13 @@ if os.getenv("MEMOLINK_SKIP_DB_BOOTSTRAP") != "1":
             ("web_search_enabled", "true"), ("agent_mode_enabled", "true"),
             ("model_selection_enabled", "true"), ("image_generation_enabled", "true"),
             ("translation_enabled", "true"), ("file_upload_enabled", "true"),
+            ("research_mode_enabled", "true"),
+            ("model_attribution_enabled", "true"),
             ("default_model", "gpt-4o-mini"), ("default_language", "English"),
+            ("web_search_min_level", "regular"), ("agent_mode_min_level", "regular"),
+            ("model_selection_min_level", "regular"), ("image_generation_min_level", "regular"),
+            ("translation_min_level", "regular"), ("file_upload_min_level", "regular"),
+            ("research_mode_min_level", "regular"), ("model_attribution_min_level", "regular"),
         ]:
             _conn.execute(text("INSERT INTO feature_flags (key, value) VALUES (:k, :v) ON CONFLICT (key) DO NOTHING"), {"k": _k, "v": _v})
         # Auto-promote first user as admin if none exists

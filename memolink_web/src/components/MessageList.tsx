@@ -28,13 +28,14 @@ interface MessageListProps {
   onApplyNoteEdit: (content: string, noteId: number | null) => void;
   hasOpenNote: boolean;
   translationEnabled?: boolean;
+  modelAttributionEnabled?: boolean;
 }
 
 export function MessageList({
   messages, loading, streaming, activeConversation,
   messagesContainerRef, bottomRef,
   onLoadOlder, onAddToNotes, onDeleteMessage, onDropFiles,
-  onApplyNoteEdit, hasOpenNote, translationEnabled = true,
+  onApplyNoteEdit, hasOpenNote, translationEnabled = true, modelAttributionEnabled = true,
 }: MessageListProps) {
   return (
     <div
@@ -59,6 +60,7 @@ export function MessageList({
               onApplyEdit={!isStreamingMsg && msg.role === "assistant" ? onApplyNoteEdit : undefined}
               hasOpenNote={hasOpenNote}
               translationEnabled={translationEnabled}
+              modelAttributionEnabled={modelAttributionEnabled}
             />
           );
         })}

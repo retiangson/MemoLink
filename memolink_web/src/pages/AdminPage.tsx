@@ -17,7 +17,8 @@ const LEVEL_FEATURES: { minKey: keyof FeatureFlags; label: string }[] = [
   { minKey: "image_generation_min_level", label: "Image Generation" },
   { minKey: "model_selection_min_level",  label: "Model Selection" },
   { minKey: "translation_min_level",      label: "Translation" },
-  { minKey: "file_upload_min_level",      label: "File Upload" },
+  { minKey: "file_upload_min_level",          label: "File Upload" },
+  { minKey: "model_attribution_min_level",    label: "Model Attribution" },
 ];
 
 const TRANSLATE_LANGUAGES = [
@@ -25,6 +26,8 @@ const TRANSLATE_LANGUAGES = [
   "Spanish", "French", "German", "Portuguese", "Italian",
   "Russian", "Arabic", "Hindi", "Tagalog",
 ];
+
+type FbStatus = "all" | "open" | "read" | "resolved";
 
 interface Props {
   onClose: () => void;
@@ -38,8 +41,9 @@ export function AdminPage({ onClose, currentUserId }: Props) {
   const [feedback, setFeedback] = useState<FeedbackItem[]>([]);
   const [fbLoading, setFbLoading] = useState(false);
   const [fbTypeFilter, setFbTypeFilter] = useState("all");
-  const [fbStatusFilter, setFbStatusFilter] = useState("all");
-  const [expandedFb, setExpandedFb] = useState<number | null>(null);
+  const [fbStatusFilter, setFbStatusFilter] = useState<FbStatus>("open");
+  const [selectedFb, setSelectedFb] = useState<FeedbackItem | null>(null);
+  const [openCount, setOpenCount] = useState(0);
 
   // Users state
   const [users, setUsers] = useState<AdminUser[]>([]);
@@ -65,8 +69,14 @@ export function AdminPage({ onClose, currentUserId }: Props) {
 
   async function loadFeedback() {
     setFbLoading(true);
-    try { setFeedback(await fetchAdminFeedback(fbTypeFilter, fbStatusFilter)); }
-    catch { /* ignore */ }
+    try {
+      const [items, allOpen] = await Promise.all([
+        fetchAdminFeedback(fbTypeFilter, fbStatusFilter),
+        fetchAdminFeedback("all", "open"),
+      ]);
+      setFeedback(items);
+      setOpenCount(allOpen.length);
+    } catch { /* ignore */ }
     finally { setFbLoading(false); }
   }
 
@@ -87,6 +97,14 @@ export function AdminPage({ onClose, currentUserId }: Props) {
   async function handleStatusChange(id: number, status: string) {
     await updateFeedbackStatus(id, status);
     setFeedback((p) => p.map((f) => f.id === id ? { ...f, status: status as any } : f));
+    setSelectedFb((prev) => prev?.id === id ? { ...prev, status: status as any } : prev);
+    // Keep open count accurate
+    setOpenCount((prev) => {
+      const wasOpen = feedback.find((f) => f.id === id)?.status === "open";
+      if (wasOpen && status !== "open") return Math.max(0, prev - 1);
+      if (!wasOpen && status === "open") return prev + 1;
+      return prev;
+    });
   }
 
   async function handleRoleToggle(userId: number, makeAdmin: boolean) {
@@ -169,6 +187,11 @@ export function AdminPage({ onClose, currentUserId }: Props) {
                 {icon}
               </svg>
               {label}
+              {key === "feedback" && openCount > 0 && (
+                <span className="ml-auto min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center leading-none">
+                  {openCount > 99 ? "99+" : openCount}
+                </span>
+              )}
             </button>
           ))}
         </nav>
@@ -181,27 +204,48 @@ export function AdminPage({ onClose, currentUserId }: Props) {
             <div>
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-semibold text-white">Bug Reports &amp; Suggestions</h2>
-                <div className="flex gap-2">
-                  <select
-                    value={fbTypeFilter}
-                    onChange={(e) => setFbTypeFilter(e.target.value)}
-                    className="bg-[#1a1a24] border border-[#2a2a38] rounded-lg px-2.5 py-1.5 text-xs text-gray-300 focus:outline-none focus:border-indigo-500/50"
+                <select
+                  value={fbTypeFilter}
+                  onChange={(e) => setFbTypeFilter(e.target.value)}
+                  className="bg-[#1a1a24] border border-[#2a2a38] rounded-lg px-2.5 py-1.5 text-xs text-gray-300 focus:outline-none focus:border-indigo-500/50"
+                >
+                  <option value="all">All types</option>
+                  <option value="bug">Bug Reports</option>
+                  <option value="suggestion">Suggestions</option>
+                </select>
+              </div>
+
+              {/* Status tab strip */}
+              <div className="flex gap-1 mb-4 bg-[#12121a] p-1 rounded-xl border border-[#2a2a38] w-fit">
+                {([
+                  { key: "open",     label: "Open" },
+                  { key: "read",     label: "Read" },
+                  { key: "resolved", label: "Resolved" },
+                  { key: "all",      label: "All" },
+                ] as { key: FbStatus; label: string }[]).map(({ key, label }) => (
+                  <button
+                    key={key}
+                    onClick={() => setFbStatusFilter(key)}
+                    className={`relative px-4 py-1.5 rounded-lg text-xs font-medium transition ${
+                      fbStatusFilter === key
+                        ? key === "open"
+                          ? "bg-amber-500/20 text-amber-300"
+                          : key === "read"
+                            ? "bg-sky-500/20 text-sky-300"
+                            : key === "resolved"
+                              ? "bg-emerald-500/20 text-emerald-300"
+                              : "bg-[#2a2a38] text-gray-200"
+                        : "text-gray-500 hover:text-gray-300"
+                    }`}
                   >
-                    <option value="all">All types</option>
-                    <option value="bug">Bug Reports</option>
-                    <option value="suggestion">Suggestions</option>
-                  </select>
-                  <select
-                    value={fbStatusFilter}
-                    onChange={(e) => setFbStatusFilter(e.target.value)}
-                    className="bg-[#1a1a24] border border-[#2a2a38] rounded-lg px-2.5 py-1.5 text-xs text-gray-300 focus:outline-none focus:border-indigo-500/50"
-                  >
-                    <option value="all">All statuses</option>
-                    <option value="open">Open</option>
-                    <option value="read">Read</option>
-                    <option value="resolved">Resolved</option>
-                  </select>
-                </div>
+                    {label}
+                    {key === "open" && openCount > 0 && (
+                      <span className="ml-1.5 px-1 min-w-[16px] h-4 inline-flex items-center justify-center bg-red-500 text-white text-[9px] font-bold rounded-full leading-none">
+                        {openCount > 99 ? "99+" : openCount}
+                      </span>
+                    )}
+                  </button>
+                ))}
               </div>
 
               {fbLoading ? (
@@ -216,7 +260,11 @@ export function AdminPage({ onClose, currentUserId }: Props) {
               ) : (
                 <div className="space-y-3">
                   {feedback.map((item) => (
-                    <div key={item.id} className="bg-[#1a1a24] border border-[#2a2a38] rounded-xl overflow-hidden">
+                    <div
+                      key={item.id}
+                      onClick={() => setSelectedFb(item)}
+                      className="bg-[#1a1a24] border border-[#2a2a38] rounded-xl overflow-hidden cursor-pointer hover:border-indigo-500/30 hover:bg-[#1e1e2e] transition group"
+                    >
                       <div className="flex items-start gap-3 px-4 py-3">
                         <div className="flex flex-col gap-1.5 shrink-0 mt-0.5">
                           <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium border capitalize ${TYPE_COLORS[item.type] ?? "bg-gray-500/10 text-gray-400"}`}>
@@ -227,46 +275,95 @@ export function AdminPage({ onClose, currentUserId }: Props) {
                           </span>
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
+                          <div className="flex items-center gap-2 mb-0.5">
                             <span className="text-xs text-gray-500 truncate">{item.user_email ?? `User #${item.user_id}`}</span>
                             <span className="text-[10px] text-gray-700">·</span>
                             <span className="text-[10px] text-gray-700 shrink-0">{item.created_at.slice(0, 10)}</span>
                           </div>
-                          <p className={`text-sm text-gray-300 leading-relaxed ${expandedFb === item.id ? "" : "line-clamp-2"}`}>
+                          <p className="text-sm font-medium text-gray-200 truncate">{item.title}</p>
+                          <p className="text-xs text-gray-500 leading-relaxed line-clamp-1 mt-0.5">
                             {item.message}
                           </p>
-                          {item.message.length > 120 && (
-                            <button
-                              onClick={() => setExpandedFb(expandedFb === item.id ? null : item.id)}
-                              className="text-[11px] text-indigo-400 hover:text-indigo-300 mt-1 transition"
-                            >
-                              {expandedFb === item.id ? "Show less" : "Show more"}
-                            </button>
-                          )}
                         </div>
-                        <div className="flex flex-col gap-1.5 shrink-0">
-                          {item.status === "open" && (
-                            <button
-                              onClick={() => handleStatusChange(item.id, "read")}
-                              className="px-2.5 py-1 text-[10px] font-medium text-sky-400 bg-sky-500/10 border border-sky-500/20 rounded-lg hover:bg-sky-500/20 transition"
-                            >Mark Read</button>
-                          )}
-                          {item.status !== "resolved" && (
-                            <button
-                              onClick={() => handleStatusChange(item.id, "resolved")}
-                              className="px-2.5 py-1 text-[10px] font-medium text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded-lg hover:bg-emerald-500/20 transition"
-                            >Resolve</button>
-                          )}
-                          {item.status !== "open" && (
-                            <button
-                              onClick={() => handleStatusChange(item.id, "open")}
-                              className="px-2.5 py-1 text-[10px] font-medium text-gray-500 hover:text-gray-300 hover:bg-[#252533] rounded-lg transition"
-                            >Reopen</button>
-                          )}
-                        </div>
+                        <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 text-gray-700 group-hover:text-indigo-400 shrink-0 mt-1 transition" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                        </svg>
                       </div>
                     </div>
                   ))}
+                </div>
+              )}
+
+              {/* Feedback detail modal */}
+              {selectedFb && (
+                <div
+                  className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+                  onClick={() => setSelectedFb(null)}
+                >
+                  <div
+                    className="bg-[#13131c] border border-[#2a2a38] rounded-2xl shadow-2xl w-full max-w-lg flex flex-col overflow-hidden"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {/* Modal header */}
+                    <div className="flex items-center justify-between px-5 py-4 border-b border-[#2a2a38]">
+                      <div className="flex flex-col gap-1.5 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium border shrink-0 ${TYPE_COLORS[selectedFb.type] ?? "bg-gray-500/10 text-gray-400"}`}>
+                            {selectedFb.type === "bug" ? "Bug Report" : "Suggestion"}
+                          </span>
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium border capitalize shrink-0 ${STATUS_COLORS[selectedFb.status] ?? ""}`}>
+                            {selectedFb.status}
+                          </span>
+                        </div>
+                        <p className="text-sm font-semibold text-white truncate">{selectedFb.title}</p>
+                      </div>
+                      <button
+                        onClick={() => setSelectedFb(null)}
+                        className="text-gray-600 hover:text-white transition p-1 rounded-lg hover:bg-[#1e1e2a]"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+
+                    {/* Meta */}
+                    <div className="px-5 py-3 border-b border-[#1e1e2a] flex items-center gap-3 text-xs text-gray-500">
+                      <span>{selectedFb.user_email ?? `User #${selectedFb.user_id}`}</span>
+                      <span className="text-gray-700">·</span>
+                      <span>{new Date(selectedFb.created_at).toLocaleString()}</span>
+                      <span className="text-gray-700">·</span>
+                      <span className="text-gray-600">#{selectedFb.id}</span>
+                    </div>
+
+                    {/* Full description */}
+                    <div className="px-5 py-4 overflow-y-auto max-h-72">
+                      <p className="text-[10px] text-gray-600 uppercase tracking-wider mb-2">Description</p>
+                      <p className="text-sm text-gray-200 leading-relaxed whitespace-pre-wrap">{selectedFb.message}</p>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-[#2a2a38]">
+                      {selectedFb.status !== "open" && (
+                        <button
+                          onClick={() => handleStatusChange(selectedFb.id, "open")}
+                          className="px-3 py-1.5 text-xs font-medium text-gray-400 hover:text-gray-200 hover:bg-[#252533] rounded-lg border border-[#2a2a38] transition"
+                        >Reopen</button>
+                      )}
+                      {selectedFb.status === "open" && (
+                        <button
+                          onClick={() => handleStatusChange(selectedFb.id, "read")}
+                          className="px-3 py-1.5 text-xs font-medium text-sky-400 bg-sky-500/10 border border-sky-500/20 rounded-lg hover:bg-sky-500/20 transition"
+                        >Mark Read</button>
+                      )}
+                      {selectedFb.status !== "resolved" && (
+                        <button
+                          onClick={() => handleStatusChange(selectedFb.id, "resolved")}
+                          className="px-3 py-1.5 text-xs font-medium text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded-lg hover:bg-emerald-500/20 transition"
+                        >Mark Resolved</button>
+                      )}
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
@@ -300,6 +397,7 @@ export function AdminPage({ onClose, currentUserId }: Props) {
                     { key: "web_search_enabled", label: "Web Search", desc: "Allow users to enable web search in chat" },
                     { key: "agent_mode_enabled", label: "Agent Mode", desc: "Allow users to enable AI agent mode" },
                     { key: "research_mode_enabled", label: "Research Mode", desc: "Allow users to run deep multi-source research analysis" },
+                    { key: "model_attribution_enabled", label: "Model Attribution", desc: "Show 'replied by [model]' label on each AI message" },
                     { key: "model_selection_enabled", label: "Model Selection", desc: "Allow users to choose the AI model" },
                     { key: "image_generation_enabled", label: "Image Generation", desc: "Allow AI image generation in chat" },
                     { key: "translation_enabled", label: "Translation", desc: "Show the translate button on chat messages" },

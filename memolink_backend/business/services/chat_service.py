@@ -264,7 +264,7 @@ class ChatService(IChatService):
                 answer = f"![Generated image]({data_url})\n\n*{revised}*"
             except Exception as exc:
                 answer = f"⚠ Image generation failed: {exc}"
-            assistant_msg = self.repo_conv.add_message(conversation_id, "assistant", answer)
+            assistant_msg = self.repo_conv.add_message(conversation_id, "assistant", answer, model=img_model)
             return ChatResponseDTO(answer=answer, sources=[], message_id=assistant_msg.id)
 
         used_model = model
@@ -292,7 +292,7 @@ class ChatService(IChatService):
         except Exception as e:
             answer = f"⚠ Unexpected error: {str(e)}"
 
-        assistant_msg = self.repo_conv.add_message(conversation_id, "assistant", answer)
+        assistant_msg = self.repo_conv.add_message(conversation_id, "assistant", answer, model=used_model)
         return ChatResponseDTO(answer=answer, sources=sources, message_id=assistant_msg.id)
 
     def ask_stream(self, dto: ChatRequestDTO) -> Iterator[str]:
@@ -317,7 +317,7 @@ class ChatService(IChatService):
                 answer = f"⚠ Image generation failed: {exc}"
             # Replace the loading text with the final image content
             yield f"data: {json.dumps({'replace': answer})}\n\n"
-            assistant_msg = self.repo_conv.add_message(conversation_id, "assistant", answer)
+            assistant_msg = self.repo_conv.add_message(conversation_id, "assistant", answer, model=img_model)
             yield f"data: {json.dumps({'done': True, 'id': assistant_msg.id, 'model': img_model})}\n\n"
             return
 
@@ -358,7 +358,7 @@ class ChatService(IChatService):
             full_answer = f"⚠ Unexpected error: {str(e)}"
             yield f"data: {json.dumps({'t': full_answer})}\n\n"
 
-        assistant_msg = self.repo_conv.add_message(conversation_id, "assistant", full_answer)
+        assistant_msg = self.repo_conv.add_message(conversation_id, "assistant", full_answer, model=used_model)
         yield f"data: {json.dumps({'done': True, 'id': assistant_msg.id, 'model': used_model})}\n\n"
 
     async def handle_file_upload(
@@ -400,6 +400,6 @@ class ChatService(IChatService):
             ],
         )
         answer = completion.choices[0].message.content
-        assistant_msg = self.repo_conv.add_message(conversation_id, "assistant", answer)
+        assistant_msg = self.repo_conv.add_message(conversation_id, "assistant", answer, model=settings.openai_chat_model)
 
         return ChatResponseDTO(answer=answer, sources=[], attachments=attachments, message_id=assistant_msg.id)

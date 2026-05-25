@@ -43,6 +43,6 @@ export async function changePassword(current_password: string, new_password: str
 }
 
 // Feedback
-export async function submitFeedback(type: "bug" | "suggestion", message: string): Promise<{ ok: boolean }> {
-  return (await api.post("/feedback", { type, message })).data;
+export async function submitFeedback(type: "bug" | "suggestion", title: string, message: string): Promise<{ ok: boolean }> {
+  return (await api.post("/feedback", { type, title, message })).data;
 }
