@@ -50,6 +50,15 @@ export function NoteEditorView({
   const [language, setLanguage] = useState("");
   const [exporting, setExporting] = useState<ExportFormat | null>(null);
   const [activeTab, setActiveTab] = useState<"editor" | "source">("editor");
+  const [rawContent, setRawContent] = useState(noteContentDraft);
+
+  // Capture the raw DB content (Markdown) when the note changes,
+  // before TipTap converts it to HTML via onChange
+  React.useEffect(() => {
+    setRawContent(noteContentDraft);
+    setActiveTab("editor");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [noteKey]);
 
   async function handleExport(format: ExportFormat) {
     setShowExport(false);
@@ -103,7 +112,7 @@ export function NoteEditorView({
         <div className="flex-1 overflow-hidden border border-[#1e1e2a] rounded-xl bg-[#0a0a0f]">
           <textarea
             readOnly
-            value={noteContentDraft}
+            value={rawContent}
             className="w-full h-full bg-transparent text-gray-400 text-xs font-mono p-4 resize-none focus:outline-none"
           />
         </div>
