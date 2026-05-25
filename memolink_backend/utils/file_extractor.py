@@ -46,7 +46,9 @@ class _HTMLTextExtractor(HTMLParser):
 
 
 class _HTMLSanitizer(HTMLParser):
-    """Strip layout tags, keep only TipTap-compatible semantic tags."""
+    """Strip layout tags, keep only TipTap-compatible semantic tags.
+    Block layout tags (div, section, etc.) are converted to <p> wrappers
+    so their text content is never orphaned."""
     _ALLOWED = {
         "h1", "h2", "h3", "h4", "h5", "h6",
         "p", "br", "hr",
@@ -57,17 +59,31 @@ class _HTMLSanitizer(HTMLParser):
     }
     _VOID = {"br", "hr", "img"}
     _SKIP = {"script", "style", "noscript", "svg", "canvas", "select", "option", "nav", "footer"}
+    # Layout tags whose text content gets wrapped in <p>
+    _BLOCK_LAYOUT = {
+        "div", "section", "article", "main", "aside",
+        "header", "figure", "figcaption", "details", "summary",
+    }
     _SAFE_ATTRS = {
         "a": {"href", "title"},
         "img": {"src", "alt", "width", "height"},
         "td": {"colspan", "rowspan"},
         "th": {"colspan", "rowspan"},
     }
+    # Tags that are already block containers — don't wrap inside these
+    _BLOCK_CONTAINERS = {
+        "h1", "h2", "h3", "h4", "h5", "h6",
+        "p", "li", "pre", "blockquote", "td", "th",
+    }
 
     def __init__(self):
         super().__init__()
         self._out: list[str] = []
         self._skip_depth = 0
+        self._tag_stack: list[str] = []  # stack of currently open allowed/layout tags
+
+    def _in_block_container(self) -> bool:
+        return any(t in self._BLOCK_CONTAINERS for t in self._tag_stack)
 
     def handle_starttag(self, tag, attrs):
         tag = tag.lower()
@@ -85,6 +101,11 @@ class _HTMLSanitizer(HTMLParser):
                 for n, v in attrs if n in safe_names and v
             )
             self._out.append(f"<{tag}{attr_str}>")
+            self._tag_stack.append(tag)
+        elif tag in self._BLOCK_LAYOUT:
+            if not self._in_block_container():
+                self._out.append("<p>")
+            self._tag_stack.append(tag)
 
     def handle_endtag(self, tag):
         tag = tag.lower()
@@ -94,6 +115,13 @@ class _HTMLSanitizer(HTMLParser):
             return
         if tag in self._ALLOWED and tag not in self._VOID:
             self._out.append(f"</{tag}>")
+            if tag in self._tag_stack:
+                self._tag_stack.pop()
+        elif tag in self._BLOCK_LAYOUT:
+            if tag in self._tag_stack:
+                self._tag_stack.pop()
+            if not self._in_block_container():
+                self._out.append("</p>")
 
     def handle_data(self, data):
         if self._skip_depth > 0:
@@ -103,6 +131,10 @@ class _HTMLSanitizer(HTMLParser):
     def handle_entityref(self, name):
         if self._skip_depth == 0:
             self._out.append(f"&{name};")
+
+    def handle_charref(self, name):
+        if self._skip_depth == 0:
+            self._out.append(f"&#{name};")
 
     def handle_charref(self, name):
         if self._skip_depth == 0:
@@ -406,13 +438,12 @@ def extract_formatted_html(file_bytes: bytes, filename: str) -> str:
 
     if ext in ("html", "htm"):
         try:
-            import html2text
             raw = file_bytes.decode("utf-8", errors="ignore")
-            converter = html2text.HTML2Text()
-            converter.ignore_links = False
-            converter.ignore_images = False
-            converter.body_width = 0
-            return converter.handle(raw).strip()
+            body_match = re.search(r"<body[^>]*>(.*?)</body>", raw, re.DOTALL | re.IGNORECASE)
+            content = body_match.group(1) if body_match else raw
+            sanitizer = _HTMLSanitizer()
+            sanitizer.feed(content)
+            return sanitizer.get_html().strip()
         except Exception:
             pass
 
