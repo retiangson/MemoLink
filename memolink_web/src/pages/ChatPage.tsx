@@ -416,11 +416,11 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
         {/* ── Unified tab bar ───────────────────────────────────────────── */}
         <div className="flex bg-[#0a0a0f] border-b border-[#1e1e2a] shrink-0" style={{ minHeight: 40 }}>
 
-          {/* Scrollable tabs — overflow only on this inner div */}
+          {/* Scrollable tabs — hidden in split modes (each panel has its own tab bar) */}
           <div className="flex items-center overflow-x-auto flex-1">
 
             {/* Chat tabs */}
-            {convs.openChats.map((chat, i) => {
+            {layoutMode === "stacked" && convs.openChats.map((chat, i) => {
               const isActive = activeTabType === "chat" && convs.activeConversation?.id === chat.id;
               const isDragOver = dragOverTab?.type === "chat" && dragOverTab.index === i && dragSrcRef.current?.index !== i;
               return (
@@ -449,7 +449,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
             })}
 
             {/* Note tabs */}
-            {editor.openNotes.map((note, i) => {
+            {layoutMode === "stacked" && editor.openNotes.map((note, i) => {
               const isActive = activeTabType === "note" && editor.activeIndex === i;
               const isDragOver = dragOverTab?.type === "note" && dragOverTab.index === i && dragSrcRef.current?.index !== i;
               return (
