@@ -45,6 +45,73 @@ class _HTMLTextExtractor(HTMLParser):
                 self._parts.append(text)
 
 
+class _HTMLSanitizer(HTMLParser):
+    """Strip layout tags, keep only TipTap-compatible semantic tags."""
+    _ALLOWED = {
+        "h1", "h2", "h3", "h4", "h5", "h6",
+        "p", "br", "hr",
+        "ul", "ol", "li",
+        "table", "thead", "tbody", "tfoot", "tr", "th", "td",
+        "strong", "b", "em", "i", "u", "s", "strike", "code", "pre",
+        "blockquote", "a", "img",
+    }
+    _VOID = {"br", "hr", "img"}
+    _SKIP = {"script", "style", "noscript", "svg", "canvas", "select", "option", "nav", "footer"}
+    _SAFE_ATTRS = {
+        "a": {"href", "title"},
+        "img": {"src", "alt", "width", "height"},
+        "td": {"colspan", "rowspan"},
+        "th": {"colspan", "rowspan"},
+    }
+
+    def __init__(self):
+        super().__init__()
+        self._out: list[str] = []
+        self._skip_depth = 0
+
+    def handle_starttag(self, tag, attrs):
+        tag = tag.lower()
+        if self._skip_depth > 0:
+            if tag in self._SKIP:
+                self._skip_depth += 1
+            return
+        if tag in self._SKIP:
+            self._skip_depth += 1
+            return
+        if tag in self._ALLOWED:
+            safe_names = self._SAFE_ATTRS.get(tag, set())
+            attr_str = "".join(
+                f' {n}="{_html.escape(v or "")}"'
+                for n, v in attrs if n in safe_names and v
+            )
+            self._out.append(f"<{tag}{attr_str}>")
+
+    def handle_endtag(self, tag):
+        tag = tag.lower()
+        if self._skip_depth > 0:
+            if tag in self._SKIP:
+                self._skip_depth -= 1
+            return
+        if tag in self._ALLOWED and tag not in self._VOID:
+            self._out.append(f"</{tag}>")
+
+    def handle_data(self, data):
+        if self._skip_depth > 0:
+            return
+        self._out.append(_html.escape(data))
+
+    def handle_entityref(self, name):
+        if self._skip_depth == 0:
+            self._out.append(f"&{name};")
+
+    def handle_charref(self, name):
+        if self._skip_depth == 0:
+            self._out.append(f"&#{name};")
+
+    def get_html(self) -> str:
+        return "".join(self._out)
+
+
 def extract_text_local(file_bytes: bytes, filename: str) -> str:
     ext = filename.lower().rsplit(".", 1)[-1]
 
@@ -342,9 +409,9 @@ def extract_formatted_html(file_bytes: bytes, filename: str) -> str:
             raw = file_bytes.decode("utf-8", errors="ignore")
             body_match = re.search(r"<body[^>]*>(.*?)</body>", raw, re.DOTALL | re.IGNORECASE)
             content = body_match.group(1) if body_match else raw
-            content = re.sub(r"<script[^>]*>.*?</script>", "", content, flags=re.DOTALL | re.IGNORECASE)
-            content = re.sub(r"<style[^>]*>.*?</style>", "", content, flags=re.DOTALL | re.IGNORECASE)
-            return content.strip()
+            sanitizer = _HTMLSanitizer()
+            sanitizer.feed(content)
+            return sanitizer.get_html().strip()
         except Exception:
             pass
 
