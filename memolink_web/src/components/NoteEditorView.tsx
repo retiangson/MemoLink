@@ -49,6 +49,7 @@ export function NoteEditorView({
   const [showVideoImport, setShowVideoImport] = useState(false);
   const [language, setLanguage] = useState("");
   const [exporting, setExporting] = useState<ExportFormat | null>(null);
+  const [activeTab, setActiveTab] = useState<"editor" | "source">("editor");
 
   async function handleExport(format: ExportFormat) {
     setShowExport(false);
@@ -71,8 +72,24 @@ export function NoteEditorView({
         className="w-full bg-transparent border-b border-[#1e1e2a] pb-2 mb-3 text-lg text-indigo-200 focus:outline-none focus:border-indigo-500 shrink-0"
       />
 
+      {/* Tabs */}
+      <div className="flex items-center gap-1 mb-2 shrink-0">
+        <button
+          onClick={() => setActiveTab("editor")}
+          className={`px-3 py-1 rounded-lg text-xs font-medium transition ${activeTab === "editor" ? "bg-indigo-600 text-white" : "text-gray-500 hover:text-gray-300"}`}
+        >
+          Editor
+        </button>
+        <button
+          onClick={() => setActiveTab("source")}
+          className={`px-3 py-1 rounded-lg text-xs font-medium transition ${activeTab === "source" ? "bg-indigo-600 text-white" : "text-gray-500 hover:text-gray-300"}`}
+        >
+          Source
+        </button>
+      </div>
+
       {/* Rich editor */}
-      <div className="flex-1 overflow-hidden flex flex-col border border-[#1e1e2a] rounded-xl bg-[#0a0a0f]">
+      <div className={`flex-1 overflow-hidden flex flex-col border border-[#1e1e2a] rounded-xl bg-[#0a0a0f] ${activeTab !== "editor" ? "hidden" : ""}`}>
         <RichNoteEditor
           key={String(noteKey)}
           noteKey={noteKey}
@@ -80,6 +97,17 @@ export function NoteEditorView({
           onChange={(html) => setNoteContentDraft(html)}
         />
       </div>
+
+      {/* Source view */}
+      {activeTab === "source" && (
+        <div className="flex-1 overflow-hidden border border-[#1e1e2a] rounded-xl bg-[#0a0a0f]">
+          <textarea
+            readOnly
+            value={noteContentDraft}
+            className="w-full h-full bg-transparent text-gray-400 text-xs font-mono p-4 resize-none focus:outline-none"
+          />
+        </div>
+      )}
 
       {/* Bottom bar */}
       <div className="mt-3 flex items-center gap-2 shrink-0">
