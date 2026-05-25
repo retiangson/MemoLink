@@ -149,3 +149,7 @@ app.include_router(feedback_controller.router, prefix="/api")
 app.include_router(admin_controller.router, prefix="/api")
 app.include_router(features_controller.router, prefix="/api")
 app.include_router(research_controller.router, prefix="/api")
+
+# AWS Lambda handler (Mangum bridges ASGI → Lambda event format)
+from mangum import Mangum  # noqa: E402
+handler = Mangum(app, lifespan="off")
