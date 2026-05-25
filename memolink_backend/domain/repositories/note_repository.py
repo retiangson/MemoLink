@@ -81,6 +81,31 @@ class NoteRepository:
         self.db.commit()
         return True
 
+    def search_hybrid(
+        self,
+        query_text: str,
+        query_vector: list[float],
+        top_k: int = 10,
+        workspace_id: int | None = None,
+        user_id: int | None = None,
+    ) -> List[Note]:
+        """Vector search for top-30 candidates, then re-rank by keyword overlap."""
+        candidates = self.search_by_vector(query_vector, top_k=30, workspace_id=workspace_id)
+        if not candidates:
+            return []
+        query_words = set(query_text.lower().split())
+        stop = {"the", "a", "an", "is", "in", "of", "to", "and", "or", "for", "with", "on", "at", "by"}
+        query_words -= stop
+
+        def kw_score(note: Note) -> float:
+            text = ((note.title or "") + " " + note.content).lower()
+            if not query_words:
+                return 0.0
+            return sum(1 for w in query_words if w in text) / len(query_words)
+
+        ranked = sorted(candidates, key=kw_score, reverse=True)
+        return ranked[:top_k]
+
     def search_by_vector(self, query_vector: list[float], top_k: int = 5, workspace_id: int | None = None) -> List[Note]:
         embedding_str = "[" + ",".join(str(x) for x in query_vector) + "]"
         if workspace_id is not None:

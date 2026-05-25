@@ -1,0 +1,508 @@
+import React, { useState, useEffect } from "react";
+import {
+  fetchAdminFeedback, updateFeedbackStatus, fetchAdminUsers, updateUserRole, updateUserLevel,
+  fetchAdminFeatures, updateAdminFeatures,
+  type FeedbackItem, type AdminUser, type FeatureFlags, type AccessLevel,
+} from "../api/adminApi";
+import { MODELS } from "../constants/models";
+
+type Tab = "feedback" | "features" | "users";
+
+const _LEVEL_ORDER: Record<string, number> = { regular: 0, plus: 1, pro: 2 };
+
+const LEVEL_FEATURES: { minKey: keyof FeatureFlags; label: string }[] = [
+  { minKey: "web_search_min_level",       label: "Web Search" },
+  { minKey: "agent_mode_min_level",       label: "Agent Mode" },
+  { minKey: "research_mode_min_level",    label: "Research Mode" },
+  { minKey: "image_generation_min_level", label: "Image Generation" },
+  { minKey: "model_selection_min_level",  label: "Model Selection" },
+  { minKey: "translation_min_level",      label: "Translation" },
+  { minKey: "file_upload_min_level",      label: "File Upload" },
+];
+
+const TRANSLATE_LANGUAGES = [
+  "English", "Māori", "Chinese", "Japanese", "Korean",
+  "Spanish", "French", "German", "Portuguese", "Italian",
+  "Russian", "Arabic", "Hindi", "Tagalog",
+];
+
+interface Props {
+  onClose: () => void;
+  currentUserId: number;
+}
+
+export function AdminPage({ onClose, currentUserId }: Props) {
+  const [tab, setTab] = useState<Tab>("feedback");
+
+  // Feedback state
+  const [feedback, setFeedback] = useState<FeedbackItem[]>([]);
+  const [fbLoading, setFbLoading] = useState(false);
+  const [fbTypeFilter, setFbTypeFilter] = useState("all");
+  const [fbStatusFilter, setFbStatusFilter] = useState("all");
+  const [expandedFb, setExpandedFb] = useState<number | null>(null);
+
+  // Users state
+  const [users, setUsers] = useState<AdminUser[]>([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [levelChanging, setLevelChanging] = useState<Record<number, boolean>>({});
+
+  // Feature flags state
+  const [flags, setFlags] = useState<FeatureFlags | null>(null);
+  const [flagsLoading, setFlagsLoading] = useState(false);
+  const [flagsSaved, setFlagsSaved] = useState(false);
+  const [flagsError, setFlagsError] = useState<string | null>(null);
+  const [levelTab, setLevelTab] = useState<AccessLevel>("regular");
+
+  useEffect(() => {
+    if (tab === "feedback") loadFeedback();
+    else if (tab === "users") loadUsers();
+    else if (tab === "features") loadFlags();
+  }, [tab]);
+
+  useEffect(() => {
+    if (tab === "feedback") loadFeedback();
+  }, [fbTypeFilter, fbStatusFilter]);
+
+  async function loadFeedback() {
+    setFbLoading(true);
+    try { setFeedback(await fetchAdminFeedback(fbTypeFilter, fbStatusFilter)); }
+    catch { /* ignore */ }
+    finally { setFbLoading(false); }
+  }
+
+  async function loadUsers() {
+    setUsersLoading(true);
+    try { setUsers(await fetchAdminUsers()); }
+    catch { /* ignore */ }
+    finally { setUsersLoading(false); }
+  }
+
+  async function loadFlags() {
+    setFlagsLoading(true);
+    try { setFlags(await fetchAdminFeatures()); }
+    catch { /* ignore */ }
+    finally { setFlagsLoading(false); }
+  }
+
+  async function handleStatusChange(id: number, status: string) {
+    await updateFeedbackStatus(id, status);
+    setFeedback((p) => p.map((f) => f.id === id ? { ...f, status: status as any } : f));
+  }
+
+  async function handleRoleToggle(userId: number, makeAdmin: boolean) {
+    await updateUserRole(userId, makeAdmin);
+    setUsers((p) => p.map((u) => u.id === userId ? { ...u, is_admin: makeAdmin } : u));
+  }
+
+  async function handleLevelChange(userId: number, level: AccessLevel) {
+    setLevelChanging((p) => ({ ...p, [userId]: true }));
+    try {
+      await updateUserLevel(userId, level);
+      setUsers((p) => p.map((u) => u.id === userId ? { ...u, access_level: level } : u));
+    } catch { /* ignore */ }
+    finally { setLevelChanging((p) => ({ ...p, [userId]: false })); }
+  }
+
+  async function handleSaveFlags() {
+    if (!flags) return;
+    setFlagsSaved(false);
+    setFlagsError(null);
+    try {
+      const updated = await updateAdminFeatures(flags);
+      setFlags(updated);
+      setFlagsSaved(true);
+      setTimeout(() => setFlagsSaved(false), 2000);
+    } catch {
+      setFlagsError("Failed to save. Please try again.");
+    }
+  }
+
+  const STATUS_COLORS: Record<string, string> = {
+    open: "bg-amber-500/15 text-amber-400 border-amber-500/30",
+    read: "bg-sky-500/15 text-sky-400 border-sky-500/30",
+    resolved: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
+  };
+
+  const TYPE_COLORS: Record<string, string> = {
+    bug: "bg-red-500/10 text-red-400 border-red-500/20",
+    suggestion: "bg-indigo-500/10 text-indigo-400 border-indigo-500/20",
+  };
+
+  return (
+    <div className="fixed inset-0 z-[100] bg-[#0d0d12] flex flex-col">
+      {/* Top bar */}
+      <div className="flex items-center justify-between px-6 py-3 border-b border-[#1e1e2a] shrink-0">
+        <div className="flex items-center gap-3">
+          <img src="/memolink-icon.png" alt="" className="h-7 w-7 rounded-md bg-white object-cover" />
+          <span className="text-base font-semibold text-white">Admin Panel</span>
+          <span className="text-xs text-gray-600">MemoLink</span>
+        </div>
+        <button
+          onClick={onClose}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-gray-400 hover:text-white hover:bg-[#1e1e2a] rounded-lg transition"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+          Close
+        </button>
+      </div>
+
+      <div className="flex flex-1 overflow-hidden">
+        {/* Sidebar nav */}
+        <nav className="w-52 shrink-0 border-r border-[#1e1e2a] flex flex-col py-4 px-3 gap-1">
+          {([
+            { key: "feedback", label: "Feedback", icon: <path d="M14 1a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H4.414A2 2 0 0 0 3 11.586l-2 2V2a1 1 0 0 1 1-1zM2 0a2 2 0 0 0-2 2v12.793a.5.5 0 0 0 .854.353l2.853-2.853A1 1 0 0 1 4.414 12H14a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2z"/> },
+            { key: "features", label: "Feature Flags", icon: <path d="M3 2a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v13h1.5a.5.5 0 0 1 0 1h-13a.5.5 0 0 1 0-1H3V2zm1 13h1.5v-2a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 .5.5v2H10V2H4v13z"/> },
+            { key: "users", label: "Users", icon: <path d="M7 14s-1 0-1-1 1-4 5-4 5 3 5 4-1 1-1 1zm4-6a3 3 0 1 0 0-6 3 3 0 0 0 0 6m-5.784 6A2.24 2.24 0 0 1 5 13c0-1.355.68-2.75 1.936-3.72A6.3 6.3 0 0 0 5 9c-4 0-5 3-5 4s1 1 1 1zM4.5 8a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5"/> },
+          ] as { key: Tab; label: string; icon: React.ReactNode }[]).map(({ key, label, icon }) => (
+            <button
+              key={key}
+              onClick={() => setTab(key)}
+              className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm text-left transition ${
+                tab === key
+                  ? "bg-indigo-600/20 text-indigo-300 font-medium"
+                  : "text-gray-500 hover:text-gray-200 hover:bg-[#1e1e2a]"
+              }`}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 shrink-0" fill="currentColor" viewBox="0 0 16 16">
+                {icon}
+              </svg>
+              {label}
+            </button>
+          ))}
+        </nav>
+
+        {/* Main content */}
+        <main className="flex-1 overflow-y-auto p-6">
+
+          {/* FEEDBACK TAB */}
+          {tab === "feedback" && (
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-white">Bug Reports &amp; Suggestions</h2>
+                <div className="flex gap-2">
+                  <select
+                    value={fbTypeFilter}
+                    onChange={(e) => setFbTypeFilter(e.target.value)}
+                    className="bg-[#1a1a24] border border-[#2a2a38] rounded-lg px-2.5 py-1.5 text-xs text-gray-300 focus:outline-none focus:border-indigo-500/50"
+                  >
+                    <option value="all">All types</option>
+                    <option value="bug">Bug Reports</option>
+                    <option value="suggestion">Suggestions</option>
+                  </select>
+                  <select
+                    value={fbStatusFilter}
+                    onChange={(e) => setFbStatusFilter(e.target.value)}
+                    className="bg-[#1a1a24] border border-[#2a2a38] rounded-lg px-2.5 py-1.5 text-xs text-gray-300 focus:outline-none focus:border-indigo-500/50"
+                  >
+                    <option value="all">All statuses</option>
+                    <option value="open">Open</option>
+                    <option value="read">Read</option>
+                    <option value="resolved">Resolved</option>
+                  </select>
+                </div>
+              </div>
+
+              {fbLoading ? (
+                <div className="flex items-center justify-center py-12 text-gray-600 text-sm">Loading…</div>
+              ) : feedback.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 text-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-10 h-10 text-gray-700 mb-3" fill="currentColor" viewBox="0 0 16 16">
+                    <path d="M14 1a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H4.414A2 2 0 0 0 3 11.586l-2 2V2a1 1 0 0 1 1-1zM2 0a2 2 0 0 0-2 2v12.793a.5.5 0 0 0 .854.353l2.853-2.853A1 1 0 0 1 4.414 12H14a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2z"/>
+                  </svg>
+                  <p className="text-gray-600">No feedback found</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {feedback.map((item) => (
+                    <div key={item.id} className="bg-[#1a1a24] border border-[#2a2a38] rounded-xl overflow-hidden">
+                      <div className="flex items-start gap-3 px-4 py-3">
+                        <div className="flex flex-col gap-1.5 shrink-0 mt-0.5">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium border capitalize ${TYPE_COLORS[item.type] ?? "bg-gray-500/10 text-gray-400"}`}>
+                            {item.type === "bug" ? "Bug" : "Suggestion"}
+                          </span>
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium border capitalize ${STATUS_COLORS[item.status] ?? ""}`}>
+                            {item.status}
+                          </span>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-xs text-gray-500 truncate">{item.user_email ?? `User #${item.user_id}`}</span>
+                            <span className="text-[10px] text-gray-700">·</span>
+                            <span className="text-[10px] text-gray-700 shrink-0">{item.created_at.slice(0, 10)}</span>
+                          </div>
+                          <p className={`text-sm text-gray-300 leading-relaxed ${expandedFb === item.id ? "" : "line-clamp-2"}`}>
+                            {item.message}
+                          </p>
+                          {item.message.length > 120 && (
+                            <button
+                              onClick={() => setExpandedFb(expandedFb === item.id ? null : item.id)}
+                              className="text-[11px] text-indigo-400 hover:text-indigo-300 mt-1 transition"
+                            >
+                              {expandedFb === item.id ? "Show less" : "Show more"}
+                            </button>
+                          )}
+                        </div>
+                        <div className="flex flex-col gap-1.5 shrink-0">
+                          {item.status === "open" && (
+                            <button
+                              onClick={() => handleStatusChange(item.id, "read")}
+                              className="px-2.5 py-1 text-[10px] font-medium text-sky-400 bg-sky-500/10 border border-sky-500/20 rounded-lg hover:bg-sky-500/20 transition"
+                            >Mark Read</button>
+                          )}
+                          {item.status !== "resolved" && (
+                            <button
+                              onClick={() => handleStatusChange(item.id, "resolved")}
+                              className="px-2.5 py-1 text-[10px] font-medium text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded-lg hover:bg-emerald-500/20 transition"
+                            >Resolve</button>
+                          )}
+                          {item.status !== "open" && (
+                            <button
+                              onClick={() => handleStatusChange(item.id, "open")}
+                              className="px-2.5 py-1 text-[10px] font-medium text-gray-500 hover:text-gray-300 hover:bg-[#252533] rounded-lg transition"
+                            >Reopen</button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* FEATURES TAB */}
+          {tab === "features" && (
+            <div>
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h2 className="text-lg font-semibold text-white">Feature Flags</h2>
+                  <p className="text-xs text-gray-500 mt-0.5">Control which features are available to all users</p>
+                </div>
+                <button
+                  onClick={handleSaveFlags}
+                  disabled={!flags || flagsLoading}
+                  className="px-4 py-2 text-sm font-medium bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white rounded-xl transition"
+                >
+                  {flagsSaved ? "Saved ✓" : "Save Changes"}
+                </button>
+              </div>
+
+              {flagsError && <p className="text-sm text-red-400 mb-4">{flagsError}</p>}
+
+              {flagsLoading || !flags ? (
+                <div className="flex items-center justify-center py-12 text-gray-600 text-sm">Loading…</div>
+              ) : (
+                <>
+                <div className="space-y-3">
+                  {([
+                    { key: "web_search_enabled", label: "Web Search", desc: "Allow users to enable web search in chat" },
+                    { key: "agent_mode_enabled", label: "Agent Mode", desc: "Allow users to enable AI agent mode" },
+                    { key: "research_mode_enabled", label: "Research Mode", desc: "Allow users to run deep multi-source research analysis" },
+                    { key: "model_selection_enabled", label: "Model Selection", desc: "Allow users to choose the AI model" },
+                    { key: "image_generation_enabled", label: "Image Generation", desc: "Allow AI image generation in chat" },
+                    { key: "translation_enabled", label: "Translation", desc: "Show the translate button on chat messages" },
+                    { key: "file_upload_enabled", label: "File Upload", desc: "Allow users to attach files to chat" },
+                  ] as { key: keyof FeatureFlags; label: string; desc: string }[]).map(({ key, label, desc }) => (
+                    <div key={key} className="flex items-center justify-between px-4 py-3.5 bg-[#1a1a24] border border-[#2a2a38] rounded-xl">
+                      <div>
+                        <p className="text-sm font-medium text-gray-200">{label}</p>
+                        <p className="text-xs text-gray-500 mt-0.5">{desc}</p>
+                      </div>
+                      <button
+                        onClick={() => setFlags((f) => f ? { ...f, [key]: !f[key as keyof FeatureFlags] } : f)}
+                        className={`relative w-11 h-6 rounded-full transition-colors shrink-0 ${
+                          flags[key] ? "bg-indigo-600" : "bg-[#252533]"
+                        }`}
+                      >
+                        <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
+                          flags[key] ? "translate-x-5" : "translate-x-0"
+                        }`} />
+                      </button>
+                    </div>
+                  ))}
+
+                  {/* Default model dropdown */}
+                  <div className="flex items-center justify-between px-4 py-3.5 bg-[#1a1a24] border border-[#2a2a38] rounded-xl">
+                    <div>
+                      <p className="text-sm font-medium text-gray-200">Default Model</p>
+                      <p className="text-xs text-gray-500 mt-0.5">The model used when model selection is disabled, or as the default</p>
+                    </div>
+                    <select
+                      value={flags.default_model}
+                      onChange={(e) => setFlags((f) => f ? { ...f, default_model: e.target.value } : f)}
+                      className="bg-[#12121a] border border-[#2a2a38] rounded-lg px-2.5 py-1.5 text-xs text-gray-300 focus:outline-none focus:border-indigo-500/50 max-w-[200px]"
+                    >
+                      {MODELS.map((m) => (
+                        <option key={m.id} value={m.id}>{m.label}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Default language dropdown */}
+                  <div className="flex items-center justify-between px-4 py-3.5 bg-[#1a1a24] border border-[#2a2a38] rounded-xl">
+                    <div>
+                      <p className="text-sm font-medium text-gray-200">Default Translation Language</p>
+                      <p className="text-xs text-gray-500 mt-0.5">Pre-selected language in the translate picker</p>
+                    </div>
+                    <select
+                      value={flags.default_language}
+                      onChange={(e) => setFlags((f) => f ? { ...f, default_language: e.target.value } : f)}
+                      className="bg-[#12121a] border border-[#2a2a38] rounded-lg px-2.5 py-1.5 text-xs text-gray-300 focus:outline-none focus:border-indigo-500/50"
+                    >
+                      {TRANSLATE_LANGUAGES.map((l) => (
+                        <option key={l} value={l}>{l}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Access Level Requirements — tabbed */}
+                <div className="mt-8">
+                  <h3 className="text-sm font-semibold text-gray-200 mb-1">Access Level Requirements</h3>
+                  <p className="text-xs text-gray-500 mb-4">Configure which features each tier can access. Pro always inherits everything enabled for Plus and Regular.</p>
+
+                  {/* Level tab bar */}
+                  <div className="flex gap-1 mb-4 bg-[#12121a] p-1 rounded-xl w-fit border border-[#2a2a38]">
+                    {(["regular", "plus", "pro"] as const).map((lvl) => (
+                      <button
+                        key={lvl}
+                        onClick={() => setLevelTab(lvl)}
+                        className={`px-5 py-1.5 rounded-lg text-xs font-medium transition capitalize ${
+                          levelTab === lvl
+                            ? lvl === "pro"
+                              ? "bg-purple-600 text-white"
+                              : lvl === "plus"
+                                ? "bg-sky-600 text-white"
+                                : "bg-indigo-600 text-white"
+                            : "text-gray-400 hover:text-gray-200"
+                        }`}
+                      >
+                        {lvl.charAt(0).toUpperCase() + lvl.slice(1)}
+                      </button>
+                    ))}
+                  </div>
+
+                  {levelTab === "pro" ? (
+                    <div className="flex items-center gap-2 px-4 py-3 bg-purple-500/5 border border-purple-500/20 rounded-xl text-xs text-purple-300">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 shrink-0" fill="currentColor" viewBox="0 0 16 16">
+                        <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16"/>
+                        <path d="m8.93 6.588-2.29.287-.082.38.45.083c.294.07.352.176.288.469l-.738 3.468c-.194.897.105 1.319.808 1.319.545 0 1.178-.252 1.465-.598l.088-.416c-.2.176-.492.246-.686.246-.275 0-.375-.193-.304-.533zM9 4.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0"/>
+                      </svg>
+                      Pro tier always has access to all features enabled for Regular and Plus. Use the global toggles above to disable a feature for everyone.
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {LEVEL_FEATURES.map(({ minKey, label }) => {
+                        const minLevel = (flags[minKey] as string) ?? "regular";
+                        const isOn = _LEVEL_ORDER[levelTab] >= _LEVEL_ORDER[minLevel];
+                        return (
+                          <div key={minKey} className="flex items-center justify-between px-4 py-3 bg-[#1a1a24] border border-[#2a2a38] rounded-xl">
+                            <div>
+                              <p className="text-sm text-gray-300">{label}</p>
+                              {!isOn && (
+                                <p className="text-[10px] text-gray-600 mt-0.5">
+                                  Requires {minLevel} or higher
+                                </p>
+                              )}
+                            </div>
+                            <button
+                              onClick={() => {
+                                const nextMinLevel = isOn
+                                  ? (levelTab === "regular" ? "plus" : "pro")
+                                  : levelTab;
+                                setFlags((f) => f ? { ...f, [minKey]: nextMinLevel } : f);
+                              }}
+                              className={`relative w-10 h-5 rounded-full transition-colors shrink-0 ${isOn ? "bg-indigo-600" : "bg-[#252533]"}`}
+                            >
+                              <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${isOn ? "translate-x-5" : "translate-x-0"}`} />
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* USERS TAB */}
+          {tab === "users" && (
+            <div>
+              <div className="mb-4">
+                <h2 className="text-lg font-semibold text-white">Users</h2>
+                <p className="text-xs text-gray-500 mt-0.5">{users.length} registered user{users.length !== 1 ? "s" : ""}</p>
+              </div>
+              {usersLoading ? (
+                <div className="flex items-center justify-center py-12 text-gray-600 text-sm">Loading…</div>
+              ) : (
+                <div className="space-y-2">
+                  {users.map((u) => (
+                    <div key={u.id} className="flex items-center gap-4 px-4 py-3 bg-[#1a1a24] border border-[#2a2a38] rounded-xl">
+                      <div className="w-8 h-8 rounded-full bg-indigo-600/30 flex items-center justify-center text-indigo-300 text-xs font-bold shrink-0">
+                        {u.email.slice(0, 2).toUpperCase()}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-gray-200 truncate">{u.email}</p>
+                        <p className="text-[10px] text-gray-600">User #{u.id}</p>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        {/* Access level badge */}
+                        <span className={`px-2 py-0.5 text-[10px] font-medium rounded-md border ${
+                          u.access_level === "pro"
+                            ? "text-purple-300 bg-purple-500/10 border-purple-500/20"
+                            : u.access_level === "plus"
+                              ? "text-sky-300 bg-sky-500/10 border-sky-500/20"
+                              : "text-gray-400 bg-gray-500/10 border-gray-500/20"
+                        }`}>
+                          {u.access_level === "pro" ? "Pro" : u.access_level === "plus" ? "Plus" : "Regular"}
+                        </span>
+
+                        {u.is_admin && (
+                          <span className="px-2 py-0.5 text-[10px] font-medium text-indigo-300 bg-indigo-500/10 border border-indigo-500/20 rounded-md">
+                            Admin
+                          </span>
+                        )}
+
+                        {u.id !== currentUserId ? (
+                          <>
+                            <select
+                              value={u.access_level}
+                              disabled={levelChanging[u.id]}
+                              onChange={(e) => handleLevelChange(u.id, e.target.value as AccessLevel)}
+                              className="bg-[#12121a] border border-[#2a2a38] rounded-lg px-2 py-1 text-[11px] text-gray-300 focus:outline-none focus:border-indigo-500/50 disabled:opacity-50"
+                            >
+                              <option value="regular">Regular</option>
+                              <option value="plus">Plus</option>
+                              <option value="pro">Pro</option>
+                            </select>
+                            <button
+                              onClick={() => handleRoleToggle(u.id, !u.is_admin)}
+                              className={`px-2.5 py-1 text-[11px] font-medium rounded-lg border transition ${
+                                u.is_admin
+                                  ? "text-red-400 bg-red-500/10 border-red-500/20 hover:bg-red-500/20"
+                                  : "text-indigo-400 bg-indigo-500/10 border-indigo-500/20 hover:bg-indigo-500/20"
+                              }`}
+                            >
+                              {u.is_admin ? "Remove Admin" : "Make Admin"}
+                            </button>
+                          </>
+                        ) : (
+                          <span className="text-[10px] text-gray-600">You</span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+        </main>
+      </div>
+    </div>
+  );
+}

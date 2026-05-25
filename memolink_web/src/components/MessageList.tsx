@@ -2,6 +2,18 @@ import React from "react";
 import ChatBubble from "./ChatBubble";
 import type { Conversation, Message } from "../types";
 
+function ThinkingSpinner() {
+  return (
+    <div className="flex items-center gap-3 px-5 py-4 max-w-[740px]">
+      <div className="relative w-7 h-7 shrink-0">
+        <div className="absolute inset-0 rounded-full border-[3px] border-indigo-500/20 border-t-indigo-400 animate-spin" />
+        <div className="absolute inset-[4px] rounded-full border-2 border-purple-500/20 border-t-purple-400 animate-[spin_1.4s_linear_infinite_reverse]" />
+      </div>
+      <span className="text-sm text-indigo-300/70 animate-pulse">Thinking…</span>
+    </div>
+  );
+}
+
 interface MessageListProps {
   messages: Message[];
   loading: boolean;
@@ -15,13 +27,14 @@ interface MessageListProps {
   onDropFiles: (files: File[]) => void;
   onApplyNoteEdit: (content: string, noteId: number | null) => void;
   hasOpenNote: boolean;
+  translationEnabled?: boolean;
 }
 
 export function MessageList({
   messages, loading, streaming, activeConversation,
   messagesContainerRef, bottomRef,
   onLoadOlder, onAddToNotes, onDeleteMessage, onDropFiles,
-  onApplyNoteEdit, hasOpenNote,
+  onApplyNoteEdit, hasOpenNote, translationEnabled = true,
 }: MessageListProps) {
   return (
     <div
@@ -39,15 +52,17 @@ export function MessageList({
               key={msg.id}
               role={msg.role}
               content={msg.content}
+              model={msg.model}
               streaming={isStreamingMsg}
               onAdd={!isStreamingMsg && msg.role === "assistant" ? (text) => onAddToNotes(text) : undefined}
               onDelete={!isStreamingMsg ? () => onDeleteMessage(msg.id, msg.content, idx) : undefined}
               onApplyEdit={!isStreamingMsg && msg.role === "assistant" ? onApplyNoteEdit : undefined}
               hasOpenNote={hasOpenNote}
+              translationEnabled={translationEnabled}
             />
           );
         })}
-        {loading && <ChatBubble role="assistant" content="Thinking…" />}
+        {loading && <ThinkingSpinner />}
         <div ref={bottomRef} />
       </div>
     </div>

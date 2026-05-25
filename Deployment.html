@@ -1,0 +1,855 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MemoLink — Deployment Guide</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --accent:    #6366f1;
+      --accent-lt: #818cf8;
+      --bg:        #0f0f13;
+      --surface:   #16161d;
+      --card:      #1e1e2a;
+      --border:    #2a2a38;
+      --text:      #e2e8f0;
+      --muted:     #94a3b8;
+      --green:     #22c55e;
+      --cyan:      #22d3ee;
+      --amber:     #f59e0b;
+      --red:       #f87171;
+    }
+
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.7;
+      min-height: 100vh;
+    }
+
+    nav {
+      position: sticky; top: 0; z-index: 100;
+      background: rgba(15,15,19,.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 2rem;
+      display: flex; align-items: center; gap: 1rem; height: 56px;
+    }
+    .nav-logo { font-weight: 700; font-size: 1.15rem; color: var(--accent-lt); letter-spacing: -.5px; }
+    .nav-links { display: flex; gap: .25rem; margin-left: auto; }
+    .nav-links a {
+      color: var(--muted); text-decoration: none; font-size: .85rem;
+      padding: .35rem .75rem; border-radius: 6px; transition: all .2s;
+    }
+    .nav-links a:hover { color: var(--text); background: var(--card); }
+    .nav-links a.active { color: var(--accent-lt); background: rgba(99,102,241,.12); }
+
+    .page-header { padding: 4rem 2rem 2.5rem; max-width: 900px; margin: 0 auto; }
+    .section-label {
+      font-size: .72rem; font-weight: 700; letter-spacing: .12em;
+      text-transform: uppercase; color: var(--accent-lt); margin-bottom: .6rem;
+    }
+    .page-header h1 {
+      font-size: clamp(1.8rem, 4vw, 2.8rem); font-weight: 800;
+      letter-spacing: -.03em; line-height: 1.15;
+      background: linear-gradient(135deg, #e2e8f0 30%, var(--accent-lt));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .page-header p { color: var(--muted); font-size: 1rem; margin-top: .75rem; max-width: 700px; }
+
+    .container { max-width: 960px; margin: 0 auto; padding: 0 2rem 5rem; }
+    section { margin-top: 3.5rem; }
+    h2 { font-size: 1.45rem; font-weight: 700; letter-spacing: -.02em; color: var(--text); margin-bottom: .6rem; }
+    h3 { font-size: 1rem; font-weight: 600; color: var(--text); margin-bottom: .4rem; }
+    p  { color: var(--muted); font-size: .93rem; margin-top: .5rem; }
+
+    .divider { border: none; border-top: 1px solid var(--border); margin: 2.5rem 0; }
+
+    /* ── CODE BLOCKS ── */
+    pre {
+      background: #0b0b10;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.15rem 1.4rem;
+      font-size: .82rem;
+      font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+      color: #c9d1d9;
+      overflow-x: auto;
+      line-height: 1.6;
+      margin-top: .8rem;
+    }
+    code {
+      background: rgba(99,102,241,.12);
+      color: var(--accent-lt);
+      font-size: .83em;
+      padding: .15em .45em;
+      border-radius: 4px;
+      font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+    }
+    pre code { background: none; color: inherit; padding: 0; font-size: inherit; }
+
+    /* comment / keyword colours in code blocks */
+    .cm  { color: #6a9955; }  /* comment */
+    .kw  { color: #569cd6; }  /* keyword */
+    .st  { color: #ce9178; }  /* string */
+    .va  { color: #9cdcfe; }  /* variable */
+    .nu  { color: #b5cea8; }  /* number */
+
+    /* ── CARDS ── */
+    .card-grid { display: grid; gap: 1rem; margin-top: 1.4rem; }
+    .card-grid-2 { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+    .card-grid-3 { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.2rem 1.4rem;
+    }
+    .card h3 { font-size: .97rem; }
+
+    /* ── OPTION CARDS ── */
+    .option-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; margin-top: 1.4rem; }
+    .option-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.4rem;
+    }
+    .option-card.recommended {
+      border-color: rgba(99,102,241,.5);
+      background: linear-gradient(135deg, rgba(99,102,241,.06) 0%, var(--card) 100%);
+    }
+    .option-badge {
+      display: inline-block; font-size: .7rem; font-weight: 700;
+      letter-spacing: .08em; text-transform: uppercase;
+      background: rgba(99,102,241,.18); color: var(--accent-lt);
+      padding: .15rem .6rem; border-radius: 999px; margin-bottom: .6rem;
+    }
+    .option-badge.free { background: rgba(34,197,94,.15); color: var(--green); }
+    .option-badge.simple { background: rgba(34,211,238,.15); color: var(--cyan); }
+
+    /* ── STEPS ── */
+    .steps { margin-top: 1.2rem; }
+    .step {
+      display: flex; gap: 1rem; align-items: flex-start;
+      padding: 1rem 1.2rem;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      margin-bottom: .75rem;
+    }
+    .step-num {
+      flex-shrink: 0;
+      width: 28px; height: 28px;
+      background: rgba(99,102,241,.18);
+      color: var(--accent-lt);
+      font-size: .78rem; font-weight: 700;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      margin-top: .1rem;
+    }
+    .step-body h4 { font-size: .93rem; font-weight: 600; color: var(--text); }
+    .step-body p  { font-size: .88rem; margin-top: .25rem; }
+
+    /* ── ENV TABLE ── */
+    .env-table { width: 100%; border-collapse: collapse; margin-top: 1.2rem; font-size: .86rem; }
+    .env-table th {
+      text-align: left; font-size: .72rem; font-weight: 700;
+      letter-spacing: .1em; text-transform: uppercase;
+      color: var(--muted); border-bottom: 1px solid var(--border);
+      padding: .6rem 1rem;
+    }
+    .env-table td {
+      padding: .65rem 1rem;
+      border-bottom: 1px solid rgba(42,42,56,.6);
+      vertical-align: top;
+    }
+    .env-table tr:last-child td { border-bottom: none; }
+    .env-table td:first-child { font-family: 'Cascadia Code', monospace; color: var(--accent-lt); font-size: .8rem; }
+    .env-table td:nth-child(2) { color: var(--muted); }
+    .tag-req  { background: rgba(248,113,113,.15); color: var(--red);   font-size: .7rem; font-weight: 700; padding: .1rem .45rem; border-radius: 999px; white-space: nowrap; }
+    .tag-opt  { background: rgba(245,158,11,.12);  color: var(--amber); font-size: .7rem; font-weight: 700; padding: .1rem .45rem; border-radius: 999px; white-space: nowrap; }
+
+    /* ── CHECKLIST ── */
+    .checklist { list-style: none; margin-top: 1.2rem; }
+    .checklist li {
+      display: flex; gap: .75rem; align-items: flex-start;
+      padding: .6rem 0;
+      border-bottom: 1px solid rgba(42,42,56,.5);
+      font-size: .9rem; color: var(--muted);
+    }
+    .checklist li:last-child { border-bottom: none; }
+    .checklist li::before { content: "☐"; color: var(--accent-lt); font-size: 1rem; flex-shrink: 0; margin-top: .05rem; }
+
+    /* ── NOTICE ── */
+    .notice {
+      background: rgba(99,102,241,.08);
+      border: 1px solid rgba(99,102,241,.25);
+      border-radius: 10px;
+      padding: 1rem 1.3rem;
+      font-size: .88rem; color: var(--muted);
+      margin-top: 1rem;
+    }
+    .notice strong { color: var(--text); }
+
+    footer { text-align: center; padding: 2rem 1rem; border-top: 1px solid var(--border); color: var(--muted); font-size: .82rem; }
+  </style>
+</head>
+<body>
+
+<nav>
+  <span class="nav-logo">&#x2B21; MemoLink</span>
+  <div class="nav-links">
+    <a href="Overview.html">Overview</a>
+    <a href="Requirements Analysis.html">Requirements</a>
+    <a href="Database Design.html">Database</a>
+    <a href="API Endpoint Design.html">API</a>
+    <a href="Deployment.html" class="active">Deployment</a>
+  </div>
+</nav>
+
+<div class="page-header">
+  <div class="section-label">Infrastructure</div>
+  <h1>Deployment Guide</h1>
+  <p>
+    From local Docker Compose to production cloud. This guide covers every path to get MemoLink
+    running — on your laptop, on a single VPS, or fully distributed across Azure Static Web Apps,
+    Railway, and Supabase.
+  </p>
+</div>
+
+<div class="container">
+
+  <!-- ── OVERVIEW ── -->
+  <section>
+    <div class="section-label">Overview</div>
+    <h2>Deployment Options at a Glance</h2>
+    <p>
+      MemoLink's three-tier architecture maps cleanly to three hosting targets. Mix and match
+      any combination — they communicate only over HTTP and environment variables.
+    </p>
+
+    <div class="card-grid card-grid-3" style="margin-top:1.4rem;">
+      <div class="card">
+        <h3>&#x1F5C4;&#xFE0F; Database</h3>
+        <p><strong>Supabase</strong> — hosted PostgreSQL with pgvector. Already provisioned for this project. No additional setup required for any deployment path.</p>
+      </div>
+      <div class="card">
+        <h3>&#x26A1; Backend</h3>
+        <p><strong>Railway</strong> (recommended) or <strong>Azure Container Apps</strong>. Both run the FastAPI container from the root <code>Dockerfile</code> with environment variables injected at runtime.</p>
+      </div>
+      <div class="card">
+        <h3>&#x1F310; Frontend</h3>
+        <p><strong>Azure Static Web Apps</strong> (recommended) or any static CDN. The React/Vite build outputs a plain <code>dist/</code> folder — no Node runtime required in production.</p>
+      </div>
+    </div>
+  </section>
+
+  <hr class="divider" />
+
+  <!-- ── OPTION 1: DOCKER COMPOSE ── -->
+  <section>
+    <div class="section-label">Option 1 — Local / Self-Hosted</div>
+    <h2>Docker Compose (Single Machine)</h2>
+    <p>
+      The fastest path. One command starts the FastAPI backend and the React/nginx frontend
+      together. Best for local development, demos, or a personal VPS.
+    </p>
+
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <h4>Install Docker Desktop</h4>
+          <p>Download from <strong>docker.com/products/docker-desktop</strong> (macOS / Windows / Linux).
+          Make sure <code>docker compose version</code> returns v2.x or newer.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <h4>Create your <code>.env</code> file</h4>
+          <p>Copy the template and fill in your secrets. The backend container reads this file at startup.</p>
+          <pre>cp .env.example .env
+<span class="cm"># open .env and set at minimum:
+# DATABASE_URL, OPENAI_API_KEY, SECRET_KEY</span></pre>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <h4>Build and start</h4>
+          <pre>docker compose up --build</pre>
+          <p>
+            The frontend container is served at <strong>http://localhost:80</strong>.
+            nginx proxies all <code>/api/*</code> requests to the backend on port 8000.
+            SSE streaming works because nginx is configured with <code>proxy_buffering off</code>.
+          </p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-body">
+          <h4>Run in the background</h4>
+          <pre>docker compose up -d --build   <span class="cm"># detached</span>
+docker compose logs -f         <span class="cm"># follow logs</span>
+docker compose down            <span class="cm"># stop</span></pre>
+        </div>
+      </div>
+    </div>
+
+    <div class="notice">
+      <strong>nginx configuration</strong> — <code>memolink_web/nginx.conf</code> sets
+      <code>proxy_buffering off</code>, <code>proxy_cache off</code>, and
+      <code>proxy_read_timeout 300s</code> so that AI streaming responses (SSE) pass through
+      without buffering delays. Do not remove these directives.
+    </div>
+  </section>
+
+  <hr class="divider" />
+
+  <!-- ── OPTION 2: CLOUD ── -->
+  <section>
+    <div class="section-label">Option 2 — Cloud (Recommended)</div>
+    <h2>Cloud Deployment</h2>
+    <p>
+      Deploy the frontend and backend independently to managed platforms. Each service scales
+      on its own, and the only coupling is the <code>VITE_API_BASE_URL</code> environment
+      variable the frontend uses to reach the backend.
+    </p>
+
+    <div class="option-grid">
+      <div class="option-card recommended">
+        <span class="option-badge">Recommended</span>
+        <h3>Frontend &rarr; Azure Static Web Apps</h3>
+        <p>Free tier, global CDN, GitHub Actions CI/CD built in. Supports custom domains and
+        automatic HTTPS. The React/Vite build (<code>dist/</code>) is uploaded directly —
+        no server runtime needed.</p>
+      </div>
+      <div class="option-card recommended">
+        <span class="option-badge">Recommended</span>
+        <h3>Backend &rarr; Railway</h3>
+        <p>Zero-config container deployments. Push to GitHub → Railway builds from the root
+        <code>Dockerfile</code> automatically. Free trial included; production plans are
+        usage-based (scales to zero when idle).</p>
+      </div>
+      <div class="option-card">
+        <span class="option-badge simple">Azure-Native Alternative</span>
+        <h3>Backend &rarr; Azure Container Apps</h3>
+        <p>Serverless containers on Azure. Integrates with Azure Container Registry.
+        Scales to zero. Better choice if you want everything in one Azure subscription
+        (RBAC, billing, monitoring).</p>
+      </div>
+    </div>
+  </section>
+
+  <hr class="divider" />
+
+  <!-- ── FRONTEND DEPLOY ── -->
+  <section>
+    <div class="section-label">Frontend Deployment</div>
+    <h2>Azure Static Web Apps</h2>
+    <p>
+      Azure Static Web Apps provides a free global CDN for static files with automatic CI/CD
+      from GitHub. The React/Vite project (<code>memolink_web/</code>) deploys with a single
+      GitHub Actions workflow file.
+    </p>
+
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <h4>Create the Static Web App resource</h4>
+          <p>
+            In the <strong>Azure Portal</strong>, search for <em>Static Web Apps</em> → <em>Create</em>.
+            Select your GitHub repo and set the build configuration:
+          </p>
+          <pre>App location:    /memolink_web
+Output location: dist
+Build command:   npm run build</pre>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <h4>Set the <code>VITE_API_BASE_URL</code> environment variable</h4>
+          <p>
+            In the Static Web App resource → <em>Configuration</em> → <em>Application settings</em>,
+            add one entry:
+          </p>
+          <pre>VITE_API_BASE_URL = https://&lt;your-backend-url&gt;/api</pre>
+          <p>
+            This variable is injected at build time. It tells the React app where to send
+            API requests. Set it to your Railway or Azure Container Apps backend URL.
+          </p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <h4>Add GitHub Actions workflow</h4>
+          <p>
+            Azure creates this file automatically when you link your repo. If you need to add
+            it manually, create <code>.github/workflows/azure-static-web-apps.yml</code>:
+          </p>
+          <pre><span class="kw">name:</span> Azure Static Web Apps CI/CD
+
+<span class="kw">on:</span>
+  <span class="kw">push:</span>
+    <span class="kw">branches:</span> [<span class="st">main</span>]
+  <span class="kw">pull_request:</span>
+    <span class="kw">branches:</span> [<span class="st">main</span>]
+
+<span class="kw">jobs:</span>
+  <span class="kw">deploy:</span>
+    <span class="kw">runs-on:</span> ubuntu-latest
+    <span class="kw">steps:</span>
+      - <span class="kw">uses:</span> <span class="st">actions/checkout@v4</span>
+
+      - <span class="kw">name:</span> Deploy to Azure Static Web Apps
+        <span class="kw">uses:</span> <span class="st">Azure/static-web-apps-deploy@v1</span>
+        <span class="kw">with:</span>
+          <span class="kw">azure_static_web_apps_api_token:</span> <span class="st">${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}</span>
+          <span class="kw">repo_token:</span> <span class="st">${{ secrets.GITHUB_TOKEN }}</span>
+          <span class="kw">action:</span> <span class="st">upload</span>
+          <span class="kw">app_location:</span> <span class="st">/memolink_web</span>
+          <span class="kw">output_location:</span> <span class="st">dist</span>
+        <span class="kw">env:</span>
+          <span class="kw">VITE_API_BASE_URL:</span> <span class="st">${{ secrets.VITE_API_BASE_URL }}</span></pre>
+          <p>
+            Add <code>AZURE_STATIC_WEB_APPS_API_TOKEN</code> and <code>VITE_API_BASE_URL</code>
+            as GitHub repository secrets (Settings → Secrets and variables → Actions).
+          </p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-body">
+          <h4>Push to <code>main</code> to deploy</h4>
+          <p>
+            Every push to <code>main</code> triggers a build and deploy. The live URL is shown
+            in the Azure Static Web Apps resource overview (e.g.
+            <code>https://&lt;random&gt;.azurestaticapps.net</code>). Custom domains are
+            configured under <em>Custom domains</em> in the same resource.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <hr class="divider" />
+
+  <!-- ── BACKEND: RAILWAY ── -->
+  <section>
+    <div class="section-label">Backend Deployment — Recommended</div>
+    <h2>Railway</h2>
+    <p>
+      Railway detects the root <code>Dockerfile</code> and builds it automatically. No
+      additional configuration files are required.
+    </p>
+
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <h4>Create a new project</h4>
+          <p>Go to <strong>railway.app</strong> → <em>New Project</em> → <em>Deploy from GitHub repo</em>.
+          Select your MemoLink repository.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <h4>Set environment variables</h4>
+          <p>In the service settings → <em>Variables</em>, add all keys from <code>.env.example</code>.
+          At minimum:</p>
+          <pre>DATABASE_URL       = postgresql+psycopg2://...
+OPENAI_API_KEY     = sk-...
+SECRET_KEY         = &lt;random 32+ char string&gt;
+FRONTEND_ORIGINS   = https://&lt;your-azure-static-url&gt;</pre>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <h4>Configure the start command</h4>
+          <p>Railway reads <code>CMD</code> from the Dockerfile by default:</p>
+          <pre>uvicorn memolink_backend.main:app --host 0.0.0.0 --port 8000</pre>
+          <p>No changes needed — the <code>Dockerfile</code> already sets this command.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-body">
+          <h4>Generate a public domain</h4>
+          <p>In the service → <em>Settings</em> → <em>Networking</em> → <em>Generate Domain</em>.
+          Copy the URL (e.g. <code>https://memolink-production.up.railway.app</code>) and use it
+          as the <code>VITE_API_BASE_URL</code> in the frontend (append <code>/api</code>).</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="notice">
+      <strong>SSE streaming note —</strong> Railway does not buffer responses by default, so
+      Server-Sent Events (AI token streaming) work without any extra configuration.
+    </div>
+  </section>
+
+  <hr class="divider" />
+
+  <!-- ── BACKEND: AZURE CONTAINER APPS ── -->
+  <section>
+    <div class="section-label">Backend Deployment — Azure-Native</div>
+    <h2>Azure Container Apps</h2>
+    <p>
+      Use Azure Container Apps if you want everything in one Azure subscription.
+      The workflow pushes the Docker image to Azure Container Registry, then deploys it
+      to a Container App that scales to zero when idle.
+    </p>
+
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <h4>Create Azure resources</h4>
+          <pre><span class="cm"># Resource group</span>
+az group create --name memolink-rg --location eastus
+
+<span class="cm"># Container Registry (to store Docker images)</span>
+az acr create --resource-group memolink-rg \
+              --name memlinkacr --sku Basic
+
+<span class="cm"># Container Apps environment</span>
+az containerapp env create \
+  --name memolink-env \
+  --resource-group memolink-rg \
+  --location eastus</pre>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <h4>Build and push the Docker image</h4>
+          <pre><span class="cm"># Build locally and push to ACR</span>
+az acr build --registry memlinkacr \
+             --image memolink-backend:latest .</pre>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <h4>Deploy the Container App</h4>
+          <pre>az containerapp create \
+  --name memolink-backend \
+  --resource-group memolink-rg \
+  --environment memolink-env \
+  --image memlinkacr.azurecr.io/memolink-backend:latest \
+  --registry-server memlinkacr.azurecr.io \
+  --target-port 8000 \
+  --ingress external \
+  --min-replicas 0 \
+  --max-replicas 3 \
+  --env-vars \
+    DATABASE_URL=secretref:database-url \
+    OPENAI_API_KEY=secretref:openai-api-key \
+    SECRET_KEY=secretref:secret-key</pre>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-body">
+          <h4>Automate with GitHub Actions</h4>
+          <p>Create <code>.github/workflows/deploy-backend.yml</code> to rebuild and redeploy
+          the Container App on every push to <code>main</code>:</p>
+          <pre><span class="kw">name:</span> Deploy Backend to Azure Container Apps
+
+<span class="kw">on:</span>
+  <span class="kw">push:</span>
+    <span class="kw">branches:</span> [<span class="st">main</span>]
+    <span class="kw">paths:</span>
+      - <span class="st">memolink_backend/**</span>
+      - <span class="st">requirements.txt</span>
+      - <span class="st">Dockerfile</span>
+
+<span class="kw">jobs:</span>
+  <span class="kw">build-and-deploy:</span>
+    <span class="kw">runs-on:</span> ubuntu-latest
+    <span class="kw">steps:</span>
+      - <span class="kw">uses:</span> <span class="st">actions/checkout@v4</span>
+
+      - <span class="kw">name:</span> Azure Login
+        <span class="kw">uses:</span> <span class="st">azure/login@v2</span>
+        <span class="kw">with:</span>
+          <span class="kw">creds:</span> <span class="st">${{ secrets.AZURE_CREDENTIALS }}</span>
+
+      - <span class="kw">name:</span> Build and push image to ACR
+        <span class="kw">run:</span> |
+          az acr build \
+            --registry memlinkacr \
+            --image memolink-backend:${{ github.sha }} \
+            --image memolink-backend:latest .
+
+      - <span class="kw">name:</span> Update Container App
+        <span class="kw">run:</span> |
+          az containerapp update \
+            --name memolink-backend \
+            --resource-group memolink-rg \
+            --image memlinkacr.azurecr.io/memolink-backend:${{ github.sha }}</pre>
+          <p>
+            Store <code>AZURE_CREDENTIALS</code> (output of <code>az ad sp create-for-rbac</code>)
+            as a GitHub secret.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <hr class="divider" />
+
+  <!-- ── BACKEND DOCKERFILE ── -->
+  <section>
+    <div class="section-label">Reference</div>
+    <h2>Dockerfiles</h2>
+    <p>Both Dockerfiles are already included in the repository.</p>
+
+    <h3 style="margin-top:1.5rem;">Backend — <code>Dockerfile</code> (root)</h3>
+    <pre><span class="kw">FROM</span> python:<span class="nu">3.11</span>-slim
+
+<span class="kw">WORKDIR</span> /app
+
+<span class="kw">COPY</span> requirements.txt .
+<span class="kw">RUN</span> pip install --no-cache-dir -r requirements.txt
+
+<span class="kw">COPY</span> . .
+
+<span class="kw">EXPOSE</span> <span class="nu">8000</span>
+
+<span class="kw">CMD</span> [<span class="st">"uvicorn"</span>, <span class="st">"memolink_backend.main:app"</span>, <span class="st">"--host"</span>, <span class="st">"0.0.0.0"</span>, <span class="st">"--port"</span>, <span class="st">"8000"</span>]</pre>
+
+    <h3 style="margin-top:1.8rem;">Frontend — <code>memolink_web/Dockerfile</code></h3>
+    <p>Multi-stage build: Node compiles the Vite bundle, then nginx serves it.</p>
+    <pre><span class="cm"># Stage 1: build</span>
+<span class="kw">FROM</span> node:<span class="nu">20</span>-slim <span class="kw">AS</span> builder
+<span class="kw">WORKDIR</span> /app
+<span class="kw">COPY</span> package.json package-lock.json ./
+<span class="kw">RUN</span> npm ci
+<span class="kw">COPY</span> . .
+<span class="kw">ARG</span> VITE_API_BASE_URL=/api
+<span class="kw">ENV</span> VITE_API_BASE_URL=$VITE_API_BASE_URL
+<span class="kw">RUN</span> npm run build
+
+<span class="cm"># Stage 2: serve</span>
+<span class="kw">FROM</span> nginx:alpine
+<span class="kw">COPY</span> --from=builder /app/dist /usr/share/nginx/html
+<span class="kw">COPY</span> nginx.conf /etc/nginx/conf.d/default.conf
+<span class="kw">EXPOSE</span> <span class="nu">80</span>
+<span class="kw">CMD</span> [<span class="st">"nginx"</span>, <span class="st">"-g"</span>, <span class="st">"daemon off;"</span>]</pre>
+
+    <h3 style="margin-top:1.8rem;">Compose — <code>docker-compose.yml</code></h3>
+    <pre><span class="kw">services:</span>
+
+  <span class="kw">backend:</span>
+    <span class="kw">build:</span>
+      <span class="kw">context:</span> <span class="st">.</span>
+      <span class="kw">dockerfile:</span> <span class="st">Dockerfile</span>
+    <span class="kw">env_file:</span> .env
+    <span class="kw">restart:</span> unless-stopped
+    <span class="kw">expose:</span>
+      - <span class="st">"8000"</span>
+
+  <span class="kw">frontend:</span>
+    <span class="kw">build:</span>
+      <span class="kw">context:</span> <span class="st">./memolink_web</span>
+      <span class="kw">dockerfile:</span> <span class="st">Dockerfile</span>
+    <span class="kw">ports:</span>
+      - <span class="st">"80:80"</span>
+    <span class="kw">depends_on:</span>
+      - backend
+    <span class="kw">restart:</span> unless-stopped</pre>
+  </section>
+
+  <hr class="divider" />
+
+  <!-- ── ENV VARS ── -->
+  <section>
+    <div class="section-label">Configuration</div>
+    <h2>Environment Variables Reference</h2>
+    <p>
+      All variables are read from <code>.env</code> (Docker Compose) or from the platform's
+      secret/environment configuration (Railway / Azure Container Apps). Never commit the
+      <code>.env</code> file to version control.
+    </p>
+
+    <table class="env-table" style="margin-top:1.4rem;">
+      <thead>
+        <tr>
+          <th>Variable</th>
+          <th>Description</th>
+          <th>Required?</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>DATABASE_URL</td>
+          <td>PostgreSQL connection string, e.g. <code>postgresql+psycopg2://user:pass@host/db</code>. Supabase connection pooler URL.</td>
+          <td><span class="tag-req">Required</span></td>
+        </tr>
+        <tr>
+          <td>OPENAI_API_KEY</td>
+          <td>OpenAI API key. Used for GPT chat, embeddings (<code>text-embedding-3-small</code>), Whisper transcription, and DALL-E image generation.</td>
+          <td><span class="tag-req">Required</span></td>
+        </tr>
+        <tr>
+          <td>SECRET_KEY</td>
+          <td>Random string (32+ characters) used to sign JWT access tokens. Generate with <code>openssl rand -hex 32</code>.</td>
+          <td><span class="tag-req">Required</span></td>
+        </tr>
+        <tr>
+          <td>FRONTEND_ORIGINS</td>
+          <td>Comma-separated CORS origins allowed to call the API, e.g. <code>https://your-app.azurestaticapps.net</code>. Defaults to <code>http://localhost:5173</code> if unset.</td>
+          <td><span class="tag-req">Required</span></td>
+        </tr>
+        <tr>
+          <td>GOOGLE_API_KEY</td>
+          <td>Google AI Studio key for Gemini models (translation quality loop, alternative chat models).</td>
+          <td><span class="tag-opt">Optional</span></td>
+        </tr>
+        <tr>
+          <td>BRAVE_SEARCH_API_KEY</td>
+          <td>Brave Search API key. Required for the Web Search toggle in ChatInput. Obtain from <code>api.search.brave.com</code>.</td>
+          <td><span class="tag-opt">Optional</span></td>
+        </tr>
+        <tr>
+          <td>SMTP_HOST</td>
+          <td>SMTP server hostname for outgoing email (password reset links, bug report notifications).</td>
+          <td><span class="tag-opt">Optional</span></td>
+        </tr>
+        <tr>
+          <td>SMTP_PORT</td>
+          <td>SMTP port. Typically <code>587</code> (STARTTLS) or <code>465</code> (SSL).</td>
+          <td><span class="tag-opt">Optional</span></td>
+        </tr>
+        <tr>
+          <td>SMTP_USER</td>
+          <td>SMTP login username (usually the sender email address).</td>
+          <td><span class="tag-opt">Optional</span></td>
+        </tr>
+        <tr>
+          <td>SMTP_PASSWORD</td>
+          <td>SMTP login password or app-specific password.</td>
+          <td><span class="tag-opt">Optional</span></td>
+        </tr>
+        <tr>
+          <td>SMTP_FROM</td>
+          <td>Sender email address shown in outgoing MemoLink emails.</td>
+          <td><span class="tag-opt">Optional</span></td>
+        </tr>
+        <tr>
+          <td>VITE_API_BASE_URL</td>
+          <td><em>Frontend build-time variable.</em> Full URL of the backend API including <code>/api</code> suffix, e.g. <code>https://memolink.up.railway.app/api</code>. Set in platform settings or <code>memolink_web/.env</code> for local dev.</td>
+          <td><span class="tag-req">Required (frontend)</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <hr class="divider" />
+
+  <!-- ── CORS NOTE ── -->
+  <section>
+    <div class="section-label">Cross-Origin</div>
+    <h2>CORS Configuration</h2>
+    <p>
+      The FastAPI backend reads <code>FRONTEND_ORIGINS</code> to build the allowed-origins list
+      for the CORS middleware. When the frontend and backend are on different domains (the typical
+      cloud setup), this variable <strong>must</strong> be set correctly or all browser requests
+      will be blocked.
+    </p>
+
+    <pre><span class="cm"># .env — cloud deployment example</span>
+FRONTEND_ORIGINS=https://&lt;random&gt;.azurestaticapps.net,https://memolink.yourdomain.com</pre>
+
+    <div class="notice">
+      After adding a custom domain to Azure Static Web Apps, remember to also add it to
+      <code>FRONTEND_ORIGINS</code> in the backend's environment variables and redeploy the
+      backend service. Both the <code>azurestaticapps.net</code> subdomain and any custom domain
+      need to be listed if both are in use.
+    </div>
+  </section>
+
+  <hr class="divider" />
+
+  <!-- ── DATABASE ── -->
+  <section>
+    <div class="section-label">Database</div>
+    <h2>Supabase (No Additional Setup Required)</h2>
+    <p>
+      MemoLink's database is already hosted on Supabase with the <code>pgvector</code> extension
+      enabled. The backend runs schema migrations automatically at startup using
+      <code>ALTER TABLE … IF NOT EXISTS</code> and <code>CREATE TABLE … IF NOT EXISTS</code>
+      statements — no manual migration tool is needed.
+    </p>
+
+    <div class="card-grid card-grid-2" style="margin-top:1.4rem;">
+      <div class="card">
+        <h3>Tables auto-created on startup</h3>
+        <p>
+          <code>users</code>, <code>conversations</code>, <code>messages</code>,
+          <code>notes</code>, <code>embeddings</code>, <code>workspaces</code>,
+          <code>reminders</code>, <code>feedback</code>, <code>feature_flags</code>
+        </p>
+      </div>
+      <div class="card">
+        <h3>Seeded defaults</h3>
+        <p>
+          Eight feature flags are inserted with <code>ON CONFLICT DO NOTHING</code> on every
+          startup. The first registered user is automatically promoted to admin.
+        </p>
+      </div>
+      <div class="card">
+        <h3>Connection string format</h3>
+        <p>Use the Supabase <strong>connection pooler</strong> (Transaction mode) URL to avoid
+        hitting the direct connection limit:<br/>
+        <code>postgresql+psycopg2://postgres.&lt;ref&gt;:&lt;pw&gt;@aws-0-region.pooler.supabase.com:6543/postgres</code></p>
+      </div>
+      <div class="card">
+        <h3>pgvector extension</h3>
+        <p>Already enabled on the Supabase project. The <code>embeddings</code> table stores
+        1536-dimensional vectors (<code>text-embedding-3-small</code> output) for cosine
+        similarity search.</p>
+      </div>
+    </div>
+  </section>
+
+  <hr class="divider" />
+
+  <!-- ── POST-DEPLOY CHECKLIST ── -->
+  <section>
+    <div class="section-label">Go-Live</div>
+    <h2>Post-Deployment Checklist</h2>
+
+    <ul class="checklist">
+      <li>Backend health check passes: <code>GET /api/health</code> returns <code>{"status":"ok"}</code></li>
+      <li><code>FRONTEND_ORIGINS</code> includes the exact frontend URL (no trailing slash)</li>
+      <li><code>VITE_API_BASE_URL</code> is set to the backend URL + <code>/api</code> in the frontend build</li>
+      <li>Register an account — confirm the first user is auto-promoted to admin (check via user menu)</li>
+      <li>Send a test chat message and verify AI streaming (SSE) works end-to-end</li>
+      <li>Upload a test note file and confirm it appears in the notes list with embeddings</li>
+      <li>Test the Admin Panel: toggle a feature flag and confirm it takes effect on the next page load</li>
+      <li>If SMTP is configured: trigger a password reset and confirm the email arrives</li>
+      <li>Verify Web Search toggle works (requires <code>BRAVE_SEARCH_API_KEY</code>)</li>
+      <li>Verify Gemini models are selectable (requires <code>GOOGLE_API_KEY</code>)</li>
+      <li>Confirm no <code>.env</code> file or secrets appear in the GitHub repository</li>
+    </ul>
+  </section>
+
+</div>
+
+<footer>MemoLink Capstone Project &mdash; 2026</footer>
+</body>
+</html>

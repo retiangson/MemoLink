@@ -189,5 +189,19 @@
 .tiptap-content [style*="text-align: right"] { text-align: right; }
 .tiptap-content [style*="text-align: left"] { text-align: left; }
 
+/* Images */
+.tiptap-content img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 6px;
+  display: block;
+  margin: 0.75em 0;
+  border: 1px solid #2a2a40;
+}
+.tiptap-content img.ProseMirror-selectednode {
+  outline: 2px solid #6366f1;
+  outline-offset: 2px;
+}
+
 /* Selection */
 .tiptap-content ::selection { background: rgba(99,102,241,0.35); }

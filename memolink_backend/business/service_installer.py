@@ -31,6 +31,21 @@ class ServiceInstaller:
             db=self._domain.get_db(),
         )
 
+    def get_agent_service(self):
+        from memolink_backend.business.services.agent_service import AgentService
+        return AgentService(
+            db=self._domain.get_db(),
+            embedding_service=self._domain.get_embedding_service(),
+        )
+
+    def get_research_service(self):
+        from memolink_backend.business.services.research_service import ResearchService
+        return ResearchService(
+            conv_repo=self._domain.get_conversation_repository(),
+            note_repo=self._domain.get_note_repository(),
+            embedding_service=self._domain.get_embedding_service(),
+        )
+
     def get_conversation_service(self) -> IConversationService:
         from memolink_backend.business.services.conversation_service import ConversationService
         return ConversationService(

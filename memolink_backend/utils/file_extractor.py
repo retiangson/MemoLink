@@ -1,4 +1,7 @@
 import io
+import re
+import html as _html
+import base64
 import zipfile
 from html.parser import HTMLParser
 
@@ -45,7 +48,7 @@ class _HTMLTextExtractor(HTMLParser):
 def extract_text_local(file_bytes: bytes, filename: str) -> str:
     ext = filename.lower().rsplit(".", 1)[-1]
 
-    if ext == "txt":
+    if ext in ("txt", "md"):
         return file_bytes.decode("utf-8", errors="ignore")
 
     if ext in ("html", "htm"):
@@ -112,6 +115,233 @@ def extract_text_local(file_bytes: bytes, filename: str) -> str:
         return result
 
     return ""
+
+
+# ---------------------------------------------------------------------------
+# Rich HTML extraction — preserves headings, bold, italic, lists, tables
+# ---------------------------------------------------------------------------
+
+def _plain_to_html(text: str) -> str:
+    lines = text.splitlines()
+    return "".join(
+        f"<p>{_html.escape(line)}</p>" if line.strip() else "<p></p>"
+        for line in lines
+    ) or f"<p>{_html.escape(text)}</p>"
+
+
+def _runs_to_html(runs) -> str:
+    result = ""
+    for run in runs:
+        text = _html.escape(run.text)
+        if not text:
+            continue
+        if run.bold:
+            text = f"<strong>{text}</strong>"
+        if run.italic:
+            text = f"<em>{text}</em>"
+        if run.underline:
+            text = f"<u>{text}</u>"
+        result += text
+    return result
+
+
+def _para_to_html(p) -> str:
+    style = (p.style.name or "").lower() if p.style else ""
+    inline = _runs_to_html(p.runs)
+    if not inline.strip():
+        return "<p></p>"
+    if "heading 1" in style:
+        return f"<h1>{inline}</h1>"
+    if "heading 2" in style:
+        return f"<h2>{inline}</h2>"
+    if "heading 3" in style:
+        return f"<h3>{inline}</h3>"
+    if style.startswith("heading"):
+        return f"<h4>{inline}</h4>"
+    if "list bullet" in style or "list paragraph" in style:
+        return f"<ul><li>{inline}</li></ul>"
+    if "list number" in style:
+        return f"<ol><li>{inline}</li></ol>"
+    return f"<p>{inline}</p>"
+
+
+def _table_to_html(tbl) -> str:
+    rows = []
+    for i, row in enumerate(tbl.rows):
+        cells = []
+        for cell in row.cells:
+            text = _html.escape(" ".join(p.text for p in cell.paragraphs).strip())
+            tag = "th" if i == 0 else "td"
+            cells.append(f"<{tag}>{text}</{tag}>")
+        rows.append(f"<tr>{''.join(cells)}</tr>")
+    return f"<table>{''.join(rows)}</table>"
+
+
+_BLIP_NS = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
+_REL_NS = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}"
+
+
+def _para_images_html(para, doc) -> list[str]:
+    """Return <img> tags for any inline images embedded in this DOCX paragraph."""
+    imgs = []
+    for blip in para._element.iter(f"{_BLIP_NS}blip"):
+        embed = blip.get(f"{_REL_NS}embed")
+        if not embed:
+            continue
+        try:
+            img_part = doc.part.related_parts[embed]
+            b64 = base64.b64encode(img_part.blob).decode()
+            ct = img_part.content_type
+            imgs.append(f'<img src="data:{ct};base64,{b64}" style="max-width:100%">')
+        except Exception:
+            pass
+    return imgs
+
+
+def _docx_to_html(file_bytes: bytes) -> str:
+    import docx  # python-docx
+    doc = docx.Document(io.BytesIO(file_bytes))
+    parts = []
+    para_iter = iter(doc.paragraphs)
+    table_iter = iter(doc.tables)
+    for child in doc.element.body:
+        tag = child.tag.split("}")[-1] if "}" in child.tag else child.tag
+        if tag == "p":
+            try:
+                para = next(para_iter)
+                parts.extend(_para_images_html(para, doc))
+                parts.append(_para_to_html(para))
+            except StopIteration:
+                pass
+        elif tag == "tbl":
+            try:
+                parts.append(_table_to_html(next(table_iter)))
+            except StopIteration:
+                pass
+    html = "".join(parts)
+    html = re.sub(r"</ul>\s*<ul>", "", html)
+    html = re.sub(r"</ol>\s*<ol>", "", html)
+    return html
+
+
+def _pdf_to_html(file_bytes: bytes) -> str:
+    import pdfplumber
+    parts = []
+    with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
+        for page in pdf.pages:
+            words = page.extract_words(extra_attrs=["fontname", "size"])
+            if not words:
+                for line in (page.extract_text() or "").splitlines():
+                    if line.strip():
+                        parts.append(f"<p>{_html.escape(line.strip())}</p>")
+                continue
+
+            sizes = [float(w.get("size") or 0) for w in words if w.get("size")]
+            body_size = sorted(sizes)[len(sizes) // 2] if sizes else 12.0
+
+            line_map: dict[float, list] = {}
+            for w in words:
+                top = round(float(w.get("top") or 0), 0)
+                line_map.setdefault(top, []).append(w)
+
+            for top in sorted(line_map):
+                line_words = sorted(line_map[top], key=lambda w: float(w.get("x0") or 0))
+                text = " ".join(w["text"] for w in line_words).strip()
+                if not text:
+                    continue
+                avg_size = sum(float(w.get("size") or body_size) for w in line_words) / len(line_words)
+                is_bold = any(
+                    "bold" in (w.get("fontname") or "").lower() for w in line_words
+                )
+                escaped = _html.escape(text)
+                if avg_size >= body_size * 1.5:
+                    parts.append(f"<h1>{escaped}</h1>")
+                elif avg_size >= body_size * 1.3:
+                    parts.append(f"<h2>{escaped}</h2>")
+                elif avg_size >= body_size * 1.15 or (is_bold and len(text) < 80):
+                    parts.append(f"<h3>{escaped}</h3>")
+                elif is_bold:
+                    parts.append(f"<p><strong>{escaped}</strong></p>")
+                else:
+                    parts.append(f"<p>{escaped}</p>")
+    return "".join(parts)
+
+
+def _pptx_to_html(file_bytes: bytes) -> str:
+    from pptx import Presentation
+    prs = Presentation(io.BytesIO(file_bytes))
+    parts = []
+    total = len(prs.slides)
+    for slide_num, slide in enumerate(prs.slides, 1):
+        title_text = None
+        content_items: list[tuple[int, str]] = []
+        slide_images: list[str] = []
+        for shape in slide.shapes:
+            # Extract embedded images from picture shapes
+            if hasattr(shape, "image"):
+                try:
+                    img_data = shape.image.blob
+                    ext = shape.image.ext.lower()
+                    mime = "image/jpeg" if ext in ("jpg", "jpeg") else f"image/{ext}"
+                    b64 = base64.b64encode(img_data).decode()
+                    slide_images.append(f'<img src="data:{mime};base64,{b64}" style="max-width:100%">')
+                except Exception:
+                    pass
+                continue
+            if not hasattr(shape, "text_frame"):
+                continue
+            ph = getattr(shape, "placeholder_format", None)
+            if ph is not None and ph.idx == 0:
+                title_text = shape.text.strip()
+            else:
+                for para in shape.text_frame.paragraphs:
+                    text = para.text.strip()
+                    if text:
+                        content_items.append((para.level, text))
+        parts.append(f"<h2>{_html.escape(title_text or f'Slide {slide_num}')}</h2>")
+        if content_items:
+            items_html = "".join(
+                f"<li>{'&nbsp;&nbsp;' * level}{_html.escape(text)}</li>"
+                for level, text in content_items
+            )
+            parts.append(f"<ul>{items_html}</ul>")
+        parts.extend(slide_images)
+        if slide_num < total:
+            parts.append("<hr>")
+    return "".join(parts)
+
+
+def extract_formatted_html(file_bytes: bytes, filename: str) -> str:
+    """
+    Extract document content as rich HTML for storage in the note editor.
+    Preserves headings, bold/italic, bullet lists, numbered lists, and tables.
+    Falls back to plain-text paragraph wrapping for unsupported types.
+    """
+    ext = filename.lower().rsplit(".", 1)[-1]
+
+    if ext == "docx":
+        try:
+            return _docx_to_html(file_bytes)
+        except Exception:
+            pass
+
+    if ext == "pdf":
+        try:
+            return _pdf_to_html(file_bytes)
+        except Exception:
+            pass
+
+    if ext == "pptx":
+        try:
+            return _pptx_to_html(file_bytes)
+        except Exception:
+            pass
+
+    # For all other types (txt, md, html, zip, audio) use plain extraction + wrap
+    text = extract_text_local(file_bytes, filename)
+    if text.strip().startswith("<"):
+        return text  # Already HTML (html/htm files)
+    return _plain_to_html(text)
 
 
 def transcribe_audio(file_bytes: bytes, filename: str, ext: str, language: str | None = None) -> str:

@@ -10,6 +10,7 @@ import Link from "@tiptap/extension-link";
 import Placeholder from "@tiptap/extension-placeholder";
 import Color from "@tiptap/extension-color";
 import { TextStyle } from "@tiptap/extension-text-style";
+import Image from "@tiptap/extension-image";
 import { marked } from "marked";
 import "../styles/editor.css";
 
@@ -38,7 +39,7 @@ function unwrapMarkdownFence(s: string) {
 }
 
 function hasRichHtmlStructure(s: string) {
-  return /<(h[1-6]|ul|ol|li|strong|em|blockquote|pre|code|table|thead|tbody|tr|th|td)\b/i.test(s);
+  return /<(h[1-6]|ul|ol|li|strong|em|blockquote|pre|code|table|thead|tbody|tr|th|td|img)\b/i.test(s);
 }
 
 async function toHtml(content: string): Promise<string> {
@@ -91,6 +92,7 @@ function Divider() {
 
 export function RichNoteEditor({ value, onChange, noteKey, disabled }: RichNoteEditorProps) {
   const lastSent = useRef<string>("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const editor = useEditor({
     extensions: [
@@ -104,9 +106,48 @@ export function RichNoteEditor({ value, onChange, noteKey, disabled }: RichNoteE
       Placeholder.configure({ placeholder: "Start writing…" }),
       TextStyle,
       Color,
+      Image.configure({ inline: false, allowBase64: true }),
     ],
     editorProps: {
       attributes: { class: "tiptap-content" },
+      handleDrop(view, event) {
+        const file = event.dataTransfer?.files?.[0];
+        if (file?.type.startsWith("image/")) {
+          event.preventDefault();
+          const reader = new FileReader();
+          reader.onload = (evt) => {
+            const src = evt.target?.result as string;
+            if (src) {
+              const node = view.state.schema.nodes.image?.create({ src });
+              if (node) view.dispatch(view.state.tr.replaceSelectionWith(node));
+            }
+          };
+          reader.readAsDataURL(file);
+          return true;
+        }
+        return false;
+      },
+      handlePaste(view, event) {
+        const items = Array.from(event.clipboardData?.items ?? []);
+        for (const item of items) {
+          if (item.type.startsWith("image/")) {
+            const file = item.getAsFile();
+            if (file) {
+              const reader = new FileReader();
+              reader.onload = (evt) => {
+                const src = evt.target?.result as string;
+                if (src) {
+                  const node = view.state.schema.nodes.image?.create({ src });
+                  if (node) view.dispatch(view.state.tr.replaceSelectionWith(node));
+                }
+              };
+              reader.readAsDataURL(file);
+              return true;
+            }
+          }
+        }
+        return false;
+      },
     },
     onUpdate({ editor }) {
       const html = editor.getHTML();
@@ -234,10 +275,31 @@ export function RichNoteEditor({ value, onChange, noteKey, disabled }: RichNoteE
 
         <Divider />
 
-        {/* Link + clear */}
+        {/* Link + image + clear */}
         <Btn title="Link" active={e.isActive("link")} onClick={setLink}>
           <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" fill="currentColor" viewBox="0 0 16 16"><path d="M4.715 6.542 3.343 7.914a3 3 0 1 0 4.243 4.243l1.828-1.829A3 3 0 0 0 8.586 5.5L8 6.086a1 1 0 0 0-.154.199 2 2 0 0 1 .861 3.337L6.88 11.45a2 2 0 1 1-2.83-2.83l.793-.792a4 4 0 0 1-.128-1.287z"/><path d="M6.586 4.672A3 3 0 0 0 7.414 9.5l.775-.776a2 2 0 0 1-.896-3.346L9.12 3.55a2 2 0 1 1 2.83 2.83l-.793.792c.112.42.155.855.128 1.287l1.372-1.372a3 3 0 1 0-4.243-4.243z"/></svg>
         </Btn>
+        <Btn title="Insert image" onClick={() => fileInputRef.current?.click()}>
+          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" fill="currentColor" viewBox="0 0 16 16"><path d="M6.002 5.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0"/><path d="M2.002 1a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V3a2 2 0 0 0-2-2zm12 1a1 1 0 0 1 1 1v6.5l-3.777-1.947a.5.5 0 0 0-.577.093l-3.71 3.71-2.66-1.772a.5.5 0 0 0-.63.062L1.002 12V3a1 1 0 0 1 1-1z"/></svg>
+        </Btn>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={(ev) => {
+            const file = ev.target.files?.[0];
+            if (file && editor) {
+              const reader = new FileReader();
+              reader.onload = (evt) => {
+                const src = evt.target?.result as string;
+                if (src) editor.chain().focus().setImage({ src }).run();
+              };
+              reader.readAsDataURL(file);
+            }
+            ev.target.value = "";
+          }}
+        />
         <Btn title="Clear formatting" onClick={() => e.chain().focus().unsetAllMarks().clearNodes().run()}>
           <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" fill="currentColor" viewBox="0 0 16 16"><path d="M8.086 2.207a2 2 0 0 1 2.828 0l3.879 3.879a2 2 0 0 1 0 2.828l-5.5 5.5A2 2 0 0 1 7.879 15H5.12a2 2 0 0 1-1.414-.586l-2.5-2.5a2 2 0 0 1 0-2.828zm.66 11.34L3.453 8.254 1.914 9.793a1 1 0 0 0 0 1.414l2.5 2.5a1 1 0 0 0 .707.293H7.88a1 1 0 0 0 .707-.293z"/></svg>
         </Btn>

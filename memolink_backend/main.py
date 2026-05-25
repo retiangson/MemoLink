@@ -22,6 +22,10 @@ from memolink_backend.api.v1 import (
     reminder_controller,
     video_controller,
     workspace_controller,
+    feedback_controller,
+    admin_controller,
+    features_controller,
+    research_controller,
 )
 
 # Register all models so SQLAlchemy sees them
@@ -60,6 +64,40 @@ if os.getenv("MEMOLINK_SKIP_DB_BOOTSTRAP") != "1":
         _conn.execute(text("ALTER TABLE notes ADD COLUMN IF NOT EXISTS workspace_id INTEGER REFERENCES workspaces(id) ON DELETE SET NULL"))
         _conn.execute(text("ALTER TABLE conversations ADD COLUMN IF NOT EXISTS workspace_id INTEGER REFERENCES workspaces(id) ON DELETE SET NULL"))
         _conn.execute(text("ALTER TABLE reminders ADD COLUMN IF NOT EXISTS workspace_id INTEGER REFERENCES workspaces(id) ON DELETE SET NULL"))
+        # Admin system migrations
+        _conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT FALSE"))
+        _conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS feedback (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                user_email VARCHAR(255),
+                type VARCHAR(20) NOT NULL,
+                message TEXT NOT NULL,
+                status VARCHAR(20) NOT NULL DEFAULT 'open',
+                created_at TIMESTAMPTZ DEFAULT now()
+            )
+        """))
+        _conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS feature_flags (
+                key VARCHAR(100) PRIMARY KEY,
+                value TEXT NOT NULL,
+                updated_at TIMESTAMPTZ DEFAULT now()
+            )
+        """))
+        # Seed default flags (skip if already exist)
+        for _k, _v in [
+            ("web_search_enabled", "true"), ("agent_mode_enabled", "true"),
+            ("model_selection_enabled", "true"), ("image_generation_enabled", "true"),
+            ("translation_enabled", "true"), ("file_upload_enabled", "true"),
+            ("default_model", "gpt-4o-mini"), ("default_language", "English"),
+        ]:
+            _conn.execute(text("INSERT INTO feature_flags (key, value) VALUES (:k, :v) ON CONFLICT (key) DO NOTHING"), {"k": _k, "v": _v})
+        # Auto-promote first user as admin if none exists
+        _conn.execute(text("""
+            UPDATE users SET is_admin = TRUE
+            WHERE id = (SELECT MIN(id) FROM users)
+            AND NOT EXISTS (SELECT 1 FROM users WHERE is_admin = TRUE)
+        """))
         _conn.commit()
 
     Base.metadata.create_all(bind=engine)
@@ -98,3 +136,7 @@ app.include_router(suggest_controller.router, prefix="/api")
 app.include_router(reminder_controller.router, prefix="/api")
 app.include_router(video_controller.router, prefix="/api")
 app.include_router(workspace_controller.router, prefix="/api")
+app.include_router(feedback_controller.router, prefix="/api")
+app.include_router(admin_controller.router, prefix="/api")
+app.include_router(features_controller.router, prefix="/api")
+app.include_router(research_controller.router, prefix="/api")

@@ -41,9 +41,9 @@ export function UploadNotes({ setNotes, workspaceId, onUploaded }: Props) {
         onDrop={(e) => { e.preventDefault(); processFiles(Array.from(e.dataTransfer.files)); }}
       >
         <p className="text-gray-300 text-sm font-medium">Upload Notes</p>
-        <p className="text-gray-500 text-xs mt-0.5">txt, pdf, docx, pptx, html, mp3, mp4, wav…</p>
+        <p className="text-gray-500 text-xs mt-0.5">txt, md, pdf, docx, pptx, html, mp3, mp4, wav…</p>
       </div>
-      <input type="file" multiple hidden accept=".txt,.html,.htm,.pdf,.docx,.pptx,.zip,.mp3,.mp4,.m4a,.mp4a,.wav,.webm,.ogg,.flac,.avi,.mpeg" ref={fileInputRef} onChange={(e) => { if (e.target.files) processFiles(Array.from(e.target.files)); }} />
+      <input type="file" multiple hidden accept=".txt,.md,.html,.htm,.pdf,.docx,.pptx,.zip,.mp3,.mp4,.m4a,.mp4a,.wav,.webm,.ogg,.flac,.avi,.mpeg" ref={fileInputRef} onChange={(e) => { if (e.target.files) processFiles(Array.from(e.target.files)); }} />
       {loading && <p className="text-xs text-indigo-400 animate-pulse">Importing notes…</p>}
       {!loading && status && <p className="text-xs text-gray-400">{status}</p>}
       {!loading && failures.length > 0 && (

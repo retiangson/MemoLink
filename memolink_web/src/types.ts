@@ -4,6 +4,7 @@ export interface Message {
   id: number;
   role: MessageRole;
   content: string;
+  model?: string;
 }
 
 export interface Conversation {

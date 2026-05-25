@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { saveUser, type User } from "../utils/auth";
 import { useNotes } from "../hooks/useNotes";
 import { useNoteEditor } from "../hooks/useNoteEditor";
@@ -18,9 +18,13 @@ import { SettingsModal } from "../components/SettingsModal";
 import { HelpModal } from "../components/HelpModal";
 import { WorkspaceManagerModal } from "../components/WorkspaceManagerModal";
 import { useSuggestions } from "../hooks/useSuggestions";
+import { useReminderNotifications } from "../hooks/useReminderNotifications";
+import { getSavedModel, saveModel } from "../constants/models";
 import type { Conversation, Note, Workspace } from "../types";
 import { TEMP_ID, convLabel } from "../types";
 import { useWorkspace } from "../hooks/useWorkspace";
+import { useFeatureFlags } from "../hooks/useFeatureFlags";
+import { AdminPage } from "./AdminPage";
 
 type WorkspaceHook = ReturnType<typeof useWorkspace>;
 
@@ -38,11 +42,35 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
   const [showSettings, setShowSettings] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [showWorkspaceManager, setShowWorkspaceManager] = useState(false);
+  const [showAdmin, setShowAdmin] = useState(false);
+  const [selectedModel, setSelectedModel] = useState<string>(getSavedModel);
+  const { flags } = useFeatureFlags();
+
+  // Tab drag-and-drop
+  const dragSrcRef = useRef<{ type: "chat" | "note"; index: number } | null>(null);
+  const [dragOverTab, setDragOverTab] = useState<{ type: "chat" | "note"; index: number } | null>(null);
+
+  // Per-workspace tab persistence
+  const pendingChatRestoreRef = useRef<{ chatIds: number[]; activeChatId: number | null } | null>(null);
+  const pendingNoteRestoreRef = useRef<{ wsId: number; noteIds: number[]; activeNoteId: number | null; activeTabType: "chat" | "note" } | null>(null);
+
+  function handleModelChange(id: string) {
+    saveModel(id);
+    setSelectedModel(id);
+  }
+
+  // Force default model when model selection is disabled
+  useEffect(() => {
+    if (!flags.model_selection_enabled) {
+      setSelectedModel(flags.default_model);
+    }
+  }, [flags.model_selection_enabled, flags.default_model]);
 
   const activeWorkspaceId = workspaceHook.activeWorkspace?.id ?? null;
 
   const { notes, setNotes, addNote, saveNote, removeNote } = useNotes(user.id, activeWorkspaceId);
   const suggestions = useSuggestions(activeWorkspaceId);
+  const { permission: notifPermission, requestPermission: requestNotifPermission } = useReminderNotifications(suggestions.items);
   const editor = useNoteEditor();
   const recording = useRecording((text) => {
     editor.setNoteContentDraft((prev) => prev ? prev + `<p>${text}</p>` : `<p>${text}</p>`);
@@ -54,9 +82,30 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
     setConversations: convs.setConversations,
     bottomRef: convs.bottomRef,
     workspaceId: activeWorkspaceId,
+    model: selectedModel,
   });
 
-  useEffect(() => { convs.initConversations(activeWorkspaceId); }, [activeWorkspaceId]);
+  useEffect(() => {
+    const saved = pendingChatRestoreRef.current;
+    pendingChatRestoreRef.current = null;
+    convs.initConversations(activeWorkspaceId, saved);
+  }, [activeWorkspaceId]);
+
+  // Restore note tabs after notes load for the new workspace
+  useEffect(() => {
+    const pending = pendingNoteRestoreRef.current;
+    if (!pending || notes.length === 0 || pending.wsId !== activeWorkspaceId) return;
+    pendingNoteRestoreRef.current = null;
+    const { noteIds, activeNoteId, activeTabType: savedTabType } = pending;
+    async function restoreNoteTabs() {
+      for (const id of noteIds) {
+        const note = notes.find((n) => n.id === id);
+        if (note) await editor.openNote(note);
+      }
+      if (savedTabType === "note" && noteIds.length > 0) setActiveTabType("note");
+    }
+    restoreNoteTabs();
+  }, [notes, activeWorkspaceId]);
 
   // When all note tabs are closed, switch back to chat
   useEffect(() => {
@@ -177,6 +226,13 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
     setShowDeleteModal(false);
   }
 
+  function handleTabDrop(type: "chat" | "note", toIndex: number) {
+    const src = dragSrcRef.current;
+    if (!src || src.type !== type) return;
+    if (type === "chat") convs.reorderOpenChats(src.index, toIndex);
+    else editor.reorderNotes(src.index, toIndex);
+  }
+
   if (!convs.activeConversation) return (
     <div className="flex h-screen w-screen items-center justify-center bg-[#0f0f13] text-gray-400">
       Loading…
@@ -286,8 +342,32 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
         workspaces={workspaceHook.workspaces}
         activeWorkspace={workspaceHook.activeWorkspace}
         onSwitchWorkspace={async (ws: Workspace) => {
+          const currentWsId = workspaceHook.activeWorkspace?.id;
+          if (currentWsId && currentWsId !== ws.id) {
+            // Snapshot current tabs for the workspace we're leaving
+            const snapshot = {
+              chatIds: convs.openChats.filter((c) => c.id !== TEMP_ID).map((c) => c.id),
+              activeChatId: convs.activeConversation?.id !== TEMP_ID ? (convs.activeConversation?.id ?? null) : null,
+              noteIds: editor.openNotes.filter((t) => t.note.id !== null).map((t) => t.note.id as number),
+              activeNoteId: editor.active?.note.id ?? null,
+              activeTabType,
+            };
+            localStorage.setItem(`memolink_tabs_ws_${currentWsId}`, JSON.stringify(snapshot));
+
+            // Stage restores for the workspace we're entering
+            try {
+              const raw = localStorage.getItem(`memolink_tabs_ws_${ws.id}`);
+              if (raw) {
+                const saved = JSON.parse(raw);
+                pendingChatRestoreRef.current = { chatIds: saved.chatIds ?? [], activeChatId: saved.activeChatId ?? null };
+                pendingNoteRestoreRef.current = { wsId: ws.id, noteIds: saved.noteIds ?? [], activeNoteId: saved.activeNoteId ?? null, activeTabType: saved.activeTabType ?? "chat" };
+              }
+            } catch { /* ignore corrupt saved state */ }
+
+            editor.closeAllNotes();
+            setActiveTabType("chat");
+          }
           await workspaceHook.switchWorkspace(ws);
-          // useEffect on activeWorkspaceId re-runs initConversations, useNotes, useSuggestions automatically
         }}
         onManageWorkspaces={() => setShowWorkspaceManager(true)}
       />
@@ -301,15 +381,21 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
           <div className="flex items-center overflow-x-auto flex-1">
 
             {/* Chat tabs */}
-            {convs.openChats.map((chat) => {
+            {convs.openChats.map((chat, i) => {
               const isActive = activeTabType === "chat" && convs.activeConversation?.id === chat.id;
+              const isDragOver = dragOverTab?.type === "chat" && dragOverTab.index === i && dragSrcRef.current?.index !== i;
               return (
                 <div
                   key={chat.id}
+                  draggable
+                  onDragStart={() => { dragSrcRef.current = { type: "chat", index: i }; }}
+                  onDragOver={(e) => { e.preventDefault(); setDragOverTab({ type: "chat", index: i }); }}
+                  onDrop={(e) => { e.preventDefault(); handleTabDrop("chat", i); setDragOverTab(null); }}
+                  onDragEnd={() => { dragSrcRef.current = null; setDragOverTab(null); }}
                   onClick={() => handleActivateChat(chat.id)}
-                  className={`flex items-center gap-1.5 px-3 h-10 text-xs cursor-pointer border-b-2 transition shrink-0 ${
+                  className={`flex items-center gap-1.5 px-3 h-10 text-xs cursor-grab active:cursor-grabbing border-b-2 transition shrink-0 select-none ${
                     isActive ? "border-indigo-500 text-white bg-[#0f0f13]" : "border-transparent text-gray-500 hover:text-gray-300 hover:bg-[#0f0f13]/60"
-                  }`}
+                  } ${isDragOver ? "border-l-2 border-l-indigo-400" : ""}`}
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3 shrink-0 opacity-70" fill="currentColor" viewBox="0 0 16 16">
                     <path d="M2.678 11.894a1 1 0 0 1 .287.801 11 11 0 0 1-.398 2c1.395-.323 2.247-.697 2.634-.893a1 1 0 0 1 .71-.074A8 8 0 0 0 8 14c3.996 0 7-2.807 7-6s-3.004-6-7-6-7 2.808-7 6c0 1.468.617 2.83 1.678 3.894z"/>
@@ -326,13 +412,19 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
             {/* Note tabs */}
             {editor.openNotes.map((note, i) => {
               const isActive = activeTabType === "note" && editor.activeIndex === i;
+              const isDragOver = dragOverTab?.type === "note" && dragOverTab.index === i && dragSrcRef.current?.index !== i;
               return (
                 <div
-                  key={i}
+                  key={note.note.id ?? `new-${i}`}
+                  draggable
+                  onDragStart={() => { dragSrcRef.current = { type: "note", index: i }; }}
+                  onDragOver={(e) => { e.preventDefault(); setDragOverTab({ type: "note", index: i }); }}
+                  onDrop={(e) => { e.preventDefault(); handleTabDrop("note", i); setDragOverTab(null); }}
+                  onDragEnd={() => { dragSrcRef.current = null; setDragOverTab(null); }}
                   onClick={() => { editor.setActiveIndex(i); setActiveTabType("note"); }}
-                  className={`flex items-center gap-1.5 px-3 h-10 text-xs cursor-pointer border-b-2 transition shrink-0 ${
+                  className={`flex items-center gap-1.5 px-3 h-10 text-xs cursor-grab active:cursor-grabbing border-b-2 transition shrink-0 select-none ${
                     isActive ? "border-indigo-500 text-white bg-[#0f0f13]" : "border-transparent text-gray-500 hover:text-gray-300 hover:bg-[#0f0f13]/60"
-                  }`}
+                  } ${isDragOver ? "border-l-2 border-l-indigo-400" : ""}`}
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3 shrink-0 opacity-70" fill="currentColor" viewBox="0 0 16 16">
                     <path d="M2 2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v13.5a.5.5 0 0 1-.777.416L8 13.101l-5.223 2.815A.5.5 0 0 1 2 15.5zm2-1a1 1 0 0 0-1 1v12.566l4.723-2.482a.5.5 0 0 1 .554 0L13 14.566V2a1 1 0 0 0-1-1z"/>
@@ -421,6 +513,19 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                     Help
                   </button>
 
+                  {/* Admin Panel — only shown to admins */}
+                  {user.is_admin && (
+                    <button
+                      onClick={() => { setUserMenuOpen(false); setShowAdmin(true); }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-indigo-400 hover:bg-indigo-500/10 hover:text-indigo-300 transition"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="currentColor" viewBox="0 0 16 16">
+                        <path d="M8 1a2 2 0 0 1 2 2v4H6V3a2 2 0 0 1 2-2m3 6V3a3 3 0 0 0-6 0v4a2 2 0 0 0-2 2v5a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2"/>
+                      </svg>
+                      Admin Panel
+                    </button>
+                  )}
+
                   <div className="border-t border-[#2a2a38] my-1" />
 
                   {/* Sign Out */}
@@ -476,6 +581,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                 onDropFiles={(files) => chat.setPendingFiles((p) => [...p, ...files])}
                 onApplyNoteEdit={handleApplyNoteEdit}
                 hasOpenNote={isNoteActive}
+                translationEnabled={flags.translation_enabled}
               />
               </div>
             </main>
@@ -489,6 +595,13 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
               attachmentInputRef={chat.attachmentInputRef}
               onSend={chat.handleSend}
               autoResize={chat.autoResize}
+              webSearch={chat.webSearch}
+              onToggleWebSearch={() => chat.setWebSearch((v) => !v)}
+              agentMode={chat.agentMode}
+              onToggleAgentMode={() => chat.setAgentMode((v) => !v)}
+              researchMode={chat.researchMode}
+              onToggleResearchMode={() => chat.setResearchMode((v) => !v)}
+              flags={flags}
             />
           </>
         )}
@@ -505,6 +618,8 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
         onRemove={suggestions.remove}
         onClearDone={suggestions.clearDone}
         onGenerate={handleGenerate}
+        notificationPermission={notifPermission}
+        onRequestNotificationPermission={requestNotifPermission}
       />
 
       <DeleteModal
@@ -529,7 +644,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
         />
       )}
 
-      <SettingsModal show={showSettings} user={user} onClose={() => setShowSettings(false)} />
+      <SettingsModal show={showSettings} user={user} onClose={() => setShowSettings(false)} selectedModel={selectedModel} onModelChange={handleModelChange} modelSelectionEnabled={flags.model_selection_enabled} />
       <HelpModal show={showHelp} onClose={() => setShowHelp(false)} />
 
       {showWorkspaceManager && (
@@ -541,6 +656,8 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
           onDeleted={(id) => workspaceHook.setWorkspaces((prev) => prev.filter((w) => w.id !== id))}
         />
       )}
+
+      {showAdmin && <AdminPage onClose={() => setShowAdmin(false)} currentUserId={user.id} />}
     </div>
   );
 }

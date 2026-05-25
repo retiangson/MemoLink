@@ -25,6 +25,16 @@ export function useConversations(workspaceId?: number | null) {
     setOpenChats((prev) => prev.filter((c) => c.id !== id));
   }
 
+  function reorderOpenChats(from: number, to: number) {
+    if (from === to) return;
+    setOpenChats((prev) => {
+      const next = [...prev];
+      const [item] = next.splice(from, 1);
+      next.splice(to, 0, item);
+      return next;
+    });
+  }
+
   async function loadMessages(conversationId: number, loadOlder = false) {
     if (loadOlder && isLoadingOlderRef.current) return;
     if (loadOlder) isLoadingOlderRef.current = true;
@@ -60,7 +70,10 @@ export function useConversations(workspaceId?: number | null) {
     }
   }
 
-  async function initConversations(wsId?: number | null) {
+  async function initConversations(
+    wsId?: number | null,
+    savedChatState?: { chatIds: number[]; activeChatId: number | null } | null,
+  ) {
     const activeWsId = wsId !== undefined ? wsId : workspaceId;
     const convs = await getConversations(activeWsId);
     if (Array.isArray(convs) && convs.length > 0) {
@@ -68,6 +81,20 @@ export function useConversations(workspaceId?: number | null) {
         .map((c: any) => ({ id: c.id, title: c.title ?? null, messages: [], created_at: c.created_at ?? null }))
         .sort((a: Conversation, b: Conversation) => b.id - a.id);
       setConversations(mapped);
+
+      if (savedChatState?.chatIds?.length) {
+        const savedChats = savedChatState.chatIds
+          .map((id) => mapped.find((c) => c.id === id))
+          .filter(Boolean) as Conversation[];
+        if (savedChats.length > 0) {
+          setOpenChats(savedChats.map((c) => ({ id: c.id, title: c.title, created_at: c.created_at })));
+          const active = savedChats.find((c) => c.id === savedChatState.activeChatId) ?? savedChats[0];
+          setActiveConversation(active);
+          await loadMessages(active.id);
+          return;
+        }
+      }
+
       setActiveConversation(mapped[0]);
       setOpenChats([{ id: mapped[0].id, title: mapped[0].title, created_at: mapped[0].created_at }]);
       await loadMessages(mapped[0].id);
@@ -119,7 +146,7 @@ export function useConversations(workspaceId?: number | null) {
   return {
     conversations, setConversations,
     activeConversation, setActiveConversation,
-    openChats, closeChat,
+    openChats, closeChat, reorderOpenChats,
     messagesCursor,
     messagesContainerRef, bottomRef,
     loadMessages, initConversations,

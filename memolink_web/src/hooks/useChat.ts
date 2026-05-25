@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { streamChat, uploadChat } from "../api/chatApi";
+import { streamChat, streamAgentChat, streamResearch, uploadChat } from "../api/chatApi";
 import { createConversation, renameConversation } from "../api/conversationApi";
 import type { Conversation, Message } from "../types";
 import { TEMP_ID } from "../types";
@@ -12,13 +12,17 @@ interface UseChatDeps {
   setConversations: React.Dispatch<React.SetStateAction<Conversation[]>>;
   bottomRef: React.RefObject<HTMLDivElement | null>;
   workspaceId?: number | null;
+  model?: string | null;
 }
 
-export function useChat({ activeConversation, setActiveConversation, setConversations, bottomRef, workspaceId }: UseChatDeps) {
+export function useChat({ activeConversation, setActiveConversation, setConversations, bottomRef, workspaceId, model }: UseChatDeps) {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [streaming, setStreaming] = useState(false);
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [webSearch, setWebSearch] = useState(false);
+  const [agentMode, setAgentMode] = useState(false);
+  const [researchMode, setResearchMode] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const attachmentInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -74,49 +78,98 @@ export function useChat({ activeConversation, setActiveConversation, setConversa
         // Text-only: stream the response token by token
         const placeholderMsg: Message = { id: STREAMING_ID, role: "assistant", content: "" };
         updated = { ...updated, messages: [...updated.messages, placeholderMsg] };
+        setActiveConversation(updated);
 
+        let toolStatus = "";   // tool-call status lines shown above the answer
         let accum = "";
-        let firstToken = true;
+        let firstContent = true;
 
-        for await (const event of streamChat(conversationId, trimmed, 5, workspaceId)) {
-          if (event.done) {
-            // Replace placeholder with the final message id
+        const stream = researchMode
+          ? streamResearch(conversationId, trimmed, workspaceId, model)
+          : agentMode
+            ? streamAgentChat(conversationId, trimmed, workspaceId, model)
+            : streamChat(conversationId, trimmed, 5, workspaceId, model, webSearch);
+
+        for await (const event of stream) {
+          if (event.image_generating) {
             setActiveConversation((prev) => {
               if (!prev) return prev;
-              const msgs = prev.messages.map((m) =>
-                m.id === STREAMING_ID ? { ...m, id: event.id ?? STREAMING_ID } : m
-              );
-              return { ...prev, messages: msgs };
+              return { ...prev, messages: prev.messages.map((m) => m.id === STREAMING_ID ? { ...m, content: "__IMAGE_GENERATING__" } : m) };
+            });
+            if (firstContent) {
+              firstContent = false;
+              setLoading(false);
+              setStreaming(true);
+            }
+            continue;
+          }
+
+          if (event.done) {
+            const finalId = event.id ?? STREAMING_ID;
+            const finalModel = event.model;
+            setActiveConversation((prev) => {
+              if (!prev) return prev;
+              return { ...prev, messages: prev.messages.map((m) => m.id === STREAMING_ID ? { ...m, id: finalId, model: finalModel } : m) };
             });
             setConversations((p) =>
               p.map((c) =>
                 c.id === conversationId
-                  ? { ...c, messages: c.messages.map((m) => m.id === STREAMING_ID ? { ...m, id: event.id ?? STREAMING_ID } : m) }
+                  ? { ...c, messages: c.messages.map((m) => m.id === STREAMING_ID ? { ...m, id: finalId, model: finalModel } : m) }
                   : c
               )
             );
             break;
           }
 
-          if (event.t) {
-            accum += event.t;
-            if (firstToken) {
-              firstToken = false;
+          // Agent tool-call status chips
+          if (event.tool_call && event.label) {
+            toolStatus += (toolStatus ? "\n" : "") + `_🔧 ${event.label}…_`;
+            const content = toolStatus;
+            setActiveConversation((prev) => {
+              if (!prev) return prev;
+              return { ...prev, messages: prev.messages.map((m) => m.id === STREAMING_ID ? { ...m, content } : m) };
+            });
+            if (firstContent) {
+              firstContent = false;
               setLoading(false);
               setStreaming(true);
-              // Add placeholder to state now that we have the first token
+            }
+          }
+
+          if (event.tool_result && event.ok) {
+            // Mark last tool line as done
+            toolStatus = toolStatus.replace(/…_$/, " ✓_");
+            const content = toolStatus;
+            setActiveConversation((prev) => {
+              if (!prev) return prev;
+              return { ...prev, messages: prev.messages.map((m) => m.id === STREAMING_ID ? { ...m, content } : m) };
+            });
+          }
+
+          if (event.replace !== undefined) {
+            accum = event.replace;
+            setActiveConversation((prev) => {
+              if (!prev) return prev;
+              return { ...prev, messages: prev.messages.map((m) => m.id === STREAMING_ID ? { ...m, content: event.replace! } : m) };
+            });
+            bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+          }
+
+          if (event.t) {
+            accum += event.t;
+            const content = toolStatus ? toolStatus + "\n\n" + accum : accum;
+            if (firstContent) {
+              firstContent = false;
+              setLoading(false);
+              setStreaming(true);
               const withPlaceholder = { ...updated, messages: [...updated.messages] };
-              withPlaceholder.messages[withPlaceholder.messages.length - 1] = { ...placeholderMsg, content: accum };
+              withPlaceholder.messages[withPlaceholder.messages.length - 1] = { ...placeholderMsg, content };
               setActiveConversation(withPlaceholder);
               setConversations((p) => [withPlaceholder, ...p.filter((c) => c.id !== withPlaceholder.id)]);
             } else {
-              const currentAccum = accum;
               setActiveConversation((prev) => {
                 if (!prev) return prev;
-                const msgs = prev.messages.map((m) =>
-                  m.id === STREAMING_ID ? { ...m, content: currentAccum } : m
-                );
-                return { ...prev, messages: msgs };
+                return { ...prev, messages: prev.messages.map((m) => m.id === STREAMING_ID ? { ...m, content } : m) };
               });
             }
             bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -137,5 +190,8 @@ export function useChat({ activeConversation, setActiveConversation, setConversa
     pendingFiles, setPendingFiles,
     textareaRef, attachmentInputRef,
     autoResize, handleSend,
+    webSearch, setWebSearch,
+    agentMode, setAgentMode,
+    researchMode, setResearchMode,
   };
 }

@@ -131,6 +131,7 @@
     <a href="Requirements Analysis.html" class="active">Requirements</a>
     <a href="Database Design.html">Database</a>
     <a href="API Endpoint Design.html">API</a>
+    <a href="Deployment.html">Deployment</a>
   </div>
 </nav>
 
@@ -372,6 +373,168 @@
           <td><span class="req-priority p-high">High</span></td>
           <td><span class="req-cat c-func">Workspaces</span></td>
         </tr>
+        <tr>
+          <td class="req-id">FR-37</td>
+          <td class="req-text">Users must be able to request a password reset by submitting their email address. The system must send a signed JWT reset link (1-hour expiry, <code>purpose:"reset"</code> claim) to the user's registered email address via SMTP. When SMTP is not configured, the link must be logged to the console. The endpoint must always return HTTP 200 regardless of whether the email exists — to prevent email enumeration.</td>
+          <td><span class="req-priority p-high">High</span></td>
+          <td><span class="req-cat c-func">Auth</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">FR-38</td>
+          <td class="req-text">Users must be able to reset their password by submitting a valid JWT reset token and a new password. The system must verify the token signature, expiry, and <code>purpose:"reset"</code> claim, then hash and store the new password using bcrypt. Returns 400 on expired token and 401 on invalid token.</td>
+          <td><span class="req-priority p-high">High</span></td>
+          <td><span class="req-cat c-func">Auth</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">FR-39</td>
+          <td class="req-text">The chat interface must support AI image generation via DALL-E 3. Image generation is triggered by prompts starting with <code>/image</code> or natural-language phrases such as "generate an image of", "draw me a", "create a picture of", "paint", or "sketch". The system must call DALL-E 3 with <code>size="1024x1024"</code>, <code>quality="standard"</code>, and <code>response_format="b64_json"</code>, and return the image as a persistent base64 data URL embedded in the chat message.</td>
+          <td><span class="req-priority p-high">High</span></td>
+          <td><span class="req-cat c-func">AI/Chat</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">FR-40</td>
+          <td class="req-text">The Settings modal must allow users to select their preferred chat model from: GPT-4o Mini (default), GPT-4o, GPT-4 Turbo, GPT-3.5 Turbo, Gemini 2.0 Flash, Gemini 2.0 Flash Lite, Gemini 1.5 Flash 8B, and Gemini 1.5 Pro. Gemini models must be accessed via an OpenAI-compatible endpoint using <code>GEMINI_API_KEY</code>. When Gemini hits a <code>RateLimitError</code> during chat, the system must silently fall back to GPT-4o-mini and log a warning — no error must be shown to the user.</td>
+          <td><span class="req-priority p-high">High</span></td>
+          <td><span class="req-cat c-func">AI/Chat</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">FR-41</td>
+          <td class="req-text">Every AI chat message must display a model attribution badge (e.g. "replied by GPT-4o Mini", "replied by DALL-E 3") below the action bar. The SSE <code>done</code> event must include a <code>model</code> field carrying the exact model identifier used for that response.</td>
+          <td><span class="req-priority p-med">Medium</span></td>
+          <td><span class="req-cat c-func">AI/Chat</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">FR-42</td>
+          <td class="req-text">The translation endpoint must use a quality-improvement loop: (1) Gemini 2.0 Flash Lite performs the initial translation; (2) the result is back-translated to the source language; (3) GPT scores semantic similarity on a 0–100 scale; (4) if the score is below 85, the feedback is returned to Gemini for a refined translation. This loop repeats for up to 3 rounds. A 1.2-second sleep between API calls must be applied to avoid burst-rate detection. If Gemini is unavailable due to rate limits, the system must fall back to GPT-4o-mini for the full translation. Māori translation must inject a hint for macron usage (ā ē ī ō ū) and natural fluency.</td>
+          <td><span class="req-priority p-high">High</span></td>
+          <td><span class="req-cat c-func">Translation</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">FR-43</td>
+          <td class="req-text">The translation bubble in the UI must display the model used and the final accuracy score (e.g. "by Gemini 2.0 Flash Lite · 87% accuracy"). The accuracy score must be colour-coded: green for ≥ 85, amber for ≥ 70, red for &lt; 70. The translation response must include <code>translation</code>, <code>accuracy</code> (integer or null), and <code>model</code> fields.</td>
+          <td><span class="req-priority p-med">Medium</span></td>
+          <td><span class="req-cat c-func">Translation</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">FR-44</td>
+          <td class="req-text">The bulk note upload endpoint (<code>POST /api/notes/bulk</code>) must preserve rich formatting from uploaded files. DOCX files must preserve headings (H1–H4 from paragraph style names), bold, italic, and underline inline runs, bullet and numbered lists, and tables (with <code>&lt;th&gt;</code> header rows), interleaved in document order. PDF files must infer headings by font-size ratio (≥ 1.5× body → H1; ≥ 1.3× → H2; ≥ 1.15× or bold+short → H3). PPTX files must map slide titles to <code>&lt;h2&gt;</code>, content items to <code>&lt;ul&gt;</code> with indent levels, and separate slides with <code>&lt;hr&gt;</code>.</td>
+          <td><span class="req-priority p-high">High</span></td>
+          <td><span class="req-cat c-func">Files</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">FR-45</td>
+          <td class="req-text">When processing DOCX or PPTX files, the system must extract embedded images and include them inline as base64 <code>&lt;img&gt;</code> tags in the generated HTML. DOCX extraction must resolve XML blip relationship parts; PPTX extraction must detect picture shapes via <code>shape.image</code>.</td>
+          <td><span class="req-priority p-med">Medium</span></td>
+          <td><span class="req-cat c-func">Files</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">FR-46</td>
+          <td class="req-text">The Tiptap note editor must support image insertion via three methods: (1) a toolbar button opening a local file picker; (2) drag-and-drop of image files onto the editor area; and (3) paste from clipboard (supporting screenshots and copied images). Images must render with rounded corners, a dark border, and a blue selection outline. The <code>hasRichHtmlStructure()</code> helper must recognise <code>&lt;img&gt;</code> tags as rich content.</td>
+          <td><span class="req-priority p-med">Medium</span></td>
+          <td><span class="req-cat c-func">Notes</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">FR-47</td>
+          <td class="req-text">The chat input must include a web search toggle (globe icon). When enabled for a message, the system must query the Brave Search API using <code>BRAVE_SEARCH_API_KEY</code> and inject the top results as a system context block (<code>[WEB SEARCH RESULTS for "..."]</code>) before the LLM call. The <code>web_search: bool</code> field must be accepted by both <code>POST /api/chat</code> and <code>POST /api/chat/stream</code>.</td>
+          <td><span class="req-priority p-high">High</span></td>
+          <td><span class="req-cat c-func">AI/Chat</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">FR-48</td>
+          <td class="req-text">The system must support an Agent mode accessible via an "Agent" toggle in ChatInput. When active, the frontend must call <code>streamAgentChat()</code> targeting <code>POST /api/chat/agent/stream</code>. The SSE stream must emit <code>{tool_call, label}</code> events as status chips during tool execution, <code>{tool_result, ok}</code> events upon tool completion, and then regular <code>{t}</code> token events for the final answer. Agent mode bypasses the standard RAG flow and uses tool-use capabilities.</td>
+          <td><span class="req-priority p-med">Medium</span></td>
+          <td><span class="req-cat c-func">AI/Chat</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">FR-49</td>
+          <td class="req-text">The <code>users</code> table must include an <code>is_admin BOOLEAN</code> column. The first user to register must be automatically promoted to admin on application startup. JWT access tokens must include an <code>is_admin</code> claim that reflects the user's current admin status. A <code>get_current_admin</code> FastAPI dependency must verify the claim and return HTTP 403 if the authenticated user is not an admin.</td>
+          <td><span class="req-priority p-high">High</span></td>
+          <td><span class="req-cat c-func">Admin</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">FR-50</td>
+          <td class="req-text">Admins must be able to promote or demote any other user's admin status via <code>PATCH /api/admin/users/{id}/role</code>. Admins must be able to list all registered users with their email, ID, and admin status via <code>GET /api/admin/users</code>.</td>
+          <td><span class="req-priority p-high">High</span></td>
+          <td><span class="req-cat c-func">Admin</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">FR-51</td>
+          <td class="req-text">The system must maintain a <code>feature_flags</code> table with at least 8 entries: <code>web_search_enabled</code>, <code>agent_mode_enabled</code>, <code>model_selection_enabled</code>, <code>image_generation_enabled</code>, <code>translation_enabled</code>, <code>file_upload_enabled</code>, <code>default_model</code> (string), and <code>default_language</code> (string). These flags must be seeded with default values on startup. Admins must be able to read and update all flags via <code>GET /api/admin/features</code> and <code>PUT /api/admin/features</code>. Any authenticated user must be able to read the current flag values via <code>GET /api/features</code>.</td>
+          <td><span class="req-priority p-high">High</span></td>
+          <td><span class="req-cat c-func">Admin</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">FR-52</td>
+          <td class="req-text">The frontend must fetch feature flags on login and apply them: disabled-feature buttons must be hidden or disabled; if <code>model_selection_enabled</code> is false the model selector must be hidden and the <code>default_model</code> flag value must be used for all requests; if <code>default_language</code> is set, the translation UI must default to that language.</td>
+          <td><span class="req-priority p-high">High</span></td>
+          <td><span class="req-cat c-func">Admin</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">FR-53</td>
+          <td class="req-text">Any authenticated user must be able to submit a bug report or feature suggestion via <code>POST /api/feedback</code>. The request must include <code>type</code> (<code>bug</code> or <code>suggestion</code>) and a non-empty <code>message</code>. The submission must be stored in the <code>feedback</code> table with <code>status="open"</code>, the authenticated user's ID and email, and a UTC <code>created_at</code> timestamp. An optional SMTP notification may be sent to the admin email on each new submission.</td>
+          <td><span class="req-priority p-med">Medium</span></td>
+          <td><span class="req-cat c-func">Feedback</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">FR-54</td>
+          <td class="req-text">Admins must be able to list all feedback entries via <code>GET /api/admin/feedback</code> with optional query parameters <code>type</code> (<code>bug</code>, <code>suggestion</code>, or <code>all</code>) and <code>status</code> (<code>open</code>, <code>read</code>, <code>resolved</code>, or <code>all</code>). Admins must be able to update the status of any feedback entry via <code>PATCH /api/admin/feedback/{id}</code>. Non-admin users must receive HTTP 403 on both endpoints.</td>
+          <td><span class="req-priority p-med">Medium</span></td>
+          <td><span class="req-cat c-func">Feedback</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">FR-55</td>
+          <td class="req-text">The Admin Panel must be accessible as a full-screen overlay from the user menu (avatar button) and must only be visible to admin users. It must contain three tabs: (1) Feedback — list and manage reports; (2) Feature Flags — toggle boolean flags and set string defaults; (3) Users — list all users and change admin status. Non-admin users must not see the Admin Panel option in the UI.</td>
+          <td><span class="req-priority p-med">Medium</span></td>
+          <td><span class="req-cat c-func">Admin</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">FR-56</td>
+          <td class="req-text">The image generation pipeline must attempt models in the following fallback order: <strong>gpt-image-2</strong> → <strong>gpt-image-1</strong> → <strong>DALL-E 3</strong> → <strong>DALL-E 2</strong> → <strong>Pollinations.ai</strong> (free HTTP API, no API key). If all paid models fail, the Pollinations.ai URL-based endpoint must be called as a final fallback. Images must always be stored as base64 data URLs in <code>messages.content</code> — no file storage. Base64 image content must be stripped from the conversation history and RAG context before sending to OpenAI to prevent token overflow. An animated spinner must be shown in the UI while the image is generating.</td>
+          <td><span class="req-priority p-high">High</span></td>
+          <td><span class="req-cat c-func">AI/Chat</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">FR-57</td>
+          <td class="req-text">The system must support a <strong>Research Mode</strong> accessible via a dedicated toggle in ChatInput. When active, the frontend must call <code>streamResearch()</code> targeting <code>POST /api/research/stream</code>. The backend must execute a four-step pipeline over SSE: (1) hybrid note retrieval — vector top-30 candidates re-ranked by keyword scoring; (2) optional live web search via Brave Search API; (3) academic paper search via OpenAlex (free, no key) or Semantic Scholar (with API key); (4) structured LLM synthesis. The SSE stream must emit <code>{tool_call, label}</code> and <code>{tool_result, ok}</code> events for each step so progress is shown in the UI. The final report must follow a fixed markdown structure: Research Summary, Key Findings (From Your Notes / From Web &amp; Academic Sources), Knowledge Gaps, Contradictions &amp; Tensions, Academic References, and Suggested Follow-up Research.</td>
+          <td><span class="req-priority p-high">High</span></td>
+          <td><span class="req-cat c-func">AI/Research</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">FR-58</td>
+          <td class="req-text">The academic paper search component of Research Mode must use <strong>OpenAlex</strong> as the primary source (free, no API key, no rate limit). If a <code>SEMANTIC_SCHOLAR_API_KEY</code> is configured, Semantic Scholar must be used instead, with OpenAlex as a transparent fallback on failure. The Semantic Scholar integration must implement exponential backoff on HTTP 429 responses (1 s → 2 s → 4 s). When the user's prompt is a meta-question about their notes (containing words such as "gap", "notes", "review", "summarize"), the system must derive a search query from the first retrieved note title rather than sending the raw conversational prompt to the academic API.</td>
+          <td><span class="req-priority p-med">Medium</span></td>
+          <td><span class="req-cat c-func">AI/Research</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">FR-59</td>
+          <td class="req-text">The Settings modal must allow users to select <strong>DeepSeek</strong> models in addition to OpenAI and Gemini: <strong>DeepSeek V3</strong> (<code>deepseek-chat</code>) and <strong>DeepSeek R1</strong> (<code>deepseek-reasoner</code>). DeepSeek models must be accessed via an OpenAI-compatible endpoint at <code>https://api.deepseek.com/v1</code> using <code>DEEPSEEK_API_KEY</code>. The model selection UI must display DeepSeek models in a separate right-hand column to prevent the panel from overflowing vertically. Without <code>DEEPSEEK_API_KEY</code> configured, DeepSeek models must remain visible in the selector but will fail at the API layer with a clear error.</td>
+          <td><span class="req-priority p-med">Medium</span></td>
+          <td><span class="req-cat c-func">AI/Chat</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">FR-60</td>
+          <td class="req-text">The system must be deployable to cloud platforms without code changes, using only environment variable configuration: the React/Vite frontend must deploy to <strong>Azure Static Web Apps</strong> via a GitHub Actions workflow (<code>azure/static-web-apps-deploy@v1</code>); the FastAPI backend must deploy as a Docker container to <strong>Railway</strong> (zero-config) or <strong>Azure Container Apps</strong> (via ACR build + <code>az containerapp update</code>); the database must remain on <strong>Supabase</strong> (no migration required). CI/CD must trigger on push to <code>main</code> with path filters so frontend and backend pipelines deploy independently.</td>
+          <td><span class="req-priority p-med">Medium</span></td>
+          <td><span class="req-cat c-func">Ops</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">FR-61</td>
+          <td class="req-text">The system must support three user <strong>access levels</strong> — <strong>Regular</strong>, <strong>Plus</strong>, and <strong>Pro</strong> — stored as an <code>access_level</code> column on the <code>users</code> table (default: <code>regular</code>). The access level must be embedded in the JWT token at login/register and propagated in the <code>TokenResponse</code>. Admin users bypass all level checks regardless of their own <code>access_level</code>.</td>
+          <td><span class="req-priority p-high">High</span></td>
+          <td><span class="req-cat c-func">Auth</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">FR-62</td>
+          <td class="req-text">The Admin Panel must allow administrators to: (1) view and change any user's access level (<code>PATCH /api/admin/users/{id}/level</code>) from the Users tab — each user row shows a colour-coded tier badge (Regular = grey, Plus = blue, Pro = purple) and a level dropdown; (2) configure a <strong>minimum access level per feature</strong> from the Feature Flags tab via a three-tab panel (Regular / Plus / Pro), where toggling a feature on/off for a given tab updates the feature's <code>*_min_level</code> flag. The Pro tab is read-only, always showing full access. Feature flags now include <code>research_mode_enabled</code> plus seven <code>*_min_level</code> flags (<code>web_search_min_level</code>, <code>agent_mode_min_level</code>, <code>research_mode_min_level</code>, <code>image_generation_min_level</code>, <code>model_selection_min_level</code>, <code>translation_min_level</code>, <code>file_upload_min_level</code>).</td>
+          <td><span class="req-priority p-high">High</span></td>
+          <td><span class="req-cat c-func">Admin</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">FR-63</td>
+          <td class="req-text">The backend must enforce access level checks at the API layer — not just in the frontend UI. The <code>GET /api/features</code> endpoint must read the requesting user's access level from the JWT and return each feature as disabled if the user's level is below the configured <code>*_min_level</code> flag. The <code>POST /api/research/stream</code> endpoint must independently validate the user's level against <code>research_mode_min_level</code> and the <code>research_mode_enabled</code> global toggle, returning <code>HTTP 403</code> if access is denied. Admin users always bypass level restrictions.</td>
+          <td><span class="req-priority p-high">High</span></td>
+          <td><span class="req-cat c-func">Auth</span></td>
+        </tr>
       </tbody>
     </table>
   </section>
@@ -457,6 +620,42 @@
           <td class="req-text">The system must be fully deployable via <code>docker compose up</code> with only <code>.env</code> configuration — no ffmpeg, yt-dlp, or other host-level tool installations required.</td>
           <td><span class="req-priority p-med">Medium</span></td>
           <td><span class="req-cat c-non">Portability</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">NFR-12</td>
+          <td class="req-text">AI image generation via DALL-E 3 must complete and deliver the image to the user within 15 seconds under normal network conditions. The first streaming token ("🎨 Generating your image…") must appear within 1 second of the request.</td>
+          <td><span class="req-priority p-med">Medium</span></td>
+          <td><span class="req-cat c-non">Performance</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">NFR-13</td>
+          <td class="req-text">Password reset tokens must expire after 1 hour. The system must reject expired or structurally invalid tokens with an appropriate HTTP error code. The reset endpoint must never reveal whether an email address is registered in the system.</td>
+          <td><span class="req-priority p-high">High</span></td>
+          <td><span class="req-cat c-non">Security</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">NFR-14</td>
+          <td class="req-text">The translation quality loop must not block the request for longer than 30 seconds in total. The 1.2-second inter-call sleep and up to 3 refinement rounds must complete within this window; if Gemini fails due to rate limiting, GPT fallback must be invoked immediately.</td>
+          <td><span class="req-priority p-med">Medium</span></td>
+          <td><span class="req-cat c-non">Performance</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">NFR-15</td>
+          <td class="req-text">All admin-only endpoints must return HTTP 403 for any request whose JWT does not carry <code>is_admin: true</code>. The <code>is_admin</code> claim must be verified server-side on every request — no client-side-only enforcement is acceptable.</td>
+          <td><span class="req-priority p-high">High</span></td>
+          <td><span class="req-cat c-non">Security</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">NFR-16</td>
+          <td class="req-text">Base64-encoded image data embedded in message content must be stripped from all conversation history and RAG context arrays before they are sent to the OpenAI API, to prevent token overflow errors. The stripping operation must be transparent to the user — stored messages must retain the full base64 content for display.</td>
+          <td><span class="req-priority p-high">High</span></td>
+          <td><span class="req-cat c-non">Reliability</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">NFR-17</td>
+          <td class="req-text">Feature flag reads must be served from a single <code>feature_flags</code> table row-set and must not require a full application restart when updated. Flag changes applied by an admin must be reflected to new user sessions without redeployment.</td>
+          <td><span class="req-priority p-med">Medium</span></td>
+          <td><span class="req-cat c-non">Maintainability</span></td>
         </tr>
       </tbody>
     </table>
@@ -569,6 +768,76 @@
         <div class="uc-title">UC-20 &middot; View Workspace Alerts</div>
         <div class="uc-desc">User opens the workspace dropdown. Workspaces with at least one pending reminder or unresolved alert display a badge. User can switch to the alerted workspace to review the outstanding items in the Reminders panel.</div>
       </div>
+      <div class="uc-card">
+        <div class="uc-actor">Actor: Unauthenticated User</div>
+        <div class="uc-title">UC-21 &middot; Reset Forgotten Password</div>
+        <div class="uc-desc">User clicks "Forgot password?" on the LoginPage, enters their email, and receives a signed JWT reset link via email. User opens the link, which loads the reset-password form pre-filled from the <code>?reset_token=</code> URL param, enters a new password, and regains access. The token expires after 1 hour.</div>
+      </div>
+      <div class="uc-card">
+        <div class="uc-actor">Actor: Logged-in User</div>
+        <div class="uc-title">UC-22 &middot; Generate Image in Chat</div>
+        <div class="uc-desc">User types "/image a mountain landscape at sunset". MemoLink detects the image intent, calls DALL-E 3, streams a generating-status token, then delivers the image as a base64 data URL embedded in the chat. Attribution shows "replied by DALL-E 3".</div>
+      </div>
+      <div class="uc-card">
+        <div class="uc-actor">Actor: Logged-in User</div>
+        <div class="uc-title">UC-23 &middot; Switch Chat Model</div>
+        <div class="uc-desc">User opens Settings and selects "Gemini 2.0 Flash" from the model dropdown. All subsequent chat messages use that model. If Gemini hits a rate limit, MemoLink silently falls back to GPT-4o-mini and the attribution badge reflects the actual model used.</div>
+      </div>
+      <div class="uc-card">
+        <div class="uc-actor">Actor: Logged-in User</div>
+        <div class="uc-title">UC-24 &middot; Translate with Quality Score</div>
+        <div class="uc-desc">User selects text in the chat and requests translation to Māori. MemoLink runs the quality loop (Gemini → back-translate → GPT score → refine up to 3×), then displays the translation with "by Gemini 2.0 Flash Lite · 91% accuracy" in a green badge.</div>
+      </div>
+      <div class="uc-card">
+        <div class="uc-actor">Actor: Logged-in User</div>
+        <div class="uc-title">UC-25 &middot; Search the Web in Chat</div>
+        <div class="uc-desc">User toggles the globe icon in ChatInput and submits a question about a recent event. MemoLink queries Brave Search, injects the top results as system context, and the LLM generates an answer grounded in both notes and current web information.</div>
+      </div>
+      <div class="uc-card">
+        <div class="uc-actor">Actor: Logged-in User</div>
+        <div class="uc-title">UC-26 &middot; Bulk Upload Formatted Document</div>
+        <div class="uc-desc">User uploads a DOCX report via the bulk-upload dialog. MemoLink extracts headings, bold text, lists, tables, and embedded images — preserving full formatting as HTML. The resulting note is stored with rich structure and embedded base64 images ready for retrieval.</div>
+      </div>
+      <div class="uc-card">
+        <div class="uc-actor">Actor: Logged-in User</div>
+        <div class="uc-title">UC-27 &middot; Insert Image into Note</div>
+        <div class="uc-desc">User pastes a screenshot from the clipboard into the Tiptap editor. The image is inserted inline at the cursor position as a base64 data URL, rendered with rounded corners and a dark border. The note is saved with the image embedded in its HTML content.</div>
+      </div>
+      <div class="uc-card">
+        <div class="uc-actor">Actor: Logged-in User</div>
+        <div class="uc-title">UC-28 &middot; Use Agent Mode</div>
+        <div class="uc-desc">User enables the "Agent" toggle in ChatInput and asks a complex multi-step question. The SSE stream shows tool-call status chips as the agent reasons through sub-tasks, then delivers the final answer. The user can see which tools were invoked via the tool_result events.</div>
+      </div>
+      <div class="uc-card">
+        <div class="uc-actor">Actor: Admin User</div>
+        <div class="uc-title">UC-29 &middot; Manage Feature Flags</div>
+        <div class="uc-desc">Admin opens the Admin Panel from the user menu and navigates to the Feature Flags tab. Admin toggles "web_search_enabled" off. All users now see the web search globe icon hidden in ChatInput. Admin sets "default_model" to "gpt-4o" — users without model selection enabled will use that model.</div>
+      </div>
+      <div class="uc-card">
+        <div class="uc-actor">Actor: Admin User</div>
+        <div class="uc-title">UC-30 &middot; Triage Feedback</div>
+        <div class="uc-desc">Admin opens the Feedback tab in the Admin Panel. Filters by status "open". Reads a bug report describing a UI issue. Marks it as "read", investigates, fixes it, then marks it "resolved". The full submission including user email and timestamp is shown.</div>
+      </div>
+      <div class="uc-card">
+        <div class="uc-actor">Actor: Admin User</div>
+        <div class="uc-title">UC-31 &middot; Manage User Roles</div>
+        <div class="uc-desc">Admin opens the Users tab in the Admin Panel. Sees a list of all registered users with their emails and admin status. Promotes a trusted colleague to admin, granting them access to the Admin Panel and admin endpoints.</div>
+      </div>
+      <div class="uc-card">
+        <div class="uc-actor">Actor: Logged-in User</div>
+        <div class="uc-title">UC-32 &middot; Submit Bug Report</div>
+        <div class="uc-desc">User encounters a UI issue. Opens the Help modal and selects "Report a Bug". Fills in a description and submits. The report is stored in the database with status "open". An SMTP notification is sent to the admin (if configured). The user receives a confirmation that the report was submitted.</div>
+      </div>
+      <div class="uc-card">
+        <div class="uc-actor">Actor: Logged-in User (Plus or Pro)</div>
+        <div class="uc-title">UC-33 &middot; Use Research Mode</div>
+        <div class="uc-desc">A Plus or Pro user enables the Research Mode toggle in ChatInput and submits a query. The frontend calls POST /research/stream. The backend checks the user's JWT access_level against the research_mode_min_level feature flag. If the check passes the streaming research pipeline runs and returns a cited, multi-source answer. If the user's level is below the minimum threshold the API returns HTTP 403 and the UI displays an access-denied message.</div>
+      </div>
+      <div class="uc-card">
+        <div class="uc-actor">Actor: Admin User</div>
+        <div class="uc-title">UC-34 &middot; Manage User Access Levels</div>
+        <div class="uc-desc">Admin opens the Admin Panel and navigates to the Users tab. Each user row displays a colour-coded access level badge (Regular / Plus / Pro) and a dropdown to change it. Admin upgrades a user to Pro; the backend calls PATCH /admin/users/{id}/level and persists the new value. The user must re-login so their JWT reflects the updated level. In the Feature Flags tab the admin uses the tabbed Access Level Requirements UI to set research_mode_min_level to "plus", ensuring Regular users cannot access Research Mode until upgraded.</div>
+      </div>
     </div>
   </section>
 
@@ -655,6 +924,70 @@
       <span class="req-id">US-19</span> &nbsp;
       <span class="story-as">As a knowledge worker,</span> I want a badge to alert me when a workspace has pending reminders so that <span class="story-so">I can quickly switch to it and address outstanding tasks without forgetting them.</span>
     </div>
+    <div class="story">
+      <span class="req-id">US-20</span> &nbsp;
+      <span class="story-as">As a user who forgot their password,</span> I want to receive a reset link by email so that <span class="story-so">I can regain access to my account without contacting support.</span>
+    </div>
+    <div class="story">
+      <span class="req-id">US-21</span> &nbsp;
+      <span class="story-as">As a creative user,</span> I want to generate AI images directly in chat so that <span class="story-so">I can quickly visualise concepts without switching to a separate image tool.</span>
+    </div>
+    <div class="story">
+      <span class="req-id">US-22</span> &nbsp;
+      <span class="story-as">As a power user,</span> I want to choose between GPT and Gemini models so that <span class="story-so">I can balance cost, speed, and quality depending on my current task.</span>
+    </div>
+    <div class="story">
+      <span class="req-id">US-23</span> &nbsp;
+      <span class="story-as">As a Māori language student,</span> I want high-quality translation with an accuracy score so that <span class="story-so">I can trust the output and understand how confident the system is in the result.</span>
+    </div>
+    <div class="story">
+      <span class="req-id">US-24</span> &nbsp;
+      <span class="story-as">As a researcher,</span> I want to search the web from within the chat so that <span class="story-so">I can get answers that combine my personal notes with the latest public information.</span>
+    </div>
+    <div class="story">
+      <span class="req-id">US-25</span> &nbsp;
+      <span class="story-as">As a professional,</span> I want to upload a formatted Word document and have its headings, tables, and images preserved so that <span class="story-so">I don't lose important structure when building my knowledge base.</span>
+    </div>
+    <div class="story">
+      <span class="req-id">US-26</span> &nbsp;
+      <span class="story-as">As a student,</span> I want to paste screenshots into my notes so that <span class="story-so">I can capture diagrams and UI screenshots without having to save and re-upload image files.</span>
+    </div>
+    <div class="story">
+      <span class="req-id">US-27</span> &nbsp;
+      <span class="story-as">As an advanced user,</span> I want to enable agent mode so that <span class="story-so">the AI can break down complex questions into multiple reasoning steps and show me its work as it goes.</span>
+    </div>
+    <div class="story">
+      <span class="req-id">US-28</span> &nbsp;
+      <span class="story-as">As an administrator,</span> I want to toggle feature flags so that <span class="story-so">I can control which features are available to all users without redeploying the application.</span>
+    </div>
+    <div class="story">
+      <span class="req-id">US-29</span> &nbsp;
+      <span class="story-as">As an administrator,</span> I want to view and triage bug reports so that <span class="story-so">I can track issues reported by users and keep them informed of resolution status.</span>
+    </div>
+    <div class="story">
+      <span class="req-id">US-30</span> &nbsp;
+      <span class="story-as">As a user,</span> I want to submit a bug report or feature suggestion from within the app so that <span class="story-so">I can give feedback without leaving MemoLink or sending an email.</span>
+    </div>
+    <div class="story">
+      <span class="req-id">US-31</span> &nbsp;
+      <span class="story-as">As an administrator,</span> I want to promote trusted users to admin so that <span class="story-so">they can help manage feature flags and feedback without requiring server access.</span>
+    </div>
+    <div class="story">
+      <span class="req-id">US-32</span> &nbsp;
+      <span class="story-as">As an administrator,</span> I want to set a default chat model via feature flags so that <span class="story-so">all users without model selection access use the same cost-controlled model by default.</span>
+    </div>
+    <div class="story">
+      <span class="req-id">US-33</span> &nbsp;
+      <span class="story-as">As an administrator,</span> I want to assign Regular, Plus, or Pro access levels to individual users so that <span class="story-so">I can grant premium features incrementally without giving everyone admin rights.</span>
+    </div>
+    <div class="story">
+      <span class="req-id">US-34</span> &nbsp;
+      <span class="story-as">As an administrator,</span> I want to set a minimum access level for each feature flag so that <span class="story-so">Regular users only see the features they are entitled to while Plus and Pro users unlock more capabilities automatically.</span>
+    </div>
+    <div class="story">
+      <span class="req-id">US-35</span> &nbsp;
+      <span class="story-as">As a Pro user,</span> I want Research Mode to be available to me without any extra configuration so that <span class="story-so">I can run deep multi-source research queries as part of my premium subscription tier.</span>
+    </div>
   </section>
 
   <hr class="divider" />
@@ -713,6 +1046,16 @@
         <div class="constraint-icon">&#x1F512;</div>
         <h4>Workspace Ownership</h4>
         <p>Workspaces are strictly user-owned. Cross-user workspace access is not permitted. Team or workspace-sharing is out of scope for this capstone version.</p>
+      </div>
+      <div class="constraint">
+        <div class="constraint-icon">&#x1F6E1;&#xFE0F;</div>
+        <h4>Single Admin Bootstrapping</h4>
+        <p>Admin status is bootstrapped by auto-promoting the first registered user. There is no separate admin registration flow. Admins can promote additional users via the Admin Panel.</p>
+      </div>
+      <div class="constraint">
+        <div class="constraint-icon">&#x1F4AC;</div>
+        <h4>Feedback Storage Only</h4>
+        <p>Bug reports and suggestions are stored in the database and optionally emailed to the admin via SMTP. No external ticketing system integration (e.g. GitHub Issues, Jira) is provided in this version.</p>
       </div>
     </div>
   </section>

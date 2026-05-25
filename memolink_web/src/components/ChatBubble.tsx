@@ -2,17 +2,30 @@ import React, { useState } from "react";
 import { marked } from "marked";
 import MarkdownRenderer from "./MarkdownRenderer";
 import { translateText } from "../api/chatApi";
+import { MODELS } from "../constants/models";
 import "highlight.js/styles/github-dark.css";
 import "../styles/markdown.css";
+
+function modelLabel(id?: string): string {
+  if (!id) return "";
+  if (id === "gpt-image-2") return "GPT Image 2";
+  if (id === "gpt-image-1") return "GPT Image 1";
+  if (id === "dall-e-3") return "DALL-E 3";
+  if (id === "dall-e-2") return "DALL-E 2";
+  if (id === "stable-diffusion") return "Stable Diffusion";
+  return MODELS.find((m) => m.id === id)?.label ?? id;
+}
 
 interface Props {
   role: "user" | "assistant";
   content: string;
+  model?: string;
   streaming?: boolean;
   onAdd?: (text: string) => void;
   onDelete?: () => void;
   onApplyEdit?: (content: string, noteId: number | null) => void;
   hasOpenNote?: boolean;
+  translationEnabled?: boolean;
 }
 
 const TRANSLATE_LANGUAGES = [
@@ -38,17 +51,43 @@ function parseNoteEdit(content: string): {
   };
 }
 
-export default function ChatBubble({ role, content, streaming, onAdd, onDelete, onApplyEdit, hasOpenNote }: Props) {
+function ImageGeneratingSpinner() {
+  return (
+    <div className="flex flex-col items-center gap-3 py-4 px-6">
+      <div className="relative w-14 h-14">
+        {/* Outer spinning ring */}
+        <div className="absolute inset-0 rounded-full border-4 border-indigo-500/20 border-t-indigo-400 animate-spin" />
+        {/* Inner pulsing ring */}
+        <div className="absolute inset-[6px] rounded-full border-2 border-purple-500/30 border-t-purple-400 animate-[spin_1.5s_linear_infinite_reverse]" />
+        {/* Center icon */}
+        <div className="absolute inset-0 flex items-center justify-center">
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-indigo-300 animate-pulse" fill="currentColor" viewBox="0 0 16 16">
+            <path d="M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0M4.5 7.5a.5.5 0 0 0 0 1h5.793l-2.147 2.146a.5.5 0 0 0 .708.708l3-3a.5.5 0 0 0 0-.708l-3-3a.5.5 0 1 0-.708.708L10.293 7.5z"/>
+          </svg>
+        </div>
+      </div>
+      <div className="flex flex-col items-center gap-1">
+        <span className="text-sm font-medium text-indigo-300 animate-pulse">Generating image…</span>
+        <span className="text-xs text-gray-500">This may take a few seconds</span>
+      </div>
+    </div>
+  );
+}
+
+export default function ChatBubble({ role, content, model, streaming, onAdd, onDelete, onApplyEdit, hasOpenNote, translationEnabled = true }: Props) {
   const isUser = role === "user";
   const [copied, setCopied] = useState(false);
   const [showLangPicker, setShowLangPicker] = useState(false);
   const [isTranslating, setIsTranslating] = useState(false);
   const [translation, setTranslation] = useState<string | null>(null);
   const [translatedTo, setTranslatedTo] = useState("");
+  const [translationAccuracy, setTranslationAccuracy] = useState<number | null>(null);
+  const [translationModel, setTranslationModel] = useState<string | undefined>(undefined);
   const [editApplied, setEditApplied] = useState(false);
   const [editPreviewOpen, setEditPreviewOpen] = useState(false);
 
-  const { pre, edit, noteId, post } = parseNoteEdit(content);
+  const isImageGenerating = content === "__IMAGE_GENERATING__";
+  const { pre, edit, noteId, post } = isImageGenerating ? { pre: "", edit: null, noteId: null, post: "" } : parseNoteEdit(content);
 
   async function handleCopy() {
     const textToCopy = translation ?? content;
@@ -67,10 +106,14 @@ export default function ChatBubble({ role, content, streaming, onAdd, onDelete, 
     setShowLangPicker(false);
     setIsTranslating(true);
     setTranslation(null);
+    setTranslationAccuracy(null);
+    setTranslationModel(undefined);
     try {
-      const { translation: result } = await translateText(content, lang);
+      const { translation: result, accuracy, model: txModel } = await translateText(content, lang);
       setTranslation(result);
       setTranslatedTo(lang);
+      setTranslationAccuracy(accuracy);
+      setTranslationModel(txModel);
     } catch (err: any) {
       const msg = err?.response?.data?.detail ?? err?.message ?? "Unknown error";
       setTranslation(`Translation failed: ${msg}`);
@@ -123,28 +166,33 @@ export default function ChatBubble({ role, content, streaming, onAdd, onDelete, 
   );
 
   return (
-    <div className={`w-full flex ${isUser ? "justify-end" : "justify-start"} my-[3px]`}>
+    <div className={`w-full flex flex-col ${isUser ? "items-end" : "items-start"} my-[3px] gap-1`}>
+      {/* Original message bubble */}
       <div
-        className={`relative max-w-[740px] px-5 py-4 rounded-2xl text-[16px] leading-relaxed backdrop-blur-sm shadow-sm
+        className={`max-w-[740px] px-5 py-4 rounded-2xl text-[16px] leading-relaxed backdrop-blur-sm shadow-sm
           ${isUser ? "bg-[#2F2F3F]/80 text-gray-100" : "text-white"}`}
       >
-        {/* Pre-edit text (or full content if no edit block) */}
-        {pre && (
-          <span>
-            <MarkdownRenderer>{pre}</MarkdownRenderer>
-            {streaming && (
-              <span className="inline-block w-[2px] h-[1em] bg-indigo-400 ml-0.5 align-middle animate-[blink_0.8s_step-end_infinite]" />
+        {isImageGenerating ? (
+          <ImageGeneratingSpinner />
+        ) : (
+          <>
+            {pre && (
+              <span>
+                <MarkdownRenderer>{pre}</MarkdownRenderer>
+                {streaming && (
+                  <span className="inline-block w-[2px] h-[1em] bg-indigo-400 ml-0.5 align-middle animate-[blink_0.8s_step-end_infinite]" />
+                )}
+              </span>
             )}
-          </span>
-        )}
-        {!pre && streaming && (
-          <span className="inline-block w-[2px] h-[1em] bg-indigo-400 align-middle animate-[blink_0.8s_step-end_infinite]" />
+            {!pre && streaming && (
+              <span className="inline-block w-[2px] h-[1em] bg-indigo-400 align-middle animate-[blink_0.8s_step-end_infinite]" />
+            )}
+          </>
         )}
 
         {/* Note edit block */}
         {edit && (
           <div className="mt-3 rounded-xl border border-indigo-500/30 bg-indigo-950/30 overflow-hidden">
-            {/* Block header */}
             <div className="flex items-center justify-between px-4 py-2.5 bg-indigo-950/40 border-b border-indigo-500/20">
               <div className="flex items-center gap-2">
                 <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 text-indigo-400" fill="currentColor" viewBox="0 0 16 16">
@@ -159,22 +207,16 @@ export default function ChatBubble({ role, content, streaming, onAdd, onDelete, 
                 {editPreviewOpen ? "Hide preview" : "Show preview"}
               </button>
             </div>
-
-            {/* Preview (collapsible) */}
             {editPreviewOpen && (
               <div className="px-4 py-3 max-h-60 overflow-y-auto border-b border-indigo-500/20">
                 <MarkdownRenderer>{edit}</MarkdownRenderer>
               </div>
             )}
-
-            {/* Raw content (always shown, scrollable) */}
             {!editPreviewOpen && (
               <pre className="px-4 py-3 text-xs text-indigo-100/80 whitespace-pre-wrap break-words font-mono leading-relaxed max-h-48 overflow-y-auto">
                 {edit}
               </pre>
             )}
-
-            {/* Action bar */}
             <div className="flex items-center justify-between px-4 py-2.5 bg-indigo-950/20">
               <span className="text-[11px] text-indigo-400/60">
                 {editApplied
@@ -212,55 +254,71 @@ export default function ChatBubble({ role, content, streaming, onAdd, onDelete, 
           </div>
         )}
 
-        {/* Post-edit text */}
         {post && <div className="mt-3"><MarkdownRenderer>{post}</MarkdownRenderer></div>}
-
-        {/* Translation block */}
-        {translation && (
-          <div className="mt-3 pt-3 border-t border-[#2a2a38]">
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-[11px] text-indigo-400 uppercase tracking-wider">{translatedTo}</span>
-              <button onClick={() => setTranslation(null)} className="text-gray-600 hover:text-gray-400 text-xs">✕</button>
-            </div>
-            <p className="text-sm text-gray-300 leading-relaxed">{translation}</p>
-          </div>
-        )}
-
-        {/* Assistant action bar */}
-        {!isUser && (
-          <div className="absolute -bottom-6 left-3 flex items-center gap-2 text-xs opacity-60 hover:opacity-100 transition">
-            {translateButton}
-            <button onClick={handleCopy} className="flex items-center gap-1 px-2 py-1 bg-[#2A2A2A]/60 backdrop-blur-sm rounded-md hover:text-indigo-300">
-              <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" fill="currentColor" viewBox="0 0 16 16">
-                <path d="M10 1.5A1.5 1.5 0 0 1 11.5 3v8A1.5 1.5 0 0 1 10 12.5H4A1.5 1.5 0 0 1 2.5 11V3A1.5 1.5 0 0 1 4 1.5h6Zm-6 1A.5.5 0 0 0 3.5 3v8a.5.5 0 0 0 .5.5h6a.5.5 0 0 0 .5-.5V3a.5.5 0 0 0-.5-.5H4Zm9 1.5v7.528a2.5 2.5 0 0 1-2 2.45V13h1a1.5 1.5 0 0 0 1.5-1.5V4h-.5Z"/>
-              </svg>
-              {copied ? "Copied!" : "Copy"}
-            </button>
-            {onAdd && (
-              <button onClick={() => onAdd(translation ?? content)} className="flex items-center gap-1 px-2 py-1 bg-[#2A2A2A]/60 backdrop-blur-sm rounded-md hover:text-indigo-300">
-                📒 Save
-              </button>
-            )}
-            {onDelete && (
-              <button onClick={onDelete} className="flex items-center gap-1 px-2 py-1 bg-[#2A2A2A]/60 backdrop-blur-sm rounded-md hover:text-red-300">
-                🗑 Delete
-              </button>
-            )}
-          </div>
-        )}
-
-        {/* User action bar */}
-        {isUser && (
-          <div className="absolute -bottom-6 right-3 flex items-center gap-2 text-xs opacity-60 hover:opacity-100 transition">
-            {translateButton}
-            {onDelete && (
-              <button onClick={onDelete} className="flex items-center gap-1 px-2 py-1 bg-[#2A2A2A]/60 backdrop-blur-sm rounded-md hover:text-red-300">
-                🗑
-              </button>
-            )}
-          </div>
-        )}
       </div>
+
+      {/* Translation bubble — same style as the original message */}
+      {translation && (
+        <div
+          className={`max-w-[740px] px-5 py-4 rounded-2xl text-[16px] leading-relaxed backdrop-blur-sm shadow-sm
+            ${isUser ? "bg-[#2F2F3F]/80 text-gray-100" : "text-white"}`}
+        >
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[11px] text-indigo-400 uppercase tracking-wider font-medium">{translatedTo}</span>
+            <button onClick={() => setTranslation(null)} className="text-gray-600 hover:text-gray-400 text-xs leading-none">✕</button>
+          </div>
+          <MarkdownRenderer>{translation}</MarkdownRenderer>
+          {(translationModel || translationAccuracy !== null) && (
+            <p className={`mt-2 text-[10px] select-none ${
+              translationAccuracy === null ? "text-gray-600"
+              : translationAccuracy >= 85 ? "text-emerald-600/50"
+              : translationAccuracy >= 70 ? "text-amber-600/50"
+              : "text-red-600/50"
+            }`}>
+              {translationModel ? `by ${modelLabel(translationModel)}` : ""}
+              {translationAccuracy !== null ? ` · ${translationAccuracy}% accuracy` : ""}
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Action bar — always at the bottom of whatever is last */}
+      {!isUser && (
+        <div className="flex flex-col gap-0.5 pl-3">
+        <div className="flex items-center gap-2 text-xs text-gray-500 opacity-60 hover:opacity-100 transition">
+          {translationEnabled && translateButton}
+          <button onClick={handleCopy} className="flex items-center gap-1 px-2 py-1 bg-[#2A2A2A]/60 backdrop-blur-sm rounded-md hover:text-indigo-300">
+            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" fill="currentColor" viewBox="0 0 16 16">
+              <path d="M10 1.5A1.5 1.5 0 0 1 11.5 3v8A1.5 1.5 0 0 1 10 12.5H4A1.5 1.5 0 0 1 2.5 11V3A1.5 1.5 0 0 1 4 1.5h6Zm-6 1A.5.5 0 0 0 3.5 3v8a.5.5 0 0 0 .5.5h6a.5.5 0 0 0 .5-.5V3a.5.5 0 0 0-.5-.5H4Zm9 1.5v7.528a2.5 2.5 0 0 1-2 2.45V13h1a1.5 1.5 0 0 0 1.5-1.5V4h-.5Z"/>
+            </svg>
+            {copied ? "Copied!" : "Copy"}
+          </button>
+          {onAdd && (
+            <button onClick={() => onAdd(translation ?? content)} className="flex items-center gap-1 px-2 py-1 bg-[#2A2A2A]/60 backdrop-blur-sm rounded-md hover:text-indigo-300">
+              📒 Save
+            </button>
+          )}
+          {onDelete && (
+            <button onClick={onDelete} className="flex items-center gap-1 px-2 py-1 bg-[#2A2A2A]/60 backdrop-blur-sm rounded-md hover:text-red-300">
+              🗑 Delete
+            </button>
+          )}
+        </div>
+        {model && !streaming && (
+          <p className="text-[10px] text-gray-700 select-none">replied by {modelLabel(model)}</p>
+        )}
+        </div>
+      )}
+      {isUser && (
+        <div className="flex items-center gap-2 text-xs text-gray-500 opacity-60 hover:opacity-100 transition pr-3">
+          {translationEnabled && translateButton}
+          {onDelete && (
+            <button onClick={onDelete} className="flex items-center gap-1 px-2 py-1 bg-[#2A2A2A]/60 backdrop-blur-sm rounded-md hover:text-red-300">
+              🗑
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

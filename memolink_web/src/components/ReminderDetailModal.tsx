@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import type { SuggestionItem } from "../hooks/useSuggestions";
+import { buildGoogleCalendarUrl } from "../utils/reminderUtils";
 
 interface ReminderDetailModalProps {
   item: SuggestionItem | null;
@@ -244,6 +245,20 @@ export function ReminderDetailModal({ item, onClose, onSave, onDelete, onToggleD
           </button>
 
           <div className="flex items-center gap-2">
+            {item.due_date && (
+              <a
+                href={buildGoogleCalendarUrl(item.text, item.description, item.due_date, item.due_time)}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Add to Google Calendar"
+                className="flex items-center gap-1.5 px-3 py-2 text-xs text-gray-400 hover:text-indigo-300 hover:bg-indigo-500/10 rounded-xl transition"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 16 16">
+                  <path d="M3.5 0a.5.5 0 0 1 .5.5V1h8V.5a.5.5 0 0 1 1 0V1h1a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2h1V.5a.5.5 0 0 1 .5-.5M1 4v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V4z"/>
+                </svg>
+                Add to Calendar
+              </a>
+            )}
             <button
               onClick={onClose}
               className="px-4 py-2 text-xs text-gray-400 hover:text-gray-200 hover:bg-[#2a2a38] rounded-xl transition"

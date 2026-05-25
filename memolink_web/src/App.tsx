@@ -10,6 +10,8 @@ export default function App() {
   const [user, setUser] = useState<User | null>(getUser());
   const workspace = useWorkspace();
 
+  const resetToken = new URLSearchParams(window.location.search).get("reset_token") ?? undefined;
+
   function refreshUser() {
     setUser(getUser());
   }
@@ -20,10 +22,10 @@ export default function App() {
     }
   }, [user]);
 
-  if (!user) {
+  if (!user || resetToken) {
     return (
       <div className="app-shell">
-        <LoginPage onLogin={refreshUser} />
+        <LoginPage onLogin={refreshUser} initialResetToken={resetToken} />
       </div>
     );
   }

@@ -4,6 +4,8 @@ export interface User {
   id: number;
   email: string;
   access_token: string;
+  is_admin?: boolean;
+  access_level?: "regular" | "plus" | "pro";
 }
 
 export function saveUser(user: User | null) {
