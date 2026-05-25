@@ -10,6 +10,7 @@ import { getNote, updateNote } from "../api/client";
 import { Sidebar } from "../components/Sidebar";
 import { NoteEditorView } from "../components/NoteEditorView";
 import { RightPanel } from "../components/RightPanel";
+import { SplitPane } from "../components/SplitPane";
 import { RecycleBinModal } from "../components/RecycleBinModal";
 import { MessageList } from "../components/MessageList";
 import { ChatInput } from "../components/ChatInput";
@@ -29,9 +30,20 @@ import { fetchAdminFeedback } from "../api/adminApi";
 import { AdminPage } from "./AdminPage";
 
 type WorkspaceHook = ReturnType<typeof useWorkspace>;
+type LayoutMode = "stacked" | "columns" | "rows";
+
+function getSavedLayout(): LayoutMode {
+  return (localStorage.getItem("memolink_layout") as LayoutMode) ?? "stacked";
+}
+function getSavedRatio(key: string): number {
+  return parseFloat(localStorage.getItem(key) ?? "0.5");
+}
 
 export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: WorkspaceHook }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [layoutMode, setLayoutMode] = useState<LayoutMode>(getSavedLayout);
+  const [colRatio, setColRatio] = useState(() => getSavedRatio("memolink_split_col"));
+  const [rowRatio, setRowRatio] = useState(() => getSavedRatio("memolink_split_row"));
   const [showNotes, setShowNotes] = useState(true);
   const [showConversations, setShowConversations] = useState(true);
   const [menuData, setMenuData] = useState<{ type: "note" | "conversation"; item: any; top: number; left: number } | null>(null);
@@ -57,6 +69,13 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
   // Per-workspace tab persistence
   const pendingChatRestoreRef = useRef<{ chatIds: number[]; activeChatId: number | null } | null>(null);
   const pendingNoteRestoreRef = useRef<{ wsId: number; noteIds: number[]; activeNoteId: number | null; activeTabType: "chat" | "note" } | null>(null);
+
+  function handleLayoutChange(mode: LayoutMode) {
+    setLayoutMode(mode);
+    localStorage.setItem("memolink_layout", mode);
+  }
+  function handleColRatio(r: number) { setColRatio(r); localStorage.setItem("memolink_split_col", String(r)); }
+  function handleRowRatio(r: number) { setRowRatio(r); localStorage.setItem("memolink_split_row", String(r)); }
 
   function handleModelChange(id: string) {
     saveModel(id);
@@ -460,6 +479,41 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
 
           </div>{/* end scrollable tabs */}
 
+          {/* Layout toggle */}
+          <div className="shrink-0 flex items-center gap-0.5 px-2 border-l border-[#1e1e2a] ml-1">
+            {([
+              ["stacked", "M2 3h12v4H2zm0 6h12v4H2z", "Stacked (default)"],
+              ["columns", "M2 3h5v10H2zm7 0h5v10H9z", "Side by side"],
+              ["rows", "M2 3h12v4H2zm0 6h12v4H2z", "Top / bottom"],
+            ] as [LayoutMode, string, string][]).map(([mode, , label], idx) => (
+              <button
+                key={mode}
+                title={label}
+                onClick={() => handleLayoutChange(mode)}
+                className={`flex items-center justify-center w-7 h-7 rounded transition ${layoutMode === mode ? "bg-indigo-600 text-white" : "text-gray-500 hover:text-gray-300 hover:bg-[#1e1e2a]"}`}
+              >
+                {idx === 0 && (
+                  <svg viewBox="0 0 16 16" className="w-3.5 h-3.5" fill="currentColor">
+                    <rect x="2" y="3" width="12" height="4" rx="1"/>
+                    <rect x="2" y="9" width="12" height="4" rx="1"/>
+                  </svg>
+                )}
+                {idx === 1 && (
+                  <svg viewBox="0 0 16 16" className="w-3.5 h-3.5" fill="currentColor">
+                    <rect x="2" y="3" width="5" height="10" rx="1"/>
+                    <rect x="9" y="3" width="5" height="10" rx="1"/>
+                  </svg>
+                )}
+                {idx === 2 && (
+                  <svg viewBox="0 0 16 16" className="w-3.5 h-3.5" fill="currentColor">
+                    <rect x="2" y="2" width="12" height="5" rx="1"/>
+                    <rect x="2" y="9" width="12" height="5" rx="1"/>
+                  </svg>
+                )}
+              </button>
+            ))}
+          </div>
+
           {/* User info — outside overflow so the bell tooltip can extend below freely */}
           <div className="shrink-0 flex items-center gap-3 px-4 text-xs text-gray-500">
             {urgentCount > 0 && (
@@ -588,64 +642,215 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
 
 
         {/* ── Content area ─────────────────────────────────────────────── */}
-        {isNoteActive ? (
-          <main className="flex-1 px-4 py-6 overflow-hidden flex flex-col">
-          <NoteEditorView
-            noteKey={editor.active?.note.id ?? `new-${editor.activeIndex}`}
-            noteTitleDraft={editor.noteTitleDraft}
-            setNoteTitleDraft={editor.setNoteTitleDraft}
-            noteContentDraft={editor.noteContentDraft}
-            setNoteContentDraft={editor.setNoteContentDraft}
-            isNoteDirty={editor.isNoteDirty}
-            onSave={handleSaveNote}
-            onDiscard={editor.discardChanges}
-            isRecording={recording.isRecording}
-            isTranscribing={recording.isTranscribing}
-            onStartRecording={(src, lang) => recording.startRecording(src, lang)}
-            onStopRecording={recording.stopRecording}
-          />
-          </main>
-        ) : (
-          <>
-            <main className="flex-1 px-4 py-6 overflow-hidden">
-              <div className="h-full flex">
-              <MessageList
-                messages={convs.activeConversation.messages}
-                loading={chat.loading}
-                streaming={chat.streaming}
-                activeConversation={convs.activeConversation}
-                messagesContainerRef={convs.messagesContainerRef}
-                bottomRef={convs.bottomRef}
-                onLoadOlder={() => convs.loadMessages(convs.activeConversation!.id, true)}
-                onAddToNotes={handleAddMessageToNotes}
-                onDeleteMessage={(id, content, index) => { setDeleteTarget({ id, content, index }); setShowDeleteModal(true); }}
-                onDropFiles={(files) => chat.setPendingFiles((p) => [...p, ...files])}
-                onApplyNoteEdit={handleApplyNoteEdit}
-                hasOpenNote={isNoteActive}
-                translationEnabled={flags.translation_enabled}
-                modelAttributionEnabled={modelAttributionEnabled}
+        {layoutMode === "stacked" ? (
+          isNoteActive ? (
+            <main className="flex-1 px-4 py-6 overflow-hidden flex flex-col">
+              <NoteEditorView
+                noteKey={editor.active?.note.id ?? `new-${editor.activeIndex}`}
+                noteTitleDraft={editor.noteTitleDraft}
+                setNoteTitleDraft={editor.setNoteTitleDraft}
+                noteContentDraft={editor.noteContentDraft}
+                setNoteContentDraft={editor.setNoteContentDraft}
+                isNoteDirty={editor.isNoteDirty}
+                onSave={handleSaveNote}
+                onDiscard={editor.discardChanges}
+                isRecording={recording.isRecording}
+                isTranscribing={recording.isTranscribing}
+                onStartRecording={(src, lang) => recording.startRecording(src, lang)}
+                onStopRecording={recording.stopRecording}
               />
-              </div>
             </main>
-            <ChatInput
-              input={chat.input}
-              setInput={chat.setInput}
-              loading={chat.loading || chat.streaming}
-              pendingFiles={chat.pendingFiles}
-              setPendingFiles={chat.setPendingFiles}
-              textareaRef={chat.textareaRef}
-              attachmentInputRef={chat.attachmentInputRef}
-              onSend={chat.handleSend}
-              autoResize={chat.autoResize}
-              webSearch={chat.webSearch}
-              onToggleWebSearch={() => chat.setWebSearch((v) => !v)}
-              agentMode={chat.agentMode}
-              onToggleAgentMode={() => chat.setAgentMode((v) => !v)}
-              researchMode={chat.researchMode}
-              onToggleResearchMode={() => chat.setResearchMode((v) => !v)}
-              flags={flags}
-            />
-          </>
+          ) : (
+            <>
+              <main className="flex-1 px-4 py-6 overflow-hidden">
+                <div className="h-full flex">
+                  <MessageList
+                    messages={convs.activeConversation.messages}
+                    loading={chat.loading}
+                    streaming={chat.streaming}
+                    activeConversation={convs.activeConversation}
+                    messagesContainerRef={convs.messagesContainerRef}
+                    bottomRef={convs.bottomRef}
+                    onLoadOlder={() => convs.loadMessages(convs.activeConversation!.id, true)}
+                    onAddToNotes={handleAddMessageToNotes}
+                    onDeleteMessage={(id, content, index) => { setDeleteTarget({ id, content, index }); setShowDeleteModal(true); }}
+                    onDropFiles={(files) => chat.setPendingFiles((p) => [...p, ...files])}
+                    onApplyNoteEdit={handleApplyNoteEdit}
+                    hasOpenNote={isNoteActive}
+                    translationEnabled={flags.translation_enabled}
+                    modelAttributionEnabled={modelAttributionEnabled}
+                  />
+                </div>
+              </main>
+              <ChatInput
+                input={chat.input}
+                setInput={chat.setInput}
+                loading={chat.loading || chat.streaming}
+                pendingFiles={chat.pendingFiles}
+                setPendingFiles={chat.setPendingFiles}
+                textareaRef={chat.textareaRef}
+                attachmentInputRef={chat.attachmentInputRef}
+                onSend={chat.handleSend}
+                autoResize={chat.autoResize}
+                webSearch={chat.webSearch}
+                onToggleWebSearch={() => chat.setWebSearch((v) => !v)}
+                agentMode={chat.agentMode}
+                onToggleAgentMode={() => chat.setAgentMode((v) => !v)}
+                researchMode={chat.researchMode}
+                onToggleResearchMode={() => chat.setResearchMode((v) => !v)}
+                flags={flags}
+              />
+            </>
+          )
+        ) : (
+          <SplitPane
+            direction={layoutMode === "columns" ? "horizontal" : "vertical"}
+            ratio={layoutMode === "columns" ? colRatio : rowRatio}
+            onRatioChange={layoutMode === "columns" ? handleColRatio : handleRowRatio}
+            first={
+              <div className="flex flex-col h-full min-h-0 bg-[#0f0f13]">
+                {/* Chat panel mini tab bar */}
+                <div className="flex items-center overflow-x-auto shrink-0 bg-[#0a0a0f] border-b border-[#1e1e2a]" style={{ minHeight: 36 }}>
+                  {convs.openChats.map((ch, i) => {
+                    const isActive = convs.activeConversation?.id === ch.id;
+                    const isDragOver = dragOverTab?.type === "chat" && dragOverTab.index === i && dragSrcRef.current?.index !== i;
+                    return (
+                      <div
+                        key={ch.id}
+                        draggable
+                        onDragStart={() => { dragSrcRef.current = { type: "chat", index: i }; }}
+                        onDragOver={(e) => { e.preventDefault(); setDragOverTab({ type: "chat", index: i }); }}
+                        onDrop={(e) => { e.preventDefault(); handleTabDrop("chat", i); setDragOverTab(null); }}
+                        onDragEnd={() => { dragSrcRef.current = null; setDragOverTab(null); }}
+                        onClick={() => handleActivateChat(ch.id)}
+                        className={`flex items-center gap-1.5 px-3 h-9 text-xs cursor-grab active:cursor-grabbing border-b-2 transition shrink-0 select-none ${
+                          isActive ? "border-indigo-500 text-white bg-[#0f0f13]" : "border-transparent text-gray-500 hover:text-gray-300"
+                        } ${isDragOver ? "border-l-2 border-l-indigo-400" : ""}`}
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3 shrink-0 opacity-70" fill="currentColor" viewBox="0 0 16 16">
+                          <path d="M2.678 11.894a1 1 0 0 1 .287.801 11 11 0 0 1-.398 2c1.395-.323 2.247-.697 2.634-.893a1 1 0 0 1 .71-.074A8 8 0 0 0 8 14c3.996 0 7-2.807 7-6s-3.004-6-7-6-7 2.808-7 6c0 1.468.617 2.83 1.678 3.894z"/>
+                        </svg>
+                        <span className="max-w-[100px] truncate">{convLabel(ch)}</span>
+                        <button onClick={(e) => { e.stopPropagation(); handleCloseChat(ch.id); }} className="text-gray-600 hover:text-gray-300 w-3.5 h-3.5 flex items-center justify-center rounded-sm hover:bg-[#2a2a38] transition leading-none">×</button>
+                      </div>
+                    );
+                  })}
+                  <button
+                    onClick={() => { convs.startNewChat(); setActiveTabType("chat"); setTimeout(() => chat.textareaRef.current?.focus(), 0); }}
+                    className="px-2 h-9 text-gray-600 hover:text-gray-300 text-sm shrink-0 transition"
+                    title="New chat"
+                  >+</button>
+                </div>
+                {/* Chat content */}
+                <main className="flex-1 px-4 py-4 overflow-hidden min-h-0">
+                  <div className="h-full flex">
+                    <MessageList
+                      messages={convs.activeConversation.messages}
+                      loading={chat.loading}
+                      streaming={chat.streaming}
+                      activeConversation={convs.activeConversation}
+                      messagesContainerRef={convs.messagesContainerRef}
+                      bottomRef={convs.bottomRef}
+                      onLoadOlder={() => convs.loadMessages(convs.activeConversation!.id, true)}
+                      onAddToNotes={handleAddMessageToNotes}
+                      onDeleteMessage={(id, content, index) => { setDeleteTarget({ id, content, index }); setShowDeleteModal(true); }}
+                      onDropFiles={(files) => chat.setPendingFiles((p) => [...p, ...files])}
+                      onApplyNoteEdit={handleApplyNoteEdit}
+                      hasOpenNote={editor.openNotes.length > 0}
+                      translationEnabled={flags.translation_enabled}
+                      modelAttributionEnabled={modelAttributionEnabled}
+                    />
+                  </div>
+                </main>
+                <ChatInput
+                  input={chat.input}
+                  setInput={chat.setInput}
+                  loading={chat.loading || chat.streaming}
+                  pendingFiles={chat.pendingFiles}
+                  setPendingFiles={chat.setPendingFiles}
+                  textareaRef={chat.textareaRef}
+                  attachmentInputRef={chat.attachmentInputRef}
+                  onSend={chat.handleSend}
+                  autoResize={chat.autoResize}
+                  webSearch={chat.webSearch}
+                  onToggleWebSearch={() => chat.setWebSearch((v) => !v)}
+                  agentMode={chat.agentMode}
+                  onToggleAgentMode={() => chat.setAgentMode((v) => !v)}
+                  researchMode={chat.researchMode}
+                  onToggleResearchMode={() => chat.setResearchMode((v) => !v)}
+                  flags={flags}
+                />
+              </div>
+            }
+            second={
+              <div className="flex flex-col h-full min-h-0 bg-[#0f0f13]">
+                {/* Note panel mini tab bar */}
+                <div className="flex items-center overflow-x-auto shrink-0 bg-[#0a0a0f] border-b border-[#1e1e2a]" style={{ minHeight: 36 }}>
+                  {editor.openNotes.map((note, i) => {
+                    const isActive = editor.activeIndex === i;
+                    const isDragOver = dragOverTab?.type === "note" && dragOverTab.index === i && dragSrcRef.current?.index !== i;
+                    return (
+                      <div
+                        key={note.note.id ?? `new-${i}`}
+                        draggable
+                        onDragStart={() => { dragSrcRef.current = { type: "note", index: i }; }}
+                        onDragOver={(e) => { e.preventDefault(); setDragOverTab({ type: "note", index: i }); }}
+                        onDrop={(e) => { e.preventDefault(); handleTabDrop("note", i); setDragOverTab(null); }}
+                        onDragEnd={() => { dragSrcRef.current = null; setDragOverTab(null); }}
+                        onClick={() => { editor.setActiveIndex(i); setActiveTabType("note"); }}
+                        className={`flex items-center gap-1.5 px-3 h-9 text-xs cursor-grab active:cursor-grabbing border-b-2 transition shrink-0 select-none ${
+                          isActive ? "border-indigo-500 text-white bg-[#0f0f13]" : "border-transparent text-gray-500 hover:text-gray-300"
+                        } ${isDragOver ? "border-l-2 border-l-indigo-400" : ""}`}
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3 shrink-0 opacity-70" fill="currentColor" viewBox="0 0 16 16">
+                          <path d="M2 2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v13.5a.5.5 0 0 1-.777.416L8 13.101l-5.223 2.815A.5.5 0 0 1 2 15.5z"/>
+                        </svg>
+                        <span className="max-w-[100px] truncate">{note.titleDraft.trim() || "Untitled"}</span>
+                        <button onClick={(e) => { e.stopPropagation(); editor.closeNote(i); }} className="text-gray-600 hover:text-gray-300 w-3.5 h-3.5 flex items-center justify-center rounded-sm hover:bg-[#2a2a38] transition leading-none">×</button>
+                      </div>
+                    );
+                  })}
+                  <button
+                    onClick={() => handleOpenNote({ id: null, title: "", content: "" })}
+                    className="px-2 h-9 text-gray-600 hover:text-gray-300 text-sm shrink-0 transition"
+                    title="New note"
+                  >+</button>
+                </div>
+                {/* Note content */}
+                {editor.openNotes.length > 0 ? (
+                  <main className="flex-1 px-4 py-4 overflow-hidden flex flex-col min-h-0">
+                    <NoteEditorView
+                      noteKey={editor.active?.note.id ?? `new-${editor.activeIndex}`}
+                      noteTitleDraft={editor.noteTitleDraft}
+                      setNoteTitleDraft={editor.setNoteTitleDraft}
+                      noteContentDraft={editor.noteContentDraft}
+                      setNoteContentDraft={editor.setNoteContentDraft}
+                      isNoteDirty={editor.isNoteDirty}
+                      onSave={handleSaveNote}
+                      onDiscard={editor.discardChanges}
+                      isRecording={recording.isRecording}
+                      isTranscribing={recording.isTranscribing}
+                      onStartRecording={(src, lang) => recording.startRecording(src, lang)}
+                      onStopRecording={recording.stopRecording}
+                    />
+                  </main>
+                ) : (
+                  <div className="flex-1 flex flex-col items-center justify-center gap-3 text-gray-600">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-8 h-8 opacity-30" fill="currentColor" viewBox="0 0 16 16">
+                      <path d="M2 2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v13.5a.5.5 0 0 1-.777.416L8 13.101l-5.223 2.815A.5.5 0 0 1 2 15.5z"/>
+                    </svg>
+                    <p className="text-xs">No note open</p>
+                    <button
+                      onClick={() => handleOpenNote({ id: null, title: "", content: "" })}
+                      className="px-3 py-1.5 rounded-lg text-xs bg-indigo-600/20 text-indigo-400 hover:bg-indigo-600/30 border border-indigo-500/20 transition"
+                    >
+                      New note
+                    </button>
+                  </div>
+                )}
+              </div>
+            }
+          />
         )}
       </div>
 
