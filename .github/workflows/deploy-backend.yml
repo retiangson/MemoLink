@@ -8,6 +8,9 @@ on:
       - "requirements.txt"
       - "Dockerfile"
 
+env:
+  ECR_REPOSITORY: memolink-backend
+
 jobs:
   test:
     name: Backend Tests
@@ -52,9 +55,10 @@ jobs:
       - name: Build and push Docker image to ECR
         id: build
         env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          IMAGE_URI=329933868979.dkr.ecr.ap-southeast-2.amazonaws.com/memolink-backend:$IMAGE_TAG
+          IMAGE_URI=$REGISTRY/${{ env.ECR_REPOSITORY }}:$IMAGE_TAG
           echo "Pushing to: $IMAGE_URI"
           docker build -t $IMAGE_URI .
           docker push $IMAGE_URI
