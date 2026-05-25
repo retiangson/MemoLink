@@ -406,12 +406,13 @@ def extract_formatted_html(file_bytes: bytes, filename: str) -> str:
 
     if ext in ("html", "htm"):
         try:
+            import html2text
             raw = file_bytes.decode("utf-8", errors="ignore")
-            body_match = re.search(r"<body[^>]*>(.*?)</body>", raw, re.DOTALL | re.IGNORECASE)
-            content = body_match.group(1) if body_match else raw
-            sanitizer = _HTMLSanitizer()
-            sanitizer.feed(content)
-            return sanitizer.get_html().strip()
+            converter = html2text.HTML2Text()
+            converter.ignore_links = False
+            converter.ignore_images = False
+            converter.body_width = 0
+            return converter.handle(raw).strip()
         except Exception:
             pass
 
