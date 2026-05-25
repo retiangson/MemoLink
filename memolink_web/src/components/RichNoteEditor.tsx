@@ -11,6 +11,7 @@ import Placeholder from "@tiptap/extension-placeholder";
 import Color from "@tiptap/extension-color";
 import { TextStyle } from "@tiptap/extension-text-style";
 import Image from "@tiptap/extension-image";
+import { Table, TableRow, TableCell, TableHeader } from "@tiptap/extension-table";
 import { marked } from "marked";
 import "../styles/editor.css";
 
@@ -107,6 +108,10 @@ export function RichNoteEditor({ value, onChange, noteKey, disabled }: RichNoteE
       TextStyle,
       Color,
       Image.configure({ inline: false, allowBase64: true }),
+      Table.configure({ resizable: false }),
+      TableRow,
+      TableHeader,
+      TableCell,
     ],
     editorProps: {
       attributes: { class: "tiptap-content" },

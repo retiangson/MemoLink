@@ -337,10 +337,19 @@ def extract_formatted_html(file_bytes: bytes, filename: str) -> str:
         except Exception:
             pass
 
-    # For all other types (txt, md, html, zip, audio) use plain extraction + wrap
+    if ext in ("html", "htm"):
+        try:
+            raw = file_bytes.decode("utf-8", errors="ignore")
+            body_match = re.search(r"<body[^>]*>(.*?)</body>", raw, re.DOTALL | re.IGNORECASE)
+            content = body_match.group(1) if body_match else raw
+            content = re.sub(r"<script[^>]*>.*?</script>", "", content, flags=re.DOTALL | re.IGNORECASE)
+            content = re.sub(r"<style[^>]*>.*?</style>", "", content, flags=re.DOTALL | re.IGNORECASE)
+            return content.strip()
+        except Exception:
+            pass
+
+    # For all other types (txt, md, zip, audio) use plain extraction + wrap
     text = extract_text_local(file_bytes, filename)
-    if text.strip().startswith("<"):
-        return text  # Already HTML (html/htm files)
     return _plain_to_html(text)
 
 
