@@ -1,5 +1,6 @@
 import React, { useState, useRef } from "react";
 import { uploadNotes } from "../api/chatApi";
+import { API_BASE } from "../api/client";
 
 interface Props {
   setNotes?: React.Dispatch<React.SetStateAction<any[]>>;
@@ -15,8 +16,32 @@ export function UploadNotes({ setNotes, workspaceId, onUploaded }: Props) {
 
   async function processFiles(files: File[]) {
     setLoading(true);
-    setStatus("Processing...");
+    setStatus("Connecting…");
     setFailures([]);
+
+    // Pre-flight health check — distinguishes "backend unreachable" from
+    // "upload rejected". Runs before sending any file bytes.
+    try {
+      await fetch(`${API_BASE}/health`, { method: "GET", signal: AbortSignal.timeout(8000) });
+    } catch (healthErr) {
+      console.error("[UploadNotes] health check failed:", healthErr);
+      setStatus("Upload failed: cannot reach the server. Check your connection or try again.");
+      setLoading(false);
+      return;
+    }
+
+    // AWS Lambda Function URL hard limit is 6 MB per request.
+    // Reject files that would exceed this before sending any bytes.
+    const LAMBDA_LIMIT_MB = 5;
+    const oversized = files.filter(f => f.size > LAMBDA_LIMIT_MB * 1024 * 1024);
+    if (oversized.length > 0) {
+      const names = oversized.map(f => `${f.name} (${(f.size / 1024 / 1024).toFixed(1)} MB)`).join(", ");
+      setStatus(`Upload failed: ${oversized.length} file(s) exceed the ${LAMBDA_LIMIT_MB} MB server limit — ${names}. Split large files or use a smaller export.`);
+      setLoading(false);
+      return;
+    }
+
+    setStatus("Processing...");
     try {
       const result = await uploadNotes(files, workspaceId);
       const notes = result.notes ?? [];
@@ -38,6 +63,8 @@ export function UploadNotes({ setNotes, workspaceId, onUploaded }: Props) {
         setStatus(`Upload failed: ${detail}`);
       } else if (status) {
         setStatus(`Upload failed (HTTP ${status}): ${detail}`);
+      } else if (e?.message?.toLowerCase().includes("network")) {
+        setStatus("Upload failed: Network Error — the connection was interrupted mid-upload. For large files, try a faster connection. If the problem persists, contact your admin to check server logs.");
       } else {
         setStatus(`Upload failed: ${detail}`);
       }
