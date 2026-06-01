@@ -21,7 +21,8 @@ _WHISPER_MIME: dict[str, str] = {
     "avi": "video/x-msvideo",
 }
 
-_WHISPER_LIMIT = 25 * 1024 * 1024  # 25 MB
+_DEEPGRAM_THRESHOLD = 5 * 1024 * 1024   # ≥ 5 MB → Deepgram
+_WHISPER_MAX = 25 * 1024 * 1024         # Whisper hard cap
 
 
 class _HTMLTextExtractor(HTMLParser):
@@ -485,33 +486,47 @@ def _transcribe_deepgram(file_bytes: bytes, filename: str, ext: str, language: s
     return data["results"]["channels"][0]["alternatives"][0]["transcript"]
 
 
-def transcribe_audio(file_bytes: bytes, filename: str, ext: str, language: str | None = None) -> str:
-    """Transcribe audio. Uses Whisper for files ≤25 MB, Deepgram for larger files (if key is set)."""
+def _transcribe_whisper(file_bytes: bytes, filename: str, language: str | None = None) -> str:
+    from openai import OpenAI
     from memolink_backend.core.config import settings
 
-    if len(file_bytes) > _WHISPER_LIMIT:
-        if not settings.deepgram_api_key:
-            return "[Transcription skipped] File exceeds the 25 MB Whisper limit and no Deepgram key is configured."
+    client = OpenAI(api_key=settings.openai_api_key)
+    safe_filename = re.sub(r"\s+", "_", filename)
+    buf = io.BytesIO(file_bytes)
+    buf.name = safe_filename
+    kwargs: dict = {"model": "whisper-1", "file": buf}
+    if language:
+        kwargs["language"] = language
+    transcript = client.audio.transcriptions.create(**kwargs)
+    return transcript.text
+
+
+def transcribe_audio(file_bytes: bytes, filename: str, ext: str, language: str | None = None) -> str:
+    """< 5 MB → Whisper; ≥ 5 MB → Deepgram (fallback: Whisper if ≤ 25 MB)."""
+    from memolink_backend.core.config import settings
+
+    size = len(file_bytes)
+
+    if size < _DEEPGRAM_THRESHOLD:
+        try:
+            return _transcribe_whisper(file_bytes, filename, language)
+        except Exception as e:
+            detail = getattr(e, "body", None) or ""
+            return f"[Transcription error] {e}{f' — detail: {detail}' if detail else ''}"
+
+    # ≥ 5 MB: try Deepgram first
+    if settings.deepgram_api_key:
         try:
             return _transcribe_deepgram(file_bytes, filename, ext, language)
-        except Exception as e:
-            return f"[Transcription error] Deepgram failed: {e}"
+        except Exception:
+            pass  # fall through to Whisper fallback
 
-    try:
-        import httpx as _httpx
-        safe_filename = filename.replace(" ", "_")
-        mime_type = _WHISPER_MIME.get(ext.lstrip("."), "audio/webm")
-        data: dict = {"model": "whisper-1"}
-        if language:
-            data["language"] = language
-        resp = _httpx.post(
-            "https://api.openai.com/v1/audio/transcriptions",
-            headers={"Authorization": f"Bearer {settings.openai_api_key}"},
-            files={"file": (safe_filename, file_bytes, mime_type)},
-            data=data,
-            timeout=120.0,
-        )
-        resp.raise_for_status()
-        return resp.json()["text"]
-    except Exception as e:
-        return f"[Transcription error] {e}"
+    # Whisper fallback (only if within its 25 MB cap)
+    if size <= _WHISPER_MAX:
+        try:
+            return _transcribe_whisper(file_bytes, filename, language)
+        except Exception as e:
+            detail = getattr(e, "body", None) or ""
+            return f"[Transcription error] {e}{f' — detail: {detail}' if detail else ''}"
+
+    return "[Transcription skipped] File exceeds the 25 MB limit and Deepgram is not configured or failed."

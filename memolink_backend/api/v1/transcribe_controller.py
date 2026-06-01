@@ -19,13 +19,13 @@ async def transcribe(
     size_mb = round(len(audio_bytes) / 1024 / 1024, 1)
 
     from memolink_backend.core.config import settings
-    _WHISPER_LIMIT_MB = 25
+    _DEEPGRAM_THRESHOLD_MB = 5
 
-    if size_mb > _WHISPER_LIMIT_MB:
+    if size_mb >= _DEEPGRAM_THRESHOLD_MB:
         if settings.deepgram_api_key:
-            c.logs().info("transcribe", f"File '{filename}' exceeds 25 MB — falling back to Deepgram Nova-2", {"filename": filename, "size_mb": size_mb, "fallback": "deepgram"}, user_id)
+            c.logs().info("transcribe", f"File '{filename}' is ≥ 5 MB — routing to Deepgram Nova-2", {"filename": filename, "size_mb": size_mb, "service": "deepgram"}, user_id)
         else:
-            c.logs().warning("transcribe", f"File '{filename}' exceeds 25 MB Whisper limit — no Deepgram key configured, transcription will be skipped", {"filename": filename, "size_mb": size_mb}, user_id)
+            c.logs().warning("transcribe", f"File '{filename}' is ≥ 5 MB but no Deepgram key — will attempt Whisper fallback", {"filename": filename, "size_mb": size_mb}, user_id)
 
     text = transcribe_audio(audio_bytes, filename, ext, language=language or None)
 
@@ -34,7 +34,7 @@ async def transcribe(
     elif text.startswith("[Transcription error]"):
         c.logs().error("transcribe", f"Transcription failed for '{filename}'", {"filename": filename, "size_mb": size_mb, "error": text}, user_id)
     else:
-        service = "deepgram" if size_mb > _WHISPER_LIMIT_MB else "whisper"
+        service = "deepgram" if size_mb >= _DEEPGRAM_THRESHOLD_MB else "whisper"
         c.logs().info("transcribe", f"Transcription complete via {service} for '{filename}'", {"filename": filename, "size_mb": size_mb, "service": service}, user_id)
 
     return {"text": text}
