@@ -1,7 +1,12 @@
+import logging
 import os
 import sys
-from fastapi import FastAPI
+import traceback
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+
+_logger = logging.getLogger(__name__)
 
 BACKEND_ROOT = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(BACKEND_ROOT)
@@ -150,6 +155,28 @@ app = FastAPI(
     openapi_url="/api/openapi.json",
     redoc_url="/api/redoc",
 )
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    tb = traceback.format_exc()
+    _logger.error("Unhandled exception on %s %s: %s", request.method, request.url.path, exc)
+    _logger.error(tb)
+    try:
+        from memolink_backend.core.db import get_db
+        from memolink_backend.domain.repositories.system_log_repository import SystemLogRepository
+        db = next(get_db())
+        SystemLogRepository(db).create(
+            "ERROR", "app.unhandled",
+            f"{request.method} {request.url.path} — {type(exc).__name__}: {exc}",
+            {"traceback": tb[-2000:], "path": str(request.url.path), "method": request.method},
+        )
+    except Exception:
+        pass
+    return JSONResponse(
+        status_code=500,
+        content={"detail": f"Internal server error: {type(exc).__name__}: {exc}"},
+    )
 
 
 @app.get("/health", tags=["system"])

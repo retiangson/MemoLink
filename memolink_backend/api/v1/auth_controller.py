@@ -13,8 +13,11 @@ def register(dto: RegisterDTO, c: RequestContainer = Depends(get_request_contain
         c.logs().info("auth.register", f"New user registered: {dto.email}")
         return result
     except ValueError as e:
-        c.logs().warning("auth.register", f"Registration failed for {dto.email}: {e}")
+        c.logs().warning("auth.register", f"Registration failed for {dto.email}: {e}", {"error": str(e)})
         raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        c.logs().error("auth.register", f"Unexpected error during registration for {dto.email}: {e}", {"error": str(e)})
+        raise HTTPException(status_code=500, detail="Registration failed. Please try again.")
 
 
 @router.post("/login", response_model=TokenResponse)
@@ -26,6 +29,9 @@ def login(dto: LoginDTO, c: RequestContainer = Depends(get_request_container)):
     except ValueError:
         c.logs().warning("auth.login", f"Failed login attempt for {dto.email}")
         raise HTTPException(status_code=401, detail="Invalid email or password")
+    except Exception as e:
+        c.logs().error("auth.login", f"Unexpected error during login for {dto.email}: {e}", {"error": str(e)})
+        raise HTTPException(status_code=500, detail="Login failed. Please try again.")
 
 
 @router.post("/change-password")
