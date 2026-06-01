@@ -252,7 +252,16 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
 @app.get("/health", tags=["system"])
 @app.get("/api/health", tags=["system"])
 def health():
-    return {"status": "ok", "service": "MemoLink API", "version": "2.1.0"}
+    import os
+    return {
+        "status": "ok",
+        "service": "MemoLink API",
+        "version": "2.1.0",
+        # Temporary debug — shows whether S3 env vars are visible to the app
+        "s3_bucket_set": bool(settings.s3_upload_bucket),
+        "s3_bucket_len": len(settings.s3_upload_bucket),
+        "s3_env_raw": bool(os.environ.get("S3_UPLOAD_BUCKET")),
+    }
 
 
 # Build allowed origins list — always wildcard, plus the explicit frontend
