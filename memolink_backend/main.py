@@ -3,10 +3,23 @@ import os
 import sys
 import traceback
 from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 _logger = logging.getLogger(__name__)
+
+
+def _try_write_system_log(level: str, source: str, message: str, details: dict) -> None:
+    """Write to system_logs without ever raising — used inside exception handlers."""
+    try:
+        from memolink_backend.core.db import get_db
+        from memolink_backend.domain.repositories.system_log_repository import SystemLogRepository
+        db = next(get_db())
+        SystemLogRepository(db).create(level, source, message, details)
+    except Exception:
+        pass
 
 BACKEND_ROOT = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(BACKEND_ROOT)
@@ -157,22 +170,77 @@ app = FastAPI(
 )
 
 
+# ── Global exception handlers (equivalent to C# error-handling middleware) ────
+#
+# FastAPI dispatches exceptions in this priority order:
+#   1. HTTPException          → http_exception_handler
+#   2. RequestValidationError → validation_exception_handler
+#   3. Everything else        → unhandled_exception_handler
+#
+# All three are registered so no exception class escapes logging.
+
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+    """Handles all explicit raise HTTPException(...) calls throughout the app.
+    5xx errors are logged as ERROR; 4xx as WARNING (only unusual ones — skip
+    routine 401/404 to avoid log noise)."""
+    path = request.url.path
+    method = request.method
+    detail = exc.detail or ""
+
+    if exc.status_code >= 500:
+        _logger.error("HTTP %s on %s %s: %s", exc.status_code, method, path, detail)
+        _try_write_system_log(
+            "ERROR", "http.error",
+            f"HTTP {exc.status_code} {method} {path}: {detail}",
+            {"status_code": exc.status_code, "path": path, "method": method, "detail": str(detail)},
+        )
+    elif exc.status_code not in (401, 404):
+        # Log unexpected 4xx (e.g. 403 Forbidden, 413 Too Large, 422 Unprocessable)
+        # but skip 401 (wrong password) and 404 (normal not-found) to reduce noise
+        _logger.warning("HTTP %s on %s %s: %s", exc.status_code, method, path, detail)
+        _try_write_system_log(
+            "WARNING", "http.error",
+            f"HTTP {exc.status_code} {method} {path}: {detail}",
+            {"status_code": exc.status_code, "path": path, "method": method, "detail": str(detail)},
+        )
+
+    return JSONResponse(status_code=exc.status_code, content={"detail": detail})
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """Handles Pydantic validation failures (missing fields, wrong types) — FastAPI
+    returns 422 for these automatically. Logged as WARNING so bad client requests
+    are visible without polluting the ERROR channel."""
+    path = request.url.path
+    errors = exc.errors()
+    _logger.warning("Validation error on %s %s: %s", request.method, path, errors)
+    _try_write_system_log(
+        "WARNING", "http.validation",
+        f"422 Unprocessable Entity {request.method} {path}",
+        {"path": path, "method": request.method, "errors": errors[:10]},
+    )
+    return JSONResponse(
+        status_code=422,
+        content={"detail": errors},
+    )
+
+
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception):
+    """Catch-all for any exception not handled above — a true safety net.
+    Logged as ERROR with a truncated traceback so it appears in system_logs
+    and server output."""
     tb = traceback.format_exc()
-    _logger.error("Unhandled exception on %s %s: %s", request.method, request.url.path, exc)
+    path = request.url.path
+    _logger.error("Unhandled %s on %s %s: %s", type(exc).__name__, request.method, path, exc)
     _logger.error(tb)
-    try:
-        from memolink_backend.core.db import get_db
-        from memolink_backend.domain.repositories.system_log_repository import SystemLogRepository
-        db = next(get_db())
-        SystemLogRepository(db).create(
-            "ERROR", "app.unhandled",
-            f"{request.method} {request.url.path} — {type(exc).__name__}: {exc}",
-            {"traceback": tb[-2000:], "path": str(request.url.path), "method": request.method},
-        )
-    except Exception:
-        pass
+    _try_write_system_log(
+        "ERROR", "app.unhandled",
+        f"Unhandled {type(exc).__name__} on {request.method} {path}: {exc}",
+        {"exception": type(exc).__name__, "path": path, "method": request.method, "traceback": tb[-2000:]},
+    )
     return JSONResponse(
         status_code=500,
         content={"detail": f"Internal server error: {type(exc).__name__}: {exc}"},
