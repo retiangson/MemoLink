@@ -20,9 +20,11 @@ export function UploadNotes({ setNotes, workspaceId, onUploaded }: Props) {
     setFailures([]);
 
     // Pre-flight health check — distinguishes "backend unreachable" from
-    // "upload rejected". Runs before sending any file bytes.
+    // "upload rejected". API_BASE includes /api so strip it to reach /health.
     try {
-      await fetch(`${API_BASE}/health`, { method: "GET", signal: AbortSignal.timeout(8000) });
+      const rootBase = API_BASE.replace(/\/api\/?$/, "");
+      const res = await fetch(`${rootBase}/health`, { method: "GET", signal: AbortSignal.timeout(8000) });
+      if (!res.ok && res.status !== 404) throw new Error(`Health check returned ${res.status}`);
     } catch (healthErr) {
       console.error("[UploadNotes] health check failed:", healthErr);
       setStatus("Upload failed: cannot reach the server. Check your connection or try again.");

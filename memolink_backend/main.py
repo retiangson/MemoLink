@@ -250,6 +250,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
 
 
 @app.get("/health", tags=["system"])
+@app.get("/api/health", tags=["system"])
 def health():
     return {"status": "ok", "service": "MemoLink API", "version": "2.1.0"}
 
