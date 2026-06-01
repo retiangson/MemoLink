@@ -501,7 +501,10 @@ def transcribe_audio(file_bytes: bytes, filename: str, ext: str, language: str |
         from openai import OpenAI
         client = OpenAI(api_key=settings.openai_api_key)
         mime = _WHISPER_MIME.get(ext, "audio/mpeg")
-        kwargs: dict = dict(model="whisper-1", file=(filename, file_bytes, mime))
+        # Whisper's server-side format detection splits on spaces, so a filename
+        # like "my recording.m4a" is seen as "my" with no extension → 400 error.
+        safe_filename = filename.replace(" ", "_")
+        kwargs: dict = dict(model="whisper-1", file=(safe_filename, file_bytes, mime))
         if language:
             kwargs["language"] = language
         transcript = client.audio.transcriptions.create(**kwargs)
