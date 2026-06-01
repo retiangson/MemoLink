@@ -1,5 +1,6 @@
 import uuid
 import boto3
+from botocore.config import Config
 from botocore.exceptions import ClientError
 from typing import List, Optional
 
@@ -22,7 +23,13 @@ _200_MB = 200 * 1024 * 1024
 # caching is intentionally avoided.
 
 def _s3():
-    kwargs = {"region_name": settings.aws_region}
+    kwargs = {
+        "region_name": settings.aws_region,
+        "config": Config(
+            signature_version="s3v4",
+            s3={"addressing_style": "virtual"},  # bucket.s3.region.amazonaws.com
+        ),
+    }
     if settings.aws_access_key_id and settings.aws_secret_access_key:
         kwargs["aws_access_key_id"] = settings.aws_access_key_id
         kwargs["aws_secret_access_key"] = settings.aws_secret_access_key
@@ -74,12 +81,15 @@ def presign_upload(
     key = f"uploads/{current_user_id}/{uuid.uuid4().hex}/{body.filename}"
 
     try:
+        # ContentType is intentionally omitted from Params — including it makes
+        # S3 require the exact same header in the PUT, which browsers report
+        # inconsistently (especially for audio/video files). Without it S3
+        # accepts any content type, which is fine for private upload buckets.
         url = _s3().generate_presigned_url(
             "put_object",
             Params={
                 "Bucket": settings.s3_upload_bucket,
                 "Key": key,
-                "ContentType": body.content_type,
             },
             ExpiresIn=3600,
         )
@@ -96,11 +106,13 @@ def presign_upload(
         raise HTTPException(status_code=500, detail=f"Could not generate upload URL: {exc}")
 
     size_mb = round(body.size_bytes / 1024 / 1024, 2)
+    from urllib.parse import urlparse
+    url_host = urlparse(url).netloc
     try:
         c.logs().info(
             "s3.presign",
             f"Presigned S3 URL generated for '{body.filename}' ({size_mb} MB)",
-            {"filename": body.filename, "size_mb": size_mb, "key": key},
+            {"filename": body.filename, "size_mb": size_mb, "key": key, "s3_host": url_host},
             current_user_id,
         )
     except Exception:
