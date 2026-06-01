@@ -577,6 +577,12 @@
           <td><span class="req-priority p-med">Medium</span></td>
           <td><span class="req-cat c-func">AI/Chat</span></td>
         </tr>
+        <tr>
+          <td class="req-id">FR-71</td>
+          <td class="req-text">The system must support direct-to-S3 file uploads to bypass AWS Lambda's 6 MB payload limit. When <code>S3_UPLOAD_BUCKET</code> is configured, the upload flow must be: (1) client requests a pre-signed S3 PUT URL from <code>POST /api/upload/presign</code>; (2) client uploads file bytes directly to S3 using the pre-signed URL — Lambda is not in the upload path; (3) client calls <code>POST /api/upload/process</code> with the S3 key; (4) Lambda downloads, processes, and creates the note, then deletes the S3 object. Files up to 200 MB must be supported. The pre-signed URL must expire in 3600 seconds. The <code>AWS_ACCESS_KEY_ID</code> and <code>AWS_SECRET_ACCESS_KEY</code> env vars are optional — on Lambda the execution role's credentials are used automatically.</td>
+          <td><span class="req-priority p-high">High</span></td>
+          <td><span class="req-cat c-func">Files</span></td>
+        </tr>
       </tbody>
     </table>
   </section>

@@ -1,5 +1,5 @@
 import React, { useState, useRef } from "react";
-import { uploadNotes } from "../api/chatApi";
+import { presignUpload, uploadToS3, processFromS3 } from "../api/chatApi";
 import { API_BASE } from "../api/client";
 
 interface Props {
@@ -30,39 +30,85 @@ export function UploadNotes({ setNotes, workspaceId, onUploaded }: Props) {
       return;
     }
 
-    // AWS Lambda Function URL hard limit is 6 MB per request.
-    // Reject files that would exceed this before sending any bytes.
-    const LAMBDA_LIMIT_MB = 5;
-    const oversized = files.filter(f => f.size > LAMBDA_LIMIT_MB * 1024 * 1024);
-    if (oversized.length > 0) {
-      const names = oversized.map(f => `${f.name} (${(f.size / 1024 / 1024).toFixed(1)} MB)`).join(", ");
-      setStatus(`Upload failed: ${oversized.length} file(s) exceed the ${LAMBDA_LIMIT_MB} MB server limit — ${names}. Split large files or use a smaller export.`);
-      setLoading(false);
-      return;
-    }
+    // S3 pre-signed upload — supports files up to 200 MB.
+    const keys: string[] = [];
+    const uploadFailed: { filename: string; reason: string }[] = [];
 
-    setStatus("Processing...");
     try {
-      const result = await uploadNotes(files, workspaceId);
+      for (const file of files) {
+        // 1. Get a pre-signed PUT URL from the backend
+        let presign: { url: string; key: string };
+        try {
+          presign = await presignUpload(
+            file.name,
+            file.type || "application/octet-stream",
+            file.size,
+          );
+        } catch (err: unknown) {
+          const e = err as { response?: { status?: number; data?: { detail?: string } }; message?: string };
+          const httpStatus = e?.response?.status;
+          const detail = e?.response?.data?.detail ?? e?.message ?? "Unknown error";
+          console.error("[UploadNotes] presign error:", err);
+          if (httpStatus === 422) {
+            setStatus(`Upload failed: ${detail}`);
+          } else if (httpStatus === 503) {
+            setStatus("Upload failed: S3 upload is not configured on this server.");
+          } else if (httpStatus === 401 || httpStatus === 403) {
+            setStatus("Upload failed: authentication error. Please sign in again.");
+          } else if (httpStatus) {
+            setStatus(`Upload failed (HTTP ${httpStatus}): ${detail}`);
+          } else if (e?.message?.toLowerCase().includes("network")) {
+            setStatus("Upload failed: Network Error — the connection was interrupted. Check your connection and try again.");
+          } else {
+            setStatus(`Upload failed: ${detail}`);
+          }
+          setLoading(false);
+          return;
+        }
+
+        // 2. Upload file bytes directly to S3 (bypasses Lambda entirely)
+        try {
+          await uploadToS3(presign.url, file, (pct) => {
+            setStatus(`Uploading ${file.name}… (${pct}%)`);
+          });
+          keys.push(presign.key);
+        } catch (err: unknown) {
+          const e = err as { message?: string };
+          console.error("[UploadNotes] S3 upload error:", err);
+          uploadFailed.push({ filename: file.name, reason: e?.message ?? "Upload to S3 failed" });
+        }
+      }
+
+      // If all files failed during S3 upload, bail early
+      if (keys.length === 0) {
+        setStatus(`Upload failed: no files could be sent to storage.`);
+        setFailures(uploadFailed);
+        setLoading(false);
+        return;
+      }
+
+      // 3. Tell the backend to download from S3, extract text, and create notes
+      setStatus(`Processing ${keys.length} file(s)…`);
+      const result = await processFromS3(keys, workspaceId);
       const notes = result.notes ?? [];
-      const failed = result.failed ?? [];
+      const failed = [...uploadFailed, ...(result.failed ?? [])];
       setStatus(`${notes.length} note(s) imported${failed.length ? `, ${failed.length} failed` : ""}.`);
       setFailures(failed);
       if (setNotes && notes.length) setNotes((prev) => [...notes, ...prev]);
       if (onUploaded && notes.length) onUploaded(notes);
     } catch (err: unknown) {
       const e = err as { response?: { status?: number; data?: { detail?: string } }; message?: string };
-      const status = e?.response?.status;
+      const httpStatus = e?.response?.status;
       const detail = e?.response?.data?.detail ?? e?.message ?? "Unknown error";
-      console.error("[UploadNotes] upload error:", err);
-      if (status === 413) {
+      console.error("[UploadNotes] process error:", err);
+      if (httpStatus === 413) {
         setStatus("Upload failed: file too large for the server. Contact your admin.");
-      } else if (status === 401 || status === 403) {
+      } else if (httpStatus === 401 || httpStatus === 403) {
         setStatus("Upload failed: authentication error. Please sign in again.");
-      } else if (status === 422) {
+      } else if (httpStatus === 422) {
         setStatus(`Upload failed: ${detail}`);
-      } else if (status) {
-        setStatus(`Upload failed (HTTP ${status}): ${detail}`);
+      } else if (httpStatus) {
+        setStatus(`Upload failed (HTTP ${httpStatus}): ${detail}`);
       } else if (e?.message?.toLowerCase().includes("network")) {
         setStatus("Upload failed: Network Error — the connection was interrupted mid-upload. For large files, try a faster connection. If the problem persists, contact your admin to check server logs.");
       } else {
@@ -91,7 +137,7 @@ export function UploadNotes({ setNotes, workspaceId, onUploaded }: Props) {
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
           </svg>
-          Importing notes…
+          {status || "Importing notes…"}
         </div>
       )}
       {!loading && status && (
