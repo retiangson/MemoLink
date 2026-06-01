@@ -16,6 +16,39 @@ function modelLabel(id?: string): string {
   return MODELS.find((m) => m.id === id)?.label ?? id;
 }
 
+const NOTE_LINK_RE = /\[\[NOTE_LINK:(\d+):([^\]]+)\]\]/g;
+
+/** Render content splitting [[NOTE_LINK:id:title]] into clickable buttons. */
+function ContentWithNoteLinks({ content, onOpenNote }: { content: string; onOpenNote?: (id: number) => void }) {
+  const segments: React.ReactNode[] = [];
+  let last = 0;
+  let m: RegExpExecArray | null;
+  NOTE_LINK_RE.lastIndex = 0;
+  while ((m = NOTE_LINK_RE.exec(content)) !== null) {
+    if (m.index > last) segments.push(<MarkdownRenderer key={last}>{content.slice(last, m.index)}</MarkdownRenderer>);
+    const noteId = parseInt(m[1]);
+    const noteTitle = m[2];
+    segments.push(
+      <button
+        key={m.index}
+        onClick={() => onOpenNote?.(noteId)}
+        className="inline-flex items-center gap-2 my-2 px-4 py-2 rounded-xl bg-indigo-600/20 border border-indigo-500/30 text-indigo-300 text-sm font-medium hover:bg-indigo-600/40 hover:text-indigo-100 transition"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 shrink-0" fill="currentColor" viewBox="0 0 16 16">
+          <path d="M5 0h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h2zm-1 1H3a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H6v2.5a.5.5 0 0 1-.5.5h-2A.5.5 0 0 1 3 4.5V1.5A.5.5 0 0 1 3.5 1H4z"/>
+        </svg>
+        Open Note: {noteTitle}
+        <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+        </svg>
+      </button>
+    );
+    last = m.index + m[0].length;
+  }
+  if (last < content.length) segments.push(<MarkdownRenderer key={last}>{content.slice(last)}</MarkdownRenderer>);
+  return segments.length > 0 ? <>{segments}</> : <MarkdownRenderer>{content}</MarkdownRenderer>;
+}
+
 interface Props {
   role: "user" | "assistant";
   content: string;
@@ -24,6 +57,7 @@ interface Props {
   onAdd?: (text: string) => void;
   onDelete?: () => void;
   onApplyEdit?: (content: string, noteId: number | null) => void;
+  onOpenNote?: (noteId: number) => void;
   hasOpenNote?: boolean;
   translationEnabled?: boolean;
   modelAttributionEnabled?: boolean;
@@ -75,7 +109,7 @@ function ImageGeneratingSpinner() {
   );
 }
 
-export default function ChatBubble({ role, content, model, streaming, onAdd, onDelete, onApplyEdit, hasOpenNote, translationEnabled = true, modelAttributionEnabled = true }: Props) {
+export default function ChatBubble({ role, content, model, streaming, onAdd, onDelete, onApplyEdit, onOpenNote, hasOpenNote, translationEnabled = true, modelAttributionEnabled = true }: Props) {
   const isUser = role === "user";
   const [copied, setCopied] = useState(false);
   const [showLangPicker, setShowLangPicker] = useState(false);
@@ -84,11 +118,14 @@ export default function ChatBubble({ role, content, model, streaming, onAdd, onD
   const [translatedTo, setTranslatedTo] = useState("");
   const [translationAccuracy, setTranslationAccuracy] = useState<number | null>(null);
   const [translationModel, setTranslationModel] = useState<string | undefined>(undefined);
+  const [translationCached, setTranslationCached] = useState(false);
   const [editApplied, setEditApplied] = useState(false);
   const [editPreviewOpen, setEditPreviewOpen] = useState(false);
 
   const isImageGenerating = content === "__IMAGE_GENERATING__";
-  const { pre, edit, noteId, post } = isImageGenerating ? { pre: "", edit: null, noteId: null, post: "" } : parseNoteEdit(content);
+  const isImprovingNote = content.startsWith("__IMPROVING_NOTE__:");
+  const improvingNoteTitle = isImprovingNote ? content.slice("__IMPROVING_NOTE__:".length) : "";
+  const { pre, edit, noteId, post } = (isImageGenerating || isImprovingNote) ? { pre: "", edit: null, noteId: null, post: "" } : parseNoteEdit(content);
 
   async function handleCopy() {
     const textToCopy = translation ?? content;
@@ -103,18 +140,22 @@ export default function ChatBubble({ role, content, model, streaming, onAdd, onD
     setTimeout(() => setCopied(false), 1500);
   }
 
-  async function handleTranslate(lang: string) {
+  async function handleTranslate(lang: string, force = false) {
     setShowLangPicker(false);
     setIsTranslating(true);
-    setTranslation(null);
-    setTranslationAccuracy(null);
-    setTranslationModel(undefined);
+    if (!force) {
+      setTranslation(null);
+      setTranslationAccuracy(null);
+      setTranslationModel(undefined);
+      setTranslationCached(false);
+    }
     try {
-      const { translation: result, accuracy, model: txModel } = await translateText(content, lang);
+      const { translation: result, accuracy, model: txModel, cached } = await translateText(content, lang, force);
       setTranslation(result);
       setTranslatedTo(lang);
       setTranslationAccuracy(accuracy);
       setTranslationModel(txModel);
+      setTranslationCached(cached);
     } catch (err: any) {
       const msg = err?.response?.data?.detail ?? err?.message ?? "Unknown error";
       setTranslation(`Translation failed: ${msg}`);
@@ -173,13 +214,23 @@ export default function ChatBubble({ role, content, model, streaming, onAdd, onD
         className={`max-w-[740px] px-5 py-4 rounded-2xl text-[16px] leading-relaxed backdrop-blur-sm shadow-sm
           ${isUser ? "bg-[#2F2F3F]/80 text-gray-100" : "text-white"}`}
       >
-        {isImageGenerating ? (
+        {isImprovingNote ? (
+          <div className="flex items-center gap-3 py-1">
+            <div className="relative w-6 h-6 shrink-0">
+              <div className="absolute inset-0 rounded-full border-[2.5px] border-indigo-500/20 border-t-indigo-400 animate-spin" />
+              <div className="absolute inset-[3px] rounded-full border-2 border-purple-500/20 border-t-purple-400 animate-[spin_1.4s_linear_infinite_reverse]" />
+            </div>
+            <span className="text-sm text-indigo-300/80 animate-pulse">
+              Improving <span className="font-medium text-indigo-300">{improvingNoteTitle}</span>…
+            </span>
+          </div>
+        ) : isImageGenerating ? (
           <ImageGeneratingSpinner />
         ) : (
           <>
             {pre && (
               <span>
-                <MarkdownRenderer>{pre}</MarkdownRenderer>
+                <ContentWithNoteLinks content={pre} onOpenNote={onOpenNote} />
                 {streaming && (
                   <span className="inline-block w-[2px] h-[1em] bg-indigo-400 ml-0.5 align-middle animate-[blink_0.8s_step-end_infinite]" />
                 )}
@@ -255,18 +306,58 @@ export default function ChatBubble({ role, content, model, streaming, onAdd, onD
           </div>
         )}
 
-        {post && <div className="mt-3"><MarkdownRenderer>{post}</MarkdownRenderer></div>}
+        {post && <div className="mt-3"><ContentWithNoteLinks content={post} onOpenNote={onOpenNote} /></div>}
       </div>
 
-      {/* Translation bubble — same style as the original message */}
+      {/* Loading bubble — shown while waiting for first translation */}
+      {isTranslating && !translation && (
+        <div className={`max-w-[740px] px-5 py-4 rounded-2xl backdrop-blur-sm shadow-sm flex items-center gap-3
+          ${isUser ? "bg-[#2F2F3F]/80 text-gray-400" : "text-gray-400"}`}>
+          <svg className="w-4 h-4 animate-spin shrink-0 text-indigo-400" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+          </svg>
+          <span className="text-sm text-indigo-400/80">Translating to {translatedTo}…</span>
+        </div>
+      )}
+
+      {/* Translation bubble */}
       {translation && (
         <div
           className={`max-w-[740px] px-5 py-4 rounded-2xl text-[16px] leading-relaxed backdrop-blur-sm shadow-sm
             ${isUser ? "bg-[#2F2F3F]/80 text-gray-100" : "text-white"}`}
         >
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[11px] text-indigo-400 uppercase tracking-wider font-medium">{translatedTo}</span>
-            <button onClick={() => setTranslation(null)} className="text-gray-600 hover:text-gray-400 text-xs leading-none">✕</button>
+          <div className="flex items-center justify-between mb-2.5">
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] text-indigo-400 uppercase tracking-wider font-medium">{translatedTo}</span>
+              {translationCached && !isTranslating && (
+                <span className="px-1.5 py-0.5 rounded text-[9px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 uppercase tracking-wide">Cached</span>
+              )}
+              {isTranslating && (
+                <span className="flex items-center gap-1 text-[10px] text-indigo-400/70">
+                  <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                  </svg>
+                  Re-translating…
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              {!isTranslating && (
+                <button
+                  onClick={() => handleTranslate(translatedTo, true)}
+                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-indigo-600/20 text-indigo-300 border border-indigo-500/30 hover:bg-indigo-600/40 hover:text-indigo-200 transition"
+                  title="Re-translate and update cache"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  Re-translate
+                </button>
+              )}
+              <button onClick={() => setTranslation(null)} className="text-gray-600 hover:text-gray-400 text-xs leading-none px-1">✕</button>
+            </div>
           </div>
           <MarkdownRenderer>{translation}</MarkdownRenderer>
           {(translationModel || translationAccuracy !== null) && (

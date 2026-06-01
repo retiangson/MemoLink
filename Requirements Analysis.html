@@ -535,6 +535,48 @@
           <td><span class="req-priority p-high">High</span></td>
           <td><span class="req-cat c-func">Auth</span></td>
         </tr>
+        <tr>
+          <td class="req-id">FR-64</td>
+          <td class="req-text">The system must maintain a <code>system_logs</code> database table that records INFO, WARNING, and ERROR events from all major operations. Every log entry must include: timestamp (UTC), level, source module, human-readable message, optional JSONB details, and optional user_id. The <code>SystemLogService</code> must expose <code>.info()</code>, <code>.warning()</code>, and <code>.error()</code> convenience methods used throughout the application. Log entries must be written for: login success and failure, user registration, transcription events (service used, file size), bulk upload events, translation events, and chat model fallback events.</td>
+          <td><span class="req-priority p-high">High</span></td>
+          <td><span class="req-cat c-func">Admin</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">FR-65</td>
+          <td class="req-text">Admins must be able to view system logs via a System Logs tab in the Admin Panel. The tab must support: filtering by level (INFO / WARNING / ERROR), filtering by source text (substring match), paginated display (50 entries per page), expandable JSON details for entries with a non-null <code>details</code> field, a manual refresh button, and a clear-all button that deletes all log entries. Non-admin users must not have access. Backend endpoints: <code>GET /api/admin/logs</code> (filterable, paginated) and <code>DELETE /api/admin/logs/clear</code> (returns count of deleted rows). Both endpoints must return HTTP 403 for non-admins.</td>
+          <td><span class="req-priority p-high">High</span></td>
+          <td><span class="req-cat c-func">Admin</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">FR-66</td>
+          <td class="req-text">The audio/video transcription upload limit must be raised from 25 MB to <strong>200 MB</strong>. Files ≤25 MB must be transcribed via OpenAI Whisper. Files &gt;25 MB must automatically fall back to <strong>Deepgram Nova-2</strong>, configured via the <code>DEEPGRAM_API_KEY</code> environment variable (free $200 credit at deepgram.com, no credit card required). The transcription routing must be implemented in <code>file_extractor.py</code> <code>transcribe_audio()</code> and must be transparent to controllers — they receive the transcript regardless of which service was used. If no <code>DEEPGRAM_API_KEY</code> is configured and the file exceeds 25 MB, the system must return HTTP 422 with a descriptive error message. Each transcription event (service used, file size, success/failure) must be written to <code>system_logs</code>.</td>
+          <td><span class="req-priority p-high">High</span></td>
+          <td><span class="req-cat c-func">Video</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">FR-67</td>
+          <td class="req-text">Successful translation results must be cached in the <code>translation_cache</code> table for all target languages regardless of accuracy score. The cache key must be the SHA-256 hash of <code>{source_text}::{target_language.lower()}</code>. On subsequent translate requests for the same text and language, the cached result must be returned immediately with <code>cached: true</code> in the response, without calling any LLM. The <code>POST /translate</code> endpoint must accept a <code>force: bool</code> field (default <code>false</code>); when <code>true</code>, the full LLM translation pipeline must run and the cache entry must be updated (upserted) with the fresh result. Cache hits must increment a <code>hit_count</code> counter on the cache entry. The <code>TranslationCacheRepository</code> must implement <code>find()</code>, <code>upsert()</code>, and <code>increment_hits()</code> methods.</td>
+          <td><span class="req-priority p-high">High</span></td>
+          <td><span class="req-cat c-func">Translation</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">FR-68</td>
+          <td class="req-text">The translation UI must display a green "Cached" badge when the result is served from cache. A "Re-translate" button (indigo pill with refresh icon) must be shown to allow the user to force a fresh LLM translation. A spinning loading indicator must appear while translation is in progress (both initial request and forced re-translate). The "Re-translate" button must be hidden and replaced by a spinner during active translation. The loading state must also display contextual text such as "Translating to [Language]…".</td>
+          <td><span class="req-priority p-high">High</span></td>
+          <td><span class="req-cat c-func">Translation</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">FR-69</td>
+          <td class="req-text">When the selected chat model fails for any reason (rate limit, API error, network error, invalid key), the system must automatically try the next available model in the fallback chain: primary model → GPT-4o-mini (always available) → Gemini 2.0 Flash (if <code>GEMINI_API_KEY</code> is set) → DeepSeek Chat (if <code>DEEPSEEK_API_KEY</code> is set). The fallback chain must be built by <code>_build_fallback_chain(primary)</code> and applied to both <code>ask()</code> and <code>ask_stream()</code> methods in ChatService. Each failed attempt must be logged to <code>system_logs</code> as WARNING. Only after all configured models are exhausted must an error message be shown to the user: "⚠ All available AI models are currently unavailable. Please try again later." The same fallback chain must apply to note improvement AI calls.</td>
+          <td><span class="req-priority p-high">High</span></td>
+          <td><span class="req-cat c-func">AI/Chat</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">FR-70</td>
+          <td class="req-text">The chat interface must detect note improvement intent from natural language prompts matching patterns such as "improve my note X", "reformat note X", "clean up my note X", "polish note X", "rewrite note X" — detected via the <code>_IMPROVE_NOTE_RE</code> regex in ChatService. On detection, the system must: (1) close the note's editor tab if currently open via a <code>close_note</code> SSE event; (2) show an animated dual-ring spinner in the chat with "Improving [title]…" via an <code>improving_note</code> SSE event; (3) find the note by fuzzy title match (exact → starts-with → contains → name-in-title); (4) call the AI to improve the HTML content using the fallback chain; (5) auto-save the improved content to the database; (6) stream a success response via a <code>replace</code> SSE event containing a clickable "Open Note: X →" button rendered from the <code>[[NOTE_LINK:id:title]]</code> marker. No user confirmation is required before saving. The <code>onCloseNote</code> and <code>onOpenNote</code> callbacks must be wired from the chat hook through to the message renderer.</td>
+          <td><span class="req-priority p-med">Medium</span></td>
+          <td><span class="req-cat c-func">AI/Chat</span></td>
+        </tr>
       </tbody>
     </table>
   </section>

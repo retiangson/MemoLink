@@ -453,21 +453,57 @@ def extract_formatted_html(file_bytes: bytes, filename: str) -> str:
     return _plain_to_html(text)
 
 
+_DEEPGRAM_MIME: dict[str, str] = {
+    "mp3": "audio/mpeg", "mp4": "video/mp4", "m4a": "audio/mp4",
+    "wav": "audio/wav", "webm": "audio/webm", "ogg": "audio/ogg",
+    "flac": "audio/flac", "mpeg": "audio/mpeg", "mpga": "audio/mpeg",
+    "mov": "video/quicktime", "avi": "video/x-msvideo",
+}
+
+
+def _transcribe_deepgram(file_bytes: bytes, filename: str, ext: str, language: str | None = None) -> str:
+    import httpx
+    from memolink_backend.core.config import settings
+
+    content_type = _DEEPGRAM_MIME.get(ext.lstrip("."), "audio/mpeg")
+    params: dict = {"model": "nova-2", "smart_format": "true"}
+    if language:
+        params["language"] = language
+
+    resp = httpx.post(
+        "https://api.deepgram.com/v1/listen",
+        params=params,
+        content=file_bytes,
+        headers={
+            "Authorization": f"Token {settings.deepgram_api_key}",
+            "Content-Type": content_type,
+        },
+        timeout=300.0,
+    )
+    resp.raise_for_status()
+    data = resp.json()
+    return data["results"]["channels"][0]["alternatives"][0]["transcript"]
+
+
 def transcribe_audio(file_bytes: bytes, filename: str, ext: str, language: str | None = None) -> str:
+    """Transcribe audio. Uses Whisper for files ≤25 MB, Deepgram for larger files (if key is set)."""
+    from memolink_backend.core.config import settings
+
+    if len(file_bytes) > _WHISPER_LIMIT:
+        if not settings.deepgram_api_key:
+            return "[Transcription skipped] File exceeds the 25 MB Whisper limit and no Deepgram key is configured."
+        try:
+            return _transcribe_deepgram(file_bytes, filename, ext, language)
+        except Exception as e:
+            return f"[Transcription error] Deepgram failed: {e}"
+
     try:
-        if len(file_bytes) > _WHISPER_LIMIT:
-            return f"[Transcription skipped] File exceeds the 25 MB Whisper limit."
-
         from openai import OpenAI
-        from memolink_backend.core.config import settings
-
         client = OpenAI(api_key=settings.openai_api_key)
         mime = _WHISPER_MIME.get(ext, "audio/mpeg")
-
         kwargs: dict = dict(model="whisper-1", file=(filename, file_bytes, mime))
         if language:
             kwargs["language"] = language
-
         transcript = client.audio.transcriptions.create(**kwargs)
         return transcript.text
     except Exception as e:

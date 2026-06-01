@@ -292,7 +292,7 @@
       <div class="card">
         <div class="card-icon">&#x1F3AC;</div>
         <h3>Video Import</h3>
-        <p>YouTube URL tab fetches captions via <code>youtube-transcript-api</code>. Upload File tab accepts MP4/M4A/WebM/MP3/WAV/MOV up to 25 MB and transcribes via OpenAI Whisper.</p>
+        <p>YouTube URL tab fetches captions via <code>youtube-transcript-api</code>. Upload File tab accepts MP4/M4A/WebM/MP3/WAV/MOV up to 200 MB — files ≤25 MB use OpenAI Whisper, larger files automatically fall back to Deepgram Nova-2.</p>
       </div>
       <div class="card">
         <div class="card-icon">&#x1F5C2;&#xFE0F;</div>
@@ -307,12 +307,12 @@
       <div class="card">
         <div class="card-icon">&#x1F310;</div>
         <h3>Multi-Language Translation</h3>
-        <p>Translation uses a Gemini 2.0 Flash Lite quality loop: initial translation → back-translate → GPT scores similarity (0–100) → up to 3 refinement rounds if score &lt; 85. The chat bubble shows the model name and accuracy score, colour-coded green/amber/red.</p>
+        <p>Translation uses a Gemini 2.0 Flash Lite quality loop: initial translation → back-translate → GPT scores similarity (0–100) → up to 3 refinement rounds if score &lt; 85. Results are cached in the <code>translation_cache</code> table; a green "Cached" badge shows when a cached result is returned. A "Re-translate" button forces a fresh LLM call. The chat bubble shows the model name and accuracy score, colour-coded green/amber/red.</p>
       </div>
       <div class="card">
         <div class="card-icon">&#x1F916;</div>
         <h3>Model Selection</h3>
-        <p>The Settings modal lets users choose their chat model across three providers — <strong>OpenAI</strong> (GPT-4o, GPT-4o Mini, GPT-4 Turbo, GPT-3.5 Turbo), <strong>Google Gemini</strong> (2.0 Flash, 2.0 Flash Lite, 1.5 Flash 8B, 1.5 Pro), and <strong>DeepSeek</strong> (DeepSeek V3, R1, Coder). Every AI reply shows a "replied by [Model]" attribution badge.</p>
+        <p>The Settings modal lets users choose their chat model across three providers — <strong>OpenAI</strong> (GPT-4o, GPT-4o Mini, GPT-4 Turbo, GPT-3.5 Turbo), <strong>Google Gemini</strong> (2.0 Flash, 2.0 Flash Lite, 1.5 Flash 8B, 1.5 Pro), and <strong>DeepSeek</strong> (DeepSeek V3, R1, Coder). Every AI reply shows a "replied by [Model]" attribution badge. If a model fails, the system automatically tries the next available model in the fallback chain: primary → GPT-4o-mini → Gemini 2.0 Flash → DeepSeek Chat.</p>
       </div>
       <div class="card">
         <div class="card-icon">&#x1F50E;</div>
@@ -337,7 +337,7 @@
       <div class="card">
         <div class="card-icon">&#x1F6E1;&#xFE0F;</div>
         <h3>Admin Panel</h3>
-        <p>Full-screen overlay accessible from the user menu (admin only). Three tabs: <strong>Feedback</strong> (view and manage bug reports/suggestions), <strong>Feature Flags</strong> (toggle features, set default model/language, configure per-feature minimum access levels via Regular/Plus/Pro tabs), and <strong>Users</strong> (promote/demote admin status, change access level). The first registered user is auto-promoted to admin on startup.</p>
+        <p>Full-screen overlay accessible from the user menu (admin only). Four tabs: <strong>Feedback</strong> (view and manage bug reports/suggestions), <strong>Feature Flags</strong> (toggle features, set default model/language, configure per-feature minimum access levels via Regular/Plus/Pro tabs), <strong>Users</strong> (promote/demote admin status, change access level), and <strong>System Logs</strong> (view INFO/WARNING/ERROR events with level badges, source filter, expandable JSON details, pagination, and clear-all). The first registered user is auto-promoted to admin on startup.</p>
       </div>
       <div class="card">
         <div class="card-icon">&#x1F3F3;&#xFE0F;</div>
@@ -358,6 +358,31 @@
         <div class="card-icon">&#x1F41B;</div>
         <h3>Bug Reports &amp; Suggestions</h3>
         <p>Users submit bug reports or feature suggestions via <strong>Help &rarr; Report Bug / Suggestion</strong>. Reports are stored in the <code>feedback</code> table with a status lifecycle (<code>open</code> &rarr; <code>read</code> &rarr; <code>resolved</code>). An optional SMTP notification is sent to the admin on new submissions. Admins filter and manage feedback in the Admin Panel.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">&#x1F4CB;</div>
+        <h3>System Logs</h3>
+        <p>All major operations — auth, transcription, translation, uploads, chat fallbacks — write structured events to the <code>system_logs</code> table (INFO / WARNING / ERROR). The <code>SystemLogService</code> provides <code>.info()</code>, <code>.warning()</code>, and <code>.error()</code> methods. Admins view, filter, paginate, and clear logs from the fourth tab of the Admin Panel.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">&#x1F399;&#xFE0F;</div>
+        <h3>Deepgram Transcription Fallback</h3>
+        <p>Upload limit raised to 200 MB. Files ≤25 MB are transcribed by OpenAI Whisper. Files &gt;25 MB automatically fall back to <strong>Deepgram Nova-2</strong> via <code>DEEPGRAM_API_KEY</code> (free $200 credit, no credit card). The fallback is transparent to users; each event is logged to <code>system_logs</code>.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">&#x26A1;</div>
+        <h3>Translation Cache</h3>
+        <p>Successful translations are stored in the <code>translation_cache</code> table keyed by SHA-256 hash of <code>{text}::{language}</code>. Repeated requests are served instantly with <code>cached: true</code>. A <code>force</code> field bypasses the cache for fresh LLM translation. A <code>hit_count</code> counter tracks reuse. The UI shows a green "Cached" badge and a "Re-translate" pill.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">&#x1F517;</div>
+        <h3>Chat Fallback Chain</h3>
+        <p>When the selected model fails for any reason (rate limit, API error, bad key), the system automatically tries the next model: primary → GPT-4o-mini → Gemini 2.0 Flash → DeepSeek Chat. Each failure is logged as a WARNING. Only after all configured models are exhausted does the user see an error message.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">&#x2728;</div>
+        <h3>Note Improvement via Chat</h3>
+        <p>Natural-language triggers ("improve my note X", "clean up note X", "polish note X") detected by <code>_IMPROVE_NOTE_RE</code> regex. MemoLink closes the note's editor tab, shows a dual-ring spinner, fuzzy-matches the note title, calls AI to improve the HTML content, auto-saves to DB, and streams back a clickable "Open Note: X →" button.</p>
       </div>
     </div>
   </section>
@@ -554,7 +579,9 @@
            <strong>feature_flags table</strong> — feature toggles + *_min_level flags seeded on startup<br/>
            <strong>feedback table</strong> — bug reports and suggestions with status lifecycle<br/>
            <strong>users.is_admin</strong> — boolean column; first user auto-promoted<br/>
-           <strong>users.access_level</strong> — VARCHAR ('regular'|'plus'|'pro'); default 'regular'</p>
+           <strong>users.access_level</strong> — VARCHAR ('regular'|'plus'|'pro'); default 'regular'<br/>
+           <strong>system_logs table</strong> — structured event log for INFO/WARNING/ERROR events<br/>
+           <strong>translation_cache table</strong> — SHA-256-keyed translation result cache with hit_count</p>
       </div>
       <div class="card">
         <h3>AI &amp; Media</h3>
@@ -563,7 +590,8 @@
            <strong>DeepSeek V3 / R1 / Coder</strong> — code-focused alternative chat models<br/>
            <strong>DALL-E 3</strong> — AI image generation (1024&times;1024, base64)<br/>
            <strong>text-embedding-3-small</strong> — vector embeddings<br/>
-           <strong>OpenAI Whisper</strong> — audio/video transcription<br/>
+           <strong>OpenAI Whisper</strong> — audio/video transcription (≤25 MB)<br/>
+           <strong>Deepgram Nova-2</strong> — audio/video transcription fallback (&gt;25 MB)<br/>
            <strong>youtube-transcript-api</strong> — YouTube caption extraction<br/>
            <strong>Brave Search API</strong> — optional per-message web context<br/>
            <strong>RAG pattern</strong> — grounded retrieval<br/>
@@ -594,7 +622,7 @@
       <p style="color:var(--text);font-size:.92rem;margin-bottom:.2rem;">
         <strong>Prerequisites:</strong> Docker Desktop installed; <code>.env</code> file populated from <code>.env.example</code>.
       </p>
-      <pre>cp .env.example .env        # fill in OPENAI_API_KEY, DATABASE_URL
+      <pre>cp .env.example .env        # fill in OPENAI_API_KEY, DATABASE_URL, DEEPGRAM_API_KEY (optional, for >25 MB files)
 docker compose up --build   # builds and starts backend + frontend</pre>
       <p style="margin-top:.9rem;font-size:.88rem;">
         The backend container runs on port 8000 behind the nginx reverse proxy.

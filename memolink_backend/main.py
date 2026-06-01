@@ -26,6 +26,7 @@ from memolink_backend.api.v1 import (
     admin_controller,
     features_controller,
     research_controller,
+    logs_controller,
 )
 
 # Register all models so SQLAlchemy sees them
@@ -36,6 +37,8 @@ import memolink_backend.domain.models.conversation     # noqa: F401
 import memolink_backend.domain.models.message          # noqa: F401
 import memolink_backend.domain.models.reminder         # noqa: F401
 import memolink_backend.domain.models.workspace        # noqa: F401
+import memolink_backend.domain.models.system_log       # noqa: F401
+import memolink_backend.domain.models.translation_cache # noqa: F401
 
 if os.getenv("MEMOLINK_SKIP_DB_BOOTSTRAP") != "1":
     with engine.connect() as _conn:
@@ -101,6 +104,34 @@ if os.getenv("MEMOLINK_SKIP_DB_BOOTSTRAP") != "1":
             ("research_mode_min_level", "regular"), ("model_attribution_min_level", "regular"),
         ]:
             _conn.execute(text("INSERT INTO feature_flags (key, value) VALUES (:k, :v) ON CONFLICT (key) DO NOTHING"), {"k": _k, "v": _v})
+        # Translation cache table
+        _conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS translation_cache (
+                id SERIAL PRIMARY KEY,
+                text_hash VARCHAR(64) UNIQUE NOT NULL,
+                source_text TEXT NOT NULL,
+                target_language VARCHAR(100) NOT NULL,
+                translation TEXT NOT NULL,
+                accuracy INTEGER,
+                model VARCHAR(100) NOT NULL,
+                hit_count INTEGER NOT NULL DEFAULT 0,
+                created_at TIMESTAMPTZ DEFAULT now() NOT NULL,
+                updated_at TIMESTAMPTZ DEFAULT now() NOT NULL
+            )
+        """))
+        _conn.execute(text("CREATE INDEX IF NOT EXISTS ix_translation_cache_text_hash ON translation_cache(text_hash)"))
+        # System logs table
+        _conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS system_logs (
+                id SERIAL PRIMARY KEY,
+                created_at TIMESTAMPTZ DEFAULT now() NOT NULL,
+                level VARCHAR(10) NOT NULL,
+                source VARCHAR(100) NOT NULL,
+                message TEXT NOT NULL,
+                details JSONB,
+                user_id INTEGER
+            )
+        """))
         # Auto-promote first user as admin if none exists
         _conn.execute(text("""
             UPDATE users SET is_admin = TRUE
@@ -149,6 +180,7 @@ app.include_router(feedback_controller.router, prefix="/api")
 app.include_router(admin_controller.router, prefix="/api")
 app.include_router(features_controller.router, prefix="/api")
 app.include_router(research_controller.router, prefix="/api")
+app.include_router(logs_controller.router, prefix="/api")
 
 # AWS Lambda handler — only active when running inside Lambda
 if os.getenv("AWS_LAMBDA_FUNCTION_NAME"):

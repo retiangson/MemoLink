@@ -123,7 +123,7 @@ const CONTENT: Record<string, React.ReactNode> = {
         <ul className="space-y-2">
           {[
             "Paste a YouTube URL - the transcript is extracted via YouTube Caption API and saved as a note.",
-            "Upload a video or audio file (MP4, M4A, WebM, MOV, MP3, WAV - max 25 MB) for Whisper transcription.",
+            "Upload a video or audio file (MP4, M4A, WebM, MOV, MP3, WAV - max 200 MB) — files ≤25 MB use Whisper, larger files use Deepgram Nova-2.",
             "Upload a Zoom recording or lecture capture; the transcript is saved as a searchable note.",
           ].map((item, i) => (
             <li key={i} className="flex gap-2"><span className="text-indigo-500 shrink-0 mt-0.5">•</span><span>{item}</span></li>

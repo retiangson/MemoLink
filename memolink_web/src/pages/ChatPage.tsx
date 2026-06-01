@@ -116,6 +116,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
     bottomRef: convs.bottomRef,
     workspaceId: activeWorkspaceId,
     model: selectedModel,
+    onCloseNote: editor.closeNoteById,
   });
 
   useEffect(() => {
@@ -204,6 +205,16 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
     if (!confirm("Delete this note?")) return;
     await removeNote(noteId);
     editor.closeNoteById(noteId);
+  }
+
+  async function handleOpenNoteById(noteId: number) {
+    const found = notes.find((n) => n.id === noteId);
+    if (found) {
+      await handleOpenNote(found);
+    } else {
+      const fresh = await getNote(noteId);
+      if (fresh) await handleOpenNote(fresh);
+    }
   }
 
   async function handleApplyNoteEdit(content: string, noteId: number | null) {
@@ -676,6 +687,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                     onDeleteMessage={(id, content, index) => { setDeleteTarget({ id, content, index }); setShowDeleteModal(true); }}
                     onDropFiles={(files) => chat.setPendingFiles((p) => [...p, ...files])}
                     onApplyNoteEdit={handleApplyNoteEdit}
+                    onOpenNote={handleOpenNoteById}
                     hasOpenNote={isNoteActive}
                     translationEnabled={flags.translation_enabled}
                     modelAttributionEnabled={modelAttributionEnabled}

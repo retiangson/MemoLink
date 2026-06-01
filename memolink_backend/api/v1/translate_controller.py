@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from openai import AsyncOpenAI, RateLimitError, APIError
 from memolink_backend.core.security import get_current_user
 from memolink_backend.core.config import settings
+from memolink_backend.di.request_container import RequestContainer, get_request_container
 
 router = APIRouter(prefix="/translate", tags=["translate"])
 logger = logging.getLogger(__name__)
@@ -25,6 +26,7 @@ _MAORI_HINT = (
 class TranslateRequest(BaseModel):
     text: str
     target_language: str = "English"
+    force: bool = False
 
 
 def _gemini_client() -> AsyncOpenAI:
@@ -138,49 +140,79 @@ async def _score_gpt_translation(gpt: AsyncOpenAI, original: str, translation: s
 
 
 @router.post("")
-async def translate(req: TranslateRequest, _: int = Depends(get_current_user)):
+async def translate(
+    req: TranslateRequest,
+    user_id: int = Depends(get_current_user),
+    c: RequestContainer = Depends(get_request_container),
+):
+    cache_repo = c.domain.get_translation_cache_repository()
+
+    # ── Cache lookup ──────────────────────────────────────────────────────────
+    if not req.force:
+        cached = cache_repo.find(req.text, req.target_language)
+        if cached:
+            cache_repo.increment_hits(cached.id)
+            c.logs().info("translate", f"Cache hit for '{req.target_language}' translation (accuracy {cached.accuracy}%, hits {cached.hit_count + 1})", {"target_language": req.target_language, "accuracy": cached.accuracy, "model": cached.model, "hit_count": cached.hit_count + 1}, user_id)
+            return {"translation": cached.translation, "accuracy": cached.accuracy, "model": cached.model, "cached": True}
+
+    # ── LLM translation ───────────────────────────────────────────────────────
     hint = _MAORI_HINT if _is_maori(req.target_language) else ""
     gpt = _openai_client()
+    translation: str
+    accuracy: int | None
+    model_used: str
 
     if not settings.gemini_api_key:
         translation = await _gpt_translate(gpt, req.text, req.target_language, hint)
         accuracy = await _score_gpt_translation(gpt, req.text, translation, req.target_language)
-        return {"translation": translation, "accuracy": accuracy, "model": settings.openai_chat_model}
-
-    gemini = _gemini_client()
-
-    try:
-        # Round 0 — initial Gemini translation
-        translation = await _gemini_translate(gemini, req.text, req.target_language, hint)
+        model_used = settings.openai_chat_model
+    else:
+        gemini = _gemini_client()
         final_score: int | None = None
+        try:
+            translation = await _gemini_translate(gemini, req.text, req.target_language, hint)
 
-        for _ in range(MAX_ROUNDS):
-            await asyncio.sleep(ROUND_DELAY_S)  # breather between rounds — avoids burst detection
-            back = await _back_translate(gemini, translation, req.target_language)
-            score = await _score_similarity(gpt, req.text, back)
-            final_score = score
+            for _ in range(MAX_ROUNDS):
+                await asyncio.sleep(ROUND_DELAY_S)
+                back = await _back_translate(gemini, translation, req.target_language)
+                score = await _score_similarity(gpt, req.text, back)
+                final_score = score
+                if score >= TARGET_SCORE:
+                    break
+                feedback = await _build_feedback(gpt, req.text, translation, back, score)
+                await asyncio.sleep(ROUND_DELAY_S)
+                translation = await _gemini_translate(gemini, req.text, req.target_language, hint, feedback)
 
-            if score >= TARGET_SCORE:
-                break
+            accuracy = final_score
+            model_used = GEMINI_MODEL
 
-            feedback = await _build_feedback(gpt, req.text, translation, back, score)
-            await asyncio.sleep(ROUND_DELAY_S)
-            translation = await _gemini_translate(gemini, req.text, req.target_language, hint, feedback)
+        except RateLimitError:
+            logger.warning("Gemini rate limit hit for language=%s — falling back to GPT", req.target_language)
+            c.logs().warning("translate", f"Gemini rate limit hit — falling back to {settings.openai_chat_model}", {"target_language": req.target_language, "fallback": settings.openai_chat_model}, user_id)
+            translation = await _gpt_translate(gpt, req.text, req.target_language, hint)
+            accuracy = await _score_gpt_translation(gpt, req.text, translation, req.target_language)
+            model_used = settings.openai_chat_model
 
-        return {"translation": translation, "accuracy": final_score, "model": GEMINI_MODEL}
+        except APIError as e:
+            logger.error("Gemini API error: %s — falling back to GPT", e)
+            c.logs().error("translate", f"Gemini API error — falling back to {settings.openai_chat_model}: {e}", {"target_language": req.target_language, "fallback": settings.openai_chat_model, "error": str(e)}, user_id)
+            translation = await _gpt_translate(gpt, req.text, req.target_language, hint)
+            accuracy = await _score_gpt_translation(gpt, req.text, translation, req.target_language)
+            model_used = settings.openai_chat_model
 
-    except RateLimitError:
-        logger.warning("Gemini rate limit hit for language=%s — falling back to GPT", req.target_language)
-        translation = await _gpt_translate(gpt, req.text, req.target_language, hint)
-        accuracy = await _score_gpt_translation(gpt, req.text, translation, req.target_language)
-        return {"translation": translation, "accuracy": accuracy, "model": settings.openai_chat_model}
+        except Exception as e:
+            logger.error("Unexpected translation error: %s", e)
+            c.logs().error("translate", f"Unexpected translation error: {e}", {"target_language": req.target_language, "error": str(e)}, user_id)
+            raise HTTPException(status_code=500, detail="Translation failed. Please try again.")
 
-    except APIError as e:
-        logger.error("Gemini API error: %s — falling back to GPT", e)
-        translation = await _gpt_translate(gpt, req.text, req.target_language, hint)
-        accuracy = await _score_gpt_translation(gpt, req.text, translation, req.target_language)
-        return {"translation": translation, "accuracy": accuracy, "model": settings.openai_chat_model}
+    # ── Always store in cache (accuracy is metadata, not a gate) ─────────────
+    action = "updated" if req.force else "stored"
+    cache_repo.upsert(req.text, req.target_language, translation, accuracy, model_used)
+    c.logs().info(
+        "translate",
+        f"Translation {action} in cache for '{req.target_language}'" + (f" (accuracy {accuracy}%)" if accuracy is not None else ""),
+        {"target_language": req.target_language, "accuracy": accuracy, "model": model_used, "force": req.force},
+        user_id,
+    )
 
-    except Exception as e:
-        logger.error("Unexpected translation error: %s", e)
-        raise HTTPException(status_code=500, detail="Translation failed. Please try again.")
+    return {"translation": translation, "accuracy": accuracy, "model": model_used, "cached": False}
