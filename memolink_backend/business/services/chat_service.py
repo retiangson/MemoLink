@@ -62,11 +62,25 @@ _IMPROVE_NOTE_RE = re.compile(
     r"(?:my\s+)?(?:note|notes?)\s*[:\-]?\s*(.+?)(?:\s*[\.?!])?$",
     re.IGNORECASE,
 )
+# "make my [name] note better/nicer/cleaner/improved/prettier"
+_MAKE_NAME_NOTE_BETTER_RE = re.compile(
+    r"\bmake\s+(?:my\s+|the\s+)?(.+?)\s+note\s+(?:better|nicer|cleaner|clearer|improved|prettier|look better|more readable|well[- ]?formatted)",
+    re.IGNORECASE,
+)
+# "make my note [name] better" | "make [name] note better"
+_MAKE_NOTE_NAME_BETTER_RE = re.compile(
+    r"\bmake\s+(?:my\s+|the\s+)?note\s+(.+?)\s+(?:better|nicer|cleaner|clearer|improved|prettier|more readable|well[- ]?formatted)[\s\.?!]*$",
+    re.IGNORECASE,
+)
 
 
 def _extract_improve_note_name(text: str) -> str | None:
-    m = _IMPROVE_NOTE_RE.search(text.strip())
-    return m.group(1).strip().strip('"\'') if m else None
+    t = text.strip()
+    for pattern in (_IMPROVE_NOTE_RE, _MAKE_NAME_NOTE_BETTER_RE, _MAKE_NOTE_NAME_BETTER_RE):
+        m = pattern.search(t)
+        if m:
+            return m.group(1).strip().strip('"\'')
+    return None
 
 
 def _build_fallback_chain(primary: str) -> list[str]:
