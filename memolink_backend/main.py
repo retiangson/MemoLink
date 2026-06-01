@@ -256,7 +256,7 @@ def health():
     return {
         "status": "ok",
         "service": "MemoLink API",
-        "version": "2.1.1",
+        "version": "2.1.2",
         # Temporary debug — shows whether S3 env vars are visible to the app
         "s3_bucket_set": bool(settings.s3_upload_bucket),
         "s3_bucket_len": len(settings.s3_upload_bucket),
