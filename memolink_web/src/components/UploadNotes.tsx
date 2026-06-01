@@ -25,8 +25,22 @@ export function UploadNotes({ setNotes, workspaceId, onUploaded }: Props) {
       setFailures(failed);
       if (setNotes && notes.length) setNotes((prev) => [...notes, ...prev]);
       if (onUploaded && notes.length) onUploaded(notes);
-    } catch {
-      setStatus("Upload failed. Please try again.");
+    } catch (err: unknown) {
+      const e = err as { response?: { status?: number; data?: { detail?: string } }; message?: string };
+      const status = e?.response?.status;
+      const detail = e?.response?.data?.detail ?? e?.message ?? "Unknown error";
+      console.error("[UploadNotes] upload error:", err);
+      if (status === 413) {
+        setStatus("Upload failed: file too large for the server. Contact your admin.");
+      } else if (status === 401 || status === 403) {
+        setStatus("Upload failed: authentication error. Please sign in again.");
+      } else if (status === 422) {
+        setStatus(`Upload failed: ${detail}`);
+      } else if (status) {
+        setStatus(`Upload failed (HTTP ${status}): ${detail}`);
+      } else {
+        setStatus(`Upload failed: ${detail}`);
+      }
     } finally {
       setLoading(false);
     }
@@ -53,7 +67,9 @@ export function UploadNotes({ setNotes, workspaceId, onUploaded }: Props) {
           Importing notes…
         </div>
       )}
-      {!loading && status && <p className="text-xs text-gray-400">{status}</p>}
+      {!loading && status && (
+        <p className={`text-xs ${status.startsWith("Upload failed") ? "text-red-400" : "text-gray-400"}`}>{status}</p>
+      )}
       {!loading && failures.length > 0 && (
         <div className="mt-1 space-y-1">
           {failures.map((f, i) => (

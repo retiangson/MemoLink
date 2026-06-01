@@ -53,7 +53,10 @@ async def bulk_upload(
             c.logs().info("bulk.upload", f"Note created from '{filename}'", {"filename": filename, "size_mb": size_mb}, current_user_id)
         except Exception as exc:
             failed.append({"filename": filename, "reason": str(exc)})
-            c.logs().error("bulk.upload", f"Failed to process '{filename}': {exc}", {"filename": filename, "error": str(exc)}, current_user_id)
+            try:
+                c.logs().error("bulk.upload", f"Failed to process '{filename}': {exc}", {"filename": filename, "error": str(exc)}, current_user_id)
+            except Exception:
+                pass
             try:
                 db.rollback()
             except Exception:
