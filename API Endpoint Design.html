@@ -225,6 +225,8 @@
         <tr><td><span class="method m-patch">PATCH</span></td><td><code>/admin/users/{id}/level</code></td><td>Set user access level: regular, plus, or pro (admin only)</td><td>Admin</td></tr>
         <tr><td><span class="method m-get">GET</span></td><td><code>/admin/features</code></td><td>Get all feature flags (admin only)</td><td>Admin</td></tr>
         <tr><td><span class="method m-put">PUT</span></td><td><code>/admin/features</code></td><td>Update one or more feature flags (admin only)</td><td>Admin</td></tr>
+        <tr><td><span class="method m-post">POST</span></td><td><code>/upload/presign</code></td><td>Generate S3 pre-signed upload URL for direct-to-S3 file upload</td><td>Upload</td></tr>
+        <tr><td><span class="method m-post">POST</span></td><td><code>/upload/process</code></td><td>Download S3 file, extract text, create note, delete S3 object</td><td>Upload</td></tr>
       </tbody>
     </table>
   </section>
@@ -2079,6 +2081,101 @@ data: <span class="json-str">[DONE]</span></pre>
               <div class="schema-box-title">Error Responses</div>
               <pre><span class="json-num">403</span> <span class="json-type">Not an admin</span>
 <span class="json-num">422</span> <span class="json-type">Unknown flag key or invalid value format</span></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <hr class="divider" />
+
+  <!-- S3 UPLOAD -->
+  <section>
+    <div class="section-label">Upload</div>
+    <h2>S3 Pre-signed Upload Endpoints</h2>
+    <p>Two-step flow that bypasses AWS Lambda's 6 MB payload limit. The client requests a pre-signed URL, uploads directly to S3, then submits the S3 key for server-side processing.</p>
+    <div class="ep-group">
+
+      <!-- PRESIGN -->
+      <div class="ep-card open" id="ep-upload-presign">
+        <div class="ep-header" onclick="toggle('ep-upload-presign')">
+          <span class="method m-post">POST</span>
+          <span class="ep-path">/api/v1/upload/presign</span>
+          <span class="ep-summary">Generate S3 pre-signed upload URL</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">
+            Validates that the file size is ≤200 MB and that <code>S3_UPLOAD_BUCKET</code> is configured. Generates an S3 pre-signed PUT URL with a 1-hour TTL (3600 seconds) scoped to the authenticated user's folder. The client uploads file bytes directly to S3 using an HTTP <code>PUT</code> request to the returned URL — Lambda is never in the upload path so the 6 MB Lambda payload limit does not apply. Auth: Bearer token required.
+          </p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Request Body — PresignDTO</div>
+              <pre>{
+  <span class="json-key">"filename"</span>:     <span class="json-str">"recording.mp4"</span>,
+  <span class="json-key">"content_type"</span>: <span class="json-str">"video/mp4"</span>,
+  <span class="json-key">"size_bytes"</span>:   <span class="json-num">104857600</span>
+}</pre>
+            </div>
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200 — PresignResponse</div>
+              <pre>{
+  <span class="json-key">"url"</span>:        <span class="json-str">"https://s3.amazonaws.com/..."</span>,
+  <span class="json-key">"key"</span>:        <span class="json-str">"uploads/1/abc/recording.mp4"</span>,
+  <span class="json-key">"expires_in"</span>: <span class="json-num">3600</span>
+}</pre>
+            </div>
+          </div>
+          <div class="schema-row" style="margin-top:.8rem;">
+            <div class="schema-box">
+              <div class="schema-box-title">Error Responses</div>
+              <pre><span class="json-num">422</span> <span class="json-type">File exceeds 200 MB limit</span>
+<span class="json-num">503</span> <span class="json-type">S3_UPLOAD_BUCKET not configured</span>
+<span class="json-num">500</span> <span class="json-type">AWS error generating pre-signed URL</span></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PROCESS -->
+      <div class="ep-card open" id="ep-upload-process">
+        <div class="ep-header" onclick="toggle('ep-upload-process')">
+          <span class="method m-post">POST</span>
+          <span class="ep-path">/api/v1/upload/process</span>
+          <span class="ep-summary">Process S3 files into notes</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">
+            Lambda downloads each S3 object by key, runs <code>extract_formatted_html</code> on the file bytes, creates a note per file, then deletes the S3 object. Each key is processed independently — one failure does not block the others. Supports all file types including audio/video (Whisper ≤25 MB, Deepgram Nova-2 &gt;25 MB). Auth: Bearer token required.
+          </p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Request Body — ProcessDTO</div>
+              <pre>{
+  <span class="json-key">"keys"</span>:         [<span class="json-str">"uploads/1/abc/recording.mp4"</span>],
+  <span class="json-key">"workspace_id"</span>: <span class="json-num">1</span>
+}</pre>
+            </div>
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200 — ProcessResponse</div>
+              <pre>{
+  <span class="json-key">"notes"</span>: [
+    {
+      <span class="json-key">"id"</span>:      <span class="json-num">60</span>,
+      <span class="json-key">"title"</span>:   <span class="json-str">"recording.mp4"</span>,
+      <span class="json-key">"content"</span>: <span class="json-str">"&lt;p&gt;The meeting started...&lt;/p&gt;"</span>
+    }
+  ],
+  <span class="json-key">"failed"</span>: [
+    {
+      <span class="json-key">"filename"</span>: <span class="json-str">"bad.xyz"</span>,
+      <span class="json-key">"reason"</span>:   <span class="json-str">"Unsupported file type"</span>
+    }
+  ]
+}</pre>
             </div>
           </div>
         </div>

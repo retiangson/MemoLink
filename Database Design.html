@@ -1328,6 +1328,7 @@
     </div>
     <p style="margin-top:1rem;"><strong style="color:var(--text)">Risk (workspaces):</strong> Existing users with data but no workspace will have a synthetic "My Workspace" auto-created on first login. This is transparent to the user — they see their existing notes, conversations, and reminders already organised under one workspace and can rename or restructure from there.</p>
     <p style="margin-top:.7rem;"><strong style="color:var(--text)">Risk (admin):</strong> Existing deployments will automatically promote the user with the lowest ID to admin on the next startup. This is expected and intentional. Admins can immediately use the Admin Panel to promote or demote other users.</p>
+    <p style="margin-top:.7rem;"><strong style="color:var(--text)">S3 pre-signed upload:</strong> The S3 upload feature (<code>POST /api/upload/presign</code> and <code>POST /api/upload/process</code>) requires no database changes. Uploaded files are processed transiently — Lambda downloads each S3 object, creates a note in the existing <code>notes</code> table, then deletes the S3 object. No new columns or tables are needed.</p>
   </section>
 
 </div>

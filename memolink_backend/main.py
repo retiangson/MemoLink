@@ -28,6 +28,7 @@ if PROJECT_ROOT not in sys.path:
 
 from sqlalchemy import text
 from memolink_backend.core.db import Base, engine
+from memolink_backend.core.config import settings
 from memolink_backend.api.v1 import (
     auth_controller,
     notes_controller,
@@ -45,6 +46,7 @@ from memolink_backend.api.v1 import (
     features_controller,
     research_controller,
     logs_controller,
+    s3_upload_controller,
 )
 
 # Register all models so SQLAlchemy sees them
@@ -252,12 +254,26 @@ def health():
     return {"status": "ok", "service": "MemoLink API"}
 
 
+# Build allowed origins list — always wildcard, plus the explicit frontend
+# URL from env so the correct origin appears in CORS responses when Lambda
+# or a CDN strips the wildcard header from error responses.
+_cors_origins: list[str] = ["*"]
+if settings.frontend_url and settings.frontend_url not in _cors_origins:
+    _cors_origins.append(settings.frontend_url)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=_cors_origins,
+    # allow_credentials must be False when allow_origins includes "*".
+    # MemoLink uses Bearer token auth (Authorization header), not cookies,
+    # so credentials mode is not needed.
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    # Explicitly list headers so the preflight Access-Control-Allow-Headers
+    # response is concrete — required for requests with an Authorization header.
+    allow_headers=["Authorization", "Content-Type", "Accept", "Origin",
+                   "X-Requested-With", "X-Real-IP", "X-Forwarded-For"],
+    expose_headers=["Content-Length", "Content-Range"],
 )
 
 app.include_router(auth_controller.router, prefix="/api")
@@ -276,6 +292,7 @@ app.include_router(admin_controller.router, prefix="/api")
 app.include_router(features_controller.router, prefix="/api")
 app.include_router(research_controller.router, prefix="/api")
 app.include_router(logs_controller.router, prefix="/api")
+app.include_router(s3_upload_controller.router, prefix="/api")
 
 # AWS Lambda handler — only active when running inside Lambda
 if os.getenv("AWS_LAMBDA_FUNCTION_NAME"):

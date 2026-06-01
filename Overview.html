@@ -322,7 +322,7 @@
       <div class="card">
         <div class="card-icon">&#x1F4C4;</div>
         <h3>Rich File Import</h3>
-        <p>Bulk upload preserves formatting: DOCX headings (H1–H4), bold/italic/underline, bullet and numbered lists, tables (with header rows), and embedded images. PDF infers headings by font-size ratio. PPTX maps slide titles to H2 and content to lists. Images are embedded as base64 <code>&lt;img&gt;</code> tags.</p>
+        <p>Bulk upload preserves formatting: DOCX headings (H1–H4), bold/italic/underline, bullet and numbered lists, tables (with header rows), and embedded images. PDF infers headings by font-size ratio. PPTX maps slide titles to H2 and content to lists. Images are embedded as base64 <code>&lt;img&gt;</code> tags. Files up to 200 MB supported via S3 pre-signed upload when deployed on Lambda.</p>
       </div>
       <div class="card">
         <div class="card-icon">&#x1F511;</div>
@@ -602,7 +602,8 @@
         <p><strong>Docker</strong> — Python 3.11-slim backend image<br/>
            <strong>Docker</strong> — Node build + nginx frontend image<br/>
            <strong>docker-compose.yml</strong> — single-command orchestration<br/>
-           <strong>nginx.conf</strong> — proxies /api/ to backend, disables buffering for SSE</p>
+           <strong>nginx.conf</strong> — proxies /api/ to backend, disables buffering for SSE<br/>
+           <strong>AWS S3</strong> — temporary upload bucket for files &gt;5 MB; pre-signed PUT URLs bypass Lambda payload limit</p>
       </div>
     </div>
   </section>
@@ -623,6 +624,7 @@
         <strong>Prerequisites:</strong> Docker Desktop installed; <code>.env</code> file populated from <code>.env.example</code>.
       </p>
       <pre>cp .env.example .env        # fill in OPENAI_API_KEY, DATABASE_URL, DEEPGRAM_API_KEY (optional, for >25 MB files)
+                            # also S3_UPLOAD_BUCKET, AWS_REGION (optional, for Lambda S3 pre-signed uploads)
 docker compose up --build   # builds and starts backend + frontend</pre>
       <p style="margin-top:.9rem;font-size:.88rem;">
         The backend container runs on port 8000 behind the nginx reverse proxy.

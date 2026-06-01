@@ -149,3 +149,41 @@ export async function uploadChat(conversationId: number, prompt: string, files: 
   files.forEach((f) => formData.append("files", f, f.name));
   return (await api.post("/chat/upload", formData, { headers: { "Content-Type": "multipart/form-data" } })).data;
 }
+
+export async function presignUpload(
+  filename: string,
+  contentType: string,
+  sizeBytes: number,
+): Promise<{ url: string; key: string }> {
+  return (await api.post("/upload/presign", { filename, content_type: contentType, size_bytes: sizeBytes })).data;
+}
+
+export async function processFromS3(
+  keys: string[],
+  workspaceId?: number | null,
+): Promise<{ notes: any[]; failed: { filename: string; reason: string }[] }> {
+  return (await api.post("/upload/process", { keys, workspace_id: workspaceId ?? null })).data;
+}
+
+export function uploadToS3(
+  url: string,
+  file: File,
+  onProgress: (pct: number) => void,
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
+    };
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) resolve();
+      else reject(new Error(`S3 upload failed: HTTP ${xhr.status}`));
+    };
+    xhr.onerror = () => reject(new Error("S3 upload network error"));
+    xhr.ontimeout = () => reject(new Error("S3 upload timed out"));
+    xhr.timeout = 600000; // 10 min
+    xhr.open("PUT", url);
+    xhr.setRequestHeader("Content-Type", file.type || "application/octet-stream");
+    xhr.send(file);
+  });
+}

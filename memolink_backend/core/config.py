@@ -30,6 +30,11 @@ class Settings(BaseSettings):
     smtp_from: str = ""
     frontend_url: str = "http://localhost:5173"
 
+    aws_access_key_id: str = ""       # Optional — Lambda uses IAM role automatically
+    aws_secret_access_key: str = ""   # Optional — Lambda uses IAM role automatically
+    aws_region: str = "ap-southeast-2"
+    s3_upload_bucket: str = ""
+
     class Config:
         env_file = ".env"
 

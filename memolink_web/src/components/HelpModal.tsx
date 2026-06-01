@@ -20,6 +20,7 @@ const NAV: Section[] = [
   { id: "aitools",    label: "AI Tools",          icon: <><path d="M6 12.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 0 1h-3a.5.5 0 0 1-.5-.5M3 8.062C3 6.76 4.235 5.765 5.53 5.886a26.6 26.6 0 0 0 4.94 0C11.765 5.765 13 6.76 13 8.062v1.157a.93.93 0 0 1-.765.935c-.845.147-2.34.346-4.235.346s-3.39-.2-4.235-.346A.93.93 0 0 1 3 9.219zm4.542-.827a.25.25 0 0 0-.217.068l-.92.9a25 25 0 0 1-1.871-.183.25.25 0 0 0-.068.495c.55.076 1.232.149 2.02.193a.25.25 0 0 0 .189-.071l.754-.736.847 1.71a.25.25 0 0 0 .404.062l.932-.97a25 25 0 0 0 1.922-.188.25.25 0 0 0-.068-.495c-.538.074-1.207.145-1.98.189a.25.25 0 0 0-.166.076l-.754.785-.842-1.7a.25.25 0 0 0-.182-.134"/><path d="M8.5 1.866a1 1 0 1 0-1 0V3h-2A4.5 4.5 0 0 0 1 7.5V8a1 1 0 0 0-1 1v2a1 1 0 0 0 1 1v1a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-1a1 1 0 0 0 1-1V9a1 1 0 0 0-1-1v-.5A4.5 4.5 0 0 0 10.5 3h-2zM14 7.5V13a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V7.5A3.5 3.5 0 0 1 5.5 4h5A3.5 3.5 0 0 1 14 7.5"/></> },
   { id: "reminders",  label: "Reminders",         icon: <path d="M8 16a2 2 0 0 0 2-2H6a2 2 0 0 0 2 2M8 1.918l-.797.161A4 4 0 0 0 4 6c0 .628-.134 2.197-.459 3.742-.16.767-.376 1.566-.663 2.258h10.244c-.287-.692-.502-1.49-.663-2.258C12.134 8.197 12 6.628 12 6a4 4 0 0 0-3.203-3.92zM14.22 12c.223.447.481.801.78 1H1c.299-.199.557-.553.78-1C2.68 10.2 3 6.88 3 6c0-2.42 1.72-4.44 4.005-4.901a1 1 0 1 1 1.99 0A5 5 0 0 1 13 6c0 .88.32 4.2 1.22 6"/> },
   { id: "models",     label: "AI Models",         icon: <path d="M6 12.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 0 1h-3a.5.5 0 0 1-.5-.5M3 8.062C3 6.76 4.235 5.765 5.53 5.886a26.6 26.6 0 0 0 4.94 0C11.765 5.765 13 6.76 13 8.062v1.157a.93.93 0 0 1-.765.935c-.845.147-2.34.346-4.235.346s-3.39-.2-4.235-.346A.93.93 0 0 1 3 9.219zm4.542-.827a.25.25 0 0 0-.217.068l-.92.9a25 25 0 0 1-1.871-.183.25.25 0 0 0-.068.495c.55.076 1.232.149 2.02.193a.25.25 0 0 0 .189-.071l.754-.736.847 1.71a.25.25 0 0 0 .404.062l.932-.97a25 25 0 0 0 1.922-.188.25.25 0 0 0-.068-.495c-.538.074-1.207.145-1.98.189a.25.25 0 0 0-.166.076l-.754.785-.842-1.7a.25.25 0 0 0-.182-.134"/> },
+  { id: "noteai",     label: "Note Improvement",  icon: <><path d="M10.5 8a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0"/><path d="M0 8s3-5.5 8-5.5S16 8 16 8s-3 5.5-8 5.5S0 8 0 8m8 3.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7"/></> },
   { id: "tips",       label: "Tips & Shortcuts",  icon: <path d="M2 2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v13.5a.5.5 0 0 1-.777.416L8 13.101l-5.223 2.815A.5.5 0 0 1 2 15.5zm2-1a1 1 0 0 0-1 1v12.566l4.723-2.482a.5.5 0 0 1 .554 0L13 14.566V2a1 1 0 0 0-1-1z"/> },
 ];
 
@@ -216,6 +217,102 @@ const CONTENT: Record<string, React.ReactNode> = {
     </div>
   ),
 
+  noteai: (
+    <div className="space-y-4 text-sm text-gray-400 leading-relaxed">
+      <p>
+        Ask the AI to <span className="text-white font-medium">automatically improve and save</span> any note just by mentioning its name in chat. The AI reformats the content with proper headings, paragraphs, lists, and bold terms — then saves it directly. No copy-paste needed.
+      </p>
+
+      {/* How it works */}
+      <div className="bg-[#12121a] border border-[#2a2a38] rounded-xl p-3 space-y-1.5">
+        <p className="text-xs font-semibold text-indigo-300 uppercase tracking-wider">How it works</p>
+        <ol className="space-y-1">
+          {[
+            "If the note is open in an editor tab, it closes automatically first",
+            "A spinning indicator shows while the AI is working",
+            "The improved content is saved directly to the database",
+            "An \"Open Note\" button appears — click it to see the result",
+          ].map((s, i) => (
+            <li key={i} className="flex gap-2 text-[12px]"><span className="text-indigo-500 shrink-0 font-bold">{i + 1}.</span><span>{s}</span></li>
+          ))}
+        </ol>
+      </div>
+
+      {/* All trigger phrases */}
+      <div>
+        <p className="text-xs font-semibold text-indigo-300 uppercase tracking-wider mb-2">All supported phrases</p>
+        <p className="text-[11px] text-gray-500 mb-2">Replace <code className="bg-[#12121a] px-1 rounded text-indigo-300">Note Name</code> with any part of your note's title — exact match, partial, or filename with extension.</p>
+        <div className="space-y-1">
+          {[
+            ["improve",  "improve my note Note Name"],
+            ["improve",  "improve note: Note Name"],
+            ["reformat", "reformat my note Note Name"],
+            ["format",   "format note Note Name"],
+            ["clean up", "clean up my note Note Name"],
+            ["fix",      "fix my note Note Name"],
+            ["polish",   "polish note Note Name"],
+            ["rewrite",  "rewrite my note Note Name"],
+            ["update",   "update my note Note Name"],
+            ["edit",     "edit note Note Name"],
+            ["upgrade",  "upgrade my note Note Name"],
+            ["revise",   "revise my note Note Name"],
+            ["optimize", "optimize my note Note Name"],
+            ["make better", "make my Note Name note better"],
+            ["make better", "make my note Note Name better"],
+            ["make nicer",  "make my Note Name note nicer"],
+            ["make cleaner","make my Note Name note cleaner"],
+            ["make clearer","make Note Name note clearer"],
+          ].map(([badge, phrase], i) => (
+            <div key={i} className="flex items-center gap-2">
+              <span className="shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 uppercase tracking-wide w-[72px] text-center">
+                {badge}
+              </span>
+              <code className="text-[11px] text-gray-300 bg-[#12121a] px-2 py-0.5 rounded border border-[#2a2a38] flex-1">
+                {phrase}
+              </code>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Real examples */}
+      <div>
+        <p className="text-xs font-semibold text-indigo-300 uppercase tracking-wider mb-2">Real examples</p>
+        <div className="space-y-1.5">
+          {[
+            "improve my note Overview",
+            "reformat note Recording (7).m4a",
+            "can you improve my note 01_20250816082443.wav",
+            "make my Recording (7).m4a note better",
+            "make my note Project Plan nicer",
+            "clean up my note Meeting Notes",
+            "polish note Lecture 3 - Database Design",
+            "fix my note Budget 2026.pdf",
+          ].map((ex, i) => (
+            <div key={i} className="flex items-start gap-2">
+              <span className="text-indigo-500 shrink-0 mt-0.5">›</span>
+              <code className="text-[11px] text-emerald-300/80 break-all">"{ex}"</code>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Tips */}
+      <div className="bg-amber-500/5 border border-amber-500/20 rounded-xl p-3">
+        <p className="text-xs font-semibold text-amber-400 mb-1.5">Tips</p>
+        <ul className="space-y-1">
+          {[
+            "You don't need the full note title — a partial match works (e.g. \"Recording\" matches \"Recording (7).m4a\").",
+            "Works with any file type — audio transcriptions, PDFs, DOCX imports, or hand-written notes.",
+            "The original content is replaced immediately. If you want to keep the old version, duplicate the note first.",
+          ].map((t, i) => (
+            <li key={i} className="flex gap-2 text-[11px] text-gray-400"><span className="text-amber-500 shrink-0 mt-0.5">•</span><span>{t}</span></li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  ),
+
   tips: (
     <div className="space-y-3 text-sm text-gray-400 leading-relaxed">
       <ul className="space-y-2">
@@ -229,6 +326,7 @@ const CONTENT: Record<string, React.ReactNode> = {
           "The default model set by the admin applies when model selection is disabled - check Settings to see what's available to you.",
           "Reminders → Suggest scans only the active workspace - switch workspaces to suggest from different note sets.",
           "Paste a YouTube video URL in the Upload Notes panel to instantly transcribe and import it.",
+          "Ask the AI to improve any note by name — e.g. \"improve my note Recording (7).m4a\". See the Note Improvement section for all supported phrases.",
         ].map((item, i) => (
           <li key={i} className="flex gap-2"><span className="text-indigo-500 shrink-0 mt-0.5">•</span><span>{item}</span></li>
         ))}
