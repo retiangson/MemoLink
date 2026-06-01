@@ -2,9 +2,10 @@ import React, { useState, useRef } from "react";
 import { uploadNotes, presignUpload, uploadToS3, processFromS3 } from "../api/chatApi";
 import { API_BASE } from "../api/client";
 
-// Files whose combined size fits within Lambda's payload limit go directly
-// through the API. Larger batches are staged via S3 presigned URLs.
-const DIRECT_LIMIT_BYTES = 5 * 1024 * 1024; // 5 MB
+// Files whose combined size fits within Lambda's effective payload limit go
+// directly through the API. Lambda Function URLs base64-encode binary bodies
+// (~33% overhead), so the real ceiling is ~4.5 MB. Larger batches use S3.
+const DIRECT_LIMIT_BYTES = 4 * 1024 * 1024; // 4 MB
 
 interface Props {
   setNotes?: React.Dispatch<React.SetStateAction<any[]>>;
