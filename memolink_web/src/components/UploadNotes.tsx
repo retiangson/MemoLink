@@ -1,6 +1,10 @@
 import React, { useState, useRef } from "react";
-import { presignUpload, uploadToS3, processFromS3 } from "../api/chatApi";
+import { uploadNotes, presignUpload, uploadToS3, processFromS3 } from "../api/chatApi";
 import { API_BASE } from "../api/client";
+
+// Files whose combined size fits within Lambda's payload limit go directly
+// through the API. Larger batches are staged via S3 presigned URLs.
+const DIRECT_LIMIT_BYTES = 5 * 1024 * 1024; // 5 MB
 
 interface Props {
   setNotes?: React.Dispatch<React.SetStateAction<any[]>>;
@@ -32,7 +36,42 @@ export function UploadNotes({ setNotes, workspaceId, onUploaded }: Props) {
       return;
     }
 
-    // S3 pre-signed upload — supports files up to 200 MB.
+    const totalSize = files.reduce((sum, f) => sum + f.size, 0);
+
+    if (totalSize <= DIRECT_LIMIT_BYTES) {
+      // ── Small files: send directly through Lambda (/notes/bulk) ──────────────
+      try {
+        setStatus("Uploading…");
+        const result = await uploadNotes(files, workspaceId);
+        const notes = result.notes ?? [];
+        const failed = result.failed ?? [];
+        setStatus(`${notes.length} note(s) imported${failed.length ? `, ${failed.length} failed` : ""}.`);
+        setFailures(failed);
+        if (setNotes && notes.length) setNotes((prev) => [...notes, ...prev]);
+        if (onUploaded && notes.length) onUploaded(notes);
+      } catch (err: unknown) {
+        const e = err as { response?: { status?: number; data?: { detail?: string } }; message?: string };
+        const httpStatus = e?.response?.status;
+        const detail = e?.response?.data?.detail ?? e?.message ?? "Unknown error";
+        console.error("[UploadNotes] direct upload error:", err);
+        if (httpStatus === 413) {
+          setStatus("Upload failed: file too large for the server.");
+        } else if (httpStatus === 401 || httpStatus === 403) {
+          setStatus("Upload failed: authentication error. Please sign in again.");
+        } else if (httpStatus === 422) {
+          setStatus(`Upload failed: ${detail}`);
+        } else if (httpStatus) {
+          setStatus(`Upload failed (HTTP ${httpStatus}): ${detail}`);
+        } else {
+          setStatus(`Upload failed: ${detail}`);
+        }
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
+    // ── Large files: stage via S3 presigned URLs, then process from S3 ────────
     const keys: string[] = [];
     const uploadFailed: { filename: string; reason: string }[] = [];
 
