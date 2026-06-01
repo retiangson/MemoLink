@@ -859,6 +859,154 @@
 
   <hr class="divider" />
 
+  <!-- TABLE: system_logs -->
+  <section>
+    <div class="section-label">Table</div>
+    <h2>system_logs</h2>
+    <p>Stores structured application events at three severity levels — INFO, WARNING, and ERROR. Written by the <code>SystemLogService</code> throughout the application (auth, transcription, translation, chat fallbacks, uploads). The table has no foreign keys; <code>user_id</code> is stored as a plain integer so log entries are preserved even after a user is deleted. Admins view, filter, paginate, and clear logs via the System Logs tab in the Admin Panel.</p>
+    <div class="schema-card">
+      <div class="schema-header">
+        <span class="schema-icon">&#x1F4CB;</span>
+        <span class="schema-name">system_logs</span>
+        <span class="schema-desc">PostgreSQL table — created at startup via CREATE TABLE IF NOT EXISTS</span>
+      </div>
+      <table class="col-table">
+        <thead>
+          <tr><th>Column</th><th>Type</th><th>Constraints</th><th>Notes</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="col-name">id</td>
+            <td class="col-type">SERIAL</td>
+            <td><span class="badge-pk">PK</span></td>
+            <td class="col-notes">Auto-incrementing primary key</td>
+          </tr>
+          <tr>
+            <td class="col-name">created_at</td>
+            <td class="col-type">TIMESTAMPTZ</td>
+            <td><span class="badge-nn">NOT NULL</span> default: <code>now()</code></td>
+            <td class="col-notes">UTC timestamp of when the event was logged. Indexed for fast time-range queries from the admin panel.</td>
+          </tr>
+          <tr>
+            <td class="col-name">level</td>
+            <td class="col-type">VARCHAR(10)</td>
+            <td><span class="badge-nn">NOT NULL</span></td>
+            <td class="col-notes">Severity level: <code>INFO</code>, <code>WARNING</code>, or <code>ERROR</code>. Filterable in the Admin Panel — displayed with colour-coded badges (sky / amber / red).</td>
+          </tr>
+          <tr>
+            <td class="col-name">source</td>
+            <td class="col-type">VARCHAR(100)</td>
+            <td><span class="badge-nn">NOT NULL</span></td>
+            <td class="col-notes">Module or subsystem that produced the event — e.g. <code>"auth.login"</code>, <code>"video.upload"</code>, <code>"translate"</code>, <code>"chat"</code>. Used as a substring filter in the Admin Panel.</td>
+          </tr>
+          <tr>
+            <td class="col-name">message</td>
+            <td class="col-type">TEXT</td>
+            <td><span class="badge-nn">NOT NULL</span></td>
+            <td class="col-notes">Human-readable description of the event — e.g. "Login failed for user 3", "File exceeds 25 MB — falling back to Deepgram Nova-2".</td>
+          </tr>
+          <tr>
+            <td class="col-name">details</td>
+            <td class="col-type">JSONB</td>
+            <td>nullable</td>
+            <td class="col-notes">Optional structured context — file size, model names, error strings, fallback info. Displayed as expandable JSON in the Admin Panel.</td>
+          </tr>
+          <tr>
+            <td class="col-name">user_id</td>
+            <td class="col-type">INTEGER</td>
+            <td>nullable</td>
+            <td class="col-notes">The user who triggered the event. Stored as a plain integer (no FK constraint) so log entries are retained after a user is deleted.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <hr class="divider" />
+
+  <!-- TABLE: translation_cache -->
+  <section>
+    <div class="section-label">Table</div>
+    <h2>translation_cache</h2>
+    <p>Caches successful translation results to avoid redundant LLM calls. The cache key is the SHA-256 hash of <code>{source_text}::{target_language.lower()}</code>. On any subsequent translate request for the same text and language, the cached result is returned immediately with <code>cached: true</code> and the <code>hit_count</code> is incremented. A <code>force: true</code> field bypasses the cache, calls the LLM pipeline, and upserts the result. The table has no foreign keys and is not scoped to any user — all users share the same cache pool.</p>
+    <div class="schema-card">
+      <div class="schema-header">
+        <span class="schema-icon">&#x26A1;</span>
+        <span class="schema-name">translation_cache</span>
+        <span class="schema-desc">PostgreSQL table — created at startup via CREATE TABLE IF NOT EXISTS</span>
+      </div>
+      <table class="col-table">
+        <thead>
+          <tr><th>Column</th><th>Type</th><th>Constraints</th><th>Notes</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="col-name">id</td>
+            <td class="col-type">SERIAL</td>
+            <td><span class="badge-pk">PK</span></td>
+            <td class="col-notes">Auto-incrementing primary key</td>
+          </tr>
+          <tr>
+            <td class="col-name">text_hash</td>
+            <td class="col-type">VARCHAR(64)</td>
+            <td><span class="badge-uq">UNIQUE</span><span class="badge-nn">NOT NULL</span><span class="badge-idx">INDEX</span></td>
+            <td class="col-notes">SHA-256 hex digest of <code>{source_text}::{target_language.lower()}</code>. Primary lookup key — unique constraint ensures one cache entry per text+language combination.</td>
+          </tr>
+          <tr>
+            <td class="col-name">source_text</td>
+            <td class="col-type">TEXT</td>
+            <td><span class="badge-nn">NOT NULL</span></td>
+            <td class="col-notes">The original text that was translated. Stored for debugging and re-translation reference.</td>
+          </tr>
+          <tr>
+            <td class="col-name">target_language</td>
+            <td class="col-type">VARCHAR(100)</td>
+            <td><span class="badge-nn">NOT NULL</span></td>
+            <td class="col-notes">The target language name as submitted — e.g. <code>"Māori"</code>, <code>"Japanese"</code>, <code>"Tagalog"</code>. Lowercased when building the hash key.</td>
+          </tr>
+          <tr>
+            <td class="col-name">translation</td>
+            <td class="col-type">TEXT</td>
+            <td><span class="badge-nn">NOT NULL</span></td>
+            <td class="col-notes">The cached translation result returned to the client when a cache hit occurs.</td>
+          </tr>
+          <tr>
+            <td class="col-name">accuracy</td>
+            <td class="col-type">INTEGER</td>
+            <td>nullable</td>
+            <td class="col-notes">Semantic similarity score 0–100 from the back-translation scoring round. <code>null</code> when scoring was skipped (e.g. GPT fallback path where no scoring round runs).</td>
+          </tr>
+          <tr>
+            <td class="col-name">model</td>
+            <td class="col-type">VARCHAR(100)</td>
+            <td><span class="badge-nn">NOT NULL</span></td>
+            <td class="col-notes">The model that produced this translation — e.g. <code>"gemini-2.0-flash-lite"</code>, <code>"gpt-4o-mini"</code>. Preserved across cache hits for display in the UI attribution badge.</td>
+          </tr>
+          <tr>
+            <td class="col-name">hit_count</td>
+            <td class="col-type">INTEGER</td>
+            <td><span class="badge-nn">NOT NULL</span> default: <code>0</code></td>
+            <td class="col-notes">Incremented each time this cache entry is served to a user. Useful for analytics and identifying heavily-used translations.</td>
+          </tr>
+          <tr>
+            <td class="col-name">created_at</td>
+            <td class="col-type">TIMESTAMPTZ</td>
+            <td><span class="badge-nn">NOT NULL</span> default: <code>now()</code></td>
+            <td class="col-notes">Timestamp when this entry was first written (UTC).</td>
+          </tr>
+          <tr>
+            <td class="col-name">updated_at</td>
+            <td class="col-type">TIMESTAMPTZ</td>
+            <td><span class="badge-nn">NOT NULL</span> default: <code>now()</code></td>
+            <td class="col-notes">Refreshed on upsert — i.e. when a <code>force: true</code> re-translate request replaces the cached entry with a fresh LLM result.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <hr class="divider" />
+
   <!-- RELATIONSHIPS -->
   <section>
     <div class="section-label">Relationships</div>
@@ -929,6 +1077,18 @@
         <span class="rel-type">standalone</span>
         <span class="rel-to">—</span>
         <span class="rel-note">feature_flags has no foreign keys. It is a global key-value configuration table not scoped to any user or workspace. All authenticated users can read; only admins can write.</span>
+      </li>
+      <li class="rel-item">
+        <span class="rel-from">system_logs</span>
+        <span class="rel-type">standalone</span>
+        <span class="rel-to">—</span>
+        <span class="rel-note">system_logs has no foreign keys. user_id is stored as a plain integer so log entries survive user deletion. The table is global and admin-readable via GET /api/admin/logs. Admins can clear all logs via DELETE /api/admin/logs/clear.</span>
+      </li>
+      <li class="rel-item">
+        <span class="rel-from">translation_cache</span>
+        <span class="rel-type">standalone</span>
+        <span class="rel-to">—</span>
+        <span class="rel-note">translation_cache has no foreign keys. It is a shared global cache keyed by SHA-256 hash of source_text::target_language. Not scoped to any user — all users benefit from and contribute to the same cache pool.</span>
       </li>
     </ul>
   </section>
@@ -1060,6 +1220,18 @@
         <div class="index-cols">feature_flags(key) PRIMARY KEY</div>
         <div class="index-purpose">O(1) lookup of a flag by key name — auto-created from PK</div>
       </div>
+      <div class="index-card">
+        <div class="index-table-label">system_logs</div>
+        <div class="index-name">ix_system_logs_created_at</div>
+        <div class="index-cols">system_logs(created_at)</div>
+        <div class="index-purpose">Fast time-range queries for admin log pagination (ordered by created_at DESC)</div>
+      </div>
+      <div class="index-card">
+        <div class="index-table-label">translation_cache</div>
+        <div class="index-name">ix_translation_cache_text_hash</div>
+        <div class="index-cols">translation_cache(text_hash) UNIQUE</div>
+        <div class="index-purpose">O(1) cache lookup by SHA-256 hash key; UNIQUE enforces one entry per text+language pair</div>
+      </div>
     </div>
   </section>
 
@@ -1140,6 +1312,16 @@
             <td class="col-name">12</td>
             <td class="col-notes">First-user admin promotion: if no user has <code>is_admin = true</code>, set <code>is_admin = true</code> for the user with the lowest <code>id</code></td>
             <td class="col-notes">Idempotent — safe to run on every startup; skipped if an admin already exists.</td>
+          </tr>
+          <tr>
+            <td class="col-name">13</td>
+            <td class="col-notes"><code>CREATE TABLE IF NOT EXISTS system_logs (id SERIAL PRIMARY KEY, created_at TIMESTAMPTZ NOT NULL DEFAULT now(), level VARCHAR(10) NOT NULL, source VARCHAR(100) NOT NULL, message TEXT NOT NULL, details JSONB, user_id INTEGER); CREATE INDEX IF NOT EXISTS ix_system_logs_created_at ON system_logs(created_at)</code></td>
+            <td class="col-notes">Creates the system_logs table and its index. Standalone — no foreign keys. Applied on every startup; idempotent due to IF NOT EXISTS guards.</td>
+          </tr>
+          <tr>
+            <td class="col-name">14</td>
+            <td class="col-notes"><code>CREATE TABLE IF NOT EXISTS translation_cache (id SERIAL PRIMARY KEY, text_hash VARCHAR(64) UNIQUE NOT NULL, source_text TEXT NOT NULL, target_language VARCHAR(100) NOT NULL, translation TEXT NOT NULL, accuracy INTEGER, model VARCHAR(100) NOT NULL, hit_count INTEGER NOT NULL DEFAULT 0, created_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now()); CREATE UNIQUE INDEX IF NOT EXISTS ix_translation_cache_text_hash ON translation_cache(text_hash)</code></td>
+            <td class="col-notes">Creates the translation_cache table and its unique index. Standalone — no foreign keys. Applied on every startup; idempotent due to IF NOT EXISTS guards.</td>
           </tr>
         </tbody>
       </table>

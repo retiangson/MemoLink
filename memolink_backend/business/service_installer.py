@@ -21,6 +21,7 @@ class ServiceInstaller:
             note_repo=self._domain.get_note_repository(),
             embedding_service=self._domain.get_embedding_service(),
             db=self._domain.get_db(),
+            log_service=self.get_system_log_service(),
         )
 
     def get_note_service(self) -> INoteService:
@@ -45,6 +46,10 @@ class ServiceInstaller:
             note_repo=self._domain.get_note_repository(),
             embedding_service=self._domain.get_embedding_service(),
         )
+
+    def get_system_log_service(self):
+        from memolink_backend.business.services.system_log_service import SystemLogService
+        return SystemLogService(repo=self._domain.get_system_log_repository())
 
     def get_conversation_service(self) -> IConversationService:
         from memolink_backend.business.services.conversation_service import ConversationService

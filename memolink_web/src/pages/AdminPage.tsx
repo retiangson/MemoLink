@@ -1,12 +1,12 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   fetchAdminFeedback, updateFeedbackStatus, fetchAdminUsers, updateUserRole, updateUserLevel,
-  fetchAdminFeatures, updateAdminFeatures,
-  type FeedbackItem, type AdminUser, type FeatureFlags, type AccessLevel,
+  fetchAdminFeatures, updateAdminFeatures, fetchSystemLogs, clearSystemLogs,
+  type FeedbackItem, type AdminUser, type FeatureFlags, type AccessLevel, type SystemLogItem,
 } from "../api/adminApi";
 import { MODELS } from "../constants/models";
 
-type Tab = "feedback" | "features" | "users";
+type Tab = "feedback" | "features" | "users" | "logs";
 
 const _LEVEL_ORDER: Record<string, number> = { regular: 0, plus: 1, pro: 2 };
 
@@ -50,6 +50,17 @@ export function AdminPage({ onClose, currentUserId }: Props) {
   const [usersLoading, setUsersLoading] = useState(false);
   const [levelChanging, setLevelChanging] = useState<Record<number, boolean>>({});
 
+  // Logs state
+  const [logs, setLogs] = useState<SystemLogItem[]>([]);
+  const [logsLoading, setLogsLoading] = useState(false);
+  const [logsTotal, setLogsTotal] = useState(0);
+  const [logsPage, setLogsPage] = useState(1);
+  const [logsPages, setLogsPages] = useState(1);
+  const [logsLevelFilter, setLogsLevelFilter] = useState("");
+  const [logsSourceFilter, setLogsSourceFilter] = useState("");
+  const [expandedLog, setExpandedLog] = useState<number | null>(null);
+  const [clearingLogs, setClearingLogs] = useState(false);
+
   // Feature flags state
   const [flags, setFlags] = useState<FeatureFlags | null>(null);
   const [flagsLoading, setFlagsLoading] = useState(false);
@@ -57,15 +68,32 @@ export function AdminPage({ onClose, currentUserId }: Props) {
   const [flagsError, setFlagsError] = useState<string | null>(null);
   const [levelTab, setLevelTab] = useState<AccessLevel>("regular");
 
+  const loadLogs = useCallback(async (page = 1) => {
+    setLogsLoading(true);
+    try {
+      const res = await fetchSystemLogs(logsLevelFilter || undefined, logsSourceFilter || undefined, page);
+      setLogs(res.items);
+      setLogsTotal(res.total);
+      setLogsPage(res.page);
+      setLogsPages(res.pages);
+    } catch { /* ignore */ }
+    finally { setLogsLoading(false); }
+  }, [logsLevelFilter, logsSourceFilter]);
+
   useEffect(() => {
     if (tab === "feedback") loadFeedback();
     else if (tab === "users") loadUsers();
     else if (tab === "features") loadFlags();
+    else if (tab === "logs") loadLogs(1);
   }, [tab]);
 
   useEffect(() => {
     if (tab === "feedback") loadFeedback();
   }, [fbTypeFilter, fbStatusFilter]);
+
+  useEffect(() => {
+    if (tab === "logs") loadLogs(1);
+  }, [logsLevelFilter, logsSourceFilter]);
 
   async function loadFeedback() {
     setFbLoading(true);
@@ -173,6 +201,7 @@ export function AdminPage({ onClose, currentUserId }: Props) {
             { key: "feedback", label: "Feedback", icon: <path d="M14 1a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H4.414A2 2 0 0 0 3 11.586l-2 2V2a1 1 0 0 1 1-1zM2 0a2 2 0 0 0-2 2v12.793a.5.5 0 0 0 .854.353l2.853-2.853A1 1 0 0 1 4.414 12H14a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2z"/> },
             { key: "features", label: "Feature Flags", icon: <path d="M3 2a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v13h1.5a.5.5 0 0 1 0 1h-13a.5.5 0 0 1 0-1H3V2zm1 13h1.5v-2a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 .5.5v2H10V2H4v13z"/> },
             { key: "users", label: "Users", icon: <path d="M7 14s-1 0-1-1 1-4 5-4 5 3 5 4-1 1-1 1zm4-6a3 3 0 1 0 0-6 3 3 0 0 0 0 6m-5.784 6A2.24 2.24 0 0 1 5 13c0-1.355.68-2.75 1.936-3.72A6.3 6.3 0 0 0 5 9c-4 0-5 3-5 4s1 1 1 1zM4.5 8a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5"/> },
+          { key: "logs", label: "System Logs", icon: <><path d="M5 0h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h2zm-1 1H3a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H6v2.5a.5.5 0 0 1-.5.5h-2A.5.5 0 0 1 3 4.5V1.5A.5.5 0 0 1 3.5 1H4z"/><path d="M4.5 12.5A.5.5 0 0 1 5 12h6a.5.5 0 0 1 0 1H5a.5.5 0 0 1-.5-.5zm0-2A.5.5 0 0 1 5 10h6a.5.5 0 0 1 0 1H5a.5.5 0 0 1-.5-.5zm0-2A.5.5 0 0 1 5 8h6a.5.5 0 0 1 0 1H5a.5.5 0 0 1-.5-.5z"/></> },
           ] as { key: Tab; label: string; icon: React.ReactNode }[]).map(({ key, label, icon }) => (
             <button
               key={key}
@@ -598,6 +627,150 @@ export function AdminPage({ onClose, currentUserId }: Props) {
               )}
             </div>
           )}
+
+          {/* LOGS TAB */}
+          {tab === "logs" && (() => {
+            const LEVEL_STYLES: Record<string, string> = {
+              INFO:    "bg-sky-500/10 text-sky-400 border-sky-500/20",
+              WARNING: "bg-amber-500/10 text-amber-400 border-amber-500/20",
+              ERROR:   "bg-red-500/10 text-red-400 border-red-500/20",
+            };
+
+            async function handleClear() {
+              if (!confirm("Delete all system logs? This cannot be undone.")) return;
+              setClearingLogs(true);
+              try {
+                await clearSystemLogs();
+                setLogs([]);
+                setLogsTotal(0);
+                setLogsPage(1);
+                setLogsPages(1);
+              } catch { /* ignore */ }
+              finally { setClearingLogs(false); }
+            }
+
+            return (
+              <div>
+                {/* Header */}
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h2 className="text-lg font-semibold text-white">System Logs</h2>
+                    <p className="text-xs text-gray-500 mt-0.5">{logsTotal} entr{logsTotal === 1 ? "y" : "ies"} total</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => loadLogs(logsPage)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-gray-400 hover:text-gray-200 hover:bg-[#1e1e2a] border border-[#2a2a38] rounded-lg transition"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                      Refresh
+                    </button>
+                    <button
+                      onClick={handleClear}
+                      disabled={clearingLogs || logsTotal === 0}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-red-400 hover:text-red-300 hover:bg-red-500/10 border border-red-500/20 rounded-lg disabled:opacity-40 transition"
+                    >
+                      Clear All
+                    </button>
+                  </div>
+                </div>
+
+                {/* Filters */}
+                <div className="flex items-center gap-2 mb-4">
+                  <select
+                    value={logsLevelFilter}
+                    onChange={(e) => setLogsLevelFilter(e.target.value)}
+                    className="bg-[#1a1a24] border border-[#2a2a38] rounded-lg px-2.5 py-1.5 text-xs text-gray-300 focus:outline-none focus:border-indigo-500/50"
+                  >
+                    <option value="">All levels</option>
+                    <option value="INFO">INFO</option>
+                    <option value="WARNING">WARNING</option>
+                    <option value="ERROR">ERROR</option>
+                  </select>
+                  <input
+                    type="text"
+                    value={logsSourceFilter}
+                    onChange={(e) => setLogsSourceFilter(e.target.value)}
+                    placeholder="Filter by source…"
+                    className="bg-[#1a1a24] border border-[#2a2a38] rounded-lg px-2.5 py-1.5 text-xs text-gray-300 placeholder-gray-600 focus:outline-none focus:border-indigo-500/50 w-44"
+                  />
+                </div>
+
+                {/* Log list */}
+                {logsLoading ? (
+                  <div className="flex items-center justify-center py-12 text-gray-600 text-sm">Loading…</div>
+                ) : logs.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-16 text-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-10 h-10 text-gray-700 mb-3" fill="currentColor" viewBox="0 0 16 16">
+                      <path d="M5 0h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h2zm-1 1H3a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H6v2.5a.5.5 0 0 1-.5.5h-2A.5.5 0 0 1 3 4.5V1.5A.5.5 0 0 1 3.5 1H4z"/>
+                    </svg>
+                    <p className="text-gray-600">No logs found</p>
+                  </div>
+                ) : (
+                  <div className="space-y-1.5 font-mono text-xs">
+                    {logs.map((entry) => (
+                      <div
+                        key={entry.id}
+                        className="bg-[#1a1a24] border border-[#2a2a38] rounded-xl overflow-hidden"
+                      >
+                        <button
+                          className="w-full flex items-start gap-3 px-4 py-2.5 text-left hover:bg-[#1e1e2e] transition"
+                          onClick={() => setExpandedLog(expandedLog === entry.id ? null : entry.id)}
+                        >
+                          <span className={`shrink-0 mt-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold border ${LEVEL_STYLES[entry.level] ?? "bg-gray-500/10 text-gray-400 border-gray-500/20"}`}>
+                            {entry.level}
+                          </span>
+                          <span className="text-gray-600 shrink-0 mt-0.5 text-[10px]">
+                            {new Date(entry.created_at).toLocaleString()}
+                          </span>
+                          <span className="text-indigo-400/70 shrink-0 mt-0.5">[{entry.source}]</span>
+                          <span className="text-gray-300 flex-1 min-w-0 truncate">{entry.message}</span>
+                          {entry.details && (
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              className={`w-3 h-3 text-gray-600 shrink-0 mt-0.5 transition-transform ${expandedLog === entry.id ? "rotate-180" : ""}`}
+                              fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+                            >
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                            </svg>
+                          )}
+                        </button>
+                        {expandedLog === entry.id && entry.details && (
+                          <div className="px-4 py-2.5 border-t border-[#252533] bg-[#12121a]">
+                            <pre className="text-[10px] text-gray-400 whitespace-pre-wrap break-all leading-relaxed">
+                              {JSON.stringify(entry.details, null, 2)}
+                            </pre>
+                            {entry.user_id && (
+                              <p className="text-[10px] text-gray-600 mt-1.5">User #{entry.user_id}</p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Pagination */}
+                {logsPages > 1 && (
+                  <div className="flex items-center justify-center gap-2 mt-4">
+                    <button
+                      disabled={logsPage <= 1}
+                      onClick={() => loadLogs(logsPage - 1)}
+                      className="px-3 py-1.5 text-xs text-gray-400 hover:text-gray-200 border border-[#2a2a38] rounded-lg disabled:opacity-30 transition"
+                    >← Prev</button>
+                    <span className="text-xs text-gray-600">Page {logsPage} of {logsPages}</span>
+                    <button
+                      disabled={logsPage >= logsPages}
+                      onClick={() => loadLogs(logsPage + 1)}
+                      className="px-3 py-1.5 text-xs text-gray-400 hover:text-gray-200 border border-[#2a2a38] rounded-lg disabled:opacity-30 transition"
+                    >Next →</button>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
         </main>
       </div>

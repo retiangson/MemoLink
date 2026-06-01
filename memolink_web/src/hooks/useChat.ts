@@ -13,9 +13,10 @@ interface UseChatDeps {
   bottomRef: React.RefObject<HTMLDivElement | null>;
   workspaceId?: number | null;
   model?: string | null;
+  onCloseNote?: (noteId: number) => void;
 }
 
-export function useChat({ activeConversation, setActiveConversation, setConversations, bottomRef, workspaceId, model }: UseChatDeps) {
+export function useChat({ activeConversation, setActiveConversation, setConversations, bottomRef, workspaceId, model, onCloseNote }: UseChatDeps) {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [streaming, setStreaming] = useState(false);
@@ -91,6 +92,21 @@ export function useChat({ activeConversation, setActiveConversation, setConversa
             : streamChat(conversationId, trimmed, 5, workspaceId, model, webSearch);
 
         for await (const event of stream) {
+          if (event.close_note !== undefined) {
+            onCloseNote?.(event.close_note);
+            continue;
+          }
+
+          if (event.improving_note !== undefined) {
+            const content = `__IMPROVING_NOTE__:${event.improving_note}`;
+            setActiveConversation((prev) => {
+              if (!prev) return prev;
+              return { ...prev, messages: prev.messages.map((m) => m.id === STREAMING_ID ? { ...m, content } : m) };
+            });
+            if (firstContent) { firstContent = false; setLoading(false); setStreaming(true); }
+            continue;
+          }
+
           if (event.image_generating) {
             setActiveConversation((prev) => {
               if (!prev) return prev;

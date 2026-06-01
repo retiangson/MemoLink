@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     openai_embedding_model: str = "text-embedding-3-small"
     gemini_api_key: str = ""
     deepseek_api_key: str = ""
+    deepgram_api_key: str = ""
     brave_search_api_key: str = ""
     semantic_scholar_api_key: str = ""
 

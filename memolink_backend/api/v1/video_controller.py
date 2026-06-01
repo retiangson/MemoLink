@@ -7,9 +7,12 @@ import urllib.request
 from fastapi import APIRouter, HTTPException, Depends, UploadFile, File
 from pydantic import BaseModel
 from openai import OpenAI
+from sqlalchemy.orm import Session
 
+from memolink_backend.core.db import get_db
 from memolink_backend.core.security import get_current_user
 from memolink_backend.core.config import settings
+from memolink_backend.domain.repositories.system_log_repository import SystemLogRepository
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/video", tags=["video"])
@@ -22,7 +25,8 @@ _YT_PATTERNS = [
     r"youtube\.com/live/([^?&#/]+)",
 ]
 
-MAX_UPLOAD_BYTES = 25 * 1024 * 1024  # 25 MB — Whisper API limit
+MAX_UPLOAD_BYTES = 200 * 1024 * 1024  # 200 MB
+WHISPER_LIMIT = 25 * 1024 * 1024     # 25 MB — Whisper API hard limit
 ACCEPTED_EXT = {".mp3", ".mp4", ".m4a", ".wav", ".webm", ".mpeg", ".mpga", ".mov"}
 
 
@@ -149,24 +153,36 @@ def import_video(req: VideoImportRequest, _: int = Depends(get_current_user)):
 @router.post("/upload")
 async def upload_video(
     file: UploadFile = File(...),
-    _: int = Depends(get_current_user),
+    user_id: int = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
+    log_repo = SystemLogRepository(db)
     ext = os.path.splitext(file.filename or "")[1].lower()
     if ext not in ACCEPTED_EXT:
+        log_repo.create("WARNING", "video.upload", f"Rejected unsupported file type '{ext}'", {"filename": file.filename}, user_id)
         raise HTTPException(
             status_code=422,
             detail=f"Unsupported file type '{ext}'. Accepted formats: {', '.join(sorted(ACCEPTED_EXT))}",
         )
 
     data = await file.read()
-    size_mb = len(data) / 1024 / 1024
+    size_mb = round(len(data) / 1024 / 1024, 1)
     if len(data) > MAX_UPLOAD_BYTES:
+        log_repo.create("WARNING", "video.upload", f"Rejected oversized file ({size_mb} MB) — limit is 200 MB", {"filename": file.filename, "size_mb": size_mb}, user_id)
         raise HTTPException(
             status_code=422,
-            detail=f"File is too large ({size_mb:.1f} MB). Maximum is 25 MB.",
+            detail=f"File is too large ({size_mb} MB). Maximum is 200 MB.",
         )
 
-    openai_client = OpenAI(api_key=settings.openai_api_key)
+    use_deepgram = len(data) > WHISPER_LIMIT
+    if use_deepgram:
+        if settings.deepgram_api_key:
+            log_repo.create("INFO", "video.upload", f"File '{file.filename}' exceeds 25 MB — falling back to Deepgram Nova-2", {"filename": file.filename, "size_mb": size_mb, "fallback": "deepgram"}, user_id)
+        else:
+            log_repo.create("WARNING", "video.upload", f"File '{file.filename}' exceeds 25 MB Whisper limit — no Deepgram key configured", {"filename": file.filename, "size_mb": size_mb}, user_id)
+            raise HTTPException(status_code=422, detail=f"File is {size_mb} MB. Files over 25 MB require a Deepgram API key to be configured.")
+    else:
+        log_repo.create("INFO", "video.upload", f"Transcribing '{file.filename}' ({size_mb} MB) via Whisper", {"filename": file.filename, "size_mb": size_mb, "service": "whisper"}, user_id)
 
     suffix = ext if ext else ".mp4"
     with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
@@ -174,14 +190,25 @@ async def upload_video(
         tmp_path = tmp.name
 
     try:
-        with open(tmp_path, "rb") as f:
-            result = openai_client.audio.transcriptions.create(
-                model="whisper-1",
-                file=f,
-                response_format="text",
-            )
-        text = result if isinstance(result, str) else getattr(result, "text", str(result))
+        if use_deepgram:
+            from memolink_backend.utils.file_extractor import _transcribe_deepgram
+            text = _transcribe_deepgram(data, file.filename or "audio", ext.lstrip("."))
+            service = "deepgram"
+        else:
+            openai_client = OpenAI(api_key=settings.openai_api_key)
+            with open(tmp_path, "rb") as f:
+                result = openai_client.audio.transcriptions.create(
+                    model="whisper-1", file=f, response_format="text",
+                )
+            text = result if isinstance(result, str) else getattr(result, "text", str(result))
+            service = "whisper"
+
         title = os.path.splitext(file.filename or "Recording")[0]
-        return {"title": title, "content": _to_html(text), "method": "whisper"}
+        log_repo.create("INFO", "video.upload", f"Transcription complete via {service} for '{file.filename}'", {"filename": file.filename, "size_mb": size_mb, "service": service}, user_id)
+        return {"title": title, "content": _to_html(text), "method": service}
+    except Exception as exc:
+        service = "deepgram" if use_deepgram else "whisper"
+        log_repo.create("ERROR", "video.upload", f"{service.capitalize()} transcription failed for '{file.filename}': {exc}", {"filename": file.filename, "size_mb": size_mb, "service": service, "error": str(exc)}, user_id)
+        raise HTTPException(status_code=500, detail=f"Transcription failed: {exc}")
     finally:
         os.unlink(tmp_path)

@@ -1066,13 +1066,16 @@
             If Gemini hits a rate limit the entire pipeline falls back to GPT-4o-mini.
             For Māori translations a hint is injected specifying correct macron usage (ā ē ī ō ū) and natural fluency.
             The <code>accuracy</code> field in the response is the final similarity score; it is <code>null</code> when the fallback model is used without a scoring round.
+            Results are cached in the <code>translation_cache</code> table — repeated requests for the same text and language are served instantly with <code>"cached": true</code>.
+            The optional <code>force</code> boolean field (default <code>false</code>) bypasses the cache: when <code>true</code>, the full LLM pipeline runs and the cache entry is updated with the fresh result.
           </p>
           <div class="schema-row">
             <div class="schema-box">
               <div class="schema-box-title">Request Body — TranslateDTO</div>
               <pre>{
   <span class="json-key">"text"</span>:            <span class="json-str">"Hola mundo"</span>,
-  <span class="json-key">"target_language"</span>: <span class="json-str">"English"</span>
+  <span class="json-key">"target_language"</span>: <span class="json-str">"English"</span>,
+  <span class="json-key">"force"</span>:           <span class="json-bool">false</span>
 }</pre>
             </div>
             <div class="schema-box">
@@ -1080,7 +1083,8 @@
               <pre>{
   <span class="json-key">"translation"</span>: <span class="json-str">"Hello world"</span>,
   <span class="json-key">"accuracy"</span>:    <span class="json-num">92</span>,
-  <span class="json-key">"model"</span>:       <span class="json-str">"gemini-2.0-flash-lite"</span>
+  <span class="json-key">"model"</span>:       <span class="json-str">"gemini-2.0-flash-lite"</span>,
+  <span class="json-key">"cached"</span>:      <span class="json-bool">false</span>
 }</pre>
             </div>
           </div>

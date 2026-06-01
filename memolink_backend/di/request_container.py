@@ -29,6 +29,9 @@ class RequestContainer:
     def research(self):
         return self.services.get_research_service()
 
+    def logs(self):
+        return self.services.get_system_log_service()
+
 
 def get_request_container(db: Session = Depends(get_db)) -> RequestContainer:
     return RequestContainer(db)

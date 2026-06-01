@@ -120,3 +120,41 @@ export async function fetchFeatureFlags(): Promise<FeatureFlags> {
   const res = await api.get("/features");
   return parseFlags(res.data.flags);
 }
+
+export interface SystemLogItem {
+  id: number;
+  created_at: string;
+  level: "INFO" | "WARNING" | "ERROR";
+  source: string;
+  message: string;
+  details: Record<string, unknown> | null;
+  user_id: number | null;
+}
+
+export interface SystemLogsResponse {
+  items: SystemLogItem[];
+  total: number;
+  page: number;
+  page_size: number;
+  pages: number;
+}
+
+export async function fetchSystemLogs(
+  level?: string,
+  source?: string,
+  page = 1,
+  pageSize = 50,
+): Promise<SystemLogsResponse> {
+  const params = new URLSearchParams();
+  if (level) params.set("level", level);
+  if (source) params.set("source", source);
+  params.set("page", String(page));
+  params.set("page_size", String(pageSize));
+  const res = await api.get(`/admin/logs?${params}`);
+  return res.data;
+}
+
+export async function clearSystemLogs(): Promise<{ deleted: number }> {
+  const res = await api.delete("/admin/logs/clear");
+  return res.data;
+}

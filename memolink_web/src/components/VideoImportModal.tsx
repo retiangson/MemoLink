@@ -179,7 +179,7 @@ export function VideoImportModal({ onClose, onImport }: VideoImportModalProps) {
                       <path d="M7.646 1.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 2.707V11.5a.5.5 0 0 1-1 0V2.707L5.354 4.854a.5.5 0 1 1-.708-.708z"/>
                     </svg>
                     <p className="text-xs text-gray-500">Drag & drop or <span className="text-indigo-400">browse</span></p>
-                    <p className="text-[10px] text-gray-600">MP4 · M4A · WebM · MP3 · WAV · MOV — max 25 MB</p>
+                    <p className="text-[10px] text-gray-600">MP4 · M4A · WebM · MP3 · WAV · MOV — max 200 MB</p>
                   </>
                 )}
               </div>

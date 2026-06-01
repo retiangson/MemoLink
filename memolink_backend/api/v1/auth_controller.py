@@ -9,16 +9,22 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 @router.post("/register", response_model=TokenResponse)
 def register(dto: RegisterDTO, c: RequestContainer = Depends(get_request_container)):
     try:
-        return c.auth().register(dto)
+        result = c.auth().register(dto)
+        c.logs().info("auth.register", f"New user registered: {dto.email}")
+        return result
     except ValueError as e:
+        c.logs().warning("auth.register", f"Registration failed for {dto.email}: {e}")
         raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.post("/login", response_model=TokenResponse)
 def login(dto: LoginDTO, c: RequestContainer = Depends(get_request_container)):
     try:
-        return c.auth().login(dto)
+        result = c.auth().login(dto)
+        c.logs().info("auth.login", f"User logged in: {dto.email}")
+        return result
     except ValueError:
+        c.logs().warning("auth.login", f"Failed login attempt for {dto.email}")
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
 

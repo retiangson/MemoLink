@@ -41,6 +41,13 @@ _DEEPSEEK_MODELS = {"deepseek-chat", "deepseek-reasoner", "deepseek-coder"}
 _GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
 _DEEPSEEK_BASE_URL = "https://api.deepseek.com/v1"
 
+# Canonical fallback model per provider (used when building the chain)
+_PROVIDER_FALLBACK = {
+    "openai":    lambda: settings.openai_chat_model,
+    "gemini":    lambda: "gemini-2.0-flash",
+    "deepseek":  lambda: "deepseek-chat",
+}
+
 
 def _get_client(model: str) -> OpenAI:
     if model in _GEMINI_MODELS:
@@ -48,6 +55,32 @@ def _get_client(model: str) -> OpenAI:
     if model in _DEEPSEEK_MODELS:
         return OpenAI(api_key=settings.deepseek_api_key, base_url=_DEEPSEEK_BASE_URL)
     return OpenAI(api_key=settings.openai_api_key)
+
+
+_IMPROVE_NOTE_RE = re.compile(
+    r"\b(?:improve|enhance|reformat|format|clean[\s-]?up|fix|polish|rewrite|update|edit|upgrade|revise|optimise|optimize)\s+"
+    r"(?:my\s+)?(?:note|notes?)\s*[:\-]?\s*(.+?)(?:\s*[\.?!])?$",
+    re.IGNORECASE,
+)
+
+
+def _extract_improve_note_name(text: str) -> str | None:
+    m = _IMPROVE_NOTE_RE.search(text.strip())
+    return m.group(1).strip().strip('"\'') if m else None
+
+
+def _build_fallback_chain(primary: str) -> list[str]:
+    """Return ordered list of models to try, starting with primary, then other available providers."""
+    chain = [primary]
+    candidates = [
+        settings.openai_chat_model,                                           # GPT — always available
+        "gemini-2.0-flash" if settings.gemini_api_key else None,
+        "deepseek-chat"    if settings.deepseek_api_key else None,
+    ]
+    for m in candidates:
+        if m and m not in chain:
+            chain.append(m)
+    return chain
 
 IMAGE_EXTS = {"png", "jpg", "jpeg", "gif", "webp"}
 
@@ -209,6 +242,7 @@ class ChatService(IChatService):
         embedding_service: Optional[EmbeddingService] = None,
         conv_repo: Optional[IConversationRepository] = None,
         note_repo: Optional[INoteRepository] = None,
+        log_service=None,
     ):
         if conv_repo is not None and note_repo is not None:
             self.repo_conv: IConversationRepository = conv_repo
@@ -220,6 +254,15 @@ class ChatService(IChatService):
             self.repo_notes = NoteRepository(db)
 
         self.embedding = embedding_service or EmbeddingService()
+        self._log = log_service
+
+    def _syslog(self, level: str, message: str, details: dict, user_id: int | None = None):
+        if self._log is None:
+            return
+        try:
+            getattr(self._log, level.lower())("chat", message, details, user_id)
+        except Exception:
+            pass
 
     def _build_chat_context(self, dto: ChatRequestDTO):
         """Prepare conversation id, OpenAI messages list, and sources for a chat request."""
@@ -281,6 +324,66 @@ class ChatService(IChatService):
 
         return conversation_id, system_msgs + message_history, sources
 
+    def _handle_improve_note_stream(self, dto: ChatRequestDTO, note_name: str, conversation_id: int) -> Iterator[str]:
+        workspace_id = getattr(dto, "workspace_id", None)
+        note = self.repo_notes.find_by_title_for_user(dto.user_id, note_name, workspace_id)
+
+        if not note:
+            msg = f'I couldn\'t find a note matching **"{note_name}"**. Please check the title and try again.\n\nAvailable notes can be found in your sidebar.'
+            assistant_msg = self.repo_conv.add_message(conversation_id, "assistant", msg)
+            yield f"data: {json.dumps({'t': msg})}\n\n"
+            yield f"data: {json.dumps({'done': True, 'id': assistant_msg.id})}\n\n"
+            return
+
+        yield f"data: {json.dumps({'close_note': note.id})}\n\n"
+        yield f"data: {json.dumps({'improving_note': note.title})}\n\n"
+
+        plain = _HTML_TAG.sub(" ", note.content or "").strip()
+        improve_messages = [
+            {"role": "system", "content": (
+                "You are a document formatting expert. Improve the structure, formatting, and clarity of the given note. "
+                "Rules: use proper HTML tags (h2, h3 for headings, p for paragraphs, ul/ol/li for lists, "
+                "<strong> for key terms, <em> for emphasis, <table> for tabular data). "
+                "Do NOT change the meaning, remove content, or add new information. "
+                "Return ONLY the improved HTML — no markdown fences, no doctype, no html/body tags, no commentary."
+            )},
+            {"role": "user", "content": f"Note title: {note.title}\n\nContent:\n{plain[:5000]}"},
+        ]
+
+        chain = _build_fallback_chain(dto.model or settings.openai_chat_model)
+        improved_html: str | None = None
+        for attempt in chain:
+            try:
+                completion = _get_client(attempt).chat.completions.create(
+                    model=attempt, messages=improve_messages,
+                )
+                improved_html = (completion.choices[0].message.content or "").strip()
+                break
+            except Exception:
+                continue
+
+        if not improved_html:
+            msg = "⚠ Failed to improve the note — all AI models are currently unavailable."
+            assistant_msg = self.repo_conv.add_message(conversation_id, "assistant", msg)
+            yield f"data: {json.dumps({'t': msg})}\n\n"
+            yield f"data: {json.dumps({'done': True, 'id': assistant_msg.id})}\n\n"
+            return
+
+        self.repo_notes.update_note(note.id, None, improved_html)
+        self._syslog("info", f"Note '{note.title}' improved and auto-saved via chat", {"note_id": note.id, "title": note.title}, dto.user_id)
+
+        response = (
+            f"✅ Done! I've improved and saved **{note.title}** automatically.\n\n"
+            f"[[NOTE_LINK:{note.id}:{note.title}]]\n\n"
+            "**What was improved:**\n"
+            "- Heading structure and visual hierarchy\n"
+            "- Paragraph and list formatting\n"
+            "- Key terms and readability"
+        )
+        assistant_msg = self.repo_conv.add_message(conversation_id, "assistant", response)
+        yield f"data: {json.dumps({'replace': response})}\n\n"
+        yield f"data: {json.dumps({'done': True, 'id': assistant_msg.id})}\n\n"
+
     def ask(self, dto: ChatRequestDTO) -> ChatResponseDTO:
         user_text = (dto.prompt or "").strip()
         if not user_text:
@@ -299,30 +402,33 @@ class ChatService(IChatService):
             assistant_msg = self.repo_conv.add_message(conversation_id, "assistant", answer, model=img_model)
             return ChatResponseDTO(answer=answer, sources=[], message_id=assistant_msg.id)
 
+        chain = _build_fallback_chain(model)
         used_model = model
+        answer: Optional[str] = None
+        last_error = ""
 
-        try:
-            completion = _get_client(model).chat.completions.create(
-                model=model,
-                messages=messages,
-            )
-            answer = completion.choices[0].message.content
-        except RateLimitError as e:
-            logger.warning("Gemini rate limit (ask) model=%s: %s", model, e)
-            used_model = settings.openai_chat_model
+        for attempt in chain:
             try:
-                completion = OpenAI(api_key=settings.openai_api_key).chat.completions.create(
-                    model=used_model,
+                completion = _get_client(attempt).chat.completions.create(
+                    model=attempt,
                     messages=messages,
                 )
                 answer = completion.choices[0].message.content
+                used_model = attempt
+                if attempt != model:
+                    self._syslog("warning", f"Fell back from {model} → {attempt} (success)", {"original": model, "fallback": attempt}, dto.user_id)
+                break
             except Exception as e:
-                answer = f"⚠ Unexpected error: {str(e)}"
-        except APIStatusError as e:
-            logger.warning("Gemini API error (ask) model=%s status=%s: %s", model, e.status_code, e.message)
-            answer = f"⚠ API error ({e.status_code}): {e.message}"
-        except Exception as e:
-            answer = f"⚠ Unexpected error: {str(e)}"
+                last_error = str(e)
+                logger.warning("Model %s failed: %s", attempt, e)
+                if attempt != model:
+                    self._syslog("warning", f"Fallback {attempt} also failed — trying next", {"model": attempt, "error": last_error}, dto.user_id)
+                else:
+                    self._syslog("warning", f"{model} failed — starting fallback chain {chain[1:]}", {"model": model, "error": last_error, "chain": chain[1:]}, dto.user_id)
+
+        if answer is None:
+            self._syslog("error", f"All models exhausted {chain} — returning error to user", {"chain": chain, "last_error": last_error}, dto.user_id)
+            answer = f"⚠ All available AI models are currently unavailable. Please try again later.\n\n*Last error: {last_error}*"
 
         assistant_msg = self.repo_conv.add_message(conversation_id, "assistant", answer, model=used_model)
         return ChatResponseDTO(answer=answer, sources=sources, message_id=assistant_msg.id)
@@ -337,6 +443,11 @@ class ChatService(IChatService):
 
         model = dto.model or settings.openai_chat_model
         conversation_id, messages, _ = self._build_chat_context(dto)
+
+        note_name = _extract_improve_note_name(user_text)
+        if note_name:
+            yield from self._handle_improve_note_stream(dto, note_name, conversation_id)
+            return
 
         if _is_image_request(user_text):
             yield f"data: {json.dumps({'image_generating': True})}\n\n"
@@ -353,41 +464,40 @@ class ChatService(IChatService):
             yield f"data: {json.dumps({'done': True, 'id': assistant_msg.id, 'model': img_model})}\n\n"
             return
 
+        chain = _build_fallback_chain(model)
         full_answer = ""
         used_model = model
-        try:
-            stream = _get_client(model).chat.completions.create(
-                model=model,
-                messages=messages,
-                stream=True,
-            )
-            for chunk in stream:
-                delta = chunk.choices[0].delta.content or ""
-                if delta:
-                    full_answer += delta
-                    yield f"data: {json.dumps({'t': delta})}\n\n"
-        except RateLimitError as e:
-            logger.warning("Gemini rate limit (stream) model=%s: %s", model, e)
-            used_model = settings.openai_chat_model
+        succeeded = False
+        last_error = ""
+
+        for attempt in chain:
             try:
-                fallback_stream = OpenAI(api_key=settings.openai_api_key).chat.completions.create(
-                    model=used_model,
+                stream = _get_client(attempt).chat.completions.create(
+                    model=attempt,
                     messages=messages,
                     stream=True,
                 )
-                for chunk in fallback_stream:
+                if attempt != model:
+                    self._syslog("warning", f"Fell back from {model} → {attempt} (stream)", {"original": model, "fallback": attempt}, dto.user_id)
+                for chunk in stream:
                     delta = chunk.choices[0].delta.content or ""
                     if delta:
                         full_answer += delta
                         yield f"data: {json.dumps({'t': delta})}\n\n"
+                used_model = attempt
+                succeeded = True
+                break
             except Exception as e:
-                full_answer = f"⚠ Unexpected error: {str(e)}"
-                yield f"data: {json.dumps({'t': full_answer})}\n\n"
-        except APIStatusError as e:
-            full_answer = f"⚠ API error ({e.status_code}): {e.message}"
-            yield f"data: {json.dumps({'t': full_answer})}\n\n"
-        except Exception as e:
-            full_answer = f"⚠ Unexpected error: {str(e)}"
+                last_error = str(e)
+                logger.warning("Model %s failed (stream): %s", attempt, e)
+                if attempt != model:
+                    self._syslog("warning", f"Fallback {attempt} also failed (stream) — trying next", {"model": attempt, "error": last_error}, dto.user_id)
+                else:
+                    self._syslog("warning", f"{model} failed (stream) — starting fallback chain {chain[1:]}", {"model": model, "error": last_error, "chain": chain[1:]}, dto.user_id)
+
+        if not succeeded:
+            self._syslog("error", f"All models exhausted {chain} (stream) — returning error to user", {"chain": chain, "last_error": last_error}, dto.user_id)
+            full_answer = f"⚠ All available AI models are currently unavailable. Please try again later.\n\n*Last error: {last_error}*"
             yield f"data: {json.dumps({'t': full_answer})}\n\n"
 
         assistant_msg = self.repo_conv.add_message(conversation_id, "assistant", full_answer, model=used_model)

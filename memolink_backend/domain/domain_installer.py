@@ -4,9 +4,12 @@ from sqlalchemy.orm import Session
 from memolink_backend.domain.interfaces.i_user_repository import IUserRepository
 from memolink_backend.domain.interfaces.i_note_repository import INoteRepository
 from memolink_backend.domain.interfaces.i_conversation_repository import IConversationRepository
+from memolink_backend.domain.interfaces.i_system_log_repository import ISystemLogRepository
 from memolink_backend.domain.repositories.user_repository import UserRepository
 from memolink_backend.domain.repositories.note_repository import NoteRepository
 from memolink_backend.domain.repositories.conversation_repository import ConversationRepository
+from memolink_backend.domain.repositories.system_log_repository import SystemLogRepository
+from memolink_backend.domain.repositories.translation_cache_repository import TranslationCacheRepository
 from memolink_backend.business.services.embedding_service import EmbeddingService
 
 
@@ -28,3 +31,9 @@ class DomainInstaller:
 
     def get_conversation_repository(self) -> IConversationRepository:
         return ConversationRepository(self._db)
+
+    def get_system_log_repository(self) -> ISystemLogRepository:
+        return SystemLogRepository(self._db)
+
+    def get_translation_cache_repository(self) -> TranslationCacheRepository:
+        return TranslationCacheRepository(self._db)

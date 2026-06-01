@@ -81,6 +81,21 @@ class NoteRepository:
         self.db.commit()
         return True
 
+    def find_by_title_for_user(self, user_id: int, name: str, workspace_id: int | None = None) -> Optional[Note]:
+        """Fuzzy title search: exact → starts-with → contains."""
+        notes = self.get_for_user(user_id, workspace_id)
+        name_l = name.lower().strip()
+        for strategy in (
+            lambda t: t == name_l,
+            lambda t: t.startswith(name_l),
+            lambda t: name_l in t,
+            lambda t: t in name_l,
+        ):
+            for n in notes:
+                if strategy((n.title or "").lower()):
+                    return n
+        return None
+
     def search_hybrid(
         self,
         query_text: str,

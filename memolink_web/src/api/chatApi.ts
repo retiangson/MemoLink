@@ -31,7 +31,7 @@ export async function* streamChat(conversation_id: number, prompt: string, top_k
     buf = lines.pop() ?? "";
     for (const line of lines) {
       if (line.startsWith("data: ")) {
-        yield JSON.parse(line.slice(6)) as { t?: string; replace?: string; done?: boolean; id?: number | null; model?: string; tool_call?: string; label?: string; tool_result?: string; ok?: boolean; image_generating?: boolean };
+        yield JSON.parse(line.slice(6)) as { t?: string; replace?: string; done?: boolean; id?: number | null; model?: string; tool_call?: string; label?: string; tool_result?: string; ok?: boolean; image_generating?: boolean; close_note?: number; improving_note?: string };
       }
     }
   }
@@ -99,8 +99,12 @@ export async function generateSuggestions(
   return (await api.post("/suggest", { title, content, workspace_id: workspace_id ?? null })).data;
 }
 
-export async function translateText(text: string, targetLanguage = "English"): Promise<{ translation: string; accuracy: number | null; model: string }> {
-  return (await api.post("/translate", { text, target_language: targetLanguage })).data;
+export async function translateText(
+  text: string,
+  targetLanguage = "English",
+  force = false,
+): Promise<{ translation: string; accuracy: number | null; model: string; cached: boolean }> {
+  return (await api.post("/translate", { text, target_language: targetLanguage, force })).data;
 }
 
 export async function* streamResearch(conversation_id: number, prompt: string, workspace_id?: number | null, model?: string | null) {
