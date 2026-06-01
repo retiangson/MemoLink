@@ -498,18 +498,20 @@ def transcribe_audio(file_bytes: bytes, filename: str, ext: str, language: str |
             return f"[Transcription error] Deepgram failed: {e}"
 
     try:
-        import io as _io
-        from openai import OpenAI
-        client = OpenAI(api_key=settings.openai_api_key)
-        # Use BytesIO with .name so the SDK derives format from the extension.
-        # Spaces in filenames confuse Whisper's server-side parser, so replace them.
+        import httpx as _httpx
         safe_filename = filename.replace(" ", "_")
-        audio_file = _io.BytesIO(file_bytes)
-        audio_file.name = safe_filename
-        kwargs: dict = dict(model="whisper-1", file=audio_file)
+        mime_type = _WHISPER_MIME.get(ext.lstrip("."), "audio/webm")
+        data: dict = {"model": "whisper-1"}
         if language:
-            kwargs["language"] = language
-        transcript = client.audio.transcriptions.create(**kwargs)
-        return transcript.text
+            data["language"] = language
+        resp = _httpx.post(
+            "https://api.openai.com/v1/audio/transcriptions",
+            headers={"Authorization": f"Bearer {settings.openai_api_key}"},
+            files={"file": (safe_filename, file_bytes, mime_type)},
+            data=data,
+            timeout=120.0,
+        )
+        resp.raise_for_status()
+        return resp.json()["text"]
     except Exception as e:
         return f"[Transcription error] {e}"

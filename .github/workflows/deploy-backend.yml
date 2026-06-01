@@ -91,9 +91,35 @@ jobs:
           FRONTEND_URL: ${{ secrets.FRONTEND_URL }}
           S3_UPLOAD_BUCKET: ${{ secrets.S3_UPLOAD_BUCKET }}
         run: |
+          # Build Variables JSON via Python to safely handle special characters in secret values
+          ENV_JSON=$(python3 -c "
+          import json, os
+          vars = {
+            'DATABASE_URL': os.environ['DATABASE_URL'],
+            'OPENAI_API_KEY': os.environ['OPENAI_API_KEY'],
+            'OPENAI_CHAT_MODEL': os.environ.get('OPENAI_CHAT_MODEL', ''),
+            'OPENAI_EMBEDDING_MODEL': os.environ.get('OPENAI_EMBEDDING_MODEL', ''),
+            'GEMINI_API_KEY': os.environ.get('GEMINI_API_KEY', ''),
+            'DEEPSEEK_API_KEY': os.environ.get('DEEPSEEK_API_KEY', ''),
+            'DEEPGRAM_API_KEY': os.environ.get('DEEPGRAM_API_KEY', ''),
+            'BRAVE_SEARCH_API_KEY': os.environ.get('BRAVE_SEARCH_API_KEY', ''),
+            'SEMANTIC_SCHOLAR_API_KEY': os.environ.get('SEMANTIC_SCHOLAR_API_KEY', ''),
+            'JWT_SECRET_KEY': os.environ['JWT_SECRET_KEY'],
+            'JWT_ALGORITHM': 'HS256',
+            'SMTP_HOST': os.environ.get('SMTP_HOST', ''),
+            'SMTP_PORT': os.environ.get('SMTP_PORT', '587'),
+            'SMTP_USER': os.environ.get('SMTP_USER', ''),
+            'SMTP_PASSWORD': os.environ.get('SMTP_PASSWORD', ''),
+            'SMTP_FROM': os.environ.get('SMTP_FROM', ''),
+            'FRONTEND_URL': os.environ.get('FRONTEND_URL', ''),
+            'S3_UPLOAD_BUCKET': os.environ.get('S3_UPLOAD_BUCKET', ''),
+            'MEMOLINK_SKIP_DB_BOOTSTRAP': '1',
+          }
+          print(json.dumps({'Variables': vars}))
+          ")
           aws lambda update-function-configuration \
             --function-name ${{ secrets.LAMBDA_FUNCTION_NAME }} \
-            --environment "Variables={DATABASE_URL=$DATABASE_URL,OPENAI_API_KEY=$OPENAI_API_KEY,OPENAI_CHAT_MODEL=$OPENAI_CHAT_MODEL,OPENAI_EMBEDDING_MODEL=$OPENAI_EMBEDDING_MODEL,GEMINI_API_KEY=$GEMINI_API_KEY,DEEPSEEK_API_KEY=$DEEPSEEK_API_KEY,DEEPGRAM_API_KEY=$DEEPGRAM_API_KEY,BRAVE_SEARCH_API_KEY=$BRAVE_SEARCH_API_KEY,SEMANTIC_SCHOLAR_API_KEY=$SEMANTIC_SCHOLAR_API_KEY,JWT_SECRET_KEY=$JWT_SECRET_KEY,JWT_ALGORITHM=HS256,SMTP_HOST=$SMTP_HOST,SMTP_PORT=$SMTP_PORT,SMTP_USER=$SMTP_USER,SMTP_PASSWORD=$SMTP_PASSWORD,SMTP_FROM=$SMTP_FROM,FRONTEND_URL=$FRONTEND_URL,S3_UPLOAD_BUCKET=$S3_UPLOAD_BUCKET,MEMOLINK_SKIP_DB_BOOTSTRAP=1}"
+            --environment "$ENV_JSON"
 
       - name: Wait for configuration update to complete
         run: |
