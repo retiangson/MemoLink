@@ -762,6 +762,8 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                 ttsSentences={chat.tts.sentencesList}
                 ttsEnabled={flags.tts_enabled}
                 videoImportEnabled={flags.video_import_enabled}
+                timelineEnabled={flags.timeline_enabled}
+                noteId={editor.active?.note.id ?? null}
               />
             </main>
           ) : (
@@ -981,6 +983,8 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                       ttsSentences={chat.tts.sentencesList}
                       ttsEnabled={flags.tts_enabled}
                       videoImportEnabled={flags.video_import_enabled}
+                      timelineEnabled={flags.timeline_enabled}
+                      noteId={editor.active?.note.id ?? null}
                     />
                   </main>
                 ) : (

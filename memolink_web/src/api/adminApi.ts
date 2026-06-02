@@ -39,6 +39,7 @@ export type FeatureFlags = {
   confidence_enabled: boolean;
   autopilot_enabled: boolean;
   study_mode_enabled: boolean;
+  timeline_enabled: boolean;
   default_model: string;
   default_language: string;
   web_search_min_level: AccessLevel;
@@ -75,6 +76,7 @@ export function parseFlags(raw: Record<string, string>): FeatureFlags {
     confidence_enabled: raw.confidence_enabled !== "false",
     autopilot_enabled: raw.autopilot_enabled !== "false",
     study_mode_enabled: raw.study_mode_enabled !== "false",
+    timeline_enabled: raw.timeline_enabled !== "false",
     default_model: raw.default_model ?? "gpt-4o-mini",
     default_language: raw.default_language ?? "English",
     web_search_min_level: (raw.web_search_min_level ?? "regular") as AccessLevel,
@@ -139,6 +141,7 @@ export async function updateAdminFeatures(flags: FeatureFlags): Promise<FeatureF
     confidence_enabled: String(flags.confidence_enabled),
     autopilot_enabled: String(flags.autopilot_enabled),
     study_mode_enabled: String(flags.study_mode_enabled),
+    timeline_enabled: String(flags.timeline_enabled),
     default_model: flags.default_model,
     default_language: flags.default_language,
     web_search_min_level: flags.web_search_min_level,

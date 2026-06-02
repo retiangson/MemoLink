@@ -87,6 +87,14 @@ class ServiceInstaller:
             note_repo=self._domain.get_note_repository(),
         )
 
+    def get_timeline_service(self):
+        from memolink_backend.business.services.timeline_service import TimelineService
+        from memolink_backend.domain.repositories.timeline_repository import TimelineRepository
+        return TimelineService(
+            timeline_repo=TimelineRepository(self._domain.get_db()),
+            note_repo=self._domain.get_note_repository(),
+        )
+
     def get_study_service(self):
         from memolink_backend.business.services.study_service import StudyService
         return StudyService(
