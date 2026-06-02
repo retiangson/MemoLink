@@ -1,3 +1,48 @@
+"""
+MemoGraph Service — AI Knowledge Graph Builder
+===============================================
+
+This service analyses a user's notes and builds a structured knowledge graph that maps
+how ideas, people, projects, and topics connect across the entire workspace.
+
+HOW IT WORKS
+------------
+1. BUILD  (triggered manually by the user)
+   - All notes in the workspace are fetched.
+   - Note and Reminder nodes are created first as first-class graph nodes.
+   - Notes are sent to GPT-4o-mini in batches of 5 (one API call per batch).
+     GPT extracts named entities of 8 types: people, topics, projects, deadlines,
+     decisions, action_items, questions, themes.
+   - For each extracted entity a GraphNode is upserted (deduplication by label+type
+     means "Professor Smith" mentioned in three notes becomes ONE node, not three).
+   - A directed GraphEdge is created from the note node to each entity node with a
+     descriptive relationship label (e.g. "covers", "mentions", "has_deadline").
+   - After all batches complete, notes that share ≥2 entity nodes are linked with a
+     bidirectional "related_to" edge, surfacing thematic connections vector search alone
+     would miss.
+   - All graph data is stored in the graph_nodes and graph_edges tables for instant
+     retrieval on subsequent opens.
+
+2. GET
+   - Returns the full serialised graph ({nodes, links}) for the frontend canvas renderer.
+
+3. GRAPH-ENHANCED RAG  (transparent to the user, runs on every chat message)
+   - After vector search finds the top-K semantically similar notes, GraphRepository
+     .get_related_note_ids() traverses the graph to find additional notes connected
+     through shared entity nodes. These are appended to the chat context block, labelled
+     "related via MemoGraph", giving the LLM a wider contextual view than vector
+     similarity alone provides.
+
+COST
+----
+Building a 20-note workspace makes ~4 GPT-4o-mini calls (batches of 5).
+Subsequent views are free — results are stored in the database.
+Graph-enhanced RAG adds no extra API calls; traversal is a SQL query.
+
+NODE TYPES  →  10 types, each with a distinct colour in the frontend canvas
+  note, reminder, person, topic, project, deadline, decision, action_item, question, theme
+"""
+
 import json
 import re
 from typing import Optional

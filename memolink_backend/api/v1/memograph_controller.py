@@ -1,3 +1,27 @@
+"""
+MemoGraph Controller — REST API for the AI Knowledge Graph feature.
+
+Endpoints
+---------
+POST /api/memograph/build?workspace_id=<id>
+    Triggers a full graph build for the workspace:
+    - Clears any existing graph data
+    - Extracts entities from all notes via GPT (batches of 5 notes per call)
+    - Stores nodes and edges in graph_nodes / graph_edges tables
+    - Returns { nodes: <count>, edges: <count> }
+
+GET  /api/memograph?workspace_id=<id>
+    Returns the serialised graph for the frontend canvas:
+    { nodes: [{id, label, type, source_id}], links: [{source, target, relationship}] }
+    Returns empty arrays if no graph has been built yet.
+
+DELETE /api/memograph?workspace_id=<id>
+    Deletes all graph nodes for the workspace (edges cascade).
+
+All endpoints require a valid JWT (Bearer token).
+workspace_id is required for build and delete; returns empty graph if omitted for GET.
+"""
+
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session

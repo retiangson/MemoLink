@@ -1,3 +1,29 @@
+"""
+GraphRepository — Persistence layer for MemoGraph nodes and edges.
+
+Tables
+------
+graph_nodes  — one row per unique entity within a workspace.
+               Unique key: (user_id, workspace_id, node_type, label).
+               Deduplication means the same person/topic mentioned in multiple notes
+               maps to a single node rather than duplicates.
+
+graph_edges  — directed relationships between nodes.
+               Unique key: (source_node_id, target_node_id, relationship).
+               Edges cascade-delete when either endpoint node is removed.
+
+Key methods
+-----------
+upsert_node            — get-or-create a node; safe to call multiple times.
+upsert_edge            — get-or-create an edge; safe to call multiple times.
+get_graph              — returns {nodes, links} JSON consumed by the frontend canvas.
+get_related_note_ids   — graph traversal used by ChatService for graph-enhanced RAG:
+                         given a list of seed note IDs (from vector search), returns
+                         IDs of OTHER notes that share entity nodes with the seeds.
+                         Traversal: seed_note → (edge) → entity → (edge) → other_note.
+clear                  — deletes all nodes for a workspace; edges cascade automatically.
+"""
+
 from typing import Optional
 from sqlalchemy.orm import Session
 from memolink_backend.domain.models.graph_node import GraphNode

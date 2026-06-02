@@ -1,3 +1,25 @@
+/**
+ * MemoGraph API client
+ *
+ * Wraps the three MemoGraph backend endpoints:
+ *   GET    /api/memograph?workspace_id=   — fetch stored graph data
+ *   POST   /api/memograph/build           — trigger entity extraction + graph build
+ *   DELETE /api/memograph                 — clear graph for workspace
+ *
+ * GraphNode types: note | reminder | person | topic | project |
+ *                  deadline | decision | action_item | question | theme
+ *
+ * GraphLink.relationship examples:
+ *   note → person      "mentions"
+ *   note → topic       "covers"
+ *   note → project     "relates_to"
+ *   note → deadline    "has_deadline"
+ *   note → decision    "records"
+ *   note → action_item "contains"
+ *   note → question    "raises"
+ *   note → theme       "exhibits"
+ *   note → note        "related_to"  (notes sharing ≥2 entity nodes)
+ */
 import { api } from "./client";
 
 export interface GraphNode {

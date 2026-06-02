@@ -1,3 +1,48 @@
+/**
+ * MemoGraphModal — Interactive AI Knowledge Graph Viewer
+ *
+ * Renders a full-screen, physics-based force-directed graph that shows how
+ * notes, people, topics, projects, decisions, and other entities extracted
+ * from the user's notes connect to each other.
+ *
+ * RENDERING
+ * ---------
+ * Uses an HTML <canvas> element drawn with the 2D Canvas API.
+ * d3-force drives the physics simulation (charge repulsion + link attraction +
+ * collision avoidance + center gravity). On each simulation tick the canvas is
+ * redrawn via requestAnimationFrame — nodes as circles with glow effects,
+ * edges as lines with relationship labels, dashed indigo lines for note↔note
+ * "related_to" connections.
+ *
+ * INTERACTION
+ * -----------
+ * Drag node   — click + drag a node circle to reposition it; node is pinned
+ *               (fx/fy set) while dragging, released on mouseup.
+ * Pan canvas  — click + drag empty space to translate the viewport.
+ * Zoom        — scroll wheel zooms toward the cursor position (non-passive
+ *               native event listener so preventDefault() works).
+ * Fit button  — auto-scales the viewport so all nodes are visible.
+ * Click note  — clicking a note node opens it in the editor and closes the modal.
+ *
+ * TRANSFORM SYSTEM
+ * ----------------
+ * All drawing happens in world coordinates. A transform (tx, ty, scale) stored
+ * in transformRef is applied via ctx.setTransform() at the start of each draw
+ * call. Mouse coordinates are converted to world space before hit-testing nodes.
+ *
+ * GRAPH-ENHANCED RAG
+ * ------------------
+ * Once a MemoGraph is built, the backend's ChatService uses the graph edges to
+ * find notes connected to vector-search results through shared entity nodes.
+ * These are appended to the chat context (labelled "related via MemoGraph"),
+ * giving the LLM wider context than semantic similarity alone provides.
+ *
+ * NODE TYPES & COLOURS
+ * --------------------
+ * note (indigo) · reminder (amber) · person (green) · topic (cyan)
+ * project (orange) · deadline (red) · decision (yellow)
+ * action_item (pink) · question (purple) · theme (teal)
+ */
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import {
   forceSimulation,
