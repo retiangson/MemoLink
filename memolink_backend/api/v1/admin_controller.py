@@ -28,6 +28,9 @@ DEFAULT_FLAGS: Dict[str, str] = {
     "proactive_insights_enabled": "true",
     "confidence_enabled": "true",
     "autopilot_enabled": "true",
+    "study_mode_enabled": "true",
+    "timeline_enabled": "true",
+    "workflow_enabled": "true",
     "default_model": "gpt-4o-mini",
     "default_language": "English",
     # Minimum access level required per feature

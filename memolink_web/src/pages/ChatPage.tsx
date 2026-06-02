@@ -32,6 +32,8 @@ import { useFeatureFlags } from "../hooks/useFeatureFlags";
 import { fetchAdminFeedback } from "../api/adminApi";
 import { getEmailStatus, autoProcessEmails } from "../api/emailApi";
 import { AdminPage } from "./AdminPage";
+import { planWorkflow } from "../api/workflowApi";
+import { TEMP_WORKFLOW_ID } from "../types";
 
 type WorkspaceHook = ReturnType<typeof useWorkspace>;
 type LayoutMode = "stacked" | "columns" | "rows";
@@ -61,6 +63,8 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
   const [showHelp, setShowHelp] = useState(false);
   const [showMemoGraph, setShowMemoGraph] = useState(false);
   const [showStudyMode, setShowStudyMode] = useState(false);
+  const [workflowMode, setWorkflowMode] = useState(false);
+  const [workflowLoading, setWorkflowLoading] = useState(false);
   const [showWorkspaceManager, setShowWorkspaceManager] = useState(false);
   const [showAdmin, setShowAdmin] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
@@ -207,6 +211,60 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
     window.addEventListener("click", close);
     return () => window.removeEventListener("click", close);
   }, []);
+
+  // ── Workflow send — intercepts normal send when workflow mode is active ───
+  async function handleWorkflowSend() {
+    if (!workflowMode) { chat.handleSend(); return; }
+    const trimmed = chat.input.trim();
+    if (!trimmed || chat.loading || chat.streaming || workflowLoading) return;
+
+    chat.setInput("");
+    setWorkflowLoading(true);
+
+    try {
+      let conv = convs.activeConversation;
+      let conversationId: number;
+      if (!conv || conv.id === TEMP_ID) {
+        const { createConversation, renameConversation } = await import("../api/conversationApi");
+        const created = await createConversation(activeWorkspaceId);
+        conversationId = created.id;
+        await renameConversation(conversationId, trimmed.slice(0, 60));
+        conv = { id: conversationId, title: trimmed.slice(0, 60), messages: [] };
+        convs.setConversations((p: any[]) => [conv!, ...p]);
+        convs.setActiveConversation(conv);
+      } else {
+        conversationId = conv.id;
+      }
+
+      // Show user message optimistically
+      const userMsg = { id: TEMP_WORKFLOW_ID, role: "user" as const, content: trimmed };
+      convs.setActiveConversation((prev: any) => prev ? { ...prev, messages: [...prev.messages, userMsg] } : prev);
+
+      // Call planning endpoint
+      const plan = await planWorkflow(conversationId, trimmed, activeWorkspaceId, selectedModel);
+
+      // Show the workflow plan card
+      const planMsg = {
+        id: plan.message_id,
+        role: "assistant" as const,
+        content: `__WORKFLOW_PLAN__:${JSON.stringify({ understanding: plan.understanding, actions: plan.actions })}`,
+      };
+      convs.setActiveConversation((prev: any) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          id: conversationId,
+          messages: prev.messages
+            .map((m: any) => m.id === TEMP_WORKFLOW_ID ? { ...m, id: plan.message_id - 1 } : m)
+            .concat(planMsg),
+        };
+      });
+    } catch (e) {
+      console.error("Workflow plan failed", e);
+    } finally {
+      setWorkflowLoading(false);
+    }
+  }
 
   // ── Chat tab actions ──────────────────────────────────────────────────────
   async function handleActivateChat(chatId: number) {
@@ -789,6 +847,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                     modelAttributionEnabled={modelAttributionEnabled}
                     confidenceEnabled={flags.confidence_enabled}
                     autopilotEnabled={flags.autopilot_enabled}
+                    workflowContext={convs.activeConversation?.id && convs.activeConversation.id !== TEMP_ID ? { conversationId: convs.activeConversation.id, workspaceId: activeWorkspaceId, model: selectedModel } : undefined}
                   />
                 </div>
               </main>
@@ -814,12 +873,14 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                 setPendingFiles={chat.setPendingFiles}
                 textareaRef={chat.textareaRef}
                 attachmentInputRef={chat.attachmentInputRef}
-                onSend={chat.handleSend}
+                onSend={handleWorkflowSend}
                 autoResize={chat.autoResize}
                 webSearch={chat.webSearch}
                 onToggleWebSearch={() => chat.setWebSearch((v) => !v)}
                 agentMode={chat.agentMode}
                 onToggleAgentMode={() => chat.setAgentMode((v) => !v)}
+                workflowMode={workflowMode}
+                onToggleWorkflowMode={() => setWorkflowMode((v) => !v)}
                 researchMode={chat.researchMode}
                 onToggleResearchMode={() => chat.setResearchMode((v) => !v)}
                 flags={flags}
@@ -911,12 +972,14 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                   setPendingFiles={chat.setPendingFiles}
                   textareaRef={chat.textareaRef}
                   attachmentInputRef={chat.attachmentInputRef}
-                  onSend={chat.handleSend}
+                  onSend={handleWorkflowSend}
                   autoResize={chat.autoResize}
                   webSearch={chat.webSearch}
                   onToggleWebSearch={() => chat.setWebSearch((v) => !v)}
                   agentMode={chat.agentMode}
                   onToggleAgentMode={() => chat.setAgentMode((v) => !v)}
+                  workflowMode={workflowMode}
+                  onToggleWorkflowMode={() => setWorkflowMode((v) => !v)}
                   researchMode={chat.researchMode}
                   onToggleResearchMode={() => chat.setResearchMode((v) => !v)}
                   flags={flags}

@@ -27,6 +27,7 @@ export interface Note {
 }
 
 export const TEMP_ID = -1;
+export const TEMP_WORKFLOW_ID = -2;
 
 export function convLabel(conv: { title?: string | null; created_at?: string | null }): string {
   if (conv.title) return conv.title;

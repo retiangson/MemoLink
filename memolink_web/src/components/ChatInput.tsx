@@ -20,6 +20,8 @@ interface ChatInputProps {
   onToggleWebSearch: () => void;
   agentMode: boolean;
   onToggleAgentMode: () => void;
+  workflowMode: boolean;
+  onToggleWorkflowMode: () => void;
   researchMode: boolean;
   onToggleResearchMode: () => void;
   flags?: {
@@ -28,6 +30,7 @@ interface ChatInputProps {
     file_upload_enabled: boolean;
     research_mode_enabled: boolean;
     slash_commands_enabled: boolean;
+    workflow_enabled?: boolean;
   };
   notes?: Note[];
 }
@@ -37,7 +40,7 @@ const ALL_SUPPORT = new Set(["improve","enhance","summarize","quiz","discussion"
 export function ChatInput({
   input, setInput, loading, pendingFiles, setPendingFiles,
   textareaRef, attachmentInputRef, onSend, autoResize,
-  webSearch, onToggleWebSearch, agentMode, onToggleAgentMode, researchMode, onToggleResearchMode, flags, notes = [],
+  webSearch, onToggleWebSearch, agentMode, onToggleAgentMode, workflowMode, onToggleWorkflowMode, researchMode, onToggleResearchMode, flags, notes = [],
 }: ChatInputProps) {
   const [showLangPicker, setShowLangPicker] = useState(false);
   const [slashPickerIndex, setSlashPickerIndex] = useState(0);
@@ -341,6 +344,25 @@ export function ChatInput({
                     <path d="M8 1.783C7.015.936 5.587.81 4.287.94c-1.514.153-3.042.672-3.994 1.105A.5.5 0 0 0 0 2.5v11a.5.5 0 0 0 .707.455c.882-.4 2.303-.881 3.68-1.02 1.409-.142 2.59.087 3.223.877a.5.5 0 0 0 .78 0c.633-.79 1.814-1.019 3.222-.877 1.378.139 2.8.62 3.681 1.02A.5.5 0 0 0 16 13.5v-11a.5.5 0 0 0-.293-.455c-.952-.433-2.48-.952-3.994-1.105C10.413.809 8.985.936 8 1.783"/>
                   </svg>
                   {agentMode && <span>Agent</span>}
+                </button>
+              )}
+
+              {/* Workflow mode toggle */}
+              {(!flags || flags.workflow_enabled !== false) && (
+                <button
+                  onClick={onToggleWorkflowMode}
+                  title={workflowMode ? "Workflow mode — AI proposes actions for your approval" : "Enable Workflow mode — AI asks before acting"}
+                  className={`flex items-center gap-1.5 px-2.5 h-8 rounded-xl text-xs font-medium transition ${
+                    workflowMode
+                      ? "bg-amber-500/15 border border-amber-500/40 text-amber-400 hover:bg-amber-500/25"
+                      : "text-gray-500 hover:text-gray-200 hover:bg-[#252533]"
+                  }`}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 shrink-0" fill="currentColor" viewBox="0 0 16 16">
+                    <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16"/>
+                    <path d="m8.93 6.588-2.29.287-.082.38.45.083c.294.07.352.176.288.469l-.738 3.468c-.194.897.105 1.319.808 1.319.545 0 1.178-.252 1.465-.598l.088-.416c-.2.176-.492.246-.686.246-.275 0-.375-.193-.304-.533zM9 4.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0"/>
+                  </svg>
+                  {workflowMode && <span>Workflow</span>}
                 </button>
               )}
 
