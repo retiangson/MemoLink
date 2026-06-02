@@ -36,7 +36,6 @@ export function RightPanel({
 }: RightPanelProps) {
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState<SuggestionItem | null>(null);
-  const [showActions, setShowActions] = useState(true);
   const [showNoteReminders, setShowNoteReminders] = useState(true);
   const [showEmailReminders, setShowEmailReminders] = useState(true);
 
@@ -173,96 +172,7 @@ export function RightPanel({
       {/* Scrollable body — everything between header and footer scrolls together */}
       <div className="flex-1 overflow-y-auto flex flex-col min-h-0">
 
-      {/* ── Action row (collapsible) ── */}
-      <div className="border-b border-[#1e1e2a] shrink-0">
-        <button
-          onClick={() => setShowActions((v) => !v)}
-          className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-[#1a1a24] transition text-left"
-        >
-          <div className="flex items-center gap-2">
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 text-indigo-400 shrink-0" fill="currentColor" viewBox="0 0 16 16">
-              <path d="M11.251.068a.5.5 0 0 1 .227.58L9.677 6.5H13a.5.5 0 0 1 .364.843l-8 8.5a.5.5 0 0 1-.842-.49L6.323 9.5H3a.5.5 0 0 1-.364-.843l8-8.5a.5.5 0 0 1 .615-.09z"/>
-            </svg>
-            <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Actions</span>
-          </div>
-          <svg xmlns="http://www.w3.org/2000/svg" className={`w-3 h-3 text-gray-600 transition-transform ${showActions ? "" : "-rotate-90"}`} fill="currentColor" viewBox="0 0 16 16">
-            <path d="M7.247 11.14 2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z"/>
-          </svg>
-        </button>
-
-        {showActions && <div className="px-3 pb-3 flex flex-col gap-2">
-        <button
-          onClick={onGenerate}
-          disabled={isGenerating}
-          className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/30 text-indigo-300 rounded-lg text-xs transition disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          {isGenerating ? (
-            <>
-              <svg className="w-3 h-3 animate-spin shrink-0" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
-              </svg>
-              Generating…
-            </>
-          ) : (
-            <>
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3 shrink-0" fill="currentColor" viewBox="0 0 16 16">
-                <path d="M2 6a6 6 0 1 1 10.174 4.31c-.203.196-.359.4-.453.619l-.762 1.769A.5.5 0 0 1 10.5 13h-5a.5.5 0 0 1-.46-.302l-.761-1.77a2 2 0 0 0-.453-.618A5.98 5.98 0 0 1 2 6m3 8.5a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 0 1l-.224.447a1 1 0 0 1-.894.553H6.618a1 1 0 0 1-.894-.553L5.5 15a.5.5 0 0 1-.5-.5"/>
-              </svg>
-              Generate from Notes
-            </>
-          )}
-        </button>
-
-        {emailConnected && (
-          <div className="flex flex-col gap-1">
-            <button
-              onClick={onSyncEmail}
-              disabled={isSyncingEmail}
-              className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-blue-600/10 hover:bg-blue-600/20 border border-blue-500/20 text-blue-300 rounded-lg text-xs transition disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              {isSyncingEmail ? (
-                <>
-                  <svg className="w-3 h-3 animate-spin shrink-0" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
-                  </svg>
-                  Syncing Email…
-                </>
-              ) : (
-                <>
-                  <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3 shrink-0" fill="currentColor" viewBox="0 0 16 16">
-                    <path d="M0 4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2zm2-1a1 1 0 0 0-1 1v.217l7 4.2 7-4.2V4a1 1 0 0 0-1-1zm13 2.383-4.708 2.825L15 11.105zm-.034 6.876-5.64-3.471L8 9.583l-1.326-.795-5.64 3.47A1 1 0 0 0 2 13h12a1 1 0 0 0 .966-.741M1 11.105l4.708-2.897L1 5.383z"/>
-                  </svg>
-                  Sync from Email
-                </>
-              )}
-            </button>
-            {emailSyncResult && (
-              <p className={`text-[10px] text-center px-2 py-1 rounded-md ${
-                emailSyncResult.startsWith("✓")
-                  ? "text-green-400 bg-green-500/10"
-                  : "text-red-400 bg-red-500/10"
-              }`}>
-                {emailSyncResult}
-              </p>
-            )}
-          </div>
-        )}
-
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 border border-[#2a2a38] hover:border-[#3a3a4a] text-gray-500 hover:text-gray-300 rounded-lg text-xs transition"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-          </svg>
-          Add Reminder
-        </button>
-        </div>}{/* end showActions */}
-      </div>{/* end action collapsible */}
-
-      {/* ── Section 1: Notes Reminders ── */}
+      {/* ── Section 1: Notes ── */}
       <div className="border-b border-[#1e1e2a]">
         <button
           onClick={() => setShowNoteReminders((v) => !v)}
@@ -286,9 +196,33 @@ export function RightPanel({
 
         {showNoteReminders && (
           <div className="px-3 pb-3 flex flex-col gap-2">
+            {/* Generate from Notes */}
+            <button
+              onClick={onGenerate}
+              disabled={isGenerating}
+              className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/30 text-indigo-300 rounded-lg text-xs transition disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {isGenerating ? (
+                <><svg className="w-3 h-3 animate-spin shrink-0" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>Generating…</>
+              ) : (
+                <><svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3 shrink-0" fill="currentColor" viewBox="0 0 16 16"><path d="M2 6a6 6 0 1 1 10.174 4.31c-.203.196-.359.4-.453.619l-.762 1.769A.5.5 0 0 1 10.5 13h-5a.5.5 0 0 1-.46-.302l-.761-1.77a2 2 0 0 0-.453-.618A5.98 5.98 0 0 1 2 6m3 8.5a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 0 1l-.224.447a1 1 0 0 1-.894.553H6.618a1 1 0 0 1-.894-.553L5.5 15a.5.5 0 0 1-.5-.5"/></svg>Generate from Notes</>
+              )}
+            </button>
+
+            {/* Add Reminder */}
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 border border-[#2a2a38] hover:border-[#3a3a4a] text-gray-500 hover:text-gray-300 rounded-lg text-xs transition"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+              </svg>
+              Add Reminder
+            </button>
+
             {noteItems.length === 0 && !isGenerating && (
-              <p className="text-[11px] text-gray-600 text-center py-3">
-                No note reminders yet — use Generate from Notes above.
+              <p className="text-[11px] text-gray-600 text-center pt-1">
+                No note reminders yet.
               </p>
             )}
             {noteItems.map(renderCard)}
@@ -321,9 +255,31 @@ export function RightPanel({
 
           {showEmailReminders && (
             <div className="px-3 pb-3 flex flex-col gap-2">
+              {/* Sync from Email */}
+              {emailConnected && (
+                <>
+                  <button
+                    onClick={onSyncEmail}
+                    disabled={isSyncingEmail}
+                    className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-blue-600/10 hover:bg-blue-600/20 border border-blue-500/20 text-blue-300 rounded-lg text-xs transition disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    {isSyncingEmail ? (
+                      <><svg className="w-3 h-3 animate-spin shrink-0" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>Syncing Email…</>
+                    ) : (
+                      <><svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3 shrink-0" fill="currentColor" viewBox="0 0 16 16"><path d="M0 4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2zm2-1a1 1 0 0 0-1 1v.217l7 4.2 7-4.2V4a1 1 0 0 0-1-1zm13 2.383-4.708 2.825L15 11.105zm-.034 6.876-5.64-3.471L8 9.583l-1.326-.795-5.64 3.47A1 1 0 0 0 2 13h12a1 1 0 0 0 .966-.741M1 11.105l4.708-2.897L1 5.383z"/></svg>Sync from Email</>
+                    )}
+                  </button>
+                  {emailSyncResult && (
+                    <p className={`text-[10px] text-center px-2 py-1 rounded-md ${emailSyncResult.startsWith("✓") ? "text-green-400 bg-green-500/10" : "text-red-400 bg-red-500/10"}`}>
+                      {emailSyncResult}
+                    </p>
+                  )}
+                </>
+              )}
+
               {emailItems.length === 0 && (
-                <p className="text-[11px] text-gray-600 text-center py-3">
-                  No email reminders yet — sync your email above.
+                <p className="text-[11px] text-gray-600 text-center pt-1">
+                  No email reminders yet.
                 </p>
               )}
               {emailItems.map(renderCard)}
