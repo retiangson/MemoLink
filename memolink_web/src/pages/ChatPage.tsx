@@ -830,7 +830,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                 <div className="h-full flex">
                   <MessageList
                     messages={convs.activeConversation.messages}
-                    loading={chat.loading}
+                    loading={chat.loading || workflowLoading}
                     streaming={chat.streaming}
                     activeConversation={convs.activeConversation}
                     messagesContainerRef={convs.messagesContainerRef}
@@ -868,7 +868,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
               <ChatInput
                 input={chat.input}
                 setInput={chat.setInput}
-                loading={chat.loading || chat.streaming}
+                loading={chat.loading || chat.streaming || workflowLoading}
                 pendingFiles={chat.pendingFiles}
                 setPendingFiles={chat.setPendingFiles}
                 textareaRef={chat.textareaRef}
@@ -932,7 +932,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                   <div className="h-full flex">
                     <MessageList
                       messages={convs.activeConversation.messages}
-                      loading={chat.loading}
+                      loading={chat.loading || workflowLoading}
                       streaming={chat.streaming}
                       activeConversation={convs.activeConversation}
                       messagesContainerRef={convs.messagesContainerRef}
@@ -967,7 +967,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                 <ChatInput
                   input={chat.input}
                   setInput={chat.setInput}
-                  loading={chat.loading || chat.streaming}
+                  loading={chat.loading || chat.streaming || workflowLoading}
                   pendingFiles={chat.pendingFiles}
                   setPendingFiles={chat.setPendingFiles}
                   textareaRef={chat.textareaRef}
