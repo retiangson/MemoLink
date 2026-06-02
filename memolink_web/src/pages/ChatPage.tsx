@@ -28,6 +28,7 @@ import { TEMP_ID, convLabel } from "../types";
 import { useWorkspace } from "../hooks/useWorkspace";
 import { useFeatureFlags } from "../hooks/useFeatureFlags";
 import { fetchAdminFeedback } from "../api/adminApi";
+import { getEmailStatus, autoProcessEmails } from "../api/emailApi";
 import { AdminPage } from "./AdminPage";
 
 type WorkspaceHook = ReturnType<typeof useWorkspace>;
@@ -62,6 +63,9 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
   const [openFeedbackCount, setOpenFeedbackCount] = useState(0);
   const [selectedModel, setSelectedModel] = useState<string>(getSavedModel);
   const { flags } = useFeatureFlags();
+  const [emailConnected, setEmailConnected] = useState(false);
+  const [isSyncingEmail, setIsSyncingEmail] = useState(false);
+  const [emailSyncResult, setEmailSyncResult] = useState<string | null>(null);
 
   // Tab drag-and-drop
   const dragSrcRef = useRef<{ type: "chat" | "note"; index: number } | null>(null);
@@ -100,9 +104,44 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
   }
   useEffect(() => { refreshFeedbackCount(); }, []);
 
+  useEffect(() => {
+    getEmailStatus().then(s => setEmailConnected(s.connected)).catch(() => {});
+  }, []);
+
+  async function handleSyncEmail() {
+    setIsSyncingEmail(true);
+    setEmailSyncResult(null);
+    try {
+      const result = await autoProcessEmails();
+      await Promise.all([suggestions.reload(), reloadNotes()]);
+      if (result.synced === 0) {
+        setEmailSyncResult("✓ No new emails");
+      } else {
+        const parts = [`✓ ${result.synced} email${result.synced !== 1 ? "s" : ""} synced`];
+        if (result.notes_added > 0) parts.push(`Email Digest updated`);
+        if (result.reminders_created > 0) parts.push(`${result.reminders_created} reminder${result.reminders_created !== 1 ? "s" : ""} added`);
+        setEmailSyncResult(parts.join(" · "));
+      }
+    } catch (err: any) {
+      const detail = err?.response?.data?.detail ?? "Email sync failed";
+      setEmailSyncResult(`✗ ${detail}`);
+    } finally {
+      setIsSyncingEmail(false);
+    }
+  }
+
+  // Open Settings → Email tab after Gmail OAuth redirect
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("email_connected") === "1") {
+      setShowSettings(true);
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, []);
+
   const activeWorkspaceId = workspaceHook.activeWorkspace?.id ?? null;
 
-  const { notes, setNotes, addNote, saveNote, removeNote } = useNotes(user.id, activeWorkspaceId);
+  const { notes, setNotes, addNote, saveNote, removeNote, reloadNotes } = useNotes(user.id, activeWorkspaceId);
   const suggestions = useSuggestions(activeWorkspaceId);
   const { permission: notifPermission, requestPermission: requestNotifPermission } = useReminderNotifications(suggestions.items);
   const editor = useNoteEditor();
@@ -941,6 +980,10 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
         onGenerate={handleGenerate}
         notificationPermission={notifPermission}
         onRequestNotificationPermission={requestNotifPermission}
+        emailConnected={emailConnected && flags.email_enabled}
+        isSyncingEmail={isSyncingEmail}
+        onSyncEmail={handleSyncEmail}
+        emailSyncResult={emailSyncResult}
       />
 
       <DeleteModal
@@ -965,7 +1008,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
         />
       )}
 
-      <SettingsModal show={showSettings} user={user} onClose={() => setShowSettings(false)} selectedModel={selectedModel} onModelChange={handleModelChange} modelSelectionEnabled={flags.model_selection_enabled} customApiKeysEnabled={flags.custom_api_keys_enabled} ttsEnabled={flags.tts_enabled} />
+      <SettingsModal show={showSettings} user={user} onClose={() => setShowSettings(false)} selectedModel={selectedModel} onModelChange={handleModelChange} modelSelectionEnabled={flags.model_selection_enabled} customApiKeysEnabled={flags.custom_api_keys_enabled} ttsEnabled={flags.tts_enabled} emailEnabled={flags.email_enabled} />
       <HelpModal show={showHelp} onClose={() => setShowHelp(false)} />
       <FeedbackModal show={showFeedback} onClose={() => setShowFeedback(false)} />
 

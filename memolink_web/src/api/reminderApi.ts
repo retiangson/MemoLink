@@ -8,6 +8,7 @@ export interface ReminderItem {
   done: boolean;
   due_date: string | null;
   due_time: string | null;
+  email_record_id: number | null;
 }
 
 export async function listReminders(workspace_id?: number | null): Promise<ReminderItem[]> {

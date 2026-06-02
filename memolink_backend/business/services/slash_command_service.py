@@ -62,13 +62,24 @@ def _parse(text: str) -> Optional[ParsedCommand]:
 
 # ── OpenAI client helper (reuses chat_service pattern) ────────────────────────
 
-_GEMINI_MODELS = {"gemini-2.0-flash", "gemini-2.0-flash-lite", "gemini-1.5-flash-8b", "gemini-1.5-pro"}
+_GEMINI_MODELS = {"gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.5-pro"}
 _DEEPSEEK_MODELS = {"deepseek-chat", "deepseek-reasoner", "deepseek-coder"}
 _GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
 _DEEPSEEK_BASE_URL = "https://api.deepseek.com/v1"
+_MODEL_ALIASES = {
+    "gemini-2.0-flash": "gemini-2.5-flash",
+    "gemini-2.0-flash-lite": "gemini-2.5-flash-lite",
+    "gemini-1.5-flash-8b": "gemini-2.5-flash-lite",
+    "gemini-1.5-pro": "gemini-2.5-pro",
+}
+
+
+def _canonical_model(model: str) -> str:
+    return _MODEL_ALIASES.get(model, model)
 
 
 def _get_client(model: str, user_keys: dict | None = None) -> OpenAI:
+    model = _canonical_model(model)
     keys = user_keys or {}
     if model in keys:
         cfg = keys[model]
@@ -115,7 +126,7 @@ class SlashCommandService:
 
     def _ai(self, model: str, messages: list, user_id: int | None) -> str:
         user_keys = self._resolve_user_keys(user_id)
-        chain = [model, settings.openai_chat_model]
+        chain = [_canonical_model(model), settings.openai_chat_model]
         for m in chain:
             try:
                 return _get_client(m, user_keys).chat.completions.create(
@@ -583,7 +594,7 @@ Base questions ONLY on the provided notes. Do not invent facts not in the notes.
             ("GPT", settings.openai_chat_model),
         ]
         if settings.gemini_api_key:
-            discussion_models.append(("Gemini", "gemini-2.0-flash"))
+            discussion_models.append(("Gemini", "gemini-2.5-flash"))
         if settings.deepseek_api_key:
             discussion_models.append(("DeepSeek", "deepseek-chat"))
 

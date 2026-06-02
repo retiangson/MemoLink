@@ -35,6 +35,9 @@ class RequestContainer:
     def commands(self):
         return self.services.get_slash_command_service()
 
+    def email(self):
+        return self.services.get_email_service()
+
 
 def get_request_container(db: Session = Depends(get_db)) -> RequestContainer:
     return RequestContainer(db)

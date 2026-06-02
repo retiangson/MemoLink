@@ -1,6 +1,9 @@
 import React, { useEffect, useState } from "react";
 import type { SuggestionItem } from "../hooks/useSuggestions";
 import { buildGoogleCalendarUrl } from "../utils/reminderUtils";
+import { getEmail } from "../api/emailApi";
+import type { EmailRecord } from "../api/emailApi";
+import { EmailReplyPanel } from "./EmailReplyPanel";
 
 interface ReminderDetailModalProps {
   item: SuggestionItem | null;
@@ -16,6 +19,7 @@ export function ReminderDetailModal({ item, onClose, onSave, onDelete, onToggleD
   const [dueDate, setDueDate] = useState("");
   const [dueTime, setDueTime] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [linkedEmail, setLinkedEmail] = useState<EmailRecord | null>(null);
 
   useEffect(() => {
     if (item) {
@@ -24,6 +28,10 @@ export function ReminderDetailModal({ item, onClose, onSave, onDelete, onToggleD
       setDueDate(item.due_date ?? "");
       setDueTime(item.due_time ?? "");
       setConfirmDelete(false);
+      setLinkedEmail(null);
+      if (item.email_record_id) {
+        getEmail(item.email_record_id).then(setLinkedEmail).catch(() => {});
+      }
     }
   }, [item]);
 
@@ -79,7 +87,7 @@ export function ReminderDetailModal({ item, onClose, onSave, onDelete, onToggleD
       onClick={onClose}
     >
       <div
-        className="bg-[#1a1a24] border border-[#2a2a38] rounded-2xl w-full max-w-md shadow-2xl overflow-hidden"
+        className={`bg-[#1a1a24] border border-[#2a2a38] rounded-2xl w-full shadow-2xl flex flex-col max-h-[90vh] ${linkedEmail ? "max-w-lg" : "max-w-md"}`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -129,7 +137,7 @@ export function ReminderDetailModal({ item, onClose, onSave, onDelete, onToggleD
         </div>
 
         {/* Body */}
-        <div className="px-5 py-4 space-y-4">
+        <div className="px-5 py-4 space-y-4 overflow-y-auto flex-1">
           {/* Title */}
           <div>
             <label className="block text-[11px] text-gray-500 uppercase tracking-wider mb-1.5">Title</label>
@@ -197,6 +205,27 @@ export function ReminderDetailModal({ item, onClose, onSave, onDelete, onToggleD
                 {item.due_time ? ` at ${formatTime(item.due_time)}` : ""}
                 {isOverdue ? " — overdue" : isToday ? " — due today" : ""}
               </span>
+            </div>
+          )}
+
+          {/* Email reply — shown when reminder was created from an email */}
+          {linkedEmail && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 px-3 py-2 bg-[#12121a] border border-[#2a2a38] rounded-xl">
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 text-blue-400 shrink-0" fill="currentColor" viewBox="0 0 16 16">
+                  <path d="M0 4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2zm2-1a1 1 0 0 0-1 1v.217l7 4.2 7-4.2V4a1 1 0 0 0-1-1zm13 2.383-4.708 2.825L15 11.105zm-.034 6.876-5.64-3.471L8 9.583l-1.326-.795-5.64 3.47A1 1 0 0 0 2 13h12a1 1 0 0 0 .966-.741M1 11.105l4.708-2.897L1 5.383z"/>
+                </svg>
+                <div className="min-w-0">
+                  <p className="text-[11px] text-gray-300 truncate font-medium">{linkedEmail.subject}</p>
+                  <p className="text-[10px] text-gray-600 truncate">from {linkedEmail.sender_name || linkedEmail.sender_email}</p>
+                </div>
+              </div>
+              <EmailReplyPanel
+                emailRecordId={linkedEmail.id}
+                senderName={linkedEmail.sender_name}
+                senderEmail={linkedEmail.sender_email}
+                subject={linkedEmail.subject}
+              />
             </div>
           )}
 

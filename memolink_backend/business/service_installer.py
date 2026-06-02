@@ -61,6 +61,15 @@ class ServiceInstaller:
             db=self._domain.get_db(),
         )
 
+    def get_email_service(self):
+        from memolink_backend.business.services.email_service import EmailService
+        return EmailService(
+            account_repo=self._domain.get_email_account_repository(),
+            record_repo=self._domain.get_email_record_repository(),
+            note_repo=self._domain.get_note_repository(),
+            embedding_service=self._domain.get_embedding_service(),
+        )
+
     def get_slash_command_service(self):
         from memolink_backend.business.services.slash_command_service import SlashCommandService
         return SlashCommandService(

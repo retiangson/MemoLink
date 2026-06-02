@@ -11,6 +11,8 @@ from memolink_backend.domain.repositories.conversation_repository import Convers
 from memolink_backend.domain.repositories.system_log_repository import SystemLogRepository
 from memolink_backend.domain.repositories.translation_cache_repository import TranslationCacheRepository
 from memolink_backend.domain.repositories.user_api_key_repository import UserApiKeyRepository
+from memolink_backend.domain.repositories.email_account_repository import EmailAccountRepository
+from memolink_backend.domain.repositories.email_record_repository import EmailRecordRepository
 from memolink_backend.business.services.embedding_service import EmbeddingService
 
 
@@ -41,3 +43,9 @@ class DomainInstaller:
 
     def get_user_api_key_repository(self) -> UserApiKeyRepository:
         return UserApiKeyRepository(self._db)
+
+    def get_email_account_repository(self) -> EmailAccountRepository:
+        return EmailAccountRepository(self._db)
+
+    def get_email_record_repository(self) -> EmailRecordRepository:
+        return EmailRecordRepository(self._db)

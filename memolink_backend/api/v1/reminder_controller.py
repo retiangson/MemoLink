@@ -14,6 +14,7 @@ def _serialize(r: Reminder) -> dict:
         "id": r.id, "text": r.text, "description": r.description,
         "type": r.type, "done": r.done,
         "due_date": r.due_date, "due_time": r.due_time,
+        "email_record_id": getattr(r, "email_record_id", None),
     }
 
 
@@ -39,9 +40,10 @@ def list_reminders(
     workspace_id: Optional[int] = None,
     db: Session = Depends(get_db),
 ):
+    from sqlalchemy import or_
     q = db.query(Reminder).filter(Reminder.user_id == user_id)
     if workspace_id is not None:
-        q = q.filter(Reminder.workspace_id == workspace_id)
+        q = q.filter(or_(Reminder.workspace_id == workspace_id, Reminder.workspace_id == None))
     return [_serialize(r) for r in q.order_by(Reminder.created_at.desc()).all()]
 
 
