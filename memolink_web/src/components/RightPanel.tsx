@@ -86,8 +86,11 @@ export function RightPanel({
         </div>
       </div>
 
+      {/* Scrollable body — everything between header and footer scrolls together */}
+      <div className="flex-1 overflow-y-auto flex flex-col min-h-0">
+
       {/* Action row: Generate + Add */}
-      <div className="px-3 pt-3 pb-3 border-b border-[#1e1e2a] shrink-0 flex flex-col gap-2">
+      <div className="px-3 pt-3 pb-3 border-b border-[#1e1e2a] flex flex-col gap-2 shrink-0">
         <button
           onClick={onGenerate}
           disabled={isGenerating}
@@ -167,7 +170,7 @@ export function RightPanel({
       )}
 
       {/* Items list */}
-      <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-2">
+      <div className="p-3 flex flex-col gap-2">
         {items.length === 0 && !isGenerating && (
           <div className="text-center mt-10 px-4">
             <svg xmlns="http://www.w3.org/2000/svg" className="w-8 h-8 text-gray-700 mx-auto mb-3" fill="currentColor" viewBox="0 0 16 16">
@@ -269,7 +272,9 @@ export function RightPanel({
         })}
       </div>
 
-      {/* Footer: clear done */}
+      </div>{/* end scrollable body */}
+
+      {/* Footer: clear done — pinned at bottom */}
       {doneCount > 0 && (
         <div className="px-3 py-2 border-t border-[#1e1e2a] shrink-0">
           <button
