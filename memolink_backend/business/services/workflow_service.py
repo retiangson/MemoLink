@@ -55,7 +55,7 @@ from memolink_backend.domain.models.reminder import Reminder
 from memolink_backend.domain.repositories.note_repository import NoteRepository
 from memolink_backend.domain.repositories.conversation_repository import ConversationRepository
 from memolink_backend.business.services.embedding_service import EmbeddingService
-from memolink_backend.utils.web_search import brave_search
+from memolink_backend.utils.web_search import brave_image_search, brave_search
 
 _HTML = re.compile(r"<[^>]+>")
 
@@ -149,7 +149,8 @@ class WorkflowService:
             "- suggest search_web   : user asked to search online / look something up / find current info,\n"
             "                         OR the AI response says it cannot browse/search the web,\n"
             "                         OR the response suggests further reading or external sources would help.\n"
-            "                         Use the user's question as the search query.\n"
+            "                         Use the user's actual question as the search query.\n"
+            "                         Never use generic placeholder queries like 'specific questions or topics of interest'.\n"
             "- suggest extract_tasks: response contains multiple action items or to-dos\n"
             "- return empty array when response is conversational, a greeting, or simple Q&A (< 3 sentences)\n"
             "- max 3 actions, labels must be short action phrases\n"
@@ -169,6 +170,21 @@ class WorkflowService:
         raw = re.sub(r"^```(?:json)?\s*", "", raw)
         raw = re.sub(r"\s*```$", "", raw)
         data = json.loads(raw)
+        generic_queries = {
+            "specific questions or topics of interest",
+            "topic",
+            "topics",
+            "further reading",
+            "external sources",
+            "research interests",
+        }
+        for action in data.get("actions", []):
+            if action.get("type") != "search_web":
+                continue
+            params = action.setdefault("params", {})
+            query = str(params.get("query") or "").strip()
+            if user_message and (not query or query.lower() in generic_queries or len(query) < 8):
+                params["query"] = user_message.strip()
         return [
             WorkflowAction(
                 id=a.get("id", f"s{i}"),
@@ -363,8 +379,17 @@ class WorkflowService:
             return f"Summary note created (ID {note.id})"
 
         if action.type == "search_web":
-            result = brave_search(p.get("query", "")) or "No results found"
-            return result[:300]
+            query = str(p.get("query") or "").strip()
+            web_results = brave_search(query, count=6)
+            image_results = brave_image_search(query, count=3)
+            if not web_results and not image_results:
+                return "No results found"
+            parts = []
+            if web_results:
+                parts.append(web_results)
+            if image_results:
+                parts.append(image_results)
+            return "\n\n".join(parts)
 
         if action.type == "organise_notes":
             notes = self._notes.get_for_user(user_id, workspace_id)
