@@ -1,11 +1,14 @@
 import React, { useState } from "react";
-import { executeAction, type WorkflowAction } from "../api/workflowApi";
+import { confirmAction, type WorkflowAction } from "../api/workflowApi";
+import type { Message } from "../types";
 
 interface Props {
   actions: WorkflowAction[];
   conversationId: number;
   workspaceId: number | null;
+  model: string | null;
   onActionDone?: (type: string) => void;
+  onConversationMessages?: (messages: Message[]) => void;
 }
 
 const ACTION_ICONS: Record<string, string> = {
@@ -45,7 +48,7 @@ const ACTION_YES_LABELS: Record<string, string> = {
 
 type ActionState = "idle" | "loading" | "done" | "error";
 
-export function WorkflowActionBar({ actions, conversationId, workspaceId, onActionDone }: Props) {
+export function WorkflowActionBar({ actions, conversationId, workspaceId, model, onActionDone, onConversationMessages }: Props) {
   const [dismissed, setDismissed] = useState(false);
   const [states, setStates] = useState<Record<string, ActionState>>({});
   const [results, setResults] = useState<Record<string, string>>({});
@@ -58,13 +61,15 @@ export function WorkflowActionBar({ actions, conversationId, workspaceId, onActi
     return s === "done" || s === "error";
   });
 
-  async function handleAction(action: WorkflowAction) {
+  async function handleAction(action: WorkflowAction, userMessage?: string) {
     if (states[action.id] && states[action.id] !== "idle" && states[action.id] !== "error") return;
     setStates(s => ({ ...s, [action.id]: "loading" }));
     try {
-      const res = await executeAction(conversationId, action, workspaceId);
+      const responseText = userMessage ?? ACTION_YES_LABELS[action.type] ?? action.label;
+      const res = await confirmAction(conversationId, action, responseText, workspaceId, model);
       setStates(s => ({ ...s, [action.id]: res.ok ? "done" : "error" }));
       setResults(r => ({ ...r, [action.id]: res.result }));
+      onConversationMessages?.([res.user_message, res.assistant_message]);
       if (res.ok) onActionDone?.(action.type);
     } catch {
       setStates(s => ({ ...s, [action.id]: "error" }));
@@ -95,7 +100,7 @@ export function WorkflowActionBar({ actions, conversationId, workspaceId, onActi
                 No
               </button>
               <button
-                onClick={() => handleAction(action)}
+                onClick={() => handleAction(action, yesLabel)}
                 className="px-3 py-1 rounded-lg text-xs font-medium text-indigo-300 bg-indigo-500/10 border border-indigo-500/25 hover:bg-indigo-500/20 transition"
               >
                 {icon} {yesLabel}
@@ -178,7 +183,7 @@ export function WorkflowActionBar({ actions, conversationId, workspaceId, onActi
           return (
             <button
               key={action.id}
-              onClick={() => handleAction(action)}
+              onClick={() => handleAction(action, action.label)}
               disabled={state === "loading"}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium border transition ${
                 state === "error"

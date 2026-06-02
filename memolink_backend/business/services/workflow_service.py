@@ -49,7 +49,7 @@ from sqlalchemy.orm import Session
 
 from memolink_backend.core.config import settings
 from memolink_backend.contracts.workflow_dtos import (
-    WorkflowAction, WorkflowPlanResponse,
+    WorkflowAction, WorkflowPlanResponse, WorkflowConfirmResponse, WorkflowChatMessage,
 )
 from memolink_backend.domain.models.reminder import Reminder
 from memolink_backend.domain.repositories.note_repository import NoteRepository
@@ -248,6 +248,37 @@ class WorkflowService:
 
     # ── Phase 2: Execute ───────────────────────────────────────────────────────
 
+    def confirm_action(
+        self,
+        user_id: int,
+        conversation_id: int,
+        action: WorkflowAction,
+        user_message: str,
+        workspace_id: Optional[int],
+        model: Optional[str],
+    ) -> WorkflowConfirmResponse:
+        """Execute one suggested action as a normal chat turn and persist both messages."""
+        model = self._chat_model(model)
+        user_text = (user_message or "Yes").strip()
+        user_msg = self._convs.add_message(conversation_id, "user", user_text)
+
+        try:
+            result = self._execute_action(action, user_id, workspace_id)
+            ok = True
+            assistant_text = self._confirmation_reply(action, result, True)
+        except Exception as exc:
+            result = str(exc)
+            ok = False
+            assistant_text = self._confirmation_reply(action, result, False)
+
+        assistant_msg = self._convs.add_message(conversation_id, "assistant", assistant_text, model=model)
+        return WorkflowConfirmResponse(
+            ok=ok,
+            result=result,
+            user_message=self._message_payload(user_msg),
+            assistant_message=self._message_payload(assistant_msg),
+        )
+
     def execute_stream(
         self,
         user_id: int,
@@ -256,10 +287,7 @@ class WorkflowService:
         workspace_id: Optional[int],
         model: Optional[str],
     ) -> Iterator[str]:
-        model = model or settings.openai_chat_model
-        _OPENAI_PREFIXES = ("gpt-", "o1-", "o3-", "o4-")
-        if not any(model.startswith(p) for p in _OPENAI_PREFIXES):
-            model = "gpt-4o-mini"
+        model = self._chat_model(model)
         total = len(actions)
         results: list[str] = []
 
@@ -415,6 +443,47 @@ class WorkflowService:
         raise ValueError(f"Unknown action type: {action.type}")
 
     # ── Helpers ────────────────────────────────────────────────────────────────
+
+    def _chat_model(self, model: Optional[str]) -> str:
+        model = model or settings.openai_chat_model
+        _OPENAI_PREFIXES = ("gpt-", "o1-", "o3-", "o4-")
+        if not any(model.startswith(p) for p in _OPENAI_PREFIXES):
+            return "gpt-4o-mini"
+        return model
+
+    def _message_payload(self, msg) -> WorkflowChatMessage:
+        return WorkflowChatMessage(
+            id=msg.id,
+            role=msg.role,
+            content=msg.content,
+            model=msg.model,
+        )
+
+    def _confirmation_reply(self, action: WorkflowAction, result: str, ok: bool) -> str:
+        if not ok:
+            return f"I tried to run **{action.label}**, but it failed: {result}"
+
+        p = action.params or {}
+        if action.type == "create_note":
+            title = p.get("title") or "the note"
+            return f"Successfully saved that as a note: **{title}**."
+        if action.type == "create_reminder":
+            title = p.get("title") or "the reminder"
+            due = f" for {p.get('due_date')}" if p.get("due_date") else ""
+            return f"Successfully added the reminder **{title}**{due}."
+        if action.type == "extract_tasks":
+            return "Successfully extracted the tasks and saved them as a checklist note."
+        if action.type == "summarise_workspace":
+            return "Successfully created a workspace summary note."
+        if action.type == "organise_notes":
+            return "Successfully created a note organisation map."
+        if action.type == "prepare_report_outline":
+            return "Successfully created the report outline note."
+        if action.type == "suggest_title":
+            return f"Successfully updated the note title. {result}"
+        if action.type == "search_web":
+            return f"Here is what I found:\n\n{result}"
+        return f"Successfully completed **{action.label}**. {result}"
 
     def _read_notes(self, query: str, user_id: int, workspace_id: Optional[int]) -> str:
         try:

@@ -17,6 +17,7 @@ from memolink_backend.contracts.workflow_dtos import (
     WorkflowPlanRequest, WorkflowPlanResponse,
     WorkflowExecuteRequest,
     WorkflowSuggestRequest, WorkflowSuggestResponse,
+    WorkflowConfirmRequest, WorkflowConfirmResponse,
 )
 
 router = APIRouter(prefix="/workflow", tags=["workflow"])
@@ -51,6 +52,22 @@ def plan_workflow(
         user_id=user_id,
         conversation_id=body.conversation_id,
         prompt=body.prompt,
+        workspace_id=body.workspace_id,
+        model=body.model,
+    )
+
+
+@router.post("/confirm", response_model=WorkflowConfirmResponse)
+def confirm_workflow_action(
+    body: WorkflowConfirmRequest,
+    user_id: int = Depends(get_current_user),
+    container: RequestContainer = Depends(get_request_container),
+):
+    return container.workflow().confirm_action(
+        user_id=user_id,
+        conversation_id=body.conversation_id,
+        action=body.action,
+        user_message=body.user_message,
         workspace_id=body.workspace_id,
         model=body.model,
     )

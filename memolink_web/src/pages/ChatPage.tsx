@@ -25,7 +25,7 @@ import { WorkspaceManagerModal } from "../components/WorkspaceManagerModal";
 import { useSuggestions } from "../hooks/useSuggestions";
 import { useReminderNotifications } from "../hooks/useReminderNotifications";
 import { getSavedModel, saveModel } from "../constants/models";
-import type { Conversation, Note, Workspace } from "../types";
+import type { Conversation, Message, Note, Workspace } from "../types";
 import { TEMP_ID, convLabel } from "../types";
 import { useWorkspace } from "../hooks/useWorkspace";
 import { useFeatureFlags } from "../hooks/useFeatureFlags";
@@ -175,6 +175,22 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
     onNoteUpdated: handleNoteUpdated,
     onOpenNote: handleOpenNoteById,
   });
+
+  function appendWorkflowMessages(messages: Message[]) {
+    if (!messages.length) return;
+    convs.setActiveConversation((prev) => {
+      if (!prev) return prev;
+      const existing = new Set(prev.messages.map((m) => m.id));
+      const nextMessages = [...prev.messages, ...messages.filter((m) => !existing.has(m.id))];
+      return { ...prev, messages: nextMessages };
+    });
+    convs.setConversations((prev) => prev.map((conv) => {
+      if (conv.id !== convs.activeConversation?.id) return conv;
+      const existing = new Set(conv.messages.map((m) => m.id));
+      return { ...conv, messages: [...conv.messages, ...messages.filter((m) => !existing.has(m.id))] };
+    }));
+    requestAnimationFrame(() => convs.bottomRef.current?.scrollIntoView({ behavior: "smooth" }));
+  }
 
   useEffect(() => {
     const saved = pendingChatRestoreRef.current;
@@ -833,6 +849,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                       if (notesActions.has(type)) reloadNotes();
                       if (reminderActions.has(type)) suggestions.reload();
                     }}
+                    onWorkflowConversationMessages={appendWorkflowMessages}
                   />
                 </div>
               </main>
@@ -931,6 +948,17 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                       hasOpenNote={editor.openNotes.length > 0}
                       translationEnabled={flags.translation_enabled}
                       modelAttributionEnabled={modelAttributionEnabled}
+                      confidenceEnabled={flags.confidence_enabled}
+                      autopilotEnabled={flags.autopilot_enabled}
+                      workflowContext={convs.activeConversation?.id && convs.activeConversation.id !== TEMP_ID ? { conversationId: convs.activeConversation.id, workspaceId: activeWorkspaceId, model: selectedModel } : undefined}
+                      workflowSuggestions={workflowSuggestions}
+                      onWorkflowActionDone={(type) => {
+                        const notesActions = new Set(["create_note","summarise_workspace","organise_notes","extract_tasks","prepare_report_outline","suggest_title"]);
+                        const reminderActions = new Set(["create_reminder"]);
+                        if (notesActions.has(type)) reloadNotes();
+                        if (reminderActions.has(type)) suggestions.reload();
+                      }}
+                      onWorkflowConversationMessages={appendWorkflowMessages}
                     />
                   </div>
                 </main>

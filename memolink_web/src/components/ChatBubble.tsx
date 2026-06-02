@@ -6,6 +6,7 @@ import { MODELS } from "../constants/models";
 import { QuizRenderer } from "./QuizRenderer";
 import { WorkflowApprovalCard } from "./WorkflowApprovalCard";
 import { WorkflowActionBar } from "./WorkflowActionBar";
+import type { Message } from "../types";
 import "highlight.js/styles/github-dark.css";
 import "../styles/markdown.css";
 
@@ -136,6 +137,7 @@ interface Props {
   workflowContext?: { conversationId: number; workspaceId: number | null; model: string | null };
   workflowActions?: { id: string; type: string; label: string; preview: string; params: Record<string, unknown> }[];
   onWorkflowActionDone?: (type: string) => void;
+  onWorkflowConversationMessages?: (messages: Message[]) => void;
 }
 
 const TRANSLATE_LANGUAGES = [
@@ -184,7 +186,7 @@ function ImageGeneratingSpinner() {
   );
 }
 
-export default function ChatBubble({ role, content, model, streaming, onAdd, onDelete, onApplyEdit, onOpenNote, onSaveNote, hasOpenNote, translationEnabled = true, modelAttributionEnabled = true, confidence, confidenceReason, confidenceEnabled = true, routingReason, autopilotEnabled = true, workflowContext, workflowActions, onWorkflowActionDone }: Props) {
+export default function ChatBubble({ role, content, model, streaming, onAdd, onDelete, onApplyEdit, onOpenNote, onSaveNote, hasOpenNote, translationEnabled = true, modelAttributionEnabled = true, confidence, confidenceReason, confidenceEnabled = true, routingReason, autopilotEnabled = true, workflowContext, workflowActions, onWorkflowActionDone, onWorkflowConversationMessages }: Props) {
   const isUser = role === "user";
   const [copied, setCopied] = useState(false);
   const [showLangPicker, setShowLangPicker] = useState(false);
@@ -551,7 +553,9 @@ export default function ChatBubble({ role, content, model, streaming, onAdd, onD
             actions={workflowActions}
             conversationId={workflowContext.conversationId}
             workspaceId={workflowContext.workspaceId}
+            model={workflowContext.model}
             onActionDone={onWorkflowActionDone}
+            onConversationMessages={onWorkflowConversationMessages}
           />
         )}
         </div>
