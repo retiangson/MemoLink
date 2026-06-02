@@ -109,7 +109,7 @@ export function TimelinePanel({ noteId, onJump }: Props) {
   }
 
   return (
-    <div className="flex-1 overflow-y-auto flex flex-col gap-4 px-1 py-2">
+    <div className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-4 px-1 py-2">
 
       {/* Header row */}
       <div className="flex items-center justify-between gap-3">

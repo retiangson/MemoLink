@@ -251,7 +251,7 @@ export function NoteEditorView({
 
       {/* Timeline tab */}
       {activeTab === "timeline" && noteId && (
-        <div className="flex-1 overflow-hidden flex flex-col border border-[#1e1e2a] rounded-xl bg-[#0a0a0f] p-4">
+        <div className="flex-1 min-h-0 overflow-hidden flex flex-col border border-[#1e1e2a] rounded-xl bg-[#0a0a0f] p-4">
           <TimelinePanel noteId={noteId} onJump={jumpToText} />
         </div>
       )}
