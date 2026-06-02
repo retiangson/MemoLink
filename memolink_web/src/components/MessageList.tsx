@@ -31,13 +31,14 @@ interface MessageListProps {
   hasOpenNote: boolean;
   translationEnabled?: boolean;
   modelAttributionEnabled?: boolean;
+  confidenceEnabled?: boolean;
 }
 
 export function MessageList({
   messages, loading, streaming, activeConversation,
   messagesContainerRef, bottomRef,
   onLoadOlder, onAddToNotes, onDeleteMessage, onDropFiles,
-  onApplyNoteEdit, onOpenNote, onSaveNote, hasOpenNote, translationEnabled = true, modelAttributionEnabled = true,
+  onApplyNoteEdit, onOpenNote, onSaveNote, hasOpenNote, translationEnabled = true, modelAttributionEnabled = true, confidenceEnabled = true,
 }: MessageListProps) {
   return (
     <div
@@ -65,6 +66,9 @@ export function MessageList({
               hasOpenNote={hasOpenNote}
               translationEnabled={translationEnabled}
               modelAttributionEnabled={modelAttributionEnabled}
+              confidence={msg.confidence}
+              confidenceReason={msg.confidence_reason}
+              confidenceEnabled={confidenceEnabled}
             />
           );
         })}

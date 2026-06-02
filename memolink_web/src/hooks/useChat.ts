@@ -169,14 +169,18 @@ export function useChat({ activeConversation, setActiveConversation, setConversa
           if (event.done) {
             const finalId = event.id ?? STREAMING_ID;
             const finalModel = event.model;
+            const confidence = event.confidence ?? undefined;
+            const confidenceReason = event.confidence_reason ?? undefined;
+            // Strip the <confidence> tag that was streamed as tokens but shouldn't display
+            const stripTag = (s: string) => s.replace(/<confidence[^>]*>[\s\S]*?<\/confidence>/gi, "").trimEnd();
             setActiveConversation((prev) => {
               if (!prev) return prev;
-              return { ...prev, messages: prev.messages.map((m) => m.id === STREAMING_ID ? { ...m, id: finalId, model: finalModel } : m) };
+              return { ...prev, messages: prev.messages.map((m) => m.id === STREAMING_ID ? { ...m, id: finalId, model: finalModel, content: stripTag(m.content), confidence, confidence_reason: confidenceReason } : m) };
             });
             setConversations((p) =>
               p.map((c) =>
                 c.id === conversationId
-                  ? { ...c, messages: c.messages.map((m) => m.id === STREAMING_ID ? { ...m, id: finalId, model: finalModel } : m) }
+                  ? { ...c, messages: c.messages.map((m) => m.id === STREAMING_ID ? { ...m, id: finalId, model: finalModel, content: stripTag(m.content), confidence, confidence_reason: confidenceReason } : m) }
                   : c
               )
             );

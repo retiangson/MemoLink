@@ -770,6 +770,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                     hasOpenNote={isNoteActive}
                     translationEnabled={flags.translation_enabled}
                     modelAttributionEnabled={modelAttributionEnabled}
+                    confidenceEnabled={flags.confidence_enabled}
                   />
                 </div>
               </main>

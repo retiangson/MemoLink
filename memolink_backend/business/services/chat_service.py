@@ -72,6 +72,39 @@ def _get_client(model: str, user_keys: dict | None = None) -> OpenAI:
     return OpenAI(api_key=settings.openai_api_key)
 
 
+# ── Confidence layer ──────────────────────────────────────────────────────────
+
+_CONFIDENCE_RE = re.compile(
+    r'\s*<confidence\s+level=["\']?(HIGH|MEDIUM|LOW|UNSUPPORTED)["\']?>(.*?)</confidence>\s*',
+    re.DOTALL | re.IGNORECASE,
+)
+
+_CONFIDENCE_INSTRUCTION = (
+    "\n\nANSWER CONFIDENCE RULE:\n"
+    "At the very end of your response, after a blank line, output this marker:\n"
+    "<confidence level=\"HIGH|MEDIUM|LOW|UNSUPPORTED\">one sentence reason</confidence>\n\n"
+    "Use these criteria:\n"
+    "- HIGH — answer is directly and substantially grounded in the user's notes\n"
+    "- MEDIUM — partially grounded; some notes are relevant but coverage is incomplete\n"
+    "- LOW — minimal note grounding; answer relies mostly on general knowledge\n"
+    "- UNSUPPORTED — notes have no relevant content; answer is entirely general AI knowledge\n"
+    "This marker is stripped before display. Always include it."
+)
+
+
+def _parse_confidence(text: str) -> tuple[str, str | None, str | None]:
+    """Strip the confidence tag from text and return (clean_text, level, reason).
+    Returns (text, None, None) when the tag is absent (e.g. old messages, errors)."""
+    m = _CONFIDENCE_RE.search(text)
+    if not m:
+        return text, None, None
+    level = m.group(1).upper()
+    reason = m.group(2).strip()
+    clean = _CONFIDENCE_RE.sub("", text).rstrip()
+    return clean, level, reason
+
+
+# ── Improve-note regex ─────────────────────────────────────────────────────────
 _IMPROVE_NOTE_RE = re.compile(
     r"\b(?:improve|enhance|reformat|format|clean[\s-]?up|fix|polish|rewrite|update|edit|upgrade|revise|optimise|optimize)\s+"
     r"(?:my\s+)?(?:note|notes?)\s*[:\-]?\s*(.+?)(?:\s*[\.?!])?$",
@@ -267,6 +300,7 @@ _SYSTEM_PROMPT = (
     "Group tickets under clear ## Epic headings. "
     "Extract as many tickets as the notes actually justify — do not artificially shorten the list. "
     "Use the full content of the notes as your source; do not invent requirements not present."
+    + _CONFIDENCE_INSTRUCTION
 )
 
 
@@ -508,8 +542,9 @@ class ChatService(IChatService):
             self._syslog("error", f"All models exhausted {chain} — returning error to user", {"chain": chain, "last_error": last_error}, dto.user_id)
             answer = f"⚠ All available AI models are currently unavailable. Please try again later.\n\n*Last error: {last_error}*"
 
-        assistant_msg = self.repo_conv.add_message(conversation_id, "assistant", answer, model=used_model)
-        return ChatResponseDTO(answer=answer, sources=sources, message_id=assistant_msg.id)
+        clean_answer, conf_level, conf_reason = _parse_confidence(answer)
+        assistant_msg = self.repo_conv.add_message(conversation_id, "assistant", clean_answer, model=used_model, confidence=conf_level, confidence_reason=conf_reason)
+        return ChatResponseDTO(answer=clean_answer, sources=sources, message_id=assistant_msg.id)
 
     def ask_stream(self, dto: ChatRequestDTO) -> Iterator[str]:
         """Yield SSE-formatted chunks. Each event is JSON: {"t":"<token>"} or {"done":true,"id":<int>}."""
@@ -578,8 +613,9 @@ class ChatService(IChatService):
             full_answer = f"⚠ All available AI models are currently unavailable. Please try again later.\n\n*Last error: {last_error}*"
             yield f"data: {json.dumps({'t': full_answer})}\n\n"
 
-        assistant_msg = self.repo_conv.add_message(conversation_id, "assistant", full_answer, model=used_model)
-        yield f"data: {json.dumps({'done': True, 'id': assistant_msg.id, 'model': used_model})}\n\n"
+        clean_answer, conf_level, conf_reason = _parse_confidence(full_answer)
+        assistant_msg = self.repo_conv.add_message(conversation_id, "assistant", clean_answer, model=used_model, confidence=conf_level, confidence_reason=conf_reason)
+        yield f"data: {json.dumps({'done': True, 'id': assistant_msg.id, 'model': used_model, 'confidence': conf_level, 'confidence_reason': conf_reason})}\n\n"
 
     async def handle_file_upload(
         self,
