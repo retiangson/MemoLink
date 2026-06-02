@@ -51,6 +51,7 @@ from memolink_backend.api.v1 import (
     slash_command_controller,
     email_controller,
     memograph_controller,
+    proactive_insight_controller,
 )
 
 # Register all models so SQLAlchemy sees them
@@ -68,6 +69,7 @@ import memolink_backend.domain.models.email_account     # noqa: F401
 import memolink_backend.domain.models.email_record      # noqa: F401
 import memolink_backend.domain.models.graph_node        # noqa: F401
 import memolink_backend.domain.models.graph_edge        # noqa: F401
+import memolink_backend.domain.models.proactive_insight # noqa: F401
 
 if os.getenv("MEMOLINK_SKIP_DB_BOOTSTRAP") != "1":
     with engine.connect() as _conn:
@@ -250,6 +252,23 @@ if os.getenv("MEMOLINK_SKIP_DB_BOOTSTRAP") != "1":
             )
         """))
         _conn.execute(text("INSERT INTO feature_flags (key, value) VALUES ('memograph_enabled', 'true') ON CONFLICT (key) DO NOTHING"))
+        # Proactive Insights table
+        _conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS proactive_insights (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                workspace_id INTEGER REFERENCES workspaces(id) ON DELETE CASCADE,
+                insight_type VARCHAR(50) NOT NULL,
+                title VARCHAR(500) NOT NULL,
+                description TEXT,
+                note_id INTEGER REFERENCES notes(id) ON DELETE CASCADE,
+                severity VARCHAR(20) NOT NULL DEFAULT 'info',
+                is_dismissed BOOLEAN NOT NULL DEFAULT FALSE,
+                created_at TIMESTAMPTZ DEFAULT now()
+            )
+        """))
+        _conn.execute(text("CREATE INDEX IF NOT EXISTS ix_proactive_insights_workspace ON proactive_insights(user_id, workspace_id)"))
+        _conn.execute(text("INSERT INTO feature_flags (key, value) VALUES ('proactive_insights_enabled', 'true') ON CONFLICT (key) DO NOTHING"))
         # Auto-promote first user as admin if none exists
         _conn.execute(text("""
             UPDATE users SET is_admin = TRUE
@@ -405,6 +424,7 @@ app.include_router(user_settings_controller.router, prefix="/api")
 app.include_router(slash_command_controller.router, prefix="/api")
 app.include_router(email_controller.router, prefix="/api")
 app.include_router(memograph_controller.router, prefix="/api")
+app.include_router(proactive_insight_controller.router, prefix="/api")
 
 # AWS Lambda handler — only active when running inside Lambda
 if os.getenv("AWS_LAMBDA_FUNCTION_NAME"):

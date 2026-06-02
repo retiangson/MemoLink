@@ -16,6 +16,7 @@ const DEFAULT_FLAGS: FeatureFlags = {
   video_import_enabled: true,
   email_enabled: true,
   memograph_enabled: true,
+  proactive_insights_enabled: true,
   default_model: "gpt-4o-mini",
   default_language: "English",
   web_search_min_level: "regular",
