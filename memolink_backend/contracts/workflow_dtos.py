@@ -39,6 +39,7 @@ class WorkflowPlanResponse(BaseModel):
 
 class WorkflowSuggestRequest(BaseModel):
     message: str
+    user_message: Optional[str] = None   # the user's prompt that triggered this response
     workspace_id: Optional[int] = None
 
 

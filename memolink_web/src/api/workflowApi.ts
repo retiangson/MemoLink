@@ -19,9 +19,10 @@ export interface WorkflowPlan {
 export async function suggestActions(
   message: string,
   workspace_id: number | null,
+  user_message?: string,
 ): Promise<WorkflowAction[]> {
   try {
-    const res = await api.post("/workflow/suggest", { message, workspace_id });
+    const res = await api.post("/workflow/suggest", { message, workspace_id, user_message });
     return res.data.actions ?? [];
   } catch {
     return [];

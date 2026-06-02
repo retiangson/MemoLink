@@ -233,7 +233,11 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
     // Already have suggestions for this message
     if (workflowSuggestions[last.id]) return;
 
-    suggestActions(last.content, activeWorkspaceId).then(actions => {
+    // Find the user message that immediately preceded this assistant response
+    const precedingUser = [...messages].reverse().find((m, i) => i > 0 && m.role === "user");
+    const userMsg = precedingUser?.content ?? undefined;
+
+    suggestActions(last.content, activeWorkspaceId, userMsg).then(actions => {
       if (actions.length > 0) {
         setWorkflowSuggestions(prev => ({ ...prev, [last.id]: actions }));
       }

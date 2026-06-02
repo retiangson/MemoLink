@@ -36,6 +36,7 @@ def suggest_actions(
         message=body.message,
         workspace_id=body.workspace_id,
         user_id=user_id,
+        user_message=body.user_message,
     )
     return WorkflowSuggestResponse(actions=actions)
 

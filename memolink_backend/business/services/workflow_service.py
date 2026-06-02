@@ -120,6 +120,7 @@ class WorkflowService:
         message: str,
         workspace_id: Optional[int],
         user_id: int,
+        user_message: Optional[str] = None,
     ) -> list[WorkflowAction]:
         """
         Analyse an AI response and return 0–3 suggested quick actions.
@@ -135,7 +136,7 @@ class WorkflowService:
             model = "gpt-4o-mini"
 
         system = (
-            "You analyse AI assistant responses and suggest up to 3 quick follow-up actions.\n"
+            "You analyse an AI assistant exchange and suggest up to 3 quick follow-up actions.\n"
             "Return ONLY valid JSON:\n"
             '{"actions": [\n'
             '  {"id":"a1","type":"create_note","label":"Save as Note","params":{"title":"...","content":"..."}},\n'
@@ -145,18 +146,22 @@ class WorkflowService:
             "Rules:\n"
             "- suggest create_note  : response contains a study plan, steps, list, or reference info worth saving\n"
             "- suggest create_reminder : response mentions a deadline, due date, task, or time-sensitive item\n"
-            "- suggest search_web   : response suggests external info or further reading would help\n"
+            "- suggest search_web   : user asked to search online / look something up / find current info,\n"
+            "                         OR the AI response says it cannot browse/search the web,\n"
+            "                         OR the response suggests further reading or external sources would help.\n"
+            "                         Use the user's question as the search query.\n"
             "- suggest extract_tasks: response contains multiple action items or to-dos\n"
             "- return empty array when response is conversational, a greeting, or simple Q&A (< 3 sentences)\n"
             "- max 3 actions, labels must be short action phrases\n"
             f"- today's date is {__import__('datetime').date.today()}"
         )
 
+        user_block = f"User asked: {user_message}\n\n" if user_message else ""
         resp = self._client.chat.completions.create(
             model=model,
             messages=[
                 {"role": "system", "content": system},
-                {"role": "user",   "content": f"AI response:\n{message[:3000]}"},
+                {"role": "user",   "content": f"{user_block}AI response:\n{message[:3000]}"},
             ],
             max_tokens=400,
         )
