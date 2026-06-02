@@ -74,34 +74,67 @@ def _get_client(model: str, user_keys: dict | None = None) -> OpenAI:
 
 # ── Confidence layer ──────────────────────────────────────────────────────────
 
+# ── Confidence layer ──────────────────────────────────────────────────────────
+# Matches <confidence level="HIGH">reason</confidence> in various formats that
+# LLMs may produce: optional quotes, extra whitespace, markdown wrapping, etc.
 _CONFIDENCE_RE = re.compile(
-    r'\s*<confidence\s+level=["\']?(HIGH|MEDIUM|LOW|UNSUPPORTED)["\']?>(.*?)</confidence>\s*',
+    r'(?:```[a-z]*\s*)?'                          # optional opening code-fence
+    r'<confidence\s+level\s*=\s*["\']?'           # opening tag + level=
+    r'(HIGH|MEDIUM|LOW|UNSUPPORTED)'              # level value
+    r'["\']?\s*>(.*?)</confidence>'               # > reason </confidence>
+    r'(?:\s*```)?',                               # optional closing code-fence
     re.DOTALL | re.IGNORECASE,
 )
 
-_CONFIDENCE_INSTRUCTION = (
-    "\n\nANSWER CONFIDENCE RULE:\n"
-    "At the very end of your response, after a blank line, output this marker:\n"
-    "<confidence level=\"HIGH|MEDIUM|LOW|UNSUPPORTED\">one sentence reason</confidence>\n\n"
-    "Use these criteria:\n"
-    "- HIGH — answer is directly and substantially grounded in the user's notes\n"
-    "- MEDIUM — partially grounded; some notes are relevant but coverage is incomplete\n"
-    "- LOW — minimal note grounding; answer relies mostly on general knowledge\n"
-    "- UNSUPPORTED — notes have no relevant content; answer is entirely general AI knowledge\n"
-    "This marker is stripped before display. Always include it."
+# Sent as a SEPARATE final system message so the model sees it clearly
+_CONFIDENCE_SYSTEM_MSG = (
+    "IMPORTANT — CONFIDENCE ASSESSMENT:\n"
+    "At the very end of your response, after a blank line, you MUST append:\n"
+    "<confidence level=\"LEVEL\">one sentence reason</confidence>\n\n"
+    "Replace LEVEL with exactly one of: HIGH, MEDIUM, LOW, UNSUPPORTED\n"
+    "- HIGH        : answer is directly and substantially grounded in the user's notes above\n"
+    "- MEDIUM      : answer is partially grounded; some notes relevant but coverage is incomplete\n"
+    "- LOW         : minimal note grounding; answer draws mainly on general knowledge\n"
+    "- UNSUPPORTED : notes have no relevant content; answer is entirely general AI knowledge\n\n"
+    "Example: <confidence level=\"HIGH\">The answer is fully supported by the Project Plan note.</confidence>\n"
+    "This tag is stripped before display — always include it."
 )
 
 
 def _parse_confidence(text: str) -> tuple[str, str | None, str | None]:
-    """Strip the confidence tag from text and return (clean_text, level, reason).
-    Returns (text, None, None) when the tag is absent (e.g. old messages, errors)."""
+    """Strip the <confidence> tag and return (clean_text, level, reason).
+    Returns (text, None, None) when absent so the caller can fall back to pre-computed."""
     m = _CONFIDENCE_RE.search(text)
     if not m:
-        return text, None, None
+        return text.rstrip(), None, None
     level = m.group(1).upper()
     reason = m.group(2).strip()
     clean = _CONFIDENCE_RE.sub("", text).rstrip()
     return clean, level, reason
+
+
+def _pre_confidence(all_notes: list, top_notes: list) -> tuple[str, str]:
+    """Deterministic server-side confidence estimate based on retrieval context.
+    Used as a guaranteed fallback when the LLM doesn't output a confidence tag."""
+    total = len(all_notes)
+    if total == 0:
+        return "UNSUPPORTED", "No notes exist in this workspace yet — answer is based on general knowledge."
+    if total <= 20:
+        # Small workspace: all notes included — confidence depends on note count
+        if total <= 2:
+            return "LOW", f"Only {total} note(s) in workspace — limited context available."
+        if total <= 5:
+            return "MEDIUM", f"{total} notes available — answer draws from your full workspace."
+        return "HIGH", f"All {total} workspace notes included as context."
+    # Large workspace — confidence based on vector search results
+    found = len(top_notes)
+    if found == 0:
+        return "UNSUPPORTED", "No relevant notes found for this question — answer is general knowledge."
+    if found <= 2:
+        return "LOW", f"Only {found} relevant note(s) found — answer may lack full context."
+    if found <= 4:
+        return "MEDIUM", f"{found} relevant notes found — answer partially grounded in your notes."
+    return "HIGH", f"{found} relevant notes found — answer strongly grounded in your workspace."
 
 
 # ── Improve-note regex ─────────────────────────────────────────────────────────
@@ -300,7 +333,6 @@ _SYSTEM_PROMPT = (
     "Group tickets under clear ## Epic headings. "
     "Extract as many tickets as the notes actually justify — do not artificially shorten the list. "
     "Use the full content of the notes as your source; do not invent requirements not present."
-    + _CONFIDENCE_INSTRUCTION
 )
 
 
@@ -373,9 +405,11 @@ class ChatService(IChatService):
 
         sources: List[ChatAnswerSource] = []
         rag_blocks: List[str] = []
+        top_notes_for_confidence: list = []
 
         if len(all_notes) <= 20:
             # Small workspace — include every note in full (up to 1 500 chars each)
+            top_notes_for_confidence = list(all_notes)
             for n in all_notes:
                 sources.append(ChatAnswerSource(note_id=n.id, title=n.title, snippet=n.content[:200] + "..."))
                 plain = _strip_base64_images(_HTML_TAG.sub(" ", n.content)).strip()
@@ -393,6 +427,8 @@ class ChatService(IChatService):
 
             if not top_notes:
                 top_notes = all_notes[:dto.top_k]
+
+            top_notes_for_confidence = list(top_notes)
 
             for n in top_notes:
                 sources.append(ChatAnswerSource(note_id=n.id, title=n.title, snippet=n.content[:200] + "..."))
@@ -432,7 +468,13 @@ class ChatService(IChatService):
             if web_block:
                 system_msgs.append({"role": "system", "content": web_block})
 
-        return conversation_id, system_msgs + message_history, sources
+        # Confidence instruction as the LAST system message — model sees it most clearly here
+        system_msgs.append({"role": "system", "content": _CONFIDENCE_SYSTEM_MSG})
+
+        # Pre-compute a deterministic confidence fallback so the badge always shows
+        pre_conf_level, pre_conf_reason = _pre_confidence(all_notes, top_notes_for_confidence)
+
+        return conversation_id, system_msgs + message_history, sources, pre_conf_level, pre_conf_reason
 
     def _handle_improve_note_stream(self, dto: ChatRequestDTO, note_name: str, conversation_id: int) -> Iterator[str]:
         workspace_id = getattr(dto, "workspace_id", None)
@@ -502,7 +544,7 @@ class ChatService(IChatService):
 
         model = dto.model or settings.openai_chat_model
         user_keys = self._resolve_user_keys(dto.user_id)
-        conversation_id, messages, sources = self._build_chat_context(dto)
+        conversation_id, messages, sources, pre_conf_level, pre_conf_reason = self._build_chat_context(dto)
 
         if _is_image_request(user_text):
             prompt = _extract_image_prompt(user_text)
@@ -543,7 +585,10 @@ class ChatService(IChatService):
             answer = f"⚠ All available AI models are currently unavailable. Please try again later.\n\n*Last error: {last_error}*"
 
         clean_answer, conf_level, conf_reason = _parse_confidence(answer)
-        assistant_msg = self.repo_conv.add_message(conversation_id, "assistant", clean_answer, model=used_model, confidence=conf_level, confidence_reason=conf_reason)
+        # Fall back to server-computed confidence if the LLM didn't output the tag
+        final_conf = conf_level or pre_conf_level
+        final_reason = conf_reason or pre_conf_reason
+        assistant_msg = self.repo_conv.add_message(conversation_id, "assistant", clean_answer, model=used_model, confidence=final_conf, confidence_reason=final_reason)
         return ChatResponseDTO(answer=clean_answer, sources=sources, message_id=assistant_msg.id)
 
     def ask_stream(self, dto: ChatRequestDTO) -> Iterator[str]:
@@ -556,7 +601,7 @@ class ChatService(IChatService):
 
         model = dto.model or settings.openai_chat_model
         user_keys = self._resolve_user_keys(dto.user_id)
-        conversation_id, messages, _ = self._build_chat_context(dto)
+        conversation_id, messages, _, pre_conf_level, pre_conf_reason = self._build_chat_context(dto)
 
         note_name = _extract_improve_note_name(user_text)
         if note_name:
@@ -614,8 +659,11 @@ class ChatService(IChatService):
             yield f"data: {json.dumps({'t': full_answer})}\n\n"
 
         clean_answer, conf_level, conf_reason = _parse_confidence(full_answer)
-        assistant_msg = self.repo_conv.add_message(conversation_id, "assistant", clean_answer, model=used_model, confidence=conf_level, confidence_reason=conf_reason)
-        yield f"data: {json.dumps({'done': True, 'id': assistant_msg.id, 'model': used_model, 'confidence': conf_level, 'confidence_reason': conf_reason})}\n\n"
+        # Fall back to server-computed confidence if the LLM didn't output the tag
+        final_conf = conf_level or pre_conf_level
+        final_reason = conf_reason or pre_conf_reason
+        assistant_msg = self.repo_conv.add_message(conversation_id, "assistant", clean_answer, model=used_model, confidence=final_conf, confidence_reason=final_reason)
+        yield f"data: {json.dumps({'done': True, 'id': assistant_msg.id, 'model': used_model, 'confidence': final_conf, 'confidence_reason': final_reason})}\n\n"
 
     async def handle_file_upload(
         self,
