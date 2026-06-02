@@ -72,6 +72,13 @@ class ServiceInstaller:
             embedding_service=self._domain.get_embedding_service(),
         )
 
+    def get_proactive_insight_service(self):
+        from memolink_backend.business.services.proactive_insight_service import ProactiveInsightService
+        return ProactiveInsightService(
+            insight_repo=self._domain.get_proactive_insight_repository(),
+            note_repo=self._domain.get_note_repository(),
+        )
+
     def get_memograph_service(self):
         from memolink_backend.business.services.memograph_service import MemographService
         from memolink_backend.domain.repositories.graph_repository import GraphRepository

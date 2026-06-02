@@ -38,6 +38,9 @@ class RequestContainer:
     def email(self):
         return self.services.get_email_service()
 
+    def insights(self):
+        return self.services.get_proactive_insight_service()
+
     def memograph(self):
         return self.services.get_memograph_service()
 

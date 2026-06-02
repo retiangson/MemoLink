@@ -3,6 +3,7 @@ import type { SuggestionItem } from "../hooks/useSuggestions";
 import { ReminderDetailModal } from "./ReminderDetailModal";
 import { AddReminderModal } from "./AddReminderModal";
 import { buildGoogleCalendarUrl } from "../utils/reminderUtils";
+import { InsightsPanel } from "./InsightsPanel";
 
 interface RightPanelProps {
   open: boolean;
@@ -21,6 +22,9 @@ interface RightPanelProps {
   isSyncingEmail?: boolean;
   onSyncEmail?: () => void;
   emailSyncResult?: string | null;
+  insightsEnabled?: boolean;
+  workspaceId?: number | null;
+  onOpenNote?: (noteId: number) => void;
 }
 
 export function RightPanel({
@@ -28,6 +32,7 @@ export function RightPanel({
   onAddManual, onToggleDone, onUpdate, onRemove, onClearDone,
   onGenerate, notificationPermission, onRequestNotificationPermission,
   emailConnected, isSyncingEmail, onSyncEmail, emailSyncResult,
+  insightsEnabled, workspaceId, onOpenNote,
 }: RightPanelProps) {
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState<SuggestionItem | null>(null);
@@ -152,6 +157,14 @@ export function RightPanel({
           Add Reminder
         </button>
       </div>
+
+      {/* Proactive AI Insights */}
+      {insightsEnabled && (
+        <InsightsPanel
+          workspaceId={workspaceId ?? null}
+          onOpenNote={onOpenNote}
+        />
+      )}
 
       {/* Items list */}
       <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-2">

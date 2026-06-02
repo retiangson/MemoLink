@@ -1003,6 +1003,12 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
         isSyncingEmail={isSyncingEmail}
         onSyncEmail={handleSyncEmail}
         emailSyncResult={emailSyncResult}
+        insightsEnabled={flags.proactive_insights_enabled}
+        workspaceId={activeWorkspaceId}
+        onOpenNote={(noteId) => {
+          const note = notes.find((n) => n.id === noteId);
+          if (note) handleOpenNote(note);
+        }}
       />
 
       <DeleteModal
