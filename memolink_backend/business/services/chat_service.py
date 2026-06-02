@@ -546,7 +546,7 @@ class ChatService(IChatService):
         model = dto.model or settings.openai_chat_model
         user_keys = self._resolve_user_keys(dto.user_id)
 
-        # AutoPilot: route to the best model for this prompt (only when on default)
+        # AutoPilot: route to the best model for this prompt
         model, routing_reason = autopilot_route(
             prompt=user_text,
             selected_model=model,
@@ -613,7 +613,7 @@ class ChatService(IChatService):
         model = dto.model or settings.openai_chat_model
         user_keys = self._resolve_user_keys(dto.user_id)
 
-        # AutoPilot: route to the best model for this prompt (only when on default)
+        # AutoPilot: route to the best model for this prompt
         model, routing_reason = autopilot_route(
             prompt=user_text,
             selected_model=model,

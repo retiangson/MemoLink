@@ -19,6 +19,15 @@ DEFAULT_FLAGS: Dict[str, str] = {
     "file_upload_enabled": "true",
     "research_mode_enabled": "true",
     "model_attribution_enabled": "true",
+    "tts_enabled": "true",
+    "slash_commands_enabled": "true",
+    "custom_api_keys_enabled": "true",
+    "video_import_enabled": "true",
+    "email_enabled": "true",
+    "memograph_enabled": "true",
+    "proactive_insights_enabled": "true",
+    "confidence_enabled": "true",
+    "autopilot_enabled": "true",
     "default_model": "gpt-4o-mini",
     "default_language": "English",
     # Minimum access level required per feature
@@ -30,6 +39,10 @@ DEFAULT_FLAGS: Dict[str, str] = {
     "file_upload_min_level": "regular",
     "research_mode_min_level": "regular",
     "model_attribution_min_level": "regular",
+    "tts_min_level": "regular",
+    "slash_commands_min_level": "regular",
+    "custom_api_keys_min_level": "regular",
+    "video_import_min_level": "regular",
 }
 
 VALID_LEVELS = {"regular", "plus", "pro"}

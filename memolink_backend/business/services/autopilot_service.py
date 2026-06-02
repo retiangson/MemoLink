@@ -8,7 +8,7 @@ balancing capability and cost — without requiring the user to think about mode
 ROUTING RULES (evaluated in priority order)
 -------------------------------------------
 1. Translation      → gemini-2.5-flash      Gemini excels at language tasks; fast, cheap
-2. Code / Debug     → deepseek-coder        Code-specialised model; strongest for programming
+2. Code / Debug     → deepseek-coder        Any language name mentioned, or ≥2 code keywords
 3. Deep Research    → gpt-4o                Maximum reasoning for analysis and research tasks
 4. Long Context     → gemini-2.5-flash      1M token context window handles large note sets
 5. Simple Query     → gpt-4o-mini           Short questions need no heavy model; saves cost
@@ -45,13 +45,43 @@ _TRANSLATION_RE = re.compile(
     re.IGNORECASE,
 )
 
+# Any programming language name is a strong enough signal on its own
+_LANGUAGE_RE = re.compile(
+    r"\b("
+    # Web / scripting
+    r"python|javascript|typescript|php|ruby|perl|lua|r\b|"
+    # Systems / compiled
+    r"c\+\+|cpp|c#|csharp|c\b|java|kotlin|swift|rust|go\b|golang|scala|"
+    r"haskell|ocaml|f#|fsharp|erlang|elixir|nim|zig|d\b|ada|fortran|cobol|"
+    # JVM / .NET extras
+    r"groovy|clojure|vala|crystal|"
+    # Shell / scripting
+    r"bash|zsh|powershell|shell|batch|vbscript|"
+    # Data / ML
+    r"julia|matlab|octave|sas|stata|"
+    # Query
+    r"sql|plsql|tsql|graphql|"
+    # Markup / style (often asked with code questions)
+    r"html|css|scss|sass|less|xml|json|yaml|toml|"
+    # Mobile
+    r"dart|flutter|"
+    # Assembly / low-level
+    r"assembly|asm|wasm|webassembly|"
+    # Frameworks frequently named as the language
+    r"react|vue|angular|svelte|nextjs|nuxt|django|flask|fastapi|laravel|"
+    r"rails|spring|express|nestjs|"
+    # Notebooks / data tools
+    r"jupyter|pandas|numpy|tensorflow|pytorch|keras"
+    r")\b",
+    re.IGNORECASE,
+)
+
 _CODE_KEYWORDS = frozenset([
     "code", "function", "debug", "error", "bug", "exception", "traceback",
-    "python", "javascript", "typescript", "java", "kotlin", "swift", "rust",
     "programming", "algorithm", "compile", "syntax", "class ", "sql ", "query",
-    "regex", "endpoint", "api ", "html", "css", "react", "component",
+    "regex", "endpoint", "api ", "component",
     "import ", "export ", "def ", "return ", "loop", "recursion", "async",
-    "database", "schema", "migration", "docker", "git ", "bash", "script",
+    "schema", "migration", "docker", "git ", "script",
 ])
 
 _RESEARCH_KEYWORDS = frozenset([
@@ -85,14 +115,9 @@ def route(
 ) -> tuple[str, Optional[str]]:
     """
     Returns (model_to_use, routing_reason).
-    routing_reason is None when no routing was applied.
-
-    AutoPilot only activates when selected_model == default_model, meaning the user
-    has not explicitly overridden the model. User choice always takes priority.
+    routing_reason is None when no routing was applied (default/fallthrough).
+    AutoPilot always evaluates — the on/off switch is the autopilot_enabled feature flag.
     """
-    if selected_model != default_model:
-        return selected_model, None
-
     text_lower = prompt.lower()
     word_count = len(prompt.split())
 
@@ -101,8 +126,11 @@ def route(
         return "gemini-2.5-flash", "Translation"
 
     # ── Rule 2: Code / Debugging ───────────────────────────────────────────────
-    code_hits = sum(1 for kw in _CODE_KEYWORDS if kw in text_lower)
-    if code_hits >= 2 and deepseek_key:
+    # Any programming language mention OR ≥2 general code keywords → DeepSeek
+    if deepseek_key and (
+        _LANGUAGE_RE.search(text_lower)
+        or sum(1 for kw in _CODE_KEYWORDS if kw in text_lower) >= 2
+    ):
         return "deepseek-coder", "Code"
 
     # ── Rule 3: Deep Research / Complex Analysis ───────────────────────────────
