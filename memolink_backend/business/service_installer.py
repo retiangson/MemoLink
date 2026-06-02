@@ -16,6 +16,7 @@ class ServiceInstaller:
 
     def get_chat_service(self) -> IChatService:
         from memolink_backend.business.services.chat_service import ChatService
+        from memolink_backend.domain.repositories.graph_repository import GraphRepository
         return ChatService(
             conv_repo=self._domain.get_conversation_repository(),
             note_repo=self._domain.get_note_repository(),
@@ -23,6 +24,7 @@ class ServiceInstaller:
             db=self._domain.get_db(),
             log_service=self.get_system_log_service(),
             user_api_key_repo=self._domain.get_user_api_key_repository(),
+            graph_repo=GraphRepository(self._domain.get_db()),
         )
 
     def get_note_service(self) -> INoteService:

@@ -88,6 +88,62 @@ class GraphRepository:
             ],
         }
 
+    def get_related_note_ids(
+        self,
+        user_id: int,
+        workspace_id: Optional[int],
+        seed_note_ids: list[int],
+        limit: int = 4,
+    ) -> list[int]:
+        """Return IDs of notes connected to the seed notes through shared entity nodes.
+
+        Traversal: seed_note_node → (edge) → entity_node → (edge) → other_note_node.
+        Only entity types (person, topic, project, etc.) bridge the connection —
+        reminder nodes are excluded so we only follow meaningful knowledge links.
+        """
+        if not seed_note_ids:
+            return []
+
+        # Step 1 — find the graph node IDs for the seed notes
+        seed_graph_ids_q = (
+            self.db.query(GraphNode.id)
+            .filter(
+                GraphNode.user_id == user_id,
+                GraphNode.workspace_id == workspace_id,
+                GraphNode.node_type == "note",
+                GraphNode.source_id.in_(seed_note_ids),
+            )
+        )
+
+        # Step 2 — entity nodes these seed notes connect to (note → entity edges)
+        entity_ids_q = (
+            self.db.query(GraphEdge.target_node_id)
+            .join(GraphNode, GraphNode.id == GraphEdge.target_node_id)
+            .filter(
+                GraphEdge.source_node_id.in_(seed_graph_ids_q),
+                GraphNode.node_type.notin_(["note", "reminder"]),
+            )
+        )
+
+        # Step 3 — other note nodes that point to those same entity nodes
+        related = (
+            self.db.query(GraphNode.source_id)
+            .join(GraphEdge, GraphEdge.source_node_id == GraphNode.id)
+            .filter(
+                GraphEdge.target_node_id.in_(entity_ids_q),
+                GraphNode.node_type == "note",
+                GraphNode.source_id.isnot(None),
+                GraphNode.source_id.notin_(seed_note_ids),
+                GraphNode.user_id == user_id,
+                GraphNode.workspace_id == workspace_id,
+            )
+            .distinct()
+            .limit(limit)
+            .all()
+        )
+
+        return [r[0] for r in related]
+
     def clear(self, user_id: int, workspace_id: Optional[int]) -> None:
         nodes = (
             self.db.query(GraphNode)
