@@ -43,7 +43,7 @@ export default function MarkdownRenderer({ children, className }: Props) {
   };
 
   marked.setOptions({ renderer, gfm: true, breaks: true });
-  const html = marked.parse(withMath);
+  const html = marked.parse(withMath) as string;
 
   useEffect(() => {
     const buttons = document.querySelectorAll(".code-copy-btn");

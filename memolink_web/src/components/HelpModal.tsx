@@ -21,6 +21,8 @@ const NAV: Section[] = [
   { id: "reminders",  label: "Reminders",         icon: <path d="M8 16a2 2 0 0 0 2-2H6a2 2 0 0 0 2 2M8 1.918l-.797.161A4 4 0 0 0 4 6c0 .628-.134 2.197-.459 3.742-.16.767-.376 1.566-.663 2.258h10.244c-.287-.692-.502-1.49-.663-2.258C12.134 8.197 12 6.628 12 6a4 4 0 0 0-3.203-3.92zM14.22 12c.223.447.481.801.78 1H1c.299-.199.557-.553.78-1C2.68 10.2 3 6.88 3 6c0-2.42 1.72-4.44 4.005-4.901a1 1 0 1 1 1.99 0A5 5 0 0 1 13 6c0 .88.32 4.2 1.22 6"/> },
   { id: "models",     label: "AI Models",         icon: <path d="M6 12.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 0 1h-3a.5.5 0 0 1-.5-.5M3 8.062C3 6.76 4.235 5.765 5.53 5.886a26.6 26.6 0 0 0 4.94 0C11.765 5.765 13 6.76 13 8.062v1.157a.93.93 0 0 1-.765.935c-.845.147-2.34.346-4.235.346s-3.39-.2-4.235-.346A.93.93 0 0 1 3 9.219zm4.542-.827a.25.25 0 0 0-.217.068l-.92.9a25 25 0 0 1-1.871-.183.25.25 0 0 0-.068.495c.55.076 1.232.149 2.02.193a.25.25 0 0 0 .189-.071l.754-.736.847 1.71a.25.25 0 0 0 .404.062l.932-.97a25 25 0 0 0 1.922-.188.25.25 0 0 0-.068-.495c-.538.074-1.207.145-1.98.189a.25.25 0 0 0-.166.076l-.754.785-.842-1.7a.25.25 0 0 0-.182-.134"/> },
   { id: "noteai",     label: "Note Improvement",  icon: <><path d="M10.5 8a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0"/><path d="M0 8s3-5.5 8-5.5S16 8 16 8s-3 5.5-8 5.5S0 8 0 8m8 3.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7"/></> },
+  { id: "commands",   label: "Slash Commands",    icon: <path d="M14 4.5V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h5.5zm-3 0A1.5 1.5 0 0 1 9.5 3V1L14 5.5zM8.646 6.646a.5.5 0 1 0-.707.708L9.293 8.5l-1.354 1.646a.5.5 0 0 0 .707.708L9.707 9.5H11a.5.5 0 0 0 0-1H9.707zM5.5 8.5a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 0 1H6a.5.5 0 0 1-.5-.5"/> },
+  { id: "apikeys",    label: "Custom API Keys",   icon: <path d="M0 8a4 4 0 0 1 7.465-2H14a.5.5 0 0 1 .354.146l1.5 1.5a.5.5 0 0 1 0 .708l-1.5 1.5a.5.5 0 0 1-.708 0L13 9.207l-.646.647a.5.5 0 0 1-.708 0L11 9.207l-.646.647a.5.5 0 0 1-.708 0L9 9.207l-.646.647A.5.5 0 0 1 8 10h-.535A4 4 0 0 1 0 8m4-3a3 3 0 1 0 2.712 4.285A.5.5 0 0 1 7.163 9h.63l.853-.854a.5.5 0 0 1 .708 0l.646.647.646-.647a.5.5 0 0 1 .708 0l.646.647.646-.647a.5.5 0 0 1 .708 0l.646.647.793-.793-1-1h-6.63a.5.5 0 0 1-.451-.285A3 3 0 0 0 4 5m0 3.5a.5.5 0 1 1 0-1 .5.5 0 0 1 0 1"/> },
   { id: "tips",       label: "Tips & Shortcuts",  icon: <path d="M2 2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v13.5a.5.5 0 0 1-.777.416L8 13.101l-5.223 2.815A.5.5 0 0 1 2 15.5zm2-1a1 1 0 0 0-1 1v12.566l4.723-2.482a.5.5 0 0 1 .554 0L13 14.566V2a1 1 0 0 0-1-1z"/> },
 ];
 
@@ -38,6 +40,8 @@ const CONTENT: Record<string, React.ReactNode> = {
           { label: "File & Video", desc: "Import PDFs, DOCX, PPTX, YouTube, and recordings" },
           { label: "AI Tools", desc: "Web search, agent mode, research, image generation" },
           { label: "Reminders", desc: "Auto-detected from notes or set manually" },
+          { label: "Slash Commands", desc: "14 commands — /Improve, /Quiz, /Discuss and more" },
+          { label: "Custom API Keys", desc: "Use your own OpenAI, Gemini, or any compatible key" },
         ].map((f) => (
           <div key={f.label} className="bg-[#12121a] border border-[#2a2a38] rounded-xl p-3">
             <p className="text-xs font-semibold text-indigo-300 mb-0.5">{f.label}</p>
@@ -186,7 +190,7 @@ const CONTENT: Record<string, React.ReactNode> = {
 
   models: (
     <div className="space-y-4 text-sm text-gray-400 leading-relaxed">
-      <p>Open <span className="text-white">Settings → AI Model</span> to choose your chat model. Every reply shows a "replied by" badge and the model is saved in conversation history.</p>
+      <p>Open <span className="text-white">Settings → AI Model</span> to choose your chat model. Every reply shows a "replied by" badge and the model is saved in conversation history. Add custom providers in <span className="text-white">Settings → API Keys</span> — they appear here too.</p>
       <div className="space-y-3">
         {[
           {
@@ -313,6 +317,145 @@ const CONTENT: Record<string, React.ReactNode> = {
     </div>
   ),
 
+  commands: (
+    <div className="space-y-4 text-sm text-gray-400 leading-relaxed">
+      <p>Type <code className="bg-[#12121a] px-1.5 py-0.5 rounded text-indigo-300 text-xs">/</code> in the chat input to access slash commands. Commands let you improve, summarize, quiz, and manage notes without leaving the chat.</p>
+
+      <div className="bg-[#12121a] border border-[#2a2a38] rounded-xl p-3 space-y-1.5">
+        <p className="text-xs font-semibold text-indigo-300 uppercase tracking-wider">Keyboard Navigation</p>
+        <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px]">
+          {[
+            ["Type /", "open command picker"],
+            ["↑ ↓ arrows", "navigate the list"],
+            ["Tab or Enter", "select highlighted item"],
+            ["Type /imp", "filter to matching commands"],
+            ["Tab after command", "open note picker"],
+            ["Esc", "cancel and clear"],
+          ].map(([k, v]) => (
+            <div key={k} className="flex items-center gap-1.5">
+              <code className="bg-[#1e1e2a] border border-[#2a2a38] rounded px-1.5 py-0.5 text-indigo-300 shrink-0">{k}</code>
+              <span className="text-gray-600">{v}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {[
+        {
+          group: "Note Editing",
+          color: "indigo",
+          cmds: [
+            { cmd: "/Improve", args: "All | \"Note Name\"", desc: "Improve grammar, clarity, structure, and Markdown. Does not add new information." },
+            { cmd: "/Enhance", args: "All | \"Note Name\"", desc: "Expand and enrich — adds helpful context and examples while preserving all original content." },
+            { cmd: "/Natural", args: "\"Note Name\"", desc: "Rewrite the note in a natural, readable style. Also available as /Humanize." },
+            { cmd: "/Update", args: "\"Note Name\" : instruction", desc: "Merge an instruction into the note — AI decides the best section to update." },
+            { cmd: "/Add", args: "\"Note Name\" : content", desc: "Append or insert new content into the most appropriate section." },
+            { cmd: "/Undo", args: "\"Note Name\"", desc: "Restore the immediately previous version of a note. One level only." },
+          ],
+        },
+        {
+          group: "Content Creation",
+          color: "emerald",
+          cmds: [
+            { cmd: "/Summarize", args: "All | \"Note Name\"", desc: "Creates a new summary note. Does not modify the original." },
+          ],
+        },
+        {
+          group: "Interactive Tools",
+          color: "violet",
+          cmds: [
+            { cmd: "/Quiz", args: "All | \"Note Name\" : count", desc: "Generate an interactive quiz from the note. Supports radio and checkbox questions. Save results to Notes after submission." },
+            { cmd: "/Discussion", args: "All | \"Note Name\"", desc: "Multi-model discussion — GPT, Gemini, DeepSeek, plus any custom providers in Settings → API Keys all share perspectives, then a synthesis is generated." },
+            { cmd: "/Read", args: "\"Note Name\"", desc: "Display a note's content inline in the chat, open it in the editor, and read it aloud. A TTS player bar appears with play/pause, stop, ◀◀ / ▶▶ sentence navigation, and speed controls (0.75× – 2×)." },
+          ],
+        },
+        {
+          group: "Productivity",
+          color: "amber",
+          cmds: [
+            { cmd: "/Reminder", args: "title : YYYY-MM-DD HH:MM", desc: "Create a reminder in the active workspace. A format hint popup shows example dates — the note picker does not appear for this command." },
+            { cmd: "/Feedback", args: "title : message", desc: "Submit a suggestion. A format hint popup shows examples instead of the note picker." },
+            { cmd: "/ReportBug", args: "title : description", desc: "Report a bug. A format hint popup shows examples instead of the note picker." },
+          ],
+        },
+      ].map(({ group, color, cmds }) => (
+        <div key={group}>
+          <p className={`text-xs font-semibold uppercase tracking-wider mb-2 ${
+            color === "indigo" ? "text-indigo-400" : color === "emerald" ? "text-emerald-400" : color === "violet" ? "text-violet-400" : "text-amber-400"
+          }`}>{group}</p>
+          <div className="space-y-1.5">
+            {cmds.map(({ cmd, args, desc }) => (
+              <div key={cmd} className="bg-[#12121a] border border-[#2a2a38] rounded-xl px-3 py-2">
+                <div className="flex items-baseline gap-2 mb-0.5 flex-wrap">
+                  <code className="text-indigo-300 font-mono text-xs font-semibold">{cmd}</code>
+                  <code className="text-gray-600 font-mono text-[10px]">{args}</code>
+                </div>
+                <p className="text-[11px] text-gray-500">{desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+
+      <div className="bg-[#12121a] border border-[#2a2a38] rounded-xl p-3 space-y-2">
+        <p className="text-xs font-semibold text-indigo-300 uppercase tracking-wider">Note picker vs Format hint</p>
+        <p className="text-[11px] text-gray-400">Commands that need a note name (/Improve, /Enhance, /Quiz, /Read, etc.) open a note picker after Tab — showing all workspace notes with arrow-key navigation. Commands that take free text (/Feedback, /ReportBug, /Reminder) show a format hint popup with the expected syntax and examples instead.</p>
+      </div>
+
+      <div className="bg-[#12121a] border border-[#2a2a38] rounded-xl p-3 space-y-2">
+        <p className="text-xs font-semibold text-indigo-300 uppercase tracking-wider">Model fallback order</p>
+        <p className="text-[11px] text-gray-400">All commands use the model you selected in Settings → AI Model. If that model fails, the fallback order is: <strong className="text-gray-300">1.</strong> your other configured custom providers → <strong className="text-gray-300">2.</strong> server-configured providers (Gemini, DeepSeek) → <strong className="text-gray-300">3.</strong> server default (GPT-4o Mini).</p>
+      </div>
+
+      <div className="bg-amber-500/5 border border-amber-500/20 rounded-xl p-3">
+        <p className="text-xs font-semibold text-amber-400 mb-1.5">Undo — how it works</p>
+        <p className="text-[11px] text-gray-400">Before any command modifies a note (/Improve, /Enhance, /Natural, /Humanize, /Update, /Add), the current version is saved as an undo snapshot. Use <code className="bg-[#12121a] px-1 rounded text-indigo-300">/Undo "Note Name"</code> to restore it. Only one level is supported — a second modification overwrites the snapshot.</p>
+      </div>
+    </div>
+  ),
+
+  apikeys: (
+    <div className="space-y-4 text-sm text-gray-400 leading-relaxed">
+      <p>Add your own API keys in <span className="text-white">Settings → API Keys</span>. When set, your key takes priority over the shared server key for all requests. Your custom providers also appear as extra participants in <code className="bg-[#12121a] px-1 rounded text-indigo-300">/Discussion</code> — each sharing their own perspective alongside GPT, Gemini, and DeepSeek.</p>
+
+      <div className="space-y-3">
+        {[
+          { provider: "OpenAI", placeholder: "sk-proj-...", hint: "platform.openai.com → API keys" },
+          { provider: "Google Gemini", placeholder: "AIza...", hint: "aistudio.google.com → Get API key" },
+          { provider: "DeepSeek", placeholder: "sk-...", hint: "platform.deepseek.com → API keys" },
+        ].map(({ provider, placeholder, hint }) => (
+          <div key={provider} className="bg-[#12121a] border border-[#2a2a38] rounded-xl p-3">
+            <p className="text-xs font-semibold text-indigo-300 mb-1">{provider}</p>
+            <p className="text-[11px] text-gray-500 font-mono mb-1">{placeholder}</p>
+            <p className="text-[11px] text-gray-600">{hint}</p>
+          </div>
+        ))}
+      </div>
+
+      <p className="text-xs font-semibold text-indigo-300 uppercase tracking-wider mt-2">Adding a Custom Provider</p>
+      <p>You can add <span className="text-white">any OpenAI-compatible API</span> — Groq, Mistral, Together AI, Ollama, Perplexity, and more.</p>
+      <div className="bg-[#12121a] border border-[#2a2a38] rounded-xl p-3 space-y-2">
+        {[
+          ["Provider Name", "A label you choose — e.g. \"Groq\" or \"My Ollama\""],
+          ["Model ID", "The model to send requests to — e.g. llama3-8b-8192"],
+          ["Base URL", "The OpenAI-compatible endpoint — e.g. https://api.groq.com/openai/v1"],
+          ["API Key", "Your key for that provider"],
+        ].map(([field, desc]) => (
+          <div key={field} className="flex gap-2 text-[11px]">
+            <span className="text-indigo-300 font-medium shrink-0 w-28">{field}</span>
+            <span className="text-gray-500">{desc}</span>
+          </div>
+        ))}
+      </div>
+
+      <div className="space-y-1.5 text-[11px] text-gray-500">
+        <p>Once added, your custom provider appears in <span className="text-gray-300">Settings → AI Model</span> under <em>Your Custom Providers</em> and can be selected like any built-in model.</p>
+        <p>Keys are encrypted at rest (Fernet symmetric encryption). The raw key is never returned by the API — only whether a key is set.</p>
+        <p>Remove a provider at any time; requests fall back to the server's shared key immediately.</p>
+      </div>
+    </div>
+  ),
+
   tips: (
     <div className="space-y-3 text-sm text-gray-400 leading-relaxed">
       <ul className="space-y-2">
@@ -327,6 +470,11 @@ const CONTENT: Record<string, React.ReactNode> = {
           "Reminders → Suggest scans only the active workspace - switch workspaces to suggest from different note sets.",
           "Paste a YouTube video URL in the Upload Notes panel to instantly transcribe and import it.",
           "Ask the AI to improve any note by name — e.g. \"improve my note Recording (7).m4a\". See the Note Improvement section for all supported phrases.",
+          "Type / in chat to access 14 slash commands — use ↑↓ arrows to navigate, Tab to complete. After a command, Tab opens a note picker with all your notes.",
+          "Add your own API key in Settings → API Keys to use your personal quota. You can also add any OpenAI-compatible provider (Groq, Mistral, Ollama) with a custom base URL.",
+          "Use /Read to hear a note read aloud. The TTS player bar lets you pause, skip by sentence, and adjust speed (0.75× – 2×). Works in any browser without extra setup.",
+          "Custom providers added in Settings → API Keys automatically join /Discussion as extra participants — each model gives its own perspective on the note.",
+          "After a /Quiz submission, click \"Save Results to Notes\" to store questions, your answers, correct answers, and explanations as a searchable note.",
         ].map((item, i) => (
           <li key={i} className="flex gap-2"><span className="text-indigo-500 shrink-0 mt-0.5">•</span><span>{item}</span></li>
         ))}

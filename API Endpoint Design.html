@@ -227,6 +227,11 @@
         <tr><td><span class="method m-put">PUT</span></td><td><code>/admin/features</code></td><td>Update one or more feature flags (admin only)</td><td>Admin</td></tr>
         <tr><td><span class="method m-post">POST</span></td><td><code>/upload/presign</code></td><td>Generate S3 pre-signed upload URL for direct-to-S3 file upload</td><td>Upload</td></tr>
         <tr><td><span class="method m-post">POST</span></td><td><code>/upload/process</code></td><td>Download S3 file, extract text, create note, delete S3 object</td><td>Upload</td></tr>
+        <tr><td><span class="method m-get">GET</span></td><td><code>/settings/api-keys</code></td><td>List all user's custom providers (no raw keys returned)</td><td>Settings</td></tr>
+        <tr><td><span class="method m-post">POST</span></td><td><code>/settings/api-keys</code></td><td>Add a custom provider (name, model, base URL, encrypted key)</td><td>Settings</td></tr>
+        <tr><td><span class="method m-put">PUT</span></td><td><code>/settings/api-keys/{id}</code></td><td>Update an existing custom provider by ID</td><td>Settings</td></tr>
+        <tr><td><span class="method m-delete">DELETE</span></td><td><code>/settings/api-keys/{id}</code></td><td>Remove a custom provider by ID</td><td>Settings</td></tr>
+        <tr><td><span class="method m-post">POST</span></td><td><code>/commands/execute</code></td><td>Execute a slash command — streams SSE response (14 commands supported)</td><td>Commands</td></tr>
       </tbody>
     </table>
   </section>
@@ -1017,17 +1022,17 @@
         <div class="ep-header" onclick="toggle('ep-transcribe')">
           <span class="method m-post">POST</span>
           <span class="ep-path">/api/v1/transcribe</span>
-          <span class="ep-summary">Transcribe audio/video via OpenAI Whisper</span>
+          <span class="ep-summary">Transcribe audio/video via Whisper (&lt;5 MB) or Deepgram (≥5 MB)</span>
           <span class="ep-toggle">&#x25BC;</span>
         </div>
         <div class="ep-body">
-          <p class="ep-desc">Accepts a multipart <code>file</code> upload (MP4, M4A, WebM, MP3, WAV, MOV — maximum 25 MB). Sends the file to OpenAI Whisper and returns the plain-text transcript. Used internally by the note editor's Record button.</p>
+          <p class="ep-desc">Accepts a multipart <code>file</code> upload (MP4, M4A, WebM, MP3, WAV, MOV — maximum 200 MB). Files &lt;5 MB are transcribed via OpenAI Whisper; files ≥5 MB are routed to Deepgram Nova-2 (Whisper fallback up to 25 MB). Returns the plain-text transcript. Used internally by the note editor's Record button.</p>
           <div class="schema-row">
             <div class="schema-box">
               <div class="schema-box-title">Form Fields</div>
               <pre><span class="json-key">file</span>     <span class="json-type">audio/video file (required)</span>
 <span class="json-key">language</span> <span class="json-type">string (optional, BCP-47)</span>
-<span class="json-type">Max size: 25 MB</span></pre>
+<span class="json-type">Max size: 200 MB</span></pre>
             </div>
             <div class="schema-box">
               <div class="schema-box-title">Response 200</div>
@@ -1158,21 +1163,21 @@
         <div class="ep-header" onclick="toggle('ep-video-upload')">
           <span class="method m-post">POST</span>
           <span class="ep-path">/api/v1/video/upload</span>
-          <span class="ep-summary">Upload audio/video file — Whisper transcription</span>
+          <span class="ep-summary">Upload audio/video file — Whisper (&lt;5 MB) / Deepgram (≥5 MB)</span>
           <span class="ep-toggle">&#x25BC;</span>
         </div>
         <div class="ep-body">
           <p class="ep-desc">
-            Accepts a multipart <code>file</code> upload (MP4, M4A, WebM, MP3, WAV, MOV — maximum 25 MB).
+            Accepts a multipart <code>file</code> upload (MP4, M4A, WebM, MP3, WAV, MOV — maximum 200 MB).
             Intended for Zoom, Teams, and Google Meet recordings.
-            Sends the file to OpenAI Whisper for transcription and wraps the result in HTML for direct insertion into the Tiptap note editor.
+            Files &lt;5 MB are transcribed via OpenAI Whisper; files ≥5 MB are routed to Deepgram Nova-2 (with Whisper as fallback up to 25 MB). The result is wrapped in HTML for direct insertion into the Tiptap note editor.
           </p>
           <div class="schema-row">
             <div class="schema-box">
               <div class="schema-box-title">Form Fields</div>
               <pre><span class="json-key">file</span> <span class="json-type">audio/video file (required)</span>
 <span class="json-type">Accepted: .mp4 .m4a .webm .mp3 .wav .mov</span>
-<span class="json-type">Max size: 25 MB</span></pre>
+<span class="json-type">Max size: 200 MB</span></pre>
             </div>
             <div class="schema-box">
               <div class="schema-box-title">Response 200 — VideoUploadResponse</div>
@@ -1186,7 +1191,7 @@
           <div class="schema-row" style="margin-top:.8rem;">
             <div class="schema-box">
               <div class="schema-box-title">Error Responses</div>
-              <pre><span class="json-num">413</span> <span class="json-type">File exceeds 25 MB limit</span>
+              <pre><span class="json-num">413</span> <span class="json-type">File exceeds 200 MB limit</span>
 <span class="json-num">415</span> <span class="json-type">Unsupported file type</span></pre>
             </div>
           </div>
@@ -2149,7 +2154,7 @@ data: <span class="json-str">[DONE]</span></pre>
         </div>
         <div class="ep-body">
           <p class="ep-desc">
-            Lambda downloads each S3 object by key, runs <code>extract_formatted_html</code> on the file bytes, creates a note per file, then deletes the S3 object. Each key is processed independently — one failure does not block the others. Supports all file types including audio/video (Whisper ≤25 MB, Deepgram Nova-2 &gt;25 MB). Auth: Bearer token required.
+            Lambda downloads each S3 object by key, runs <code>extract_formatted_html</code> on the file bytes, creates a note per file, then deletes the S3 object. Each key is processed independently — one failure does not block the others. Supports all file types including audio/video (Whisper &lt;5 MB, Deepgram Nova-2 ≥5 MB with Whisper fallback up to 25 MB). Auth: Bearer token required.
           </p>
           <div class="schema-row">
             <div class="schema-box">
@@ -2176,6 +2181,188 @@ data: <span class="json-str">[DONE]</span></pre>
     }
   ]
 }</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <hr class="divider" />
+
+  <!-- USER SETTINGS -->
+  <section>
+    <div class="section-label">User Settings</div>
+    <h2>User API Key Endpoints</h2>
+    <p>Allow authenticated users to store their own provider API keys. Keys are Fernet-encrypted before storage. When a key is set for a provider, it takes priority over the server's shared key for all that user's chat requests (streaming, RAG, fallback chain). Valid providers: <code>openai</code>, <code>gemini</code>, <code>deepseek</code>.</p>
+    <div class="ep-group">
+
+      <!-- GET STATUS -->
+      <div class="ep-card open" id="ep-keys-status">
+        <div class="ep-header" onclick="toggle('ep-keys-status')">
+          <span class="method m-get">GET</span>
+          <span class="ep-path">/api/v1/settings/api-keys</span>
+          <span class="ep-summary">Get which providers have a key stored</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">Returns a boolean per provider indicating whether the authenticated user has a key stored. The raw key is never returned.</p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Auth</div>
+              <pre><span class="json-type">Bearer token required</span></pre>
+            </div>
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200</div>
+              <pre>{
+  <span class="json-key">"openai"</span>:   <span class="json-bool">true</span>,
+  <span class="json-key">"gemini"</span>:   <span class="json-bool">false</span>,
+  <span class="json-key">"deepseek"</span>: <span class="json-bool">false</span>
+}</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SAVE KEY -->
+      <div class="ep-card open" id="ep-keys-save">
+        <div class="ep-header" onclick="toggle('ep-keys-save')">
+          <span class="method m-put">PUT</span>
+          <span class="ep-path">/api/v1/settings/api-keys/{provider}</span>
+          <span class="ep-summary">Save or replace an API key for a provider</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">
+            Encrypts the supplied key with Fernet (key derived from <code>ENCRYPTION_KEY</code> env var, or the JWT secret as a fallback) and upserts the record into the <code>user_api_keys</code> table.
+            If a key already exists for this provider, it is overwritten. Returns 400 for an unknown provider or empty key.
+          </p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Path Param</div>
+              <pre><span class="json-key">provider</span> <span class="json-type">openai | gemini | deepseek</span></pre>
+            </div>
+            <div class="schema-box">
+              <div class="schema-box-title">Request Body</div>
+              <pre>{ <span class="json-key">"key"</span>: <span class="json-str">"sk-proj-..."</span> }</pre>
+            </div>
+          </div>
+          <div class="schema-row" style="margin-top:.8rem;">
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200</div>
+              <pre>{ <span class="json-key">"ok"</span>: <span class="json-bool">true</span>, <span class="json-key">"provider"</span>: <span class="json-str">"openai"</span> }</pre>
+            </div>
+            <div class="schema-box">
+              <div class="schema-box-title">Error Responses</div>
+              <pre><span class="json-num">400</span> <span class="json-type">Unknown provider or empty key</span>
+<span class="json-num">401</span> <span class="json-type">Unauthenticated</span></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- DELETE KEY -->
+      <div class="ep-card open" id="ep-keys-delete">
+        <div class="ep-header" onclick="toggle('ep-keys-delete')">
+          <span class="method m-delete">DELETE</span>
+          <span class="ep-path">/api/v1/settings/api-keys/{provider}</span>
+          <span class="ep-summary">Remove the stored API key for a provider</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">Deletes the encrypted key record for the given provider. After deletion the user's requests fall back to the server's shared key for that provider. Returns 404 if no key was stored.</p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Path Param</div>
+              <pre><span class="json-key">provider</span> <span class="json-type">openai | gemini | deepseek</span></pre>
+            </div>
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200</div>
+              <pre>{ <span class="json-key">"ok"</span>: <span class="json-bool">true</span> }</pre>
+            </div>
+          </div>
+          <div class="schema-row" style="margin-top:.8rem;">
+            <div class="schema-box">
+              <div class="schema-box-title">Error Responses</div>
+              <pre><span class="json-num">404</span> <span class="json-type">No key found for this provider</span>
+<span class="json-num">400</span> <span class="json-type">Unknown provider</span></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <hr class="divider" />
+
+  <!-- SLASH COMMANDS -->
+  <section>
+    <div class="section-label">Commands</div>
+    <h2>Slash Command Endpoint</h2>
+    <p>Executes a slash command typed in the chat input. All 14 commands stream responses via SSE in the same format as <code>/chat/stream</code>. Commands are scoped to the authenticated user and active workspace.</p>
+    <div class="ep-group">
+
+      <div class="ep-card open" id="ep-cmd-execute">
+        <div class="ep-header" onclick="toggle('ep-cmd-execute')">
+          <span class="method m-post">POST</span>
+          <span class="ep-path">/api/v1/commands/execute</span>
+          <span class="ep-summary">Execute a slash command — SSE stream</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">
+            Parses and executes a slash command. The <code>command</code> field contains the full typed text (e.g. <code>/Improve "Assessment 2 Notes"</code>).
+            The backend saves the command as a user message, executes the operation (AI call, DB update, reminder creation, etc.) and streams the result.<br/><br/>
+            Special SSE events beyond standard <code>{"t":"token"}</code>:<br/>
+            <code>{"cmd_running":"message"}</code> — shown while the AI is processing (dual-ring spinner in UI)<br/>
+            <code>{"note_updated":id}</code> — triggers frontend to refresh the note in sidebar and editor<br/>
+            <code>{"quiz":{...}}</code> — renders an interactive quiz component in the chat bubble<br/>
+            <code>{"open_note":id}</code> — opens the note in the editor (used by /Read)<br/>
+            <code>{"speak":"plain text"}</code> — triggers browser text-to-speech via Web Speech API (used by /Read; Markdown symbols stripped server-side before sending)
+          </p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Request Body — SlashCommandRequestDTO</div>
+              <pre>{
+  <span class="json-key">"command"</span>:         <span class="json-str">"/Improve \"Assessment 2 Notes\""</span>,
+  <span class="json-key">"conversation_id"</span>: <span class="json-num">7</span>,
+  <span class="json-key">"workspace_id"</span>:   <span class="json-num">1</span>,
+  <span class="json-key">"model"</span>:           <span class="json-str">"gpt-4o-mini"</span>
+}</pre>
+            </div>
+            <div class="schema-box">
+              <div class="schema-box-title">SSE Event Stream</div>
+              <pre><span class="json-str">data: {"cmd_running":"Improving note..."}</span>
+<span class="json-str">data: {"note_updated":42}</span>
+<span class="json-str">data: {"t":"**Note** has been improved."}</span>
+<span class="json-str">data: {"done":true,"id":110,"conversation_id":7}</span>
+
+<span class="json-type">// /Read command example:</span>
+<span class="json-str">data: {"open_note":42}</span>
+<span class="json-str">data: {"t":"## My Note\n\nContent..."}</span>
+<span class="json-str">data: {"speak":"My Note. Content without markdown symbols."}</span>
+<span class="json-str">data: {"done":true,"id":111,"conversation_id":7}</span></pre>
+            </div>
+          </div>
+          <div class="schema-row" style="margin-top:.8rem;">
+            <div class="schema-box">
+              <div class="schema-box-title">Supported Commands</div>
+              <pre><span class="json-str">/Improve</span>   <span class="json-str">/Enhance</span>   <span class="json-str">/Summarize</span>
+<span class="json-str">/Natural</span>   <span class="json-str">/Humanize</span>  <span class="json-str">/Update</span>
+<span class="json-str">/Add</span>       <span class="json-str">/Undo</span>      <span class="json-str">/Reminder</span>
+<span class="json-str">/Quiz</span>      <span class="json-str">/Discussion</span><span class="json-str">/Read</span>
+<span class="json-str">/Feedback</span>  <span class="json-str">/ReportBug</span></pre>
+            </div>
+            <div class="schema-box">
+              <div class="schema-box-title">Undo Snapshot Fields (notes table)</div>
+              <pre><span class="json-key">undo_title</span>      <span class="json-type">TEXT</span>
+<span class="json-key">undo_content</span>    <span class="json-type">TEXT</span>
+<span class="json-key">undo_command</span>    <span class="json-type">VARCHAR(50)</span>
+<span class="json-key">undo_instruction</span><span class="json-type">TEXT</span>
+<span class="json-key">undo_created_at</span> <span class="json-type">TIMESTAMPTZ</span>
+<span class="json-key">undo_available</span>  <span class="json-type">BOOLEAN DEFAULT FALSE</span></pre>
             </div>
           </div>
         </div>

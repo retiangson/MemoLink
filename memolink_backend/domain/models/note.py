@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, func, ForeignKey
+from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, func, ForeignKey
 from sqlalchemy.orm import relationship
 from memolink_backend.core.db import Base
 
@@ -14,6 +14,14 @@ class Note(Base):
     source = Column(String(255), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     deleted_at = Column(DateTime(timezone=True), nullable=True)
+
+    # Undo snapshot columns (populated by slash commands that modify note content)
+    undo_title = Column(Text, nullable=True)
+    undo_content = Column(Text, nullable=True)
+    undo_command = Column(String(50), nullable=True)
+    undo_instruction = Column(Text, nullable=True)
+    undo_created_at = Column(DateTime(timezone=True), nullable=True)
+    undo_available = Column(Boolean, default=False, nullable=True)
 
     embedding = relationship(
         "Embedding",

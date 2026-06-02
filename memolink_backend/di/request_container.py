@@ -32,6 +32,9 @@ class RequestContainer:
     def logs(self):
         return self.services.get_system_log_service()
 
+    def commands(self):
+        return self.services.get_slash_command_service()
+
 
 def get_request_container(db: Session = Depends(get_db)) -> RequestContainer:
     return RequestContainer(db)

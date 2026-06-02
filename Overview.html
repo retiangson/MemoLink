@@ -205,6 +205,9 @@
     <span class="pill">Admin Panel</span>
     <span class="pill">Feature Flags</span>
     <span class="pill">Bug Reports</span>
+    <span class="pill">User API Keys</span>
+    <span class="pill">Slash Commands</span>
+    <span class="pill">Interactive Quiz</span>
   </div>
 </div>
 
@@ -292,7 +295,7 @@
       <div class="card">
         <div class="card-icon">&#x1F3AC;</div>
         <h3>Video Import</h3>
-        <p>YouTube URL tab fetches captions via <code>youtube-transcript-api</code>. Upload File tab accepts MP4/M4A/WebM/MP3/WAV/MOV up to 200 MB — files ≤25 MB use OpenAI Whisper, larger files automatically fall back to Deepgram Nova-2.</p>
+        <p>YouTube URL tab fetches captions via <code>youtube-transcript-api</code>. Upload File tab accepts MP4/M4A/WebM/MP3/WAV/MOV up to 200 MB — files &lt;5 MB use OpenAI Whisper, files ≥5 MB are routed to Deepgram Nova-2 (with Whisper as fallback up to 25 MB).</p>
       </div>
       <div class="card">
         <div class="card-icon">&#x1F5C2;&#xFE0F;</div>
@@ -366,8 +369,8 @@
       </div>
       <div class="card">
         <div class="card-icon">&#x1F399;&#xFE0F;</div>
-        <h3>Deepgram Transcription Fallback</h3>
-        <p>Upload limit raised to 200 MB. Files ≤25 MB are transcribed by OpenAI Whisper. Files &gt;25 MB automatically fall back to <strong>Deepgram Nova-2</strong> via <code>DEEPGRAM_API_KEY</code> (free $200 credit, no credit card). The fallback is transparent to users; each event is logged to <code>system_logs</code>.</p>
+        <h3>Smart Transcription Routing</h3>
+        <p>Upload limit raised to 200 MB. Files &lt;5 MB are transcribed by <strong>OpenAI Whisper</strong>. Files ≥5 MB are routed to <strong>Deepgram Nova-2</strong> via <code>DEEPGRAM_API_KEY</code> (free $200 credit, no credit card); if Deepgram fails, Whisper is used as a fallback for files up to 25 MB. Routing is transparent to users; each event is logged to <code>system_logs</code>.</p>
       </div>
       <div class="card">
         <div class="card-icon">&#x26A1;</div>
@@ -383,6 +386,31 @@
         <div class="card-icon">&#x2728;</div>
         <h3>Note Improvement via Chat</h3>
         <p>Natural-language triggers ("improve my note X", "clean up note X", "polish note X") detected by <code>_IMPROVE_NOTE_RE</code> regex. MemoLink closes the note's editor tab, shows a dual-ring spinner, fuzzy-matches the note title, calls AI to improve the HTML content, auto-saves to DB, and streams back a clickable "Open Note: X →" button.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">&#x1F511;</div>
+        <h3>User API Keys &amp; Custom Providers</h3>
+        <p>Users can store their own OpenAI, Gemini, or DeepSeek API keys in <strong>Settings → API Keys</strong>. Keys are encrypted at rest using Fernet symmetric encryption. Additionally, users can add <strong>any OpenAI-compatible provider</strong> (Groq, Mistral, Together AI, Ollama, Perplexity, etc.) by supplying a name, base URL, model ID, and API key. Custom providers appear in the AI Model picker alongside built-in models. The selected provider's key takes priority over server keys for all requests.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">&#x1F5A5;&#xFE0F;</div>
+        <h3>Slash Command System</h3>
+        <p>14 slash commands available directly in the chat input. Type <code>/</code> to open the command picker with keyboard navigation (↑↓ arrows, Tab/Enter to select, Esc to cancel). Commands: <strong>/Improve</strong>, <strong>/Enhance</strong>, <strong>/Summarize</strong>, <strong>/Natural</strong>, <strong>/Humanize</strong>, <strong>/Update</strong>, <strong>/Add</strong>, <strong>/Undo</strong>, <strong>/Reminder</strong>, <strong>/Quiz</strong>, <strong>/Discussion</strong>, <strong>/Read</strong>, <strong>/Feedback</strong>, <strong>/ReportBug</strong>. Commands that take note names show a searchable note picker after Tab. Commands that take free text (<code>/Feedback</code>, <code>/ReportBug</code>, <code>/Reminder</code>) show a format hint popup with examples instead. Commands that modify notes save a one-level undo snapshot automatically. All commands use the currently selected AI model with user custom keys taking priority over server keys.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">&#x1F4DD;</div>
+        <h3>Interactive Quiz</h3>
+        <p>The <code>/Quiz</code> command generates an interactive quiz from any note or all notes. Questions use radio buttons (single answer) or checkboxes (multiple answers). After submission the quiz shows score, correct answers, and per-question explanations. A <strong>Save Results to Notes</strong> button creates a formatted Markdown note with the full results — questions, answers, explanations, and topics to review.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">&#x1F508;</div>
+        <h3>Text-to-Speech (/Read)</h3>
+        <p>The <code>/Read</code> command opens a note in the editor, displays it in chat, and reads it aloud using the browser's built-in Web Speech API — no extra API key required. A TTS player bar appears above the chat input with: <strong>Play/Pause</strong>, <strong>Stop</strong>, <strong>◀◀ / ▶▶</strong> sentence navigation, and speed controls <strong>0.75× 1× 1.25× 1.5× 2×</strong>. Markdown symbols are stripped before speaking for natural delivery. Changing speed restarts the current sentence at the new rate.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">&#x1F4AC;</div>
+        <h3>Multi-Model Discussion (/Discussion)</h3>
+        <p>The <code>/Discussion</code> command invites every configured AI model — GPT, Gemini, DeepSeek, and any custom providers the user has added in Settings → API Keys — to each share a 3-5 sentence perspective grounded in the note content. A synthesis is then generated combining all perspectives. The command uses the selected model first, then falls back through user custom keys → server providers → server default.</p>
       </div>
     </div>
   </section>
@@ -557,7 +585,8 @@
            <strong>Uvicorn</strong> — ASGI server<br/>
            <strong>python-jose</strong> — JWT utilities<br/>
            <strong>python-multipart</strong> — file upload handling<br/>
-           <strong>passlib (bcrypt)</strong> — password hashing</p>
+           <strong>passlib (bcrypt)</strong> — password hashing<br/>
+           <strong>cryptography (Fernet)</strong> — symmetric encryption for user API keys</p>
       </div>
       <div class="card">
         <h3>Frontend</h3>
@@ -581,7 +610,8 @@
            <strong>users.is_admin</strong> — boolean column; first user auto-promoted<br/>
            <strong>users.access_level</strong> — VARCHAR ('regular'|'plus'|'pro'); default 'regular'<br/>
            <strong>system_logs table</strong> — structured event log for INFO/WARNING/ERROR events<br/>
-           <strong>translation_cache table</strong> — SHA-256-keyed translation result cache with hit_count</p>
+           <strong>translation_cache table</strong> — SHA-256-keyed translation result cache with hit_count<br/>
+           <strong>user_api_keys table</strong> — per-user encrypted API keys (provider + Fernet-encrypted key, unique per user+provider)</p>
       </div>
       <div class="card">
         <h3>AI &amp; Media</h3>
@@ -590,8 +620,8 @@
            <strong>DeepSeek V3 / R1 / Coder</strong> — code-focused alternative chat models<br/>
            <strong>DALL-E 3</strong> — AI image generation (1024&times;1024, base64)<br/>
            <strong>text-embedding-3-small</strong> — vector embeddings<br/>
-           <strong>OpenAI Whisper</strong> — audio/video transcription (≤25 MB)<br/>
-           <strong>Deepgram Nova-2</strong> — audio/video transcription fallback (&gt;25 MB)<br/>
+           <strong>OpenAI Whisper</strong> — audio/video transcription (&lt;5 MB primary, up to 25 MB fallback)<br/>
+           <strong>Deepgram Nova-2</strong> — audio/video transcription (≥5 MB primary)<br/>
            <strong>youtube-transcript-api</strong> — YouTube caption extraction<br/>
            <strong>Brave Search API</strong> — optional per-message web context<br/>
            <strong>RAG pattern</strong> — grounded retrieval<br/>
@@ -623,7 +653,7 @@
       <p style="color:var(--text);font-size:.92rem;margin-bottom:.2rem;">
         <strong>Prerequisites:</strong> Docker Desktop installed; <code>.env</code> file populated from <code>.env.example</code>.
       </p>
-      <pre>cp .env.example .env        # fill in OPENAI_API_KEY, DATABASE_URL, DEEPGRAM_API_KEY (optional, for >25 MB files)
+      <pre>cp .env.example .env        # fill in OPENAI_API_KEY, DATABASE_URL, DEEPGRAM_API_KEY (optional, for ≥5 MB files)
                             # also S3_UPLOAD_BUCKET, AWS_REGION (optional, for Lambda S3 pre-signed uploads)
 docker compose up --build   # builds and starts backend + frontend</pre>
       <p style="margin-top:.9rem;font-size:.88rem;">

@@ -29,6 +29,10 @@ export type FeatureFlags = {
   file_upload_enabled: boolean;
   research_mode_enabled: boolean;
   model_attribution_enabled: boolean;
+  tts_enabled: boolean;
+  slash_commands_enabled: boolean;
+  custom_api_keys_enabled: boolean;
+  video_import_enabled: boolean;
   default_model: string;
   default_language: string;
   web_search_min_level: AccessLevel;
@@ -39,6 +43,10 @@ export type FeatureFlags = {
   file_upload_min_level: AccessLevel;
   research_mode_min_level: AccessLevel;
   model_attribution_min_level: AccessLevel;
+  tts_min_level: AccessLevel;
+  slash_commands_min_level: AccessLevel;
+  custom_api_keys_min_level: AccessLevel;
+  video_import_min_level: AccessLevel;
 };
 
 export function parseFlags(raw: Record<string, string>): FeatureFlags {
@@ -51,6 +59,10 @@ export function parseFlags(raw: Record<string, string>): FeatureFlags {
     file_upload_enabled: raw.file_upload_enabled !== "false",
     research_mode_enabled: raw.research_mode_enabled !== "false",
     model_attribution_enabled: raw.model_attribution_enabled !== "false",
+    tts_enabled: raw.tts_enabled !== "false",
+    slash_commands_enabled: raw.slash_commands_enabled !== "false",
+    custom_api_keys_enabled: raw.custom_api_keys_enabled !== "false",
+    video_import_enabled: raw.video_import_enabled !== "false",
     default_model: raw.default_model ?? "gpt-4o-mini",
     default_language: raw.default_language ?? "English",
     web_search_min_level: (raw.web_search_min_level ?? "regular") as AccessLevel,
@@ -61,6 +73,10 @@ export function parseFlags(raw: Record<string, string>): FeatureFlags {
     file_upload_min_level: (raw.file_upload_min_level ?? "regular") as AccessLevel,
     research_mode_min_level: (raw.research_mode_min_level ?? "regular") as AccessLevel,
     model_attribution_min_level: (raw.model_attribution_min_level ?? "regular") as AccessLevel,
+    tts_min_level: (raw.tts_min_level ?? "regular") as AccessLevel,
+    slash_commands_min_level: (raw.slash_commands_min_level ?? "regular") as AccessLevel,
+    custom_api_keys_min_level: (raw.custom_api_keys_min_level ?? "regular") as AccessLevel,
+    video_import_min_level: (raw.video_import_min_level ?? "regular") as AccessLevel,
   };
 }
 
@@ -101,6 +117,10 @@ export async function updateAdminFeatures(flags: FeatureFlags): Promise<FeatureF
     file_upload_enabled: String(flags.file_upload_enabled),
     research_mode_enabled: String(flags.research_mode_enabled),
     model_attribution_enabled: String(flags.model_attribution_enabled),
+    tts_enabled: String(flags.tts_enabled),
+    slash_commands_enabled: String(flags.slash_commands_enabled),
+    custom_api_keys_enabled: String(flags.custom_api_keys_enabled),
+    video_import_enabled: String(flags.video_import_enabled),
     default_model: flags.default_model,
     default_language: flags.default_language,
     web_search_min_level: flags.web_search_min_level,
@@ -111,6 +131,10 @@ export async function updateAdminFeatures(flags: FeatureFlags): Promise<FeatureF
     file_upload_min_level: flags.file_upload_min_level,
     research_mode_min_level: flags.research_mode_min_level,
     model_attribution_min_level: flags.model_attribution_min_level,
+    tts_min_level: flags.tts_min_level,
+    slash_commands_min_level: flags.slash_commands_min_level,
+    custom_api_keys_min_level: flags.custom_api_keys_min_level,
+    video_import_min_level: flags.video_import_min_level,
   };
   const res = await api.put("/admin/features", { flags: raw });
   return parseFlags(res.data.flags);

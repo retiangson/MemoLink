@@ -41,7 +41,7 @@ def test_chat_service_uses_notes_as_context_and_saves_assistant_message(monkeypa
     monkeypatch.setattr(
         chat_module,
         "_get_client",
-        lambda model: SimpleNamespace(chat=SimpleNamespace(completions=fake_chat)),
+        lambda model, user_keys=None: SimpleNamespace(chat=SimpleNamespace(completions=fake_chat)),
     )
     service = ChatService(
         conv_repo=conv_repo,

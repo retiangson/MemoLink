@@ -20,7 +20,7 @@ def test_chat_api_returns_answer_with_mocked_openai(db_session, fake, monkeypatc
     monkeypatch.setattr(
         chat_module,
         "_get_client",
-        lambda model: SimpleNamespace(chat=SimpleNamespace(completions=FakeOpenAIChat())),
+        lambda model, user_keys=None: SimpleNamespace(chat=SimpleNamespace(completions=FakeOpenAIChat())),
     )
 
     with api_client(db_session, user_id=user.id) as client:

@@ -19,6 +19,10 @@ const LEVEL_FEATURES: { minKey: keyof FeatureFlags; label: string }[] = [
   { minKey: "translation_min_level",      label: "Translation" },
   { minKey: "file_upload_min_level",          label: "File Upload" },
   { minKey: "model_attribution_min_level",    label: "Model Attribution" },
+  { minKey: "tts_min_level",                  label: "Text-to-Speech" },
+  { minKey: "slash_commands_min_level",       label: "Slash Commands" },
+  { minKey: "custom_api_keys_min_level",      label: "Custom API Keys" },
+  { minKey: "video_import_min_level",         label: "Video Import" },
 ];
 
 const TRANSLATE_LANGUAGES = [
@@ -431,6 +435,10 @@ export function AdminPage({ onClose, currentUserId }: Props) {
                     { key: "image_generation_enabled", label: "Image Generation", desc: "Allow AI image generation in chat" },
                     { key: "translation_enabled", label: "Translation", desc: "Show the translate button on chat messages" },
                     { key: "file_upload_enabled", label: "File Upload", desc: "Allow users to attach files to chat" },
+                    { key: "tts_enabled", label: "Text-to-Speech", desc: "Allow users to read notes and chat aloud with TTS" },
+                    { key: "slash_commands_enabled", label: "Slash Commands", desc: "Show the / command autocomplete picker in chat" },
+                    { key: "custom_api_keys_enabled", label: "Custom API Keys", desc: "Allow users to add their own AI provider API keys" },
+                    { key: "video_import_enabled", label: "Video Import", desc: "Allow importing note content from a video URL" },
                   ] as { key: keyof FeatureFlags; label: string; desc: string }[]).map(({ key, label, desc }) => (
                     <div key={key} className="flex items-center justify-between px-4 py-3.5 bg-[#1a1a24] border border-[#2a2a38] rounded-xl">
                       <div>

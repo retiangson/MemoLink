@@ -3,6 +3,7 @@ import { marked } from "marked";
 import MarkdownRenderer from "./MarkdownRenderer";
 import { translateText } from "../api/chatApi";
 import { MODELS } from "../constants/models";
+import { QuizRenderer } from "./QuizRenderer";
 import "highlight.js/styles/github-dark.css";
 import "../styles/markdown.css";
 
@@ -17,36 +18,90 @@ function modelLabel(id?: string): string {
 }
 
 const NOTE_LINK_RE = /\[\[NOTE_LINK:(\d+):([^\]]+)\]\]/g;
+const TOKEN_RE = /(\[\[NOTE_LINK:\d+:[^\]]+\]\]|✅|⚠)/g;
 
-/** Render content splitting [[NOTE_LINK:id:title]] into clickable buttons. */
+function CmdCheck() {
+  return (
+    <span className="inline-flex items-center justify-center w-[18px] h-[18px] rounded-full bg-emerald-500/15 border border-emerald-500/25 mx-0.5 align-middle shrink-0">
+      <svg className="w-2.5 h-2.5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+      </svg>
+    </span>
+  );
+}
+
+function CmdWarn() {
+  return (
+    <span className="inline-flex items-center justify-center w-[18px] h-[18px] rounded-full bg-amber-500/15 border border-amber-500/25 mx-0.5 align-middle shrink-0">
+      <svg className="w-2.5 h-2.5 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+      </svg>
+    </span>
+  );
+}
+
+/** Render content splitting [[NOTE_LINK:id:title]], ✅ and ⚠ into styled components.
+ *  Status icons (✅ ⚠) are paired with the immediately following text in a flex row
+ *  so the icon stays inline with the first line of the MarkdownRenderer output. */
 function ContentWithNoteLinks({ content, onOpenNote }: { content: string; onOpenNote?: (id: number) => void }) {
-  const segments: React.ReactNode[] = [];
-  let last = 0;
-  let m: RegExpExecArray | null;
-  NOTE_LINK_RE.lastIndex = 0;
-  while ((m = NOTE_LINK_RE.exec(content)) !== null) {
-    if (m.index > last) segments.push(<MarkdownRenderer key={last}>{content.slice(last, m.index)}</MarkdownRenderer>);
-    const noteId = parseInt(m[1]);
-    const noteTitle = m[2];
-    segments.push(
-      <button
-        key={m.index}
-        onClick={() => onOpenNote?.(noteId)}
-        className="inline-flex items-center gap-2 my-2 px-4 py-2 rounded-xl bg-indigo-600/20 border border-indigo-500/30 text-indigo-300 text-sm font-medium hover:bg-indigo-600/40 hover:text-indigo-100 transition"
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 shrink-0" fill="currentColor" viewBox="0 0 16 16">
-          <path d="M5 0h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h2zm-1 1H3a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H6v2.5a.5.5 0 0 1-.5.5h-2A.5.5 0 0 1 3 4.5V1.5A.5.5 0 0 1 3.5 1H4z"/>
-        </svg>
-        Open Note: {noteTitle}
-        <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-        </svg>
-      </button>
-    );
-    last = m.index + m[0].length;
+  TOKEN_RE.lastIndex = 0;
+  const parts = content.split(TOKEN_RE).filter(Boolean);
+  if (parts.length === 1 && !TOKEN_RE.test(content)) {
+    return <MarkdownRenderer>{content}</MarkdownRenderer>;
   }
-  if (last < content.length) segments.push(<MarkdownRenderer key={last}>{content.slice(last)}</MarkdownRenderer>);
-  return segments.length > 0 ? <>{segments}</> : <MarkdownRenderer>{content}</MarkdownRenderer>;
+
+  const nodes: React.ReactNode[] = [];
+  let i = 0;
+  while (i < parts.length) {
+    const part = parts[i];
+
+    if (part === "✅" || part === "⚠") {
+      const Icon = part === "✅" ? CmdCheck : CmdWarn;
+      const next = parts[i + 1];
+      // Pair icon + following text segment in a flex row to keep them on the same line
+      if (next && !next.match(/^[✅⚠]$/) && !next.startsWith("[[NOTE_LINK:")) {
+        nodes.push(
+          <div key={i} className="flex items-start gap-1.5">
+            <span className="shrink-0 mt-[3px]"><Icon /></span>
+            <div className="flex-1 min-w-0"><MarkdownRenderer>{next}</MarkdownRenderer></div>
+          </div>
+        );
+        i += 2;
+        continue;
+      }
+      nodes.push(<Icon key={i} />);
+      i++;
+      continue;
+    }
+
+    const noteMatch = part.match(/^\[\[NOTE_LINK:(\d+):([^\]]+)\]\]$/);
+    if (noteMatch) {
+      const noteId = parseInt(noteMatch[1]);
+      const noteTitle = noteMatch[2];
+      nodes.push(
+        <button
+          key={i}
+          onClick={() => onOpenNote?.(noteId)}
+          className="inline-flex items-center gap-2 my-2 px-4 py-2 rounded-xl bg-indigo-600/20 border border-indigo-500/30 text-indigo-300 text-sm font-medium hover:bg-indigo-600/40 hover:text-indigo-100 transition"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 shrink-0" fill="currentColor" viewBox="0 0 16 16">
+            <path d="M5 0h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h2zm-1 1H3a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H6v2.5a.5.5 0 0 1-.5.5h-2A.5.5 0 0 1 3 4.5V1.5A.5.5 0 0 1 3.5 1H4z"/>
+          </svg>
+          Open Note: {noteTitle}
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
+      );
+      i++;
+      continue;
+    }
+
+    nodes.push(<MarkdownRenderer key={i}>{part}</MarkdownRenderer>);
+    i++;
+  }
+
+  return <>{nodes}</>;
 }
 
 interface Props {
@@ -58,6 +113,7 @@ interface Props {
   onDelete?: () => void;
   onApplyEdit?: (content: string, noteId: number | null) => void;
   onOpenNote?: (noteId: number) => void;
+  onSaveNote?: (title: string, content: string) => void;
   hasOpenNote?: boolean;
   translationEnabled?: boolean;
   modelAttributionEnabled?: boolean;
@@ -109,7 +165,7 @@ function ImageGeneratingSpinner() {
   );
 }
 
-export default function ChatBubble({ role, content, model, streaming, onAdd, onDelete, onApplyEdit, onOpenNote, hasOpenNote, translationEnabled = true, modelAttributionEnabled = true }: Props) {
+export default function ChatBubble({ role, content, model, streaming, onAdd, onDelete, onApplyEdit, onOpenNote, onSaveNote, hasOpenNote, translationEnabled = true, modelAttributionEnabled = true }: Props) {
   const isUser = role === "user";
   const [copied, setCopied] = useState(false);
   const [showLangPicker, setShowLangPicker] = useState(false);
@@ -125,7 +181,11 @@ export default function ChatBubble({ role, content, model, streaming, onAdd, onD
   const isImageGenerating = content === "__IMAGE_GENERATING__";
   const isImprovingNote = content.startsWith("__IMPROVING_NOTE__:");
   const improvingNoteTitle = isImprovingNote ? content.slice("__IMPROVING_NOTE__:".length) : "";
-  const { pre, edit, noteId, post } = (isImageGenerating || isImprovingNote) ? { pre: "", edit: null, noteId: null, post: "" } : parseNoteEdit(content);
+  const isQuiz = content.startsWith("__QUIZ__:");
+  const quizData = isQuiz ? (() => { try { return JSON.parse(content.slice("__QUIZ__:".length)); } catch { return null; } })() : null;
+  const isCmdRunning = content.startsWith("__CMD_RUNNING__:");
+  const cmdRunningMsg = isCmdRunning ? content.slice("__CMD_RUNNING__:".length) : "";
+  const { pre, edit, noteId, post } = (isImageGenerating || isImprovingNote || isQuiz || isCmdRunning) ? { pre: "", edit: null, noteId: null, post: "" } : parseNoteEdit(content);
 
   async function handleCopy() {
     const textToCopy = translation ?? content;
@@ -214,7 +274,17 @@ export default function ChatBubble({ role, content, model, streaming, onAdd, onD
         className={`max-w-[740px] px-5 py-4 rounded-2xl text-[16px] leading-relaxed backdrop-blur-sm shadow-sm
           ${isUser ? "bg-[#2F2F3F]/80 text-gray-100" : "text-white"}`}
       >
-        {isImprovingNote ? (
+        {isQuiz && quizData ? (
+          <QuizRenderer quiz={quizData} onSaveNote={onSaveNote} />
+        ) : isCmdRunning ? (
+          <div className="flex items-center gap-3 py-1">
+            <div className="relative w-5 h-5 shrink-0">
+              <div className="absolute inset-0 rounded-full border-[2.5px] border-indigo-500/20 border-t-indigo-400 animate-spin" />
+              <div className="absolute inset-[3px] rounded-full border border-purple-500/20 border-t-purple-400 animate-[spin_1.4s_linear_infinite_reverse]" />
+            </div>
+            <MarkdownRenderer>{cmdRunningMsg}</MarkdownRenderer>
+          </div>
+        ) : isImprovingNote ? (
           <div className="flex items-center gap-3 py-1">
             <div className="relative w-6 h-6 shrink-0">
               <div className="absolute inset-0 rounded-full border-[2.5px] border-indigo-500/20 border-t-indigo-400 animate-spin" />
@@ -387,17 +457,30 @@ export default function ChatBubble({ role, content, model, streaming, onAdd, onD
           </button>
           {onAdd && (
             <button onClick={() => onAdd(translation ?? content)} className="flex items-center gap-1 px-2 py-1 bg-[#2A2A2A]/60 backdrop-blur-sm rounded-md hover:text-indigo-300">
-              📒 Save
+              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M17 3H7a2 2 0 00-2 2v16l7-3 7 3V5a2 2 0 00-2-2z" />
+              </svg>
+              Save
             </button>
           )}
           {onDelete && (
             <button onClick={onDelete} className="flex items-center gap-1 px-2 py-1 bg-[#2A2A2A]/60 backdrop-blur-sm rounded-md hover:text-red-300">
-              🗑 Delete
+              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+              Delete
             </button>
           )}
         </div>
         {modelAttributionEnabled && model && !streaming && (
-          <p className="text-[10px] text-gray-700 select-none">replied by {modelLabel(model)}</p>
+          <div className="flex items-center gap-1.5 text-[10px] text-gray-700 select-none">
+            <span className="inline-flex items-center justify-center w-[14px] h-[14px] rounded bg-[#1a1a24] border border-[#2a2a38]">
+              <svg className="w-2 h-2 text-indigo-400/60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+            </span>
+            {modelLabel(model)}
+          </div>
         )}
         </div>
       )}
@@ -406,7 +489,9 @@ export default function ChatBubble({ role, content, model, streaming, onAdd, onD
           {translationEnabled && translateButton}
           {onDelete && (
             <button onClick={onDelete} className="flex items-center gap-1 px-2 py-1 bg-[#2A2A2A]/60 backdrop-blur-sm rounded-md hover:text-red-300">
-              🗑
+              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
             </button>
           )}
         </div>

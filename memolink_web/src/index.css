@@ -62,3 +62,8 @@ html, body {
   scrollbar-width: thin;
   scrollbar-color: #2a2a38 transparent;
 }
+
+.tts-highlight {
+  background: rgba(99, 102, 241, 0.35);
+  border-radius: 2px;
+}

@@ -297,7 +297,7 @@
         </tr>
         <tr>
           <td class="req-id">FR-24</td>
-          <td class="req-text">The note editor must support uploading audio/video files (MP4, M4A, WebM, MP3, WAV, MOV up to 25 MB) and transcribing them via OpenAI Whisper for use as note content.</td>
+          <td class="req-text">The note editor must support uploading audio/video files (MP4, M4A, WebM, MP3, WAV, MOV up to 200 MB) and transcribing them — files &lt;5 MB via OpenAI Whisper, files ≥5 MB via Deepgram Nova-2 (Whisper fallback up to 25 MB) — for use as note content.</td>
           <td><span class="req-priority p-high">High</span></td>
           <td><span class="req-cat c-func">Video</span></td>
         </tr>
@@ -549,7 +549,7 @@
         </tr>
         <tr>
           <td class="req-id">FR-66</td>
-          <td class="req-text">The audio/video transcription upload limit must be raised from 25 MB to <strong>200 MB</strong>. Files ≤25 MB must be transcribed via OpenAI Whisper. Files &gt;25 MB must automatically fall back to <strong>Deepgram Nova-2</strong>, configured via the <code>DEEPGRAM_API_KEY</code> environment variable (free $200 credit at deepgram.com, no credit card required). The transcription routing must be implemented in <code>file_extractor.py</code> <code>transcribe_audio()</code> and must be transparent to controllers — they receive the transcript regardless of which service was used. If no <code>DEEPGRAM_API_KEY</code> is configured and the file exceeds 25 MB, the system must return HTTP 422 with a descriptive error message. Each transcription event (service used, file size, success/failure) must be written to <code>system_logs</code>.</td>
+          <td class="req-text">The audio/video transcription upload limit must be <strong>200 MB</strong>. Files &lt;5 MB must be transcribed via <strong>OpenAI Whisper</strong>. Files ≥5 MB must be routed to <strong>Deepgram Nova-2</strong>, configured via the <code>DEEPGRAM_API_KEY</code> environment variable (free $200 credit at deepgram.com, no credit card required); if Deepgram fails, Whisper must be used as a fallback for files up to 25 MB. The transcription routing must be implemented in <code>file_extractor.py</code> <code>transcribe_audio()</code> and must be transparent to controllers — they receive the transcript regardless of which service was used. Each transcription event (service used, file size, success/failure) must be written to <code>system_logs</code>.</td>
           <td><span class="req-priority p-high">High</span></td>
           <td><span class="req-cat c-func">Video</span></td>
         </tr>
@@ -774,7 +774,7 @@
       <div class="uc-card">
         <div class="uc-actor">Actor: Logged-in User</div>
         <div class="uc-title">UC-12 &middot; Upload Meeting Recording</div>
-        <div class="uc-desc">User drags an MP4/M4A/WebM/MP3/WAV/MOV file (up to 25 MB) onto the Upload File tab. System sends it to OpenAI Whisper for transcription and inserts the result as note content.</div>
+        <div class="uc-desc">User drags an MP4/M4A/WebM/MP3/WAV/MOV file (up to 200 MB) onto the Upload File tab. System routes it to OpenAI Whisper (&lt;5 MB) or Deepgram Nova-2 (≥5 MB) for transcription and inserts the result as note content.</div>
       </div>
       <div class="uc-card">
         <div class="uc-actor">Actor: Logged-in User</div>
@@ -1063,7 +1063,7 @@
       <div class="constraint">
         <div class="constraint-icon">&#x1F4C4;</div>
         <h4>File Type Scope</h4>
-        <p>Chat uploads: plain text (.txt), PDF (.pdf), Word (.docx). Video uploads: MP4, M4A, WebM, MP3, WAV, MOV (max 25 MB).</p>
+        <p>Chat uploads: plain text (.txt), PDF (.pdf), Word (.docx). Video uploads: MP4, M4A, WebM, MP3, WAV, MOV (max 200 MB).</p>
       </div>
       <div class="constraint">
         <div class="constraint-icon">&#x1F9EA;</div>
@@ -1082,8 +1082,8 @@
       </div>
       <div class="constraint">
         <div class="constraint-icon">&#x1F4E4;</div>
-        <h4>25 MB Upload Limit</h4>
-        <p>Audio and video file uploads are capped at 25 MB — the OpenAI Whisper API limit. Files exceeding this are rejected before transcription.</p>
+        <h4>Transcription Routing</h4>
+        <p>Audio and video files up to 200 MB are supported. Files &lt;5 MB are transcribed via OpenAI Whisper. Files ≥5 MB are routed to Deepgram Nova-2; if Deepgram fails, Whisper is used as a fallback for files up to 25 MB.</p>
       </div>
       <div class="constraint">
         <div class="constraint-icon">&#x1F5C2;&#xFE0F;</div>

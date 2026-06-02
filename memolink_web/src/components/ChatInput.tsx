@@ -1,5 +1,10 @@
 import React, { useEffect, useState } from "react";
 import { useRecording } from "../hooks/useRecording";
+import { SlashCommandPicker } from "./SlashCommandPicker";
+import { SLASH_COMMANDS } from "../constants/slashCommands";
+import { NotePickerForCommand } from "./NotePickerForCommand";
+import { CommandFormatHint, NOTE_COMMANDS, FORMAT_HINTS } from "./CommandFormatHint";
+import type { Note } from "../types";
 
 interface ChatInputProps {
   input: string;
@@ -22,15 +27,62 @@ interface ChatInputProps {
     agent_mode_enabled: boolean;
     file_upload_enabled: boolean;
     research_mode_enabled: boolean;
+    slash_commands_enabled: boolean;
   };
+  notes?: Note[];
 }
+
+const ALL_SUPPORT = new Set(["improve","enhance","summarize","quiz","discussion"]);
 
 export function ChatInput({
   input, setInput, loading, pendingFiles, setPendingFiles,
   textareaRef, attachmentInputRef, onSend, autoResize,
-  webSearch, onToggleWebSearch, agentMode, onToggleAgentMode, researchMode, onToggleResearchMode, flags,
+  webSearch, onToggleWebSearch, agentMode, onToggleAgentMode, researchMode, onToggleResearchMode, flags, notes = [],
 }: ChatInputProps) {
   const [showLangPicker, setShowLangPicker] = useState(false);
+  const [slashPickerIndex, setSlashPickerIndex] = useState(0);
+  const [notePickerIndex, setNotePickerIndex] = useState(0);
+
+  // Stage 1: command picker — /something with no space
+  const SLASH_PICKER_VISIBLE = (flags?.slash_commands_enabled !== false) && input.startsWith("/") && !input.slice(1).includes(" ");
+  const slashFilter = SLASH_PICKER_VISIBLE ? input.slice(1).toLowerCase() : "";
+  const filteredSlashCmds = SLASH_COMMANDS.filter(
+    (c) => !slashFilter || c.cmd.toLowerCase().startsWith(slashFilter)
+  );
+  const clampedSlashIdx = Math.min(slashPickerIndex, Math.max(0, filteredSlashCmds.length - 1));
+
+  // Stage 2: note picker — /Command <text> where note not yet fully selected
+  const cmdArgsMatch = /^\/(\w+)\s+(.*)$/.exec(input);
+  const commandWord = cmdArgsMatch?.[1] ?? "";
+  const afterSpace  = cmdArgsMatch?.[2] ?? "";
+  // Hide once note is selected: complete "..." or All
+  const noteAlreadySelected = /^"[^"]+"/.test(afterSpace) || /^All(\s|$)/i.test(afterSpace);
+  // Note picker only for commands that take note names
+  const showNotePicker = !!(cmdArgsMatch && !noteAlreadySelected && NOTE_COMMANDS.has(commandWord.toLowerCase()));
+  // Format hint for commands that take free text (feedback, reportbug, reminder)
+  const showFormatHint = !!(cmdArgsMatch && FORMAT_HINTS[commandWord.toLowerCase()] && !afterSpace.includes(" : "));
+  const noteQuery = afterSpace; // raw typed text = filter
+
+  // Build ordered picker items so ChatInput and NotePickerForCommand agree on indices
+  const showAllOption = ALL_SUPPORT.has(commandWord.toLowerCase()) &&
+    (!noteQuery || "all".includes(noteQuery.toLowerCase()));
+  const filteredNotes = notes
+    .filter(n => !noteQuery || (n.title ?? "").toLowerCase().includes(noteQuery.toLowerCase()))
+    .slice(0, 25);
+  const pickerItems: string[] = [
+    ...(showAllOption ? ["__ALL__"] : []),
+    ...filteredNotes.map(n => n.title ?? "Untitled"),
+  ];
+  const clampedIdx = Math.min(notePickerIndex, Math.max(0, pickerItems.length - 1));
+
+  useEffect(() => { setSlashPickerIndex(0); }, [slashFilter, SLASH_PICKER_VISIBLE]);
+  useEffect(() => { setNotePickerIndex(0); }, [noteQuery, showNotePicker]);
+
+  function handleNoteSelect(raw: string) {
+    const cmdWord = /^\/\w+/.exec(input)?.[0] ?? "";
+    setInput(raw === "__ALL__" ? `${cmdWord} All` : `${cmdWord} "${raw}"`);
+    setTimeout(() => textareaRef.current?.focus(), 0);
+  }
 
   // Voice recording for chat — appends transcribed text to the input
   const recording = useRecording((text) => {
@@ -91,7 +143,40 @@ export function ChatInput({
         </>
       )}
 
-      <div className="max-w-[740px] mx-auto">
+      <div className="max-w-[740px] mx-auto relative">
+        {/* Stage 1: command name picker */}
+        {SLASH_PICKER_VISIBLE && (
+          <SlashCommandPicker
+            query={input}
+            activeIndex={clampedSlashIdx}
+            onSelect={(syntax) => {
+              const cmdWord = /^\/\w+/.exec(syntax)?.[0] ?? syntax;
+              setInput(`${cmdWord} `);
+              setSlashPickerIndex(0);
+              setNotePickerIndex(0);
+              setTimeout(() => textareaRef.current?.focus(), 0);
+            }}
+            onClose={() => setInput("")}
+          />
+        )}
+        {/* Stage 2: note/All picker — only for note commands */}
+        {showNotePicker && !SLASH_PICKER_VISIBLE && (
+          <NotePickerForCommand
+            command={commandWord}
+            query={noteQuery}
+            notes={notes}
+            activeIndex={clampedIdx}
+            onSelect={handleNoteSelect}
+            onClose={() => { const w = /^\/\w+/.exec(input)?.[0] ?? ""; setInput(w); }}
+          />
+        )}
+        {/* Stage 2: format hint — for commands that take free text */}
+        {showFormatHint && !SLASH_PICKER_VISIBLE && (
+          <CommandFormatHint
+            command={commandWord}
+            onClose={() => {}}
+          />
+        )}
         <div
           className="bg-[#15151e] rounded-2xl border border-[#252533] focus-within:border-indigo-600/50 shadow-xl transition-colors"
           onDragOver={(e) => e.preventDefault()}
@@ -135,7 +220,48 @@ export function ChatInput({
             value={input}
             onChange={(e) => { setInput(e.target.value); autoResize(); }}
             onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); onSend(); return; }
+              // Arrow navigation — slash command picker
+              if (SLASH_PICKER_VISIBLE && filteredSlashCmds.length > 0) {
+                if (e.key === "ArrowDown") { e.preventDefault(); setSlashPickerIndex(i => Math.min(i + 1, filteredSlashCmds.length - 1)); return; }
+                if (e.key === "ArrowUp")   { e.preventDefault(); setSlashPickerIndex(i => Math.max(0, i - 1)); return; }
+              }
+
+              // Arrow navigation — note picker
+              if (showNotePicker && pickerItems.length > 0) {
+                if (e.key === "ArrowDown") { e.preventDefault(); setNotePickerIndex(i => Math.min(i + 1, pickerItems.length - 1)); return; }
+                if (e.key === "ArrowUp")   { e.preventDefault(); setNotePickerIndex(i => Math.max(0, i - 1)); return; }
+              }
+
+              if (e.key === "Tab") {
+                e.preventDefault();
+                if (SLASH_PICKER_VISIBLE && filteredSlashCmds.length > 0) {
+                  const match = filteredSlashCmds[clampedSlashIdx];
+                  setInput(`/${match.cmd} `); setSlashPickerIndex(0); setNotePickerIndex(0);
+                  return;
+                }
+                if (showNotePicker && pickerItems.length > 0) {
+                  handleNoteSelect(pickerItems[clampedIdx]);
+                  return;
+                }
+                return;
+              }
+
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                if (SLASH_PICKER_VISIBLE && filteredSlashCmds.length > 0) {
+                  const match = filteredSlashCmds[clampedSlashIdx];
+                  setInput(`/${match.cmd} `); setSlashPickerIndex(0); setNotePickerIndex(0);
+                  return;
+                }
+                if (showNotePicker && pickerItems.length > 0) {
+                  handleNoteSelect(pickerItems[clampedIdx]);
+                  return;
+                }
+                onSend();
+                return;
+              }
+
+              if (e.key === "Escape" && input.startsWith("/")) { setInput(""); return; }
               autoResize();
             }}
             rows={1}
