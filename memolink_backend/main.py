@@ -49,6 +49,7 @@ from memolink_backend.api.v1 import (
     s3_upload_controller,
     user_settings_controller,
     slash_command_controller,
+    email_controller,
 )
 
 # Register all models so SQLAlchemy sees them
@@ -62,6 +63,8 @@ import memolink_backend.domain.models.workspace        # noqa: F401
 import memolink_backend.domain.models.system_log       # noqa: F401
 import memolink_backend.domain.models.translation_cache # noqa: F401
 import memolink_backend.domain.models.user_api_key      # noqa: F401
+import memolink_backend.domain.models.email_account     # noqa: F401
+import memolink_backend.domain.models.email_record      # noqa: F401
 
 if os.getenv("MEMOLINK_SKIP_DB_BOOTSTRAP") != "1":
     with engine.connect() as _conn:
@@ -122,6 +125,7 @@ if os.getenv("MEMOLINK_SKIP_DB_BOOTSTRAP") != "1":
             ("model_attribution_enabled", "true"),
             ("tts_enabled", "true"), ("slash_commands_enabled", "true"),
             ("custom_api_keys_enabled", "true"), ("video_import_enabled", "true"),
+            ("email_enabled", "true"),
             ("default_model", "gpt-4o-mini"), ("default_language", "English"),
             ("web_search_min_level", "regular"), ("agent_mode_min_level", "regular"),
             ("model_selection_min_level", "regular"), ("image_generation_min_level", "regular"),
@@ -163,6 +167,42 @@ if os.getenv("MEMOLINK_SKIP_DB_BOOTSTRAP") != "1":
         """))
         _conn.execute(text("ALTER TABLE user_api_keys ADD COLUMN IF NOT EXISTS base_url TEXT"))
         _conn.execute(text("ALTER TABLE user_api_keys ADD COLUMN IF NOT EXISTS model VARCHAR(100)"))
+        # Email records table
+        _conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS email_records (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                gmail_message_id VARCHAR(255) NOT NULL,
+                subject TEXT NOT NULL DEFAULT '(no subject)',
+                sender_name VARCHAR(255),
+                sender_email VARCHAR(255) NOT NULL,
+                snippet TEXT,
+                body_text TEXT,
+                importance_score FLOAT NOT NULL DEFAULT 3.0,
+                is_read BOOLEAN NOT NULL DEFAULT FALSE,
+                email_date TIMESTAMPTZ,
+                synced_at TIMESTAMPTZ DEFAULT now()
+            )
+        """))
+        _conn.execute(text("CREATE INDEX IF NOT EXISTS ix_email_records_user_id ON email_records(user_id)"))
+        _conn.execute(text("CREATE INDEX IF NOT EXISTS ix_email_records_gmail_message_id ON email_records(gmail_message_id)"))
+        _conn.execute(text("ALTER TABLE email_records ADD COLUMN IF NOT EXISTS note_appended BOOLEAN NOT NULL DEFAULT FALSE"))
+        _conn.execute(text("ALTER TABLE email_records ADD COLUMN IF NOT EXISTS gmail_thread_id VARCHAR(255)"))
+        _conn.execute(text("ALTER TABLE reminders ADD COLUMN IF NOT EXISTS email_record_id INTEGER REFERENCES email_records(id) ON DELETE SET NULL"))
+        # Email accounts table
+        _conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS email_accounts (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+                provider VARCHAR(50) NOT NULL DEFAULT 'google',
+                email_address VARCHAR(255) NOT NULL,
+                encrypted_access_token TEXT NOT NULL,
+                encrypted_refresh_token TEXT NOT NULL,
+                token_expiry TIMESTAMPTZ,
+                connected_at TIMESTAMPTZ DEFAULT now(),
+                updated_at TIMESTAMPTZ DEFAULT now()
+            )
+        """))
         # Slash command undo snapshot columns
         _conn.execute(text("ALTER TABLE notes ADD COLUMN IF NOT EXISTS undo_title TEXT"))
         _conn.execute(text("ALTER TABLE notes ADD COLUMN IF NOT EXISTS undo_content TEXT"))
@@ -335,6 +375,7 @@ app.include_router(logs_controller.router, prefix="/api")
 app.include_router(s3_upload_controller.router, prefix="/api")
 app.include_router(user_settings_controller.router, prefix="/api")
 app.include_router(slash_command_controller.router, prefix="/api")
+app.include_router(email_controller.router, prefix="/api")
 
 # AWS Lambda handler — only active when running inside Lambda
 if os.getenv("AWS_LAMBDA_FUNCTION_NAME"):

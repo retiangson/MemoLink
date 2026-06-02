@@ -32,9 +32,10 @@ class NoteRepository:
         return self.db.query(Note).filter(Note.id == note_id).first()
 
     def get_for_user(self, user_id: int, workspace_id: int | None = None) -> List[Note]:
+        from sqlalchemy import or_
         q = self.db.query(Note).filter(Note.user_id == user_id, Note.deleted_at == None)
         if workspace_id is not None:
-            q = q.filter(Note.workspace_id == workspace_id)
+            q = q.filter(or_(Note.workspace_id == workspace_id, Note.workspace_id == None))
         return q.order_by(Note.id.desc()).all()
 
     def get_trash_for_user(self, user_id: int) -> List[Note]:

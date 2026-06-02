@@ -32,6 +32,10 @@ class Settings(BaseSettings):
 
     encryption_key: str = ""
 
+    google_client_id: str = ""
+    google_client_secret: str = ""
+    google_redirect_uri: str = "http://localhost:8000/api/email/callback"
+
     aws_access_key_id: str = ""       # Optional — Lambda uses IAM role automatically
     aws_secret_access_key: str = ""   # Optional — Lambda uses IAM role automatically
     aws_session_token: str = ""       # Required when using STS temporary credentials explicitly

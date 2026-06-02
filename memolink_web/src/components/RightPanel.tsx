@@ -17,12 +17,17 @@ interface RightPanelProps {
   onGenerate: () => void;
   notificationPermission: NotificationPermission;
   onRequestNotificationPermission: () => void;
+  emailConnected?: boolean;
+  isSyncingEmail?: boolean;
+  onSyncEmail?: () => void;
+  emailSyncResult?: string | null;
 }
 
 export function RightPanel({
   open, onClose, items, isGenerating,
   onAddManual, onToggleDone, onUpdate, onRemove, onClearDone,
   onGenerate, notificationPermission, onRequestNotificationPermission,
+  emailConnected, isSyncingEmail, onSyncEmail, emailSyncResult,
 }: RightPanelProps) {
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState<SuggestionItem | null>(null);
@@ -100,6 +105,42 @@ export function RightPanel({
             </>
           )}
         </button>
+
+        {emailConnected && (
+          <div className="flex flex-col gap-1">
+            <button
+              onClick={onSyncEmail}
+              disabled={isSyncingEmail}
+              className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-blue-600/10 hover:bg-blue-600/20 border border-blue-500/20 text-blue-300 rounded-lg text-xs transition disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {isSyncingEmail ? (
+                <>
+                  <svg className="w-3 h-3 animate-spin shrink-0" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                  </svg>
+                  Syncing Email…
+                </>
+              ) : (
+                <>
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3 shrink-0" fill="currentColor" viewBox="0 0 16 16">
+                    <path d="M0 4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2zm2-1a1 1 0 0 0-1 1v.217l7 4.2 7-4.2V4a1 1 0 0 0-1-1zm13 2.383-4.708 2.825L15 11.105zm-.034 6.876-5.64-3.471L8 9.583l-1.326-.795-5.64 3.47A1 1 0 0 0 2 13h12a1 1 0 0 0 .966-.741M1 11.105l4.708-2.897L1 5.383z"/>
+                  </svg>
+                  Sync from Email
+                </>
+              )}
+            </button>
+            {emailSyncResult && (
+              <p className={`text-[10px] text-center px-2 py-1 rounded-md ${
+                emailSyncResult.startsWith("✓")
+                  ? "text-green-400 bg-green-500/10"
+                  : "text-red-400 bg-red-500/10"
+              }`}>
+                {emailSyncResult}
+              </p>
+            )}
+          </div>
+        )}
 
         <button
           onClick={() => setShowAddModal(true)}

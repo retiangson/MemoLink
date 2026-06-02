@@ -90,6 +90,10 @@ jobs:
           SMTP_FROM: ${{ secrets.SMTP_FROM }}
           FRONTEND_URL: ${{ secrets.FRONTEND_URL }}
           S3_UPLOAD_BUCKET: ${{ secrets.S3_UPLOAD_BUCKET }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          GOOGLE_REDIRECT_URI: ${{ secrets.GOOGLE_REDIRECT_URI }}
+          FERNET_KEY: ${{ secrets.FERNET_KEY }}
         run: |
           # Build Variables JSON via Python to safely handle special characters in secret values
           ENV_JSON=$(python3 -c "
@@ -113,6 +117,10 @@ jobs:
             'SMTP_FROM': os.environ.get('SMTP_FROM', ''),
             'FRONTEND_URL': os.environ.get('FRONTEND_URL', ''),
             'S3_UPLOAD_BUCKET': os.environ.get('S3_UPLOAD_BUCKET', ''),
+            'GOOGLE_CLIENT_ID': os.environ.get('GOOGLE_CLIENT_ID', ''),
+            'GOOGLE_CLIENT_SECRET': os.environ.get('GOOGLE_CLIENT_SECRET', ''),
+            'GOOGLE_REDIRECT_URI': os.environ.get('GOOGLE_REDIRECT_URI', ''),
+            'FERNET_KEY': os.environ.get('FERNET_KEY', ''),
             'MEMOLINK_SKIP_DB_BOOTSTRAP': '1',
           }
           print(json.dumps({'Variables': vars}))

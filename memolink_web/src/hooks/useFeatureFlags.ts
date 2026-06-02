@@ -14,6 +14,7 @@ const DEFAULT_FLAGS: FeatureFlags = {
   slash_commands_enabled: true,
   custom_api_keys_enabled: true,
   video_import_enabled: true,
+  email_enabled: true,
   default_model: "gpt-4o-mini",
   default_language: "English",
   web_search_min_level: "regular",

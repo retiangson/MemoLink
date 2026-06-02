@@ -15,9 +15,11 @@ export function useSuggestions(workspaceId?: number | null) {
   const [items, setItems] = useState<SuggestionItem[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
 
-  useEffect(() => {
-    listReminders(workspaceId).then(setItems).catch(() => {});
-  }, [workspaceId]);
+  async function reload() {
+    try { setItems(await listReminders(workspaceId)); } catch { /* ignore */ }
+  }
+
+  useEffect(() => { reload(); }, [workspaceId]);
 
   async function generateFromNote(title: string, content: string) {
     if (!content.trim()) return;
@@ -32,6 +34,7 @@ export function useSuggestions(workspaceId?: number | null) {
         done: false,
         due_date: s.due_date ?? null,
         due_time: s.due_time ?? null,
+        email_record_id: null,
       }));
       setItems((prev) => [...newItems, ...prev]);
     } catch {
@@ -89,5 +92,5 @@ export function useSuggestions(workspaceId?: number | null) {
     await Promise.all(doneItems.map((i) => deleteReminder(i.id).catch(() => {})));
   }
 
-  return { items, isGenerating, generateFromNote, addManual, toggleDone, updateItem, remove, clearDone };
+  return { items, isGenerating, generateFromNote, addManual, toggleDone, updateItem, remove, clearDone, reload };
 }

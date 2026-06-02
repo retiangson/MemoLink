@@ -34,23 +34,33 @@ from memolink_backend.utils.web_search import brave_search
 from memolink_backend.contracts.chat_dtos import ChatResponseDTO, ChatAnswerSource, ChatRequestDTO, ChatAttachmentDTO
 
 _GEMINI_MODELS = {
-    "gemini-2.0-flash", "gemini-2.0-flash-lite",
-    "gemini-1.5-flash-8b", "gemini-1.5-pro",
+    "gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.5-pro",
 }
 _DEEPSEEK_MODELS = {"deepseek-chat", "deepseek-reasoner", "deepseek-coder"}
 _GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
 _DEEPSEEK_BASE_URL = "https://api.deepseek.com/v1"
+_MODEL_ALIASES = {
+    "gemini-2.0-flash": "gemini-2.5-flash",
+    "gemini-2.0-flash-lite": "gemini-2.5-flash-lite",
+    "gemini-1.5-flash-8b": "gemini-2.5-flash-lite",
+    "gemini-1.5-pro": "gemini-2.5-pro",
+}
 
 # Canonical fallback model per provider (used when building the chain)
 _PROVIDER_FALLBACK = {
     "openai":    lambda: settings.openai_chat_model,
-    "gemini":    lambda: "gemini-2.0-flash",
+    "gemini":    lambda: "gemini-2.5-flash",
     "deepseek":  lambda: "deepseek-chat",
 }
 
 
+def _canonical_model(model: str) -> str:
+    return _MODEL_ALIASES.get(model, model)
+
+
 def _get_client(model: str, user_keys: dict | None = None) -> OpenAI:
     """Build an OpenAI-compatible client. User's custom provider takes priority over server keys."""
+    model = _canonical_model(model)
     keys = user_keys or {}
     if model in keys:
         cfg = keys[model]
@@ -96,15 +106,15 @@ def _build_fallback_chain(primary: str, user_keys: dict | None = None) -> list[s
     4. Server default (always last resort)
     """
     keys = user_keys or {}
-    chain = [primary]
+    chain = [_canonical_model(primary)]
     # User's other custom model IDs (try user keys before server keys)
     for m in keys:
         if m not in chain:
             chain.append(m)
     # Server-configured fallbacks
     candidates = [
-        settings.openai_chat_model,
-        "gemini-2.0-flash" if settings.gemini_api_key else None,
+        _canonical_model(settings.openai_chat_model),
+        "gemini-2.5-flash" if settings.gemini_api_key else None,
         "deepseek-chat"    if settings.deepseek_api_key else None,
     ]
     for m in candidates:

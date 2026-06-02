@@ -199,8 +199,8 @@ const CONTENT: Record<string, React.ReactNode> = {
           },
           {
             provider: "Google Gemini",
-            models: ["Gemini 2.0 Flash", "Gemini 2.0 Flash Lite", "Gemini 1.5 Flash 8B", "Gemini 1.5 Pro"],
-            note: "Free tier - rate limits may apply. Falls back to GPT-4o Mini on quota exceeded.",
+            models: ["Gemini 2.5 Flash", "Gemini 2.5 Flash Lite", "Gemini 2.5 Pro"],
+            note: "Rate limits may apply. Falls back to GPT-4o Mini on quota exceeded.",
           },
           {
             provider: "DeepSeek",

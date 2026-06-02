@@ -5,9 +5,11 @@ import type { Note } from "../types";
 export function useNotes(userId: number, workspaceId?: number | null) {
   const [notes, setNotes] = useState<Note[]>([]);
 
-  useEffect(() => {
-    listNotes(workspaceId).then(setNotes);
-  }, [userId, workspaceId]);
+  async function reloadNotes() {
+    try { setNotes(await listNotes(workspaceId)); } catch { /* ignore */ }
+  }
+
+  useEffect(() => { reloadNotes(); }, [userId, workspaceId]);
 
   async function addNote(title: string, content: string): Promise<Note> {
     const created = await createNote(title, content, "manual", workspaceId);
@@ -28,5 +30,5 @@ export function useNotes(userId: number, workspaceId?: number | null) {
     setNotes((p) => p.filter((n) => n.id !== id));
   }
 
-  return { notes, setNotes, addNote, saveNote, removeNote };
+  return { notes, setNotes, addNote, saveNote, removeNote, reloadNotes };
 }

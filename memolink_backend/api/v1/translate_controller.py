@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 MAX_ROUNDS = 3          # 3 rounds max = at most 7 Gemini calls
 TARGET_SCORE = 85
 ROUND_DELAY_S = 1.2     # pause between rounds to avoid burst-rate detection
-GEMINI_MODEL = "gemini-2.0-flash-lite"  # lighter model, softer burst thresholds
+GEMINI_MODEL = "gemini-2.5-flash-lite"  # lighter model, softer burst thresholds
 
 _MAORI_HINT = (
     "Te reo Māori is the indigenous language of New Zealand. "
