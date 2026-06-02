@@ -34,6 +34,7 @@ export type FeatureFlags = {
   custom_api_keys_enabled: boolean;
   video_import_enabled: boolean;
   email_enabled: boolean;
+  memograph_enabled: boolean;
   default_model: string;
   default_language: string;
   web_search_min_level: AccessLevel;
@@ -65,6 +66,7 @@ export function parseFlags(raw: Record<string, string>): FeatureFlags {
     custom_api_keys_enabled: raw.custom_api_keys_enabled !== "false",
     video_import_enabled: raw.video_import_enabled !== "false",
     email_enabled: raw.email_enabled !== "false",
+    memograph_enabled: raw.memograph_enabled !== "false",
     default_model: raw.default_model ?? "gpt-4o-mini",
     default_language: raw.default_language ?? "English",
     web_search_min_level: (raw.web_search_min_level ?? "regular") as AccessLevel,

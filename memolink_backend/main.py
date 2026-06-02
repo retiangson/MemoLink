@@ -50,6 +50,7 @@ from memolink_backend.api.v1 import (
     user_settings_controller,
     slash_command_controller,
     email_controller,
+    memograph_controller,
 )
 
 # Register all models so SQLAlchemy sees them
@@ -65,6 +66,8 @@ import memolink_backend.domain.models.translation_cache # noqa: F401
 import memolink_backend.domain.models.user_api_key      # noqa: F401
 import memolink_backend.domain.models.email_account     # noqa: F401
 import memolink_backend.domain.models.email_record      # noqa: F401
+import memolink_backend.domain.models.graph_node        # noqa: F401
+import memolink_backend.domain.models.graph_edge        # noqa: F401
 
 if os.getenv("MEMOLINK_SKIP_DB_BOOTSTRAP") != "1":
     with engine.connect() as _conn:
@@ -222,6 +225,31 @@ if os.getenv("MEMOLINK_SKIP_DB_BOOTSTRAP") != "1":
                 user_id INTEGER
             )
         """))
+        # MemoGraph tables
+        _conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS graph_nodes (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                workspace_id INTEGER REFERENCES workspaces(id) ON DELETE CASCADE,
+                node_type VARCHAR(50) NOT NULL,
+                label VARCHAR(500) NOT NULL,
+                source_id INTEGER,
+                created_at TIMESTAMPTZ DEFAULT now(),
+                UNIQUE (user_id, workspace_id, node_type, label)
+            )
+        """))
+        _conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS graph_edges (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                source_node_id INTEGER NOT NULL REFERENCES graph_nodes(id) ON DELETE CASCADE,
+                target_node_id INTEGER NOT NULL REFERENCES graph_nodes(id) ON DELETE CASCADE,
+                relationship VARCHAR(100) NOT NULL,
+                created_at TIMESTAMPTZ DEFAULT now(),
+                UNIQUE (source_node_id, target_node_id, relationship)
+            )
+        """))
+        _conn.execute(text("INSERT INTO feature_flags (key, value) VALUES ('memograph_enabled', 'true') ON CONFLICT (key) DO NOTHING"))
         # Auto-promote first user as admin if none exists
         _conn.execute(text("""
             UPDATE users SET is_admin = TRUE
@@ -376,6 +404,7 @@ app.include_router(s3_upload_controller.router, prefix="/api")
 app.include_router(user_settings_controller.router, prefix="/api")
 app.include_router(slash_command_controller.router, prefix="/api")
 app.include_router(email_controller.router, prefix="/api")
+app.include_router(memograph_controller.router, prefix="/api")
 
 # AWS Lambda handler — only active when running inside Lambda
 if os.getenv("AWS_LAMBDA_FUNCTION_NAME"):

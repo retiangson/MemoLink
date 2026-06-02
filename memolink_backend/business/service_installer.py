@@ -70,6 +70,14 @@ class ServiceInstaller:
             embedding_service=self._domain.get_embedding_service(),
         )
 
+    def get_memograph_service(self):
+        from memolink_backend.business.services.memograph_service import MemographService
+        from memolink_backend.domain.repositories.graph_repository import GraphRepository
+        return MemographService(
+            graph_repo=GraphRepository(self._domain.get_db()),
+            note_repo=self._domain.get_note_repository(),
+        )
+
     def get_slash_command_service(self):
         from memolink_backend.business.services.slash_command_service import SlashCommandService
         return SlashCommandService(

@@ -17,6 +17,7 @@ import { ChatInput } from "../components/ChatInput";
 import { DeleteModal } from "../components/DeleteModal";
 import { SettingsModal } from "../components/SettingsModal";
 import { HelpModal } from "../components/HelpModal";
+import { MemoGraphModal } from "../components/MemoGraphModal";
 import { FeedbackModal } from "../components/FeedbackModal";
 import { TTSPlayerBar } from "../components/TTSPlayerBar";
 import { WorkspaceManagerModal } from "../components/WorkspaceManagerModal";
@@ -57,6 +58,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
+  const [showMemoGraph, setShowMemoGraph] = useState(false);
   const [showWorkspaceManager, setShowWorkspaceManager] = useState(false);
   const [showAdmin, setShowAdmin] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
@@ -653,6 +655,23 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                     Help
                   </button>
 
+                  {/* MemoGraph */}
+                  {flags.memograph_enabled && activeWorkspaceId && (
+                    <button
+                      onClick={() => { setUserMenuOpen(false); setShowMemoGraph(true); }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-indigo-300 hover:bg-indigo-500/10 hover:text-indigo-200 transition"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                        <circle cx="5" cy="12" r="2.5"/><circle cx="19" cy="5" r="2.5"/><circle cx="19" cy="19" r="2.5"/>
+                        <circle cx="12" cy="8" r="2.5"/><circle cx="12" cy="16" r="2.5"/>
+                        <line x1="7.2" y1="11" x2="10" y2="9"/><line x1="14" y1="9" x2="16.8" y2="6.5"/>
+                        <line x1="7.2" y1="13" x2="10" y2="15"/><line x1="14" y1="15" x2="16.8" y2="17.5"/>
+                        <line x1="12" y1="10.5" x2="12" y2="13.5"/>
+                      </svg>
+                      MemoGraph
+                    </button>
+                  )}
+
                   {/* Admin Panel — only shown to admins */}
                   {user.is_admin && (
                     <button
@@ -1011,6 +1030,16 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
       <SettingsModal show={showSettings} user={user} onClose={() => setShowSettings(false)} selectedModel={selectedModel} onModelChange={handleModelChange} modelSelectionEnabled={flags.model_selection_enabled} customApiKeysEnabled={flags.custom_api_keys_enabled} ttsEnabled={flags.tts_enabled} emailEnabled={flags.email_enabled} />
       <HelpModal show={showHelp} onClose={() => setShowHelp(false)} />
       <FeedbackModal show={showFeedback} onClose={() => setShowFeedback(false)} />
+      <MemoGraphModal
+        show={showMemoGraph}
+        onClose={() => setShowMemoGraph(false)}
+        workspaceId={activeWorkspaceId}
+        workspaceName={workspaceHook.activeWorkspace?.name}
+        onOpenNote={(noteId) => {
+          const note = notes.find((n) => n.id === noteId);
+          if (note) handleOpenNote(note);
+        }}
+      />
 
       {showWorkspaceManager && (
         <WorkspaceManagerModal
