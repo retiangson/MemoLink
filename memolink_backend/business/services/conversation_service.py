@@ -38,7 +38,7 @@ class ConversationService(IConversationService):
         messages = self.repo.get_messages_paginated(conv_id, limit, before_id)
         messages.sort(key=lambda m: m.id)
         return [
-            {"id": m.id, "conversation_id": m.conversation_id, "role": m.role, "content": m.content, "model": m.model, "created_at": m.created_at}
+            {"id": m.id, "conversation_id": m.conversation_id, "role": m.role, "content": m.content, "model": m.model, "confidence": m.confidence, "confidence_reason": m.confidence_reason, "created_at": m.created_at}
             for m in messages
         ]
 

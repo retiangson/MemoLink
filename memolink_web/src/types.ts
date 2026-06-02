@@ -1,10 +1,14 @@
 export type MessageRole = "user" | "assistant";
 
+export type ConfidenceLevel = "HIGH" | "MEDIUM" | "LOW" | "UNSUPPORTED";
+
 export interface Message {
   id: number;
   role: MessageRole;
   content: string;
   model?: string;
+  confidence?: ConfidenceLevel;
+  confidence_reason?: string;
 }
 
 export interface Conversation {

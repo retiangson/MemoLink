@@ -104,6 +104,15 @@ function ContentWithNoteLinks({ content, onOpenNote }: { content: string; onOpen
   return <>{nodes}</>;
 }
 
+import type { ConfidenceLevel } from "../types";
+
+const CONFIDENCE_CONFIG: Record<ConfidenceLevel, { label: string; dot: string; pill: string; text: string }> = {
+  HIGH:        { label: "High Confidence",   dot: "bg-emerald-400", pill: "bg-emerald-500/10 border-emerald-500/25", text: "text-emerald-400" },
+  MEDIUM:      { label: "Medium Confidence", dot: "bg-amber-400",   pill: "bg-amber-500/10  border-amber-500/25",   text: "text-amber-400"   },
+  LOW:         { label: "Low Confidence",    dot: "bg-orange-400",  pill: "bg-orange-500/10 border-orange-500/25",  text: "text-orange-400"  },
+  UNSUPPORTED: { label: "General Knowledge", dot: "bg-gray-500",    pill: "bg-gray-500/10   border-gray-500/25",    text: "text-gray-400"    },
+};
+
 interface Props {
   role: "user" | "assistant";
   content: string;
@@ -117,6 +126,9 @@ interface Props {
   hasOpenNote?: boolean;
   translationEnabled?: boolean;
   modelAttributionEnabled?: boolean;
+  confidence?: ConfidenceLevel;
+  confidenceReason?: string;
+  confidenceEnabled?: boolean;
 }
 
 const TRANSLATE_LANGUAGES = [
@@ -165,7 +177,7 @@ function ImageGeneratingSpinner() {
   );
 }
 
-export default function ChatBubble({ role, content, model, streaming, onAdd, onDelete, onApplyEdit, onOpenNote, onSaveNote, hasOpenNote, translationEnabled = true, modelAttributionEnabled = true }: Props) {
+export default function ChatBubble({ role, content, model, streaming, onAdd, onDelete, onApplyEdit, onOpenNote, onSaveNote, hasOpenNote, translationEnabled = true, modelAttributionEnabled = true, confidence, confidenceReason, confidenceEnabled = true }: Props) {
   const isUser = role === "user";
   const [copied, setCopied] = useState(false);
   const [showLangPicker, setShowLangPicker] = useState(false);
@@ -472,14 +484,40 @@ export default function ChatBubble({ role, content, model, streaming, onAdd, onD
             </button>
           )}
         </div>
-        {modelAttributionEnabled && model && !streaming && (
-          <div className="flex items-center gap-1.5 text-[10px] text-gray-700 select-none">
-            <span className="inline-flex items-center justify-center w-[14px] h-[14px] rounded bg-[#1a1a24] border border-[#2a2a38]">
-              <svg className="w-2 h-2 text-indigo-400/60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
-              </svg>
-            </span>
-            {modelLabel(model)}
+        {!streaming && (
+          <div className="flex items-center gap-3 flex-wrap">
+            {modelAttributionEnabled && model && (
+              <div className="flex items-center gap-1.5 text-[10px] text-gray-700 select-none">
+                <span className="inline-flex items-center justify-center w-[14px] h-[14px] rounded bg-[#1a1a24] border border-[#2a2a38]">
+                  <svg className="w-2 h-2 text-indigo-400/60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                </span>
+                {modelLabel(model)}
+              </div>
+            )}
+            {confidenceEnabled && confidence && (() => {
+              const cfg = CONFIDENCE_CONFIG[confidence];
+              return (
+                <div className="group relative inline-flex">
+                  <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[10px] font-medium select-none cursor-default ${cfg.pill} ${cfg.text}`}>
+                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${cfg.dot}`} />
+                    {cfg.label}
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-2.5 h-2.5 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  {confidenceReason && (
+                    <div className="absolute bottom-full left-0 mb-1.5 w-56 hidden group-hover:block z-50">
+                      <div className="bg-[#1e1e2a] border border-[#2a2a38] rounded-xl px-3 py-2 shadow-xl">
+                        <p className={`text-[10px] font-semibold mb-0.5 ${cfg.text}`}>{cfg.label}</p>
+                        <p className="text-[11px] text-gray-400 leading-relaxed">{confidenceReason}</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         )}
         </div>
