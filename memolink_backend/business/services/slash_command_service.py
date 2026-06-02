@@ -186,6 +186,8 @@ class SlashCommandService:
                             full_text += payload["t"]
                         elif "replace" in payload:
                             full_text = payload["replace"]
+                        elif "quiz" in payload:
+                            full_text = f"__QUIZ__:{json.dumps(payload['quiz'])}"
                     except Exception:
                         pass
                 yield chunk

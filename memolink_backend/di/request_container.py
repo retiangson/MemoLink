@@ -44,6 +44,9 @@ class RequestContainer:
     def memograph(self):
         return self.services.get_memograph_service()
 
+    def study(self):
+        return self.services.get_study_service()
+
 
 def get_request_container(db: Session = Depends(get_db)) -> RequestContainer:
     return RequestContainer(db)
