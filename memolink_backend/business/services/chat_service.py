@@ -2,6 +2,7 @@ from typing import List, Iterator, Optional
 from fastapi import UploadFile
 from sqlalchemy.orm import Session
 from openai import OpenAI, RateLimitError, APIStatusError
+from datetime import date
 import json
 import logging
 import re
@@ -99,6 +100,21 @@ _CONFIDENCE_SYSTEM_MSG = (
     "- UNSUPPORTED : notes have no relevant content; answer is entirely general AI knowledge\n\n"
     "Example: <confidence level=\"HIGH\">The answer is fully supported by the Project Plan note.</confidence>\n"
     "This tag is stripped before display — always include it."
+)
+
+_WEB_SEARCH_SYSTEM_MSG = (
+    "WEB SEARCH MODE IS ENABLED:\n"
+    "- The following web results were fetched live for this user request.\n"
+    "- You DO have web search context for this turn. Never say you cannot access the internet, cannot browse, or cannot perform live searches when web results are provided.\n"
+    "- Answer the user's question using the web results first, then optionally connect them to the user's notes.\n"
+    "- Cite specific result URLs inline or in a short Sources section.\n"
+    "- If the web results are thin, say what they do and do not establish, then suggest a better query.\n"
+    f"- Today's date is {date.today().isoformat()}."
+)
+
+_WEB_SEARCH_EMPTY_MSG = (
+    "WEB SEARCH MODE WAS REQUESTED, but MemoLink did not receive usable Brave Search results for this turn. "
+    "Do not claim the model simply cannot browse. Instead, explain briefly that the configured web search provider returned no results or may be unavailable, then answer from notes/general knowledge if possible."
 )
 
 
@@ -465,9 +481,12 @@ class ChatService(IChatService):
             system_msgs.append({"role": "system", "content": "--- USER NOTES CONTEXT ---\n" + "\n\n".join(rag_blocks)})
 
         if getattr(dto, "web_search", False) and user_text:
-            web_block = brave_search(user_text)
+            web_block = brave_search(user_text, count=8)
             if web_block:
+                system_msgs.append({"role": "system", "content": _WEB_SEARCH_SYSTEM_MSG})
                 system_msgs.append({"role": "system", "content": web_block})
+            else:
+                system_msgs.append({"role": "system", "content": _WEB_SEARCH_EMPTY_MSG})
 
         # Confidence instruction as the LAST system message — model sees it most clearly here
         system_msgs.append({"role": "system", "content": _CONFIDENCE_SYSTEM_MSG})

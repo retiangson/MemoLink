@@ -47,6 +47,30 @@ class WorkflowSuggestResponse(BaseModel):
     actions: List[WorkflowAction]
 
 
+# ── Confirm (conversational execution) ───────────────────────────────────────
+
+class WorkflowConfirmRequest(BaseModel):
+    conversation_id: int
+    action: WorkflowAction
+    user_message: str       # the text the user "said" (e.g. "Yes, search online")
+    workspace_id: Optional[int] = None
+    model: Optional[str] = None
+
+
+class WorkflowChatMessage(BaseModel):
+    id: int
+    role: str
+    content: str
+    model: Optional[str] = None
+
+
+class WorkflowConfirmResponse(BaseModel):
+    ok: bool
+    result: str
+    user_message: WorkflowChatMessage
+    assistant_message: WorkflowChatMessage
+
+
 # ── Phase 2: Execute ──────────────────────────────────────────────────────────
 
 class WorkflowExecuteRequest(BaseModel):

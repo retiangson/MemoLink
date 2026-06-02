@@ -1,5 +1,6 @@
 import { api, API_BASE } from "./client";
 import { getToken } from "../utils/auth";
+import type { Message } from "../types";
 
 export interface WorkflowAction {
   id: string;
@@ -33,14 +34,28 @@ export async function executeAction(
   conversation_id: number,
   action: WorkflowAction,
   workspace_id: number | null,
+  user_message = "Yes",
+  model: string | null = null,
 ): Promise<{ ok: boolean; result: string }> {
-  for await (const event of executeWorkflow(conversation_id, [action], workspace_id, null)) {
-    if (event.workflow_done) {
-      const d = event.workflow_done as { ok: boolean; result: string };
-      return { ok: d.ok, result: d.result };
-    }
-  }
-  return { ok: true, result: "Done" };
+  const res = await confirmAction(conversation_id, action, user_message, workspace_id, model);
+  return { ok: res.ok, result: res.result };
+}
+
+export async function confirmAction(
+  conversation_id: number,
+  action: WorkflowAction,
+  user_message: string,
+  workspace_id: number | null,
+  model: string | null,
+): Promise<{ ok: boolean; result: string; user_message: Message; assistant_message: Message }> {
+  const res = await api.post("/workflow/confirm", {
+    conversation_id,
+    action,
+    user_message,
+    workspace_id,
+    model,
+  });
+  return res.data;
 }
 
 export async function planWorkflow(
