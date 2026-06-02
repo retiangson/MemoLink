@@ -208,6 +208,9 @@
     <span class="pill">User API Keys</span>
     <span class="pill">Slash Commands</span>
     <span class="pill">Interactive Quiz</span>
+    <span class="pill">Gmail Integration</span>
+    <span class="pill">OAuth 2.0</span>
+    <span class="pill">Email-to-Note</span>
   </div>
 </div>
 
@@ -310,12 +313,12 @@
       <div class="card">
         <div class="card-icon">&#x1F310;</div>
         <h3>Multi-Language Translation</h3>
-        <p>Translation uses a Gemini 2.0 Flash Lite quality loop: initial translation → back-translate → GPT scores similarity (0–100) → up to 3 refinement rounds if score &lt; 85. Results are cached in the <code>translation_cache</code> table; a green "Cached" badge shows when a cached result is returned. A "Re-translate" button forces a fresh LLM call. The chat bubble shows the model name and accuracy score, colour-coded green/amber/red.</p>
+        <p>Translation uses a Gemini 2.5 Flash Lite quality loop: initial translation → back-translate → GPT scores similarity (0–100) → up to 3 refinement rounds if score &lt; 85. Results are cached in the <code>translation_cache</code> table; a green "Cached" badge shows when a cached result is returned. A "Re-translate" button forces a fresh LLM call. The chat bubble shows the model name and accuracy score, colour-coded green/amber/red.</p>
       </div>
       <div class="card">
         <div class="card-icon">&#x1F916;</div>
         <h3>Model Selection</h3>
-        <p>The Settings modal lets users choose their chat model across three providers — <strong>OpenAI</strong> (GPT-4o, GPT-4o Mini, GPT-4 Turbo, GPT-3.5 Turbo), <strong>Google Gemini</strong> (2.0 Flash, 2.0 Flash Lite, 1.5 Flash 8B, 1.5 Pro), and <strong>DeepSeek</strong> (DeepSeek V3, R1, Coder). Every AI reply shows a "replied by [Model]" attribution badge. If a model fails, the system automatically tries the next available model in the fallback chain: primary → GPT-4o-mini → Gemini 2.0 Flash → DeepSeek Chat.</p>
+        <p>The Settings modal lets users choose their chat model across three providers — <strong>OpenAI</strong> (GPT-4o, GPT-4o Mini, GPT-4 Turbo, GPT-3.5 Turbo), <strong>Google Gemini</strong> (2.5 Flash, 2.5 Flash Lite, 2.5 Pro), and <strong>DeepSeek</strong> (DeepSeek V3, R1, Coder). Every AI reply shows a "replied by [Model]" attribution badge. If a model fails, the system automatically tries the next available model in the fallback chain: primary → GPT-4o-mini → Gemini 2.5 Flash → DeepSeek Chat. Stored model preferences using old Gemini 2.0 IDs are automatically migrated to their 2.5 equivalents.</p>
       </div>
       <div class="card">
         <div class="card-icon">&#x1F50E;</div>
@@ -380,7 +383,7 @@
       <div class="card">
         <div class="card-icon">&#x1F517;</div>
         <h3>Chat Fallback Chain</h3>
-        <p>When the selected model fails for any reason (rate limit, API error, bad key), the system automatically tries the next model: primary → GPT-4o-mini → Gemini 2.0 Flash → DeepSeek Chat. Each failure is logged as a WARNING. Only after all configured models are exhausted does the user see an error message.</p>
+        <p>When the selected model fails for any reason (rate limit, API error, bad key), the system automatically tries the next model: primary → GPT-4o-mini → Gemini 2.5 Flash → DeepSeek Chat. Each failure is logged as a WARNING. Only after all configured models are exhausted does the user see an error message.</p>
       </div>
       <div class="card">
         <div class="card-icon">&#x2728;</div>
@@ -411,6 +414,11 @@
         <div class="card-icon">&#x1F4AC;</div>
         <h3>Multi-Model Discussion (/Discussion)</h3>
         <p>The <code>/Discussion</code> command invites every configured AI model — GPT, Gemini, DeepSeek, and any custom providers the user has added in Settings → API Keys — to each share a 3-5 sentence perspective grounded in the note content. A synthesis is then generated combining all perspectives. The command uses the selected model first, then falls back through user custom keys → server providers → server default.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">&#x1F4E7;</div>
+        <h3>Gmail Email Integration</h3>
+        <p>Connect Gmail via OAuth 2.0 in Settings → Email. MemoLink fetches unread and important emails, batch-scores importance with GPT (1–5), and saves those scoring ≥ 3. Auto-process appends new emails to a global <strong>Email Digest</strong> note and creates reminders for emails with detected deadlines — both are global (visible across all workspaces). A <strong>Sync from Email</strong> button in the Reminders panel triggers a fresh sync on demand. Email-sourced reminders link back to the original email. Reply to any email in-app: choose a tone (Formal / Friendly / Brief), generate 3 RAG-grounded AI draft suggestions, edit, and send — reply threads correctly in Gmail via <code>In-Reply-To</code> + <code>threadId</code>.</p>
       </div>
     </div>
   </section>
@@ -445,7 +453,7 @@
         <tr>
           <td><strong>Business</strong></td>
           <td><code>business/services/</code></td>
-          <td>Application logic — chat, notes, auth, conversations, reminders, video, workspaces, admin, feature flags, feedback</td>
+          <td>Application logic — chat, notes, auth, conversations, reminders, video, workspaces, admin, feature flags, feedback, email</td>
           <td><span class="tag tag-py">Python</span></td>
         </tr>
         <tr>
@@ -487,8 +495,14 @@
         <tr>
           <td><strong>Translation</strong></td>
           <td><code>business/services/translate_service</code></td>
-          <td>Gemini 2.0 Flash Lite initial translation → back-translate → GPT similarity score (0–100) → up to 3 refinement rounds; falls back to GPT-4o-mini on rate limit</td>
+          <td>Gemini 2.5 Flash Lite initial translation → back-translate → GPT similarity score (0–100) → up to 3 refinement rounds; falls back to GPT-4o-mini on rate limit</td>
           <td><span class="tag tag-ai">Gemini</span><span class="tag tag-ai">OpenAI</span></td>
+        </tr>
+        <tr>
+          <td><strong>Email Integration</strong></td>
+          <td><code>business/services/email_service</code></td>
+          <td>Gmail OAuth 2.0 connect/disconnect; sync inbox (importance-scored by GPT); auto-process appends to Email Digest note + extracts reminders; RAG-grounded reply suggestions; in-app MIME send with <code>In-Reply-To</code> + <code>threadId</code> threading; tokens encrypted with Fernet</td>
+          <td><span class="tag tag-ai">Gmail API</span><span class="tag tag-ai">OpenAI</span></td>
         </tr>
         <tr>
           <td><strong>Image Generation</strong></td>
@@ -611,12 +625,15 @@
            <strong>users.access_level</strong> — VARCHAR ('regular'|'plus'|'pro'); default 'regular'<br/>
            <strong>system_logs table</strong> — structured event log for INFO/WARNING/ERROR events<br/>
            <strong>translation_cache table</strong> — SHA-256-keyed translation result cache with hit_count<br/>
-           <strong>user_api_keys table</strong> — per-user encrypted API keys (provider + Fernet-encrypted key, unique per user+provider)</p>
+           <strong>user_api_keys table</strong> — per-user encrypted API keys (provider + Fernet-encrypted key, unique per user+provider)<br/>
+           <strong>email_accounts table</strong> — one Gmail OAuth record per user; access + refresh tokens encrypted with Fernet<br/>
+           <strong>email_records table</strong> — synced email metadata (subject, sender, snippet, body, importance score, note_appended flag)<br/>
+           <strong>reminders.email_record_id</strong> — FK linking email-generated reminders back to their source email</p>
       </div>
       <div class="card">
         <h3>AI &amp; Media</h3>
         <p><strong>OpenAI GPT-4o / GPT-4o-mini</strong> — answer generation (streaming)<br/>
-           <strong>Gemini 2.0 Flash / Flash Lite / 1.5 Pro / 1.5 Flash 8B</strong> — alternative chat models &amp; translation<br/>
+           <strong>Gemini 2.5 Flash / Flash Lite / 2.5 Pro</strong> — alternative chat models &amp; translation<br/>
            <strong>DeepSeek V3 / R1 / Coder</strong> — code-focused alternative chat models<br/>
            <strong>DALL-E 3</strong> — AI image generation (1024&times;1024, base64)<br/>
            <strong>text-embedding-3-small</strong> — vector embeddings<br/>

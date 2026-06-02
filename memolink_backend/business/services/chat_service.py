@@ -284,6 +284,7 @@ class ChatService(IChatService):
         note_repo: Optional[INoteRepository] = None,
         log_service=None,
         user_api_key_repo=None,
+        graph_repo=None,
     ):
         if conv_repo is not None and note_repo is not None:
             self.repo_conv: IConversationRepository = conv_repo
@@ -297,6 +298,7 @@ class ChatService(IChatService):
         self.embedding = embedding_service or EmbeddingService()
         self._log = log_service
         self._user_api_key_repo = user_api_key_repo
+        self._graph_repo = graph_repo  # optional; None = no graph enhancement
 
     def _syslog(self, level: str, message: str, details: dict, user_id: int | None = None):
         if self._log is None:
@@ -362,6 +364,30 @@ class ChatService(IChatService):
                 sources.append(ChatAnswerSource(note_id=n.id, title=n.title, snippet=n.content[:200] + "..."))
                 plain = _strip_base64_images(_HTML_TAG.sub(" ", n.content)).strip()
                 rag_blocks.append(f"[NOTE {n.id}: {n.title or 'Untitled'}]\n{plain}")
+
+            # Graph-enhanced RAG: find notes connected to the vector results via shared entities
+            if self._graph_repo and top_notes and ws_filter is not None:
+                try:
+                    seed_ids = [n.id for n in top_notes]
+                    related_ids = self._graph_repo.get_related_note_ids(
+                        user_id=dto.user_id,
+                        workspace_id=ws_filter,
+                        seed_note_ids=seed_ids,
+                        limit=3,
+                    )
+                    top_ids = set(seed_ids)
+                    for nid in related_ids:
+                        if nid in top_ids:
+                            continue
+                        note = self.repo_notes.get_by_id(nid)
+                        if not note:
+                            continue
+                        top_ids.add(nid)
+                        sources.append(ChatAnswerSource(note_id=note.id, title=note.title, snippet=note.content[:200] + "..."))
+                        plain = _strip_base64_images(_HTML_TAG.sub(" ", note.content)).strip()
+                        rag_blocks.append(f"[NOTE {note.id}: {note.title or 'Untitled'} — related via MemoGraph]\n{plain}")
+                except Exception:
+                    pass  # graph enhancement is best-effort; never break chat
 
         system_msgs = [{"role": "system", "content": _SYSTEM_PROMPT}]
         if rag_blocks:
