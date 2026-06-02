@@ -213,6 +213,12 @@ class AgentService:
         model: Optional[str] = None,
     ) -> Iterator[str]:
         model = model or settings.openai_chat_model
+        # Tool calling requires an OpenAI model — Gemini and DeepSeek are not
+        # routed through the OpenAI client and will return 404 if passed here.
+        # Fall back to gpt-4o-mini when any non-OpenAI model is selected.
+        _OPENAI_PREFIXES = ("gpt-", "o1-", "o3-", "o4-")
+        if not any(model.startswith(p) for p in _OPENAI_PREFIXES):
+            model = "gpt-4o-mini"
         user_text = prompt.strip()
         if not user_text:
             yield f"data: {json.dumps({'t': 'Please provide a message.'})}\n\n"
