@@ -93,6 +93,11 @@ export function MemoGraphModal({
   const dragRef = useRef<{ node: SimNode; offsetX: number; offsetY: number } | null>(null);
   const tooltipRef = useRef<{ label: string; type: string; x: number; y: number } | null>(null);
 
+  // Pan / zoom transform: all draw calls use world coordinates
+  const transformRef = useRef({ x: 0, y: 0, scale: 1 });
+  const isPanningRef = useRef(false);
+  const panStartRef = useRef({ mx: 0, my: 0, tx: 0, ty: 0 });
+
   const [loading, setLoading] = useState(false);
   const [building, setBuilding] = useState(false);
   const [buildResult, setBuildResult] = useState<{ nodes: number; edges: number } | null>(null);
@@ -118,6 +123,11 @@ export function MemoGraphModal({
     // Background
     ctx.fillStyle = "#0d0d15";
     ctx.fillRect(0, 0, W, H);
+
+    // Apply pan/zoom transform
+    const { x: tx, y: ty, scale } = transformRef.current;
+    ctx.save();
+    ctx.setTransform(scale, 0, 0, scale, tx, ty);
 
     const visible = new Set(activeTypes);
 
@@ -191,6 +201,8 @@ export function MemoGraphModal({
       const text = node.label.length > maxLen ? node.label.slice(0, maxLen - 1) + "…" : node.label;
       ctx.fillText(text, node.x, node.y + r + 10);
     });
+
+    ctx.restore();
   }, [activeTypes]);
 
   // ── Simulation setup ───────────────────────────────────────────────────────
@@ -201,6 +213,9 @@ export function MemoGraphModal({
         simRef.current.stop();
         cancelAnimationFrame(rafRef.current);
       }
+
+      // Reset pan/zoom when a new graph is loaded
+      transformRef.current = { x: 0, y: 0, scale: 1 };
 
       const nodes: SimNode[] = rawNodes.map((n) => ({
         ...n,
@@ -336,12 +351,17 @@ export function MemoGraphModal({
     return null;
   }
 
-  function canvasCoords(e: React.MouseEvent<HTMLCanvasElement>): { x: number; y: number } {
-    const rect = canvasRef.current!.getBoundingClientRect();
-    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  function screenToWorld(sx: number, sy: number): { x: number; y: number } {
+    const { x: tx, y: ty, scale } = transformRef.current;
+    return { x: (sx - tx) / scale, y: (sy - ty) / scale };
   }
 
-  // Release drag if mouse is released anywhere on the page (not just the canvas)
+  function canvasCoords(e: React.MouseEvent<HTMLCanvasElement>): { x: number; y: number } {
+    const rect = canvasRef.current!.getBoundingClientRect();
+    return screenToWorld(e.clientX - rect.left, e.clientY - rect.top);
+  }
+
+  // Release drag/pan if mouse is released anywhere on the page
   useEffect(() => {
     const globalUp = () => {
       if (dragRef.current) {
@@ -350,10 +370,34 @@ export function MemoGraphModal({
         dragRef.current = null;
         simRef.current?.alphaTarget(0);
       }
+      isPanningRef.current = false;
     };
     window.addEventListener("mouseup", globalUp);
     return () => window.removeEventListener("mouseup", globalUp);
   }, []);
+
+  // Non-passive wheel listener for zoom
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const rect = canvas.getBoundingClientRect();
+      const sx = e.clientX - rect.left;
+      const sy = e.clientY - rect.top;
+      const { x: tx, y: ty, scale } = transformRef.current;
+      const factor = e.deltaY < 0 ? 1.12 : 0.89;
+      const newScale = Math.max(0.15, Math.min(4, scale * factor));
+      transformRef.current = {
+        x: sx + (tx - sx) * (newScale / scale),
+        y: sy + (ty - sy) * (newScale / scale),
+        scale: newScale,
+      };
+      draw();
+    };
+    canvas.addEventListener("wheel", onWheel, { passive: false });
+    return () => canvas.removeEventListener("wheel", onWheel);
+  }, [draw]);
 
   const onMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const { x, y } = canvasCoords(e);
@@ -363,10 +407,23 @@ export function MemoGraphModal({
       node.fy = node.y;
       dragRef.current = { node, offsetX: x - node.x, offsetY: y - node.y };
       simRef.current?.alphaTarget(0.1).restart();
+    } else {
+      // Start panning on empty canvas
+      isPanningRef.current = true;
+      panStartRef.current = { mx: e.clientX, my: e.clientY, tx: transformRef.current.x, ty: transformRef.current.y };
+      if (canvasRef.current) canvasRef.current.style.cursor = "grabbing";
     }
   };
 
   const onMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    // Pan
+    if (isPanningRef.current) {
+      transformRef.current.x = panStartRef.current.tx + (e.clientX - panStartRef.current.mx);
+      transformRef.current.y = panStartRef.current.ty + (e.clientY - panStartRef.current.my);
+      draw();
+      return;
+    }
+
     const { x, y } = canvasCoords(e);
     if (dragRef.current) {
       const { node, offsetX, offsetY } = dragRef.current;
@@ -375,14 +432,17 @@ export function MemoGraphModal({
     }
     const hovered = getNodeAt(x, y);
     if (hovered) {
-      const newTip = { label: hovered.label, type: hovered.type, x: x + 12, y: y - 8 };
+      const rect = canvasRef.current!.getBoundingClientRect();
+      const sx = e.clientX - rect.left;
+      const sy = e.clientY - rect.top;
+      const newTip = { label: hovered.label, type: hovered.type, x: sx + 14, y: sy - 8 };
       tooltipRef.current = newTip;
       setTooltip(newTip);
       if (canvasRef.current) canvasRef.current.style.cursor = "pointer";
     } else {
       tooltipRef.current = null;
       setTooltip(null);
-      if (canvasRef.current) canvasRef.current.style.cursor = "default";
+      if (canvasRef.current) canvasRef.current.style.cursor = dragRef.current ? "grabbing" : "grab";
     }
   };
 
@@ -393,9 +453,37 @@ export function MemoGraphModal({
       dragRef.current = null;
       simRef.current?.alphaTarget(0);
     }
+    isPanningRef.current = false;
+    if (canvasRef.current) canvasRef.current.style.cursor = "grab";
   };
 
+  // Fit all nodes into view
+  const handleFit = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || !nodesRef.current.length) return;
+    const W = canvas.width;
+    const H = canvas.height;
+    const xs = nodesRef.current.map((n) => n.x).filter((v) => v != null) as number[];
+    const ys = nodesRef.current.map((n) => n.y).filter((v) => v != null) as number[];
+    if (!xs.length) return;
+    const pad = 60;
+    const minX = Math.min(...xs) - pad;
+    const maxX = Math.max(...xs) + pad;
+    const minY = Math.min(...ys) - pad;
+    const maxY = Math.max(...ys) + pad;
+    const scaleX = W / (maxX - minX);
+    const scaleY = H / (maxY - minY);
+    const scale = Math.min(scaleX, scaleY, 1.5);
+    transformRef.current = {
+      x: (W - (minX + maxX) * scale) / 2,
+      y: (H - (minY + maxY) * scale) / 2,
+      scale,
+    };
+    draw();
+  }, [draw]);
+
   const onCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (isPanningRef.current) return;
     const { x, y } = canvasCoords(e);
     const node = getNodeAt(x, y);
     if (node?.type === "note" && node.source_id && onOpenNote) {
@@ -483,12 +571,24 @@ export function MemoGraphModal({
             </button>
 
             {nodeCount > 0 && (
-              <button
-                onClick={handleClear}
-                className="px-2.5 py-1.5 rounded-lg text-xs text-gray-500 hover:text-red-400 hover:bg-red-500/10 transition"
-              >
-                Clear
-              </button>
+              <>
+                <button
+                  onClick={handleFit}
+                  title="Fit all nodes into view"
+                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs text-gray-400 hover:text-white hover:bg-[#2a2a38] transition"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5" />
+                  </svg>
+                  Fit
+                </button>
+                <button
+                  onClick={handleClear}
+                  className="px-2.5 py-1.5 rounded-lg text-xs text-gray-500 hover:text-red-400 hover:bg-red-500/10 transition"
+                >
+                  Clear
+                </button>
+              </>
             )}
 
             <button
@@ -597,6 +697,18 @@ export function MemoGraphModal({
                   <circle cx="4" cy="8" r="2.5"/><circle cx="12" cy="4" r="2.5"/><line x1="6.3" y1="7" x2="9.7" y2="5"/>
                 </svg>
                 Drag nodes to rearrange
+              </div>
+              <div className="flex items-center gap-1.5">
+                <svg className="w-3 h-3 shrink-0" fill="none" viewBox="0 0 16 16" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" d="M8 2v12M2 8h12"/>
+                </svg>
+                Drag empty space to pan
+              </div>
+              <div className="flex items-center gap-1.5">
+                <svg className="w-3 h-3 shrink-0" fill="none" viewBox="0 0 16 16" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" d="M8 3v3m0 4v3M5 8H2m12 0h-3"/>
+                </svg>
+                Scroll to zoom in / out
               </div>
               <div className="flex items-center gap-1.5">
                 <svg className="w-3 h-3 shrink-0" fill="none" viewBox="0 0 16 16" stroke="currentColor" strokeWidth={1.5}>
