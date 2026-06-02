@@ -1,11 +1,12 @@
 import React, { useState, useCallback } from "react";
 import {
   generateFlashcards, generateExamReview, generateStudyPlan,
-  detectWeakTopics, summarizeNote,
+  detectWeakTopics, summarizeNote, generateQuiz,
   type FlashcardItem, type ExamReviewResponse, type StudyPlanResponse,
-  type WeakTopicsResponse, type SummaryResponse,
+  type WeakTopicsResponse, type SummaryResponse, type QuizData,
 } from "../api/studyApi";
 import { createNote } from "../api/client";
+import { QuizRenderer } from "./QuizRenderer";
 
 interface Note { id: number; title: string | null; }
 
@@ -16,10 +17,11 @@ interface Props {
   notes: Note[];
 }
 
-type Tab = "flashcards" | "exam" | "plan" | "weak" | "summary";
+type Tab = "flashcards" | "quiz" | "exam" | "plan" | "weak" | "summary";
 
 const TABS: { id: Tab; label: string; icon: string }[] = [
   { id: "flashcards", label: "Flashcards",    icon: "🃏" },
+  { id: "quiz",       label: "Quiz",          icon: "❓" },
   { id: "exam",       label: "Exam Review",   icon: "📋" },
   { id: "plan",       label: "Study Plan",    icon: "📅" },
   { id: "weak",       label: "Weak Topics",   icon: "🔍" },
@@ -52,6 +54,71 @@ function SaveNoteButton({ content, title, workspaceId }: { content: string; titl
     >
       {saved ? "✓ Saved!" : "💾 Save as Note"}
     </button>
+  );
+}
+
+// ── Quiz tab ──────────────────────────────────────────────────────────────────
+
+function QuizTab({ workspaceId, notes }: { workspaceId: number | null; notes: Note[] }) {
+  const [noteId, setNoteId] = useState<string>("all");
+  const [count, setCount] = useState(10);
+  const [quiz, setQuiz] = useState<QuizData | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleGenerate() {
+    if (!workspaceId) return;
+    setLoading(true); setError(null); setQuiz(null);
+    try {
+      const res = await generateQuiz(workspaceId, noteId === "all" ? null : Number(noteId), count);
+      if (!res.questions.length) { setError("No questions generated. Try adding more notes to this workspace."); return; }
+      setQuiz(res);
+    } catch { setError("Failed to generate quiz. Please try again."); }
+    finally { setLoading(false); }
+  }
+
+  async function handleSaveNote(title: string, content: string) {
+    if (!workspaceId) return;
+    await createNote(title, `<p>${content.replace(/\n/g, "</p><p>")}</p>`, null, workspaceId);
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap gap-3 items-end">
+        <div className="flex flex-col gap-1">
+          <label className="text-[10px] text-gray-600 uppercase tracking-wider">Note</label>
+          <select
+            value={noteId}
+            onChange={e => { setNoteId(e.target.value); setQuiz(null); }}
+            className="bg-[#12121a] border border-[#2a2a38] rounded-lg px-2.5 py-1.5 text-xs text-gray-300 focus:outline-none focus:border-indigo-500/50 min-w-[160px]"
+          >
+            <option value="all">All notes</option>
+            {notes.map(n => <option key={n.id} value={String(n.id)}>{n.title || "Untitled"}</option>)}
+          </select>
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-[10px] text-gray-600 uppercase tracking-wider">Questions</label>
+          <select
+            value={count}
+            onChange={e => setCount(Number(e.target.value))}
+            className="bg-[#12121a] border border-[#2a2a38] rounded-lg px-2.5 py-1.5 text-xs text-gray-300 focus:outline-none focus:border-indigo-500/50"
+          >
+            {[5, 10, 15, 20, 30].map(n => <option key={n} value={n}>{n} questions</option>)}
+          </select>
+        </div>
+        <button
+          onClick={handleGenerate}
+          disabled={loading || !workspaceId}
+          className="px-4 py-1.5 text-xs font-medium bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white rounded-lg transition"
+        >
+          Generate Quiz
+        </button>
+      </div>
+
+      {loading && <Spinner />}
+      {error && <p className="text-sm text-red-400">{error}</p>}
+      {quiz && <QuizRenderer quiz={quiz} onSaveNote={handleSaveNote} />}
+    </div>
   );
 }
 
@@ -652,6 +719,7 @@ export function StudyModeModal({ show, onClose, workspaceId, notes }: Props) {
           </h2>
 
           {tab === "flashcards" && <FlashcardsTab workspaceId={workspaceId} notes={notes} />}
+          {tab === "quiz"       && <QuizTab workspaceId={workspaceId} notes={notes} />}
           {tab === "exam"       && <ExamReviewTab workspaceId={workspaceId} notes={notes} />}
           {tab === "plan"       && <StudyPlanTab workspaceId={workspaceId} />}
           {tab === "weak"       && <WeakTopicsTab workspaceId={workspaceId} />}

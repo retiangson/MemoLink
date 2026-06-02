@@ -88,6 +88,28 @@ class WeakTopicsResponse(BaseModel):
     message: Optional[str] = None   # e.g. "Not enough conversation history yet"
 
 
+# ── Quiz ─────────────────────────────────────────────────────────────────────
+
+class QuizRequest(BaseModel):
+    workspace_id: int
+    note_id: Optional[int] = None   # None = all notes
+    count: int = 10
+
+
+class QuizQuestion(BaseModel):
+    id: int
+    type: str           # "single" | "multi"
+    question: str
+    options: List[str]
+    correct: List[int]
+    explanation: str
+
+
+class QuizResponse(BaseModel):
+    title: str
+    questions: List[QuizQuestion]
+
+
 # ── Summary Levels ────────────────────────────────────────────────────────────
 
 class SummaryRequest(BaseModel):

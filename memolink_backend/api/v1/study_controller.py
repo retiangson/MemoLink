@@ -22,6 +22,7 @@ from memolink_backend.contracts.study_dtos import (
     StudyPlanRequest, StudyPlanResponse,
     WeakTopicsRequest, WeakTopicsResponse,
     SummaryRequest, SummaryResponse,
+    QuizRequest, QuizResponse,
 )
 
 router = APIRouter(prefix="/study", tags=["study"])
@@ -77,6 +78,20 @@ def detect_weak_topics(
     return container.study().detect_weak_topics(
         user_id=user_id,
         workspace_id=body.workspace_id,
+    )
+
+
+@router.post("/quiz", response_model=QuizResponse)
+def generate_quiz(
+    body: QuizRequest,
+    user_id: int = Depends(get_current_user),
+    container: RequestContainer = Depends(get_request_container),
+):
+    return container.study().generate_quiz(
+        user_id=user_id,
+        workspace_id=body.workspace_id,
+        note_id=body.note_id,
+        count=max(1, min(body.count, 30)),
     )
 
 

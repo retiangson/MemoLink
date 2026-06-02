@@ -53,6 +53,7 @@ from memolink_backend.contracts.study_dtos import (
     StudyPlanDay, StudyPlanResponse,
     WeakTopic, WeakTopicsResponse,
     SummaryResponse,
+    QuizQuestion, QuizResponse,
 )
 from memolink_backend.domain.repositories.note_repository import NoteRepository
 from memolink_backend.domain.repositories.conversation_repository import ConversationRepository
@@ -284,7 +285,80 @@ class StudyService:
         topics.sort(key=lambda t: t.frequency, reverse=True)
         return WeakTopicsResponse(topics=topics)
 
-    # ── 5. Summary Levels ──────────────────────────────────────────────────────
+    # ── 5. Quiz ────────────────────────────────────────────────────────────────
+
+    def generate_quiz(
+        self,
+        user_id: int,
+        workspace_id: int,
+        note_id: Optional[int],
+        count: int,
+    ) -> QuizResponse:
+        if note_id:
+            note = self._notes.get_by_id(note_id)
+            notes = [note] if note else []
+        else:
+            notes = self._notes.get_for_user(user_id, workspace_id)
+
+        if not notes:
+            return QuizResponse(title="Quiz", questions=[])
+
+        if len(notes) == 1:
+            quiz_title = f"Quiz — {notes[0].title or 'Untitled'}"
+            context = _strip_html(notes[0].content or "")[:6000]
+        else:
+            quiz_title = "Quiz — All Notes"
+            context = "\n\n---\n\n".join(
+                f"## {n.title or 'Untitled'}\n{_strip_html(n.content or '')[:2000]}"
+                for n in notes[:10]
+            )
+
+        client = OpenAI(api_key=settings.openai_api_key)
+        sys_prompt = (
+            f'Generate a quiz with exactly {count} questions based on the given notes.\n'
+            'Return ONLY valid JSON (no markdown fences):\n'
+            '{\n'
+            f'  "title": "{quiz_title}",\n'
+            '  "questions": [\n'
+            '    {\n'
+            '      "id": 1,\n'
+            '      "type": "single",\n'
+            '      "question": "...",\n'
+            '      "options": ["A", "B", "C", "D"],\n'
+            '      "correct": [0],\n'
+            '      "explanation": "..."\n'
+            '    }\n'
+            '  ]\n'
+            '}\n'
+            'Use "single" for one correct answer (radio), "multi" for multiple correct answers (checkbox).\n'
+            'Base questions ONLY on the provided notes. Do not invent facts not in the notes.'
+        )
+        resp = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": sys_prompt},
+                {"role": "user",   "content": context},
+            ],
+            max_tokens=3000,
+        )
+        raw = (resp.choices[0].message.content or "").strip()
+        raw = re.sub(r"^```(?:json)?\s*", "", raw)
+        raw = re.sub(r"\s*```$", "", raw)
+        data = json.loads(raw)
+        questions = [
+            QuizQuestion(
+                id=q.get("id", i + 1),
+                type=q.get("type", "single"),
+                question=q.get("question", ""),
+                options=q.get("options", []),
+                correct=q.get("correct", []),
+                explanation=q.get("explanation", ""),
+            )
+            for i, q in enumerate(data.get("questions", []))
+        ]
+        return QuizResponse(title=data.get("title", quiz_title), questions=questions)
+
+    # ── 6. Summary Levels ──────────────────────────────────────────────────────
 
     def summarize_at_level(
         self,

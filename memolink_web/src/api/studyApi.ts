@@ -62,6 +62,14 @@ export async function detectWeakTopics(workspace_id: number): Promise<WeakTopics
   return res.data;
 }
 
+export interface QuizQuestion { id: number; type: "single" | "multi"; question: string; options: string[]; correct: number[]; explanation: string; }
+export interface QuizData { title: string; questions: QuizQuestion[]; }
+
+export async function generateQuiz(workspace_id: number, note_id: number | null, count: number): Promise<QuizData> {
+  const res = await api.post("/study/quiz", { workspace_id, note_id, count });
+  return res.data;
+}
+
 export async function summarizeNote(workspace_id: number, note_id: number, level: string): Promise<SummaryResponse> {
   const res = await api.post("/study/summary", { workspace_id, note_id, level });
   return res.data;
