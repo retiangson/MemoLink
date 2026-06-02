@@ -5,6 +5,7 @@ interface Props {
   actions: WorkflowAction[];
   conversationId: number;
   workspaceId: number | null;
+  onActionDone?: (type: string) => void;
 }
 
 const ACTION_ICONS: Record<string, string> = {
@@ -20,7 +21,7 @@ const ACTION_ICONS: Record<string, string> = {
 
 type BtnState = "idle" | "loading" | "done" | "error";
 
-export function WorkflowActionBar({ actions, conversationId, workspaceId }: Props) {
+export function WorkflowActionBar({ actions, conversationId, workspaceId, onActionDone }: Props) {
   const [states, setStates] = useState<Record<string, BtnState>>({});
 
   if (!actions.length) return null;
@@ -31,6 +32,7 @@ export function WorkflowActionBar({ actions, conversationId, workspaceId }: Prop
     try {
       const res = await executeAction(conversationId, action, workspaceId);
       setStates(s => ({ ...s, [action.id]: res.ok ? "done" : "error" }));
+      if (res.ok) onActionDone?.(action.type);
     } catch {
       setStates(s => ({ ...s, [action.id]: "error" }));
     }

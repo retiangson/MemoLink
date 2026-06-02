@@ -135,6 +135,7 @@ interface Props {
   autopilotEnabled?: boolean;
   workflowContext?: { conversationId: number; workspaceId: number | null; model: string | null };
   workflowActions?: { id: string; type: string; label: string; preview: string; params: Record<string, unknown> }[];
+  onWorkflowActionDone?: (type: string) => void;
 }
 
 const TRANSLATE_LANGUAGES = [
@@ -183,7 +184,7 @@ function ImageGeneratingSpinner() {
   );
 }
 
-export default function ChatBubble({ role, content, model, streaming, onAdd, onDelete, onApplyEdit, onOpenNote, onSaveNote, hasOpenNote, translationEnabled = true, modelAttributionEnabled = true, confidence, confidenceReason, confidenceEnabled = true, routingReason, autopilotEnabled = true, workflowContext, workflowActions }: Props) {
+export default function ChatBubble({ role, content, model, streaming, onAdd, onDelete, onApplyEdit, onOpenNote, onSaveNote, hasOpenNote, translationEnabled = true, modelAttributionEnabled = true, confidence, confidenceReason, confidenceEnabled = true, routingReason, autopilotEnabled = true, workflowContext, workflowActions, onWorkflowActionDone }: Props) {
   const isUser = role === "user";
   const [copied, setCopied] = useState(false);
   const [showLangPicker, setShowLangPicker] = useState(false);
@@ -550,6 +551,7 @@ export default function ChatBubble({ role, content, model, streaming, onAdd, onD
             actions={workflowActions}
             conversationId={workflowContext.conversationId}
             workspaceId={workflowContext.workspaceId}
+            onActionDone={onWorkflowActionDone}
           />
         )}
         </div>

@@ -823,6 +823,12 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                     autopilotEnabled={flags.autopilot_enabled}
                     workflowContext={convs.activeConversation?.id && convs.activeConversation.id !== TEMP_ID ? { conversationId: convs.activeConversation.id, workspaceId: activeWorkspaceId, model: selectedModel } : undefined}
                     workflowSuggestions={workflowSuggestions}
+                    onWorkflowActionDone={(type) => {
+                      const notesActions = new Set(["create_note","summarise_workspace","organise_notes","extract_tasks","prepare_report_outline","suggest_title"]);
+                      const reminderActions = new Set(["create_reminder"]);
+                      if (notesActions.has(type)) reloadNotes();
+                      if (reminderActions.has(type)) suggestions.reload();
+                    }}
                   />
                 </div>
               </main>
