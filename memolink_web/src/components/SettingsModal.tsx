@@ -60,6 +60,15 @@ export function SettingsModal({
   const [editLoading, setEditLoading] = useState(false);
   const [deleteLoadingId, setDeleteLoadingId] = useState<number | null>(null);
 
+  // Workflow user preference (localStorage-backed, must be declared here with all other hooks)
+  const [wfSuggestions, setWfSuggestions] = useState(
+    () => localStorage.getItem("memolink_workflow_suggestions") !== "false"
+  );
+  function toggleWfSuggestions(val: boolean) {
+    setWfSuggestions(val);
+    localStorage.setItem("memolink_workflow_suggestions", String(val));
+  }
+
   // Email connection state
   const [emailStatus, setEmailStatus] = useState<EmailStatus>({ connected: false, email: null });
   const [emailLoading, setEmailLoading] = useState(false);
@@ -281,16 +290,6 @@ export function SettingsModal({
   }
 
   const initials = user.email.slice(0, 2).toUpperCase();
-
-  // User-level workflow preference (localStorage so it persists without a DB round-trip)
-  const WF_KEY = "memolink_workflow_suggestions";
-  const [wfSuggestions, setWfSuggestions] = React.useState(
-    () => localStorage.getItem(WF_KEY) !== "false"
-  );
-  function toggleWfSuggestions(val: boolean) {
-    setWfSuggestions(val);
-    localStorage.setItem(WF_KEY, String(val));
-  }
 
   const tabs: { id: Tab; label: string }[] = [
     { id: "profile",  label: "Profile" },
