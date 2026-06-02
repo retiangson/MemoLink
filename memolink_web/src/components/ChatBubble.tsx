@@ -484,38 +484,42 @@ export default function ChatBubble({ role, content, model, streaming, onAdd, onD
             </button>
           )}
         </div>
-        {modelAttributionEnabled && model && !streaming && (
-          <div className="flex items-center gap-1.5 text-[10px] text-gray-700 select-none">
-            <span className="inline-flex items-center justify-center w-[14px] h-[14px] rounded bg-[#1a1a24] border border-[#2a2a38]">
-              <svg className="w-2 h-2 text-indigo-400/60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
-              </svg>
-            </span>
-            {modelLabel(model)}
+        {!streaming && (
+          <div className="flex items-center gap-3 flex-wrap">
+            {modelAttributionEnabled && model && (
+              <div className="flex items-center gap-1.5 text-[10px] text-gray-700 select-none">
+                <span className="inline-flex items-center justify-center w-[14px] h-[14px] rounded bg-[#1a1a24] border border-[#2a2a38]">
+                  <svg className="w-2 h-2 text-indigo-400/60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                </span>
+                {modelLabel(model)}
+              </div>
+            )}
+            {confidenceEnabled && confidence && (() => {
+              const cfg = CONFIDENCE_CONFIG[confidence];
+              return (
+                <div className="group relative inline-flex">
+                  <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[10px] font-medium select-none cursor-default ${cfg.pill} ${cfg.text}`}>
+                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${cfg.dot}`} />
+                    {cfg.label}
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-2.5 h-2.5 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  {confidenceReason && (
+                    <div className="absolute bottom-full left-0 mb-1.5 w-56 hidden group-hover:block z-50">
+                      <div className="bg-[#1e1e2a] border border-[#2a2a38] rounded-xl px-3 py-2 shadow-xl">
+                        <p className={`text-[10px] font-semibold mb-0.5 ${cfg.text}`}>{cfg.label}</p>
+                        <p className="text-[11px] text-gray-400 leading-relaxed">{confidenceReason}</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         )}
-        {confidenceEnabled && confidence && !streaming && (() => {
-          const cfg = CONFIDENCE_CONFIG[confidence];
-          return (
-            <div className="group relative inline-flex">
-              <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[10px] font-medium select-none cursor-default ${cfg.pill} ${cfg.text}`}>
-                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${cfg.dot}`} />
-                {cfg.label}
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-2.5 h-2.5 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-              {confidenceReason && (
-                <div className="absolute bottom-full left-0 mb-1.5 w-56 hidden group-hover:block z-50">
-                  <div className="bg-[#1e1e2a] border border-[#2a2a38] rounded-xl px-3 py-2 shadow-xl">
-                    <p className={`text-[10px] font-semibold mb-0.5 ${cfg.text}`}>{cfg.label}</p>
-                    <p className="text-[11px] text-gray-400 leading-relaxed">{confidenceReason}</p>
-                  </div>
-                </div>
-              )}
-            </div>
-          );
-        })()}
         </div>
       )}
       {isUser && (
