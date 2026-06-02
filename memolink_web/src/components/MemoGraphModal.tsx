@@ -97,6 +97,8 @@ export function MemoGraphModal({
   const transformRef = useRef({ x: 0, y: 0, scale: 1 });
   const isPanningRef = useRef(false);
   const panStartRef = useRef({ mx: 0, my: 0, tx: 0, ty: 0 });
+  // Stable ref to the latest draw so wheel/pan handlers never hold stale closures
+  const drawRef = useRef<() => void>(() => {});
 
   const [loading, setLoading] = useState(false);
   const [building, setBuilding] = useState(false);
@@ -376,7 +378,8 @@ export function MemoGraphModal({
     return () => window.removeEventListener("mouseup", globalUp);
   }, []);
 
-  // Non-passive wheel listener for zoom
+  // Non-passive wheel listener — attached once per mount so it is never torn down
+  // mid-session. Uses drawRef so it always calls the current draw version.
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -393,11 +396,11 @@ export function MemoGraphModal({
         y: sy + (ty - sy) * (newScale / scale),
         scale: newScale,
       };
-      draw();
+      drawRef.current();
     };
     canvas.addEventListener("wheel", onWheel, { passive: false });
     return () => canvas.removeEventListener("wheel", onWheel);
-  }, [draw]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const onMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const { x, y } = canvasCoords(e);
@@ -502,6 +505,9 @@ export function MemoGraphModal({
       return next;
     });
   };
+
+  // Keep drawRef current so wheel/pan handlers always call the latest version
+  useEffect(() => { drawRef.current = draw; }, [draw]);
 
   // Redraw when filters change
   useEffect(() => {
