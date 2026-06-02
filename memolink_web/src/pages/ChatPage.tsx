@@ -218,6 +218,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
 
     if (!wasStreaming || chat.streaming) return;           // only on streaming → false transition
     if (!flags.workflow_enabled) return;
+    if (localStorage.getItem("memolink_workflow_suggestions") === "false") return;
 
     const messages = convs.activeConversation?.messages;
     if (!messages?.length) return;
@@ -1091,7 +1092,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
         />
       )}
 
-      <SettingsModal show={showSettings} user={user} onClose={() => setShowSettings(false)} selectedModel={selectedModel} onModelChange={handleModelChange} modelSelectionEnabled={flags.model_selection_enabled} customApiKeysEnabled={flags.custom_api_keys_enabled} ttsEnabled={flags.tts_enabled} emailEnabled={flags.email_enabled} />
+      <SettingsModal show={showSettings} user={user} onClose={() => setShowSettings(false)} selectedModel={selectedModel} onModelChange={handleModelChange} modelSelectionEnabled={flags.model_selection_enabled} customApiKeysEnabled={flags.custom_api_keys_enabled} ttsEnabled={flags.tts_enabled} emailEnabled={flags.email_enabled} workflowEnabled={flags.workflow_enabled} />
       <HelpModal show={showHelp} onClose={() => setShowHelp(false)} />
       <FeedbackModal show={showFeedback} onClose={() => setShowFeedback(false)} />
       <MemoGraphModal
