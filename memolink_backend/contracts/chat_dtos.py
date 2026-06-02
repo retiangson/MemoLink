@@ -30,3 +30,4 @@ class ChatResponseDTO(BaseModel):
     sources: List[ChatAnswerSource] = []
     attachments: List[ChatAttachmentDTO] = []
     message_id: Optional[int] = None
+    routing_reason: Optional[str] = None  # set when AutoPilot routed to a different model

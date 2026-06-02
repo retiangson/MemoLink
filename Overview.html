@@ -211,6 +211,11 @@
     <span class="pill">Gmail Integration</span>
     <span class="pill">OAuth 2.0</span>
     <span class="pill">Email-to-Note</span>
+    <span class="pill">AI Memory Graph</span>
+    <span class="pill">Graph-Enhanced RAG</span>
+    <span class="pill">Proactive Insights</span>
+    <span class="pill">Answer Confidence</span>
+    <span class="pill">AutoPilot Routing</span>
   </div>
 </div>
 
@@ -348,7 +353,7 @@
       <div class="card">
         <div class="card-icon">&#x1F3F3;&#xFE0F;</div>
         <h3>Feature Flags</h3>
-        <p>System-wide flags stored in the <code>feature_flags</code> table: web search, agent mode, model selection, image generation, translation, file upload, research mode, default model, and default language. Each feature also has a <code>*_min_level</code> flag (<code>regular</code> / <code>plus</code> / <code>pro</code>) that controls the minimum access tier required. Admins configure both toggles and minimum levels via the Admin Panel; the frontend fetches them on login and hides disabled controls accordingly.</p>
+        <p>System-wide flags stored in the <code>feature_flags</code> table: web search, agent mode, model selection, image generation, translation, file upload, research mode, TTS, slash commands, custom API keys, video import, email integration, AI memory graph (<code>memograph_enabled</code>), proactive insights (<code>proactive_insights_enabled</code>), answer confidence (<code>confidence_enabled</code>), AutoPilot routing (<code>autopilot_enabled</code>), default model, and default language. Each feature also has a <code>*_min_level</code> flag (<code>regular</code> / <code>plus</code> / <code>pro</code>) that controls the minimum access tier required. Admins configure both toggles and minimum levels via the Admin Panel; the frontend fetches them on login and hides disabled controls accordingly.</p>
       </div>
       <div class="card">
         <div class="card-icon">&#x1F3C5;</div>
@@ -420,6 +425,26 @@
         <h3>Gmail Email Integration</h3>
         <p>Connect Gmail via OAuth 2.0 in Settings → Email. MemoLink fetches unread and important emails, batch-scores importance with GPT (1–5), and saves those scoring ≥ 3. Auto-process appends new emails to a global <strong>Email Digest</strong> note and creates reminders for emails with detected deadlines — both are global (visible across all workspaces). A <strong>Sync from Email</strong> button in the Reminders panel triggers a fresh sync on demand. Email-sourced reminders link back to the original email. Reply to any email in-app: choose a tone (Formal / Friendly / Brief), generate 3 RAG-grounded AI draft suggestions, edit, and send — reply threads correctly in Gmail via <code>In-Reply-To</code> + <code>threadId</code>.</p>
       </div>
+      <div class="card">
+        <div class="card-icon">&#x1F9E0;</div>
+        <h3>AI Memory Graph (MemoGraph)</h3>
+        <p>A full-screen force-directed graph that visualises how the AI perceives and connects knowledge across all notes. MemoGraph uses GPT to batch-extract entities — <strong>people, topics, projects, deadlines, decisions, action items, questions, and themes</strong> — then draws edges between entities and the notes that mention them. Notes sharing entities are automatically linked with <em>related_to</em> edges. The canvas supports pan, zoom, and a Fit button. Each node type has a distinct colour. Entity nodes are stored in <code>graph_nodes</code> and relationships in <code>graph_edges</code>. The graph data also powers <strong>Graph-Enhanced RAG</strong>: the retrieval pipeline traverses graph edges to find notes connected to the top-K vector hits, expanding context beyond cosine similarity alone.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">&#x1F4A1;</div>
+        <h3>Proactive Reminder Intelligence</h3>
+        <p>An AI-powered scan that surfaces missed deadlines, incomplete action items, and urgency signals buried in the user's notes — without the user having to ask. Detection runs in two passes: a <strong>rule-based pass</strong> (filename regex flags recently uploaded unreviewed files) and a <strong>GPT batch pass</strong> (8 notes per call, each classified into <em>missing_reminder</em>, <em>incomplete_actions</em>, or <em>urgency_signal</em>). Insights appear in a collapsible <strong>AI Insights</strong> section in the Reminders panel, colour-coded by severity (red / amber / indigo). Each insight links directly to the source note. Dismissed insights are soft-deleted and not re-shown. Results are persisted in the <code>proactive_insights</code> table and refresh on each scan.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">&#x1F6E1;&#xFE0F;</div>
+        <h3>Source-Grounded Answer Confidence</h3>
+        <p>Every AI response carries a <strong>HIGH / MEDIUM / LOW / UNSUPPORTED</strong> confidence badge inline with the model attribution. The system uses a two-layer approach: the LLM self-assesses by appending a <code>&lt;confidence&gt;</code> tag to its own reply (stripped before display), and a server-side pre-computed fallback guarantees a badge even if the model omits the tag. The fallback is deterministic — UNSUPPORTED when no notes exist, LOW/MEDIUM/HIGH based on how many top-K vector results were retrieved. Confidence and reasoning are persisted to the <code>messages</code> table (<code>confidence</code>, <code>confidence_reason</code> columns) so historical responses retain their badges. A hover tooltip shows the reasoning. The feature is toggled via the <code>confidence_enabled</code> feature flag.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">&#x26A1;</div>
+        <h3>AutoPilot Model Routing</h3>
+        <p>An intelligent, zero-latency routing layer that automatically selects the best AI model for each prompt — with no extra API calls. Rules are evaluated in priority order: <strong>Translation</strong> (language regex) → <strong>Code / Debug</strong> (any programming language name, or ≥2 code keywords) → <strong>Deep Research</strong> (analysis/research keywords) → <strong>Long Context</strong> (prompt &gt;250 words) → <strong>Simple Query</strong> (≤12 words, stays on default). Translation and Long Context route to <em>Gemini 2.5 Flash</em> (large context window); Code routes to <em>DeepSeek Coder</em>; Deep Research to <em>GPT-4o</em>. Rules skip gracefully if a model's API key is not configured. A violet <strong>⚡ AutoPilot · {Reason}</strong> chip appears inline with the model attribution, hidden for Simple Query. Controlled via the <code>autopilot_enabled</code> feature flag.</p>
+      </div>
     </div>
   </section>
 
@@ -453,7 +478,7 @@
         <tr>
           <td><strong>Business</strong></td>
           <td><code>business/services/</code></td>
-          <td>Application logic — chat, notes, auth, conversations, reminders, video, workspaces, admin, feature flags, feedback, email</td>
+          <td>Application logic — chat, notes, auth, conversations, reminders, video, workspaces, admin, feature flags, feedback, email, memograph, proactive insights, autopilot routing</td>
           <td><span class="tag tag-py">Python</span></td>
         </tr>
         <tr>
@@ -523,6 +548,24 @@
           <td><span class="tag tag-py">Python</span></td>
         </tr>
         <tr>
+          <td><strong>AI Memory Graph</strong></td>
+          <td><code>business/services/memograph_service</code></td>
+          <td>GPT batch entity extraction (people, topics, projects, deadlines, decisions, action items, questions, themes); builds graph_nodes + graph_edges; graph-enhanced RAG traverses edges to expand retrieval context beyond vector search</td>
+          <td><span class="tag tag-ai">OpenAI</span><span class="tag tag-db">pgvector</span></td>
+        </tr>
+        <tr>
+          <td><strong>Proactive Insights</strong></td>
+          <td><code>business/services/proactive_insight_service</code></td>
+          <td>Two-pass detection: rule-based filename regex (unreviewed uploads) + GPT batch analysis (8 notes/call) for missing_reminder, incomplete_actions, urgency_signal; results persisted in proactive_insights table; dismiss soft-deletes</td>
+          <td><span class="tag tag-ai">OpenAI</span><span class="tag tag-py">Python</span></td>
+        </tr>
+        <tr>
+          <td><strong>AutoPilot Routing</strong></td>
+          <td><code>business/services/autopilot_service</code></td>
+          <td>Pure heuristic intent classification — Translation → Gemini 2.5 Flash, Code/Debug (any language name) → DeepSeek Coder, Deep Research → GPT-4o, Long Context → Gemini 2.5 Flash, Simple → default. Zero extra API calls; skips rules when API key absent; routing_reason returned in done SSE event</td>
+          <td><span class="tag tag-py">Python</span></td>
+        </tr>
+        <tr>
           <td><strong>Deployment</strong></td>
           <td><code>docker-compose.yml</code></td>
           <td>Backend + frontend containers orchestrated; nginx proxies /api/ and disables SSE buffering</td>
@@ -573,13 +616,32 @@
         <span class="flow-arrow">&rarr;</span>
         <div class="flow-step">[Optional] Brave Search context injected</div>
         <span class="flow-arrow">&rarr;</span>
+        <div class="flow-step">AutoPilot selects best model (heuristic)</div>
+        <span class="flow-arrow">&rarr;</span>
         <div class="flow-step">Selected model stream=True</div>
         <span class="flow-arrow">&rarr;</span>
         <div class="flow-step"><code>data: {"t":"&lt;token&gt;"}</code> per chunk</div>
         <span class="flow-arrow">&rarr;</span>
-        <div class="flow-step"><code>data: {"done":true,"id":&lt;msg_id&gt;,"model":"gpt-4o-mini"}</code></div>
+        <div class="flow-step"><code>data: {"done":true,"model":"…","routing_reason":"…","confidence":"HIGH"}</code></div>
         <span class="flow-arrow">&rarr;</span>
-        <div class="flow-step">Blinking cursor in UI — attribution badge rendered</div>
+        <div class="flow-step">Model attribution + AutoPilot chip + Confidence badge rendered</div>
+      </div>
+    </div>
+
+    <div style="margin-top:1.4rem;">
+      <p style="margin-bottom:.5rem;"><strong style="color:var(--text)">Graph-Enhanced RAG path</strong></p>
+      <div class="flow">
+        <div class="flow-step">Top-K vector hits (seed notes)</div>
+        <span class="flow-arrow">&rarr;</span>
+        <div class="flow-step">Fetch graph_nodes for seed notes</div>
+        <span class="flow-arrow">&rarr;</span>
+        <div class="flow-step">Traverse graph_edges to entity nodes</div>
+        <span class="flow-arrow">&rarr;</span>
+        <div class="flow-step">Find other note nodes sharing those entities</div>
+        <span class="flow-arrow">&rarr;</span>
+        <div class="flow-step">Merge related notes into context (up to 4 extra)</div>
+        <span class="flow-arrow">&rarr;</span>
+        <div class="flow-step">Richer, cross-note answer with broader context</div>
       </div>
     </div>
   </section>
@@ -628,7 +690,12 @@
            <strong>user_api_keys table</strong> — per-user encrypted API keys (provider + Fernet-encrypted key, unique per user+provider)<br/>
            <strong>email_accounts table</strong> — one Gmail OAuth record per user; access + refresh tokens encrypted with Fernet<br/>
            <strong>email_records table</strong> — synced email metadata (subject, sender, snippet, body, importance score, note_appended flag)<br/>
-           <strong>reminders.email_record_id</strong> — FK linking email-generated reminders back to their source email</p>
+           <strong>reminders.email_record_id</strong> — FK linking email-generated reminders back to their source email<br/>
+           <strong>graph_nodes table</strong> — one row per entity (user_id, workspace_id, node_type, label, source_id); unique constraint prevents duplicates<br/>
+           <strong>graph_edges table</strong> — directed relationships between graph nodes (source_node_id, target_node_id, relationship); CASCADE delete from nodes<br/>
+           <strong>proactive_insights table</strong> — AI-detected insight records (note_id, type, title, description, severity, dismissed flag, created_at)<br/>
+           <strong>messages.confidence</strong> — VARCHAR(20) column storing HIGH | MEDIUM | LOW | UNSUPPORTED per assistant message<br/>
+           <strong>messages.confidence_reason</strong> — TEXT column storing the LLM's or server-side fallback reasoning for the confidence level</p>
       </div>
       <div class="card">
         <h3>AI &amp; Media</h3>

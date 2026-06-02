@@ -129,6 +129,8 @@ interface Props {
   confidence?: ConfidenceLevel;
   confidenceReason?: string;
   confidenceEnabled?: boolean;
+  routingReason?: string;
+  autopilotEnabled?: boolean;
 }
 
 const TRANSLATE_LANGUAGES = [
@@ -177,7 +179,7 @@ function ImageGeneratingSpinner() {
   );
 }
 
-export default function ChatBubble({ role, content, model, streaming, onAdd, onDelete, onApplyEdit, onOpenNote, onSaveNote, hasOpenNote, translationEnabled = true, modelAttributionEnabled = true, confidence, confidenceReason, confidenceEnabled = true }: Props) {
+export default function ChatBubble({ role, content, model, streaming, onAdd, onDelete, onApplyEdit, onOpenNote, onSaveNote, hasOpenNote, translationEnabled = true, modelAttributionEnabled = true, confidence, confidenceReason, confidenceEnabled = true, routingReason, autopilotEnabled = true }: Props) {
   const isUser = role === "user";
   const [copied, setCopied] = useState(false);
   const [showLangPicker, setShowLangPicker] = useState(false);
@@ -494,6 +496,14 @@ export default function ChatBubble({ role, content, model, streaming, onAdd, onD
                   </svg>
                 </span>
                 {modelLabel(model)}
+              </div>
+            )}
+            {autopilotEnabled && routingReason && routingReason !== "Simple Query" && (
+              <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-violet-500/10 border border-violet-500/20 text-[10px] text-violet-400 select-none" title={`AutoPilot routed to ${modelLabel(model)} for: ${routingReason}`}>
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 16 16">
+                  <path d="M11.251.068a.5.5 0 0 1 .227.58L9.677 6.5H13a.5.5 0 0 1 .364.843l-8 8.5a.5.5 0 0 1-.842-.49L6.323 9.5H3a.5.5 0 0 1-.364-.843l8-8.5a.5.5 0 0 1 .615-.09z"/>
+                </svg>
+                AutoPilot · {routingReason}
               </div>
             )}
             {confidenceEnabled && confidence && (() => {

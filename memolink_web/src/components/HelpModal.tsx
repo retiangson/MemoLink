@@ -24,6 +24,10 @@ const NAV: Section[] = [
   { id: "commands",   label: "Slash Commands",    icon: <path d="M14 4.5V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h5.5zm-3 0A1.5 1.5 0 0 1 9.5 3V1L14 5.5zM8.646 6.646a.5.5 0 1 0-.707.708L9.293 8.5l-1.354 1.646a.5.5 0 0 0 .707.708L9.707 9.5H11a.5.5 0 0 0 0-1H9.707zM5.5 8.5a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 0 1H6a.5.5 0 0 1-.5-.5"/> },
   { id: "apikeys",    label: "Custom API Keys",   icon: <path d="M0 8a4 4 0 0 1 7.465-2H14a.5.5 0 0 1 .354.146l1.5 1.5a.5.5 0 0 1 0 .708l-1.5 1.5a.5.5 0 0 1-.708 0L13 9.207l-.646.647a.5.5 0 0 1-.708 0L11 9.207l-.646.647a.5.5 0 0 1-.708 0L9 9.207l-.646.647A.5.5 0 0 1 8 10h-.535A4 4 0 0 1 0 8m4-3a3 3 0 1 0 2.712 4.285A.5.5 0 0 1 7.163 9h.63l.853-.854a.5.5 0 0 1 .708 0l.646.647.646-.647a.5.5 0 0 1 .708 0l.646.647.646-.647a.5.5 0 0 1 .708 0l.646.647.793-.793-1-1h-6.63a.5.5 0 0 1-.451-.285A3 3 0 0 0 4 5m0 3.5a.5.5 0 1 1 0-1 .5.5 0 0 1 0 1"/> },
   { id: "email",      label: "Gmail Email",       icon: <path d="M.05 3.555A2 2 0 0 1 2 2h12a2 2 0 0 1 1.95 1.555L8 8.414zM0 4.697v7.104l5.803-3.558zM6.761 8.83l-6.57 4.027A2 2 0 0 0 2 14h12a2 2 0 0 0 1.808-1.144l-6.57-4.027L8 9.586zm3.436-.586L16 11.801V4.697z"/> },
+  { id: "memograph",  label: "AI Memory Graph",   icon: <path d="M6 3.5A1.5 1.5 0 0 1 7.5 2h1A1.5 1.5 0 0 1 10 3.5v1A1.5 1.5 0 0 1 8.5 6v1H14a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-1 0V8h-5v.5a.5.5 0 0 1-1 0V8h-5v.5a.5.5 0 0 1-1 0v-1A.5.5 0 0 1 2 7h5.5V6A1.5 1.5 0 0 1 6 4.5zm-6 8A1.5 1.5 0 0 1 1.5 10h1A1.5 1.5 0 0 1 4 11.5v1A1.5 1.5 0 0 1 2.5 14h-1A1.5 1.5 0 0 1 0 12.5zm6 0A1.5 1.5 0 0 1 7.5 10h1a1.5 1.5 0 0 1 1.5 1.5v1A1.5 1.5 0 0 1 8.5 14h-1A1.5 1.5 0 0 1 6 12.5zm6 0a1.5 1.5 0 0 1 1.5-1.5h1a1.5 1.5 0 0 1 1.5 1.5v1a1.5 1.5 0 0 1-1.5 1.5h-1a1.5 1.5 0 0 1-1.5-1.5z"/> },
+  { id: "proactive",  label: "Proactive Insights", icon: <path d="M2 6a6 6 0 1 1 10.174 4.31c-.203.196-.359.4-.453.619l-.762 1.769A.5.5 0 0 1 10.5 13a.5.5 0 0 1 0 1 .5.5 0 0 1 0 1l-.224.447a1 1 0 0 1-.894.553H6.618a1 1 0 0 1-.894-.553L5.5 15a.5.5 0 0 1 0-1 .5.5 0 0 1 0-1 .5.5 0 0 1-.46-.302l-.761-1.77a2 2 0 0 0-.453-.618A5.98 5.98 0 0 1 2 6m6-5a5 5 0 0 0-3.479 8.592c.263.254.514.564.676.941L5.83 12h4.342l.632-1.467c.162-.377.413-.687.676-.941A5 5 0 0 0 8 1"/> },
+  { id: "confidence", label: "Answer Confidence",  icon: <path d="M5.072.56C6.157.265 7.31 0 8 0s1.843.265 2.928.56c1.11.3 2.229.655 2.887.87a1.54 1.54 0 0 1 1.044 1.262c.596 4.477-.787 7.795-2.465 9.99a11.8 11.8 0 0 1-2.517 2.453 7 7 0 0 1-1.048.625c-.28.132-.581.24-.829.24s-.548-.108-.829-.24a7 7 0 0 1-1.048-.625 11.8 11.8 0 0 1-2.517-2.453C1.928 10.487.545 7.169 1.141 2.692A1.54 1.54 0 0 1 2.185 1.43 63 63 0 0 1 5.072.56"/> },
+  { id: "autopilot",  label: "AutoPilot Routing",  icon: <path d="M11.251.068a.5.5 0 0 1 .227.58L9.677 6.5H13a.5.5 0 0 1 .364.843l-8 8.5a.5.5 0 0 1-.842-.49L6.323 9.5H3a.5.5 0 0 1-.364-.843l8-8.5a.5.5 0 0 1 .615-.09z"/> },
   { id: "tips",       label: "Tips & Shortcuts",  icon: <path d="M2 2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v13.5a.5.5 0 0 1-.777.416L8 13.101l-5.223 2.815A.5.5 0 0 1 2 15.5zm2-1a1 1 0 0 0-1 1v12.566l4.723-2.482a.5.5 0 0 1 .554 0L13 14.566V2a1 1 0 0 0-1-1z"/> },
 ];
 
@@ -43,6 +47,10 @@ const CONTENT: Record<string, React.ReactNode> = {
           { label: "Reminders", desc: "Auto-detected from notes or set manually" },
           { label: "Slash Commands", desc: "14 commands — /Improve, /Quiz, /Discuss and more" },
           { label: "Gmail Email", desc: "Connect Gmail, auto-sync important emails to notes and reminders, reply in-app" },
+          { label: "AI Memory Graph", desc: "Visual force-directed graph of entities extracted from notes with cross-note links" },
+          { label: "Proactive Insights", desc: "AI scans notes to surface missed deadlines, action items, and urgency signals" },
+          { label: "Answer Confidence", desc: "HIGH / MEDIUM / LOW confidence badge on every AI response" },
+          { label: "AutoPilot Routing", desc: "Automatically selects the best AI model based on your question's intent" },
           { label: "Custom API Keys", desc: "Use your own OpenAI, Gemini, or any compatible key" },
         ].map((f) => (
           <div key={f.label} className="bg-[#12121a] border border-[#2a2a38] rounded-xl p-3">
@@ -513,6 +521,90 @@ const CONTENT: Record<string, React.ReactNode> = {
     </div>
   ),
 
+  memograph: (
+    <div className="space-y-4 text-sm text-gray-400 leading-relaxed">
+      <p>The <span className="text-white font-medium">AI Memory Graph</span> visualises how your knowledge is connected — entities extracted from notes are drawn as colour-coded nodes, and shared entities between notes are linked with edges.</p>
+      <div className="space-y-3">
+        {[
+          { title: "Opening MemoGraph", desc: "Click the graph icon (⬡) in the top toolbar. MemoLink builds or re-uses the graph for your current workspace. Click \"Rebuild\" to re-scan all notes." },
+          { title: "Node types", desc: "note (indigo) · reminder (amber) · person (green) · topic (cyan) · project (orange) · deadline (red) · decision (yellow) · action item (pink) · question (purple) · theme (teal). Each type can be toggled with the filter chips at the top." },
+          { title: "Pan & Zoom", desc: "Drag on empty canvas to pan. Scroll to zoom in/out. Click \"Fit\" to auto-scale so all nodes are visible. Drag a node to pin it — it will stay fixed until you drag it again." },
+          { title: "Graph-Enhanced RAG", desc: "The graph isn't just visual — it improves AI answers. When you chat, MemoLink traverses the graph from the top vector-search hits to find related notes you might not have mentioned. This expands the context beyond simple similarity." },
+          { title: "How entities are extracted", desc: "GPT processes your notes in batches of 5. It identifies people, topics, projects, deadlines, decisions, action items, questions, and themes. Notes that share an entity are automatically linked with a \"related_to\" edge." },
+        ].map((t) => (
+          <div key={t.title}>
+            <p className="text-xs font-semibold text-indigo-300 mb-1">{t.title}</p>
+            <p>{t.desc}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  ),
+
+  proactive: (
+    <div className="space-y-4 text-sm text-gray-400 leading-relaxed">
+      <p><span className="text-white font-medium">Proactive Insights</span> scans your notes and surfaces things you might have missed — deadlines without reminders, incomplete action items, and urgent signals buried in your notes.</p>
+      <div className="space-y-3">
+        {[
+          { title: "How to use it", desc: "Open the Reminders panel (bell icon) and expand the \"AI Insights\" section. Click \"Scan Notes\" to trigger a fresh analysis of all your notes in the current workspace." },
+          { title: "Insight types", desc: "🔴 Urgency Signal — something needs immediate attention. 🟠 Missing Reminder — a deadline mentioned in a note has no reminder. 🔵 Incomplete Actions — action items detected in a note with no follow-up." },
+          { title: "Unreviewed uploads", desc: "Files uploaded to the workspace in the last 14 days that haven't been reviewed are automatically flagged — no AI call needed for this check." },
+          { title: "Dismissing insights", desc: "Click the × on any insight card to dismiss it. Dismissed insights are not re-shown on the next scan." },
+          { title: "Open Note link", desc: "Each insight card has an \"Open Note\" link that takes you directly to the source note so you can act on it immediately." },
+        ].map((t) => (
+          <div key={t.title}>
+            <p className="text-xs font-semibold text-indigo-300 mb-1">{t.title}</p>
+            <p>{t.desc}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  ),
+
+  confidence: (
+    <div className="space-y-4 text-sm text-gray-400 leading-relaxed">
+      <p>Every AI response carries a <span className="text-white font-medium">confidence badge</span> inline with the model attribution — so you always know how well-grounded the answer is in your notes.</p>
+      <div className="space-y-2">
+        {[
+          { level: "HIGH", color: "text-emerald-400", desc: "The AI found strong, relevant evidence in your notes and is confident in the answer." },
+          { level: "MEDIUM", color: "text-amber-400", desc: "Some relevant notes were found but the evidence is partial or indirect." },
+          { level: "LOW", color: "text-orange-400", desc: "Very little relevant context was found — treat the answer with caution." },
+          { level: "UNSUPPORTED", color: "text-red-400", desc: "No notes in this workspace cover the topic. The AI answered from general knowledge only." },
+        ].map(({ level, color, desc }) => (
+          <div key={level} className="bg-[#12121a] border border-[#2a2a38] rounded-xl px-3 py-2.5">
+            <p className={`text-xs font-bold mb-0.5 ${color}`}>{level}</p>
+            <p className="text-[11px] text-gray-500">{desc}</p>
+          </div>
+        ))}
+      </div>
+      <p className="text-[11px] text-gray-600">Hover over the badge to see the AI's reasoning. The badge is always shown — even if the model doesn't self-assess, a server-side fallback computes a level based on how many relevant notes were retrieved.</p>
+    </div>
+  ),
+
+  autopilot: (
+    <div className="space-y-4 text-sm text-gray-400 leading-relaxed">
+      <p><span className="text-white font-medium">AutoPilot</span> automatically picks the best AI model for each message based on what you're asking — no manual switching needed.</p>
+      <div className="space-y-2">
+        {[
+          { intent: "Translation", model: "Gemini 2.5 Flash", signal: "Any translation-related phrase (\"translate to French\", \"in Spanish\", etc.)", color: "text-blue-400" },
+          { intent: "Code / Debug", model: "DeepSeek Coder", signal: "Any programming language name (Python, Rust, SQL, React, Go…) or ≥2 code keywords", color: "text-emerald-400" },
+          { intent: "Deep Research", model: "GPT-4o", signal: "Research, analysis, compare, evaluate, elaborate, implications…", color: "text-violet-400" },
+          { intent: "Long Context", model: "Gemini 2.5 Flash", signal: "Prompt longer than 250 words", color: "text-cyan-400" },
+          { intent: "Simple Query", model: "GPT-4o Mini (default)", signal: "Short question ≤12 words with no complex intent", color: "text-gray-400" },
+        ].map(({ intent, model, signal, color }) => (
+          <div key={intent} className="bg-[#12121a] border border-[#2a2a38] rounded-xl px-3 py-2.5">
+            <div className="flex items-baseline gap-2 mb-0.5">
+              <span className={`text-xs font-semibold ${color}`}>{intent}</span>
+              <span className="text-[10px] text-gray-600">→ {model}</span>
+            </div>
+            <p className="text-[11px] text-gray-500">{signal}</p>
+          </div>
+        ))}
+      </div>
+      <p className="text-[11px] text-gray-600">When AutoPilot routes a message, a violet <strong className="text-violet-400">⚡ AutoPilot · {"{reason}"}</strong> chip appears next to the model name. Simple Query never shows a chip. AutoPilot skips a rule if the target model's API key isn't configured.</p>
+    </div>
+  ),
+
   tips: (
     <div className="space-y-3 text-sm text-gray-400 leading-relaxed">
       <ul className="space-y-2">
@@ -535,6 +627,12 @@ const CONTENT: Record<string, React.ReactNode> = {
           "Connect Gmail in Settings → Email to automatically sync important emails to an \"Email Digest\" note and create deadline reminders. The \"Sync from Email\" button in the Reminders panel triggers a fresh sync at any time.",
           "Email-sourced reminders are global — they appear in every workspace, not just the one that was active when they were created.",
           "Reply to emails directly from a reminder detail or the email list in Settings → Email — MemoLink builds 3 AI-drafted options based on your notes, and sends the reply threaded correctly in Gmail.",
+          "Open the AI Memory Graph (⬡ icon in toolbar) to see how your notes are connected through shared entities. Rebuild the graph after adding new notes to update the relationships.",
+          "Graph-Enhanced RAG is automatic — when you chat, MemoLink traverses the knowledge graph to find related notes beyond the top vector search results, giving more complete answers.",
+          "Use the AI Insights scan (Reminders panel → AI Insights → Scan Notes) before important deadlines to catch anything you may have forgotten to set a reminder for.",
+          "The Answer Confidence badge tells you how grounded each AI reply is. UNSUPPORTED means the topic isn't in your notes — try uploading a relevant document first.",
+          "AutoPilot automatically routes coding questions to DeepSeek Coder — just mention any language name (Python, Go, Rust, SQL…) in your message.",
+          "AutoPilot routes research and analysis questions to GPT-4o. For quick factual questions it stays on the default fast model. The violet ⚡ chip shows when a routing decision was made.",
         ].map((item, i) => (
           <li key={i} className="flex gap-2"><span className="text-indigo-500 shrink-0 mt-0.5">•</span><span>{item}</span></li>
         ))}

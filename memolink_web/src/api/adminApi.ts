@@ -37,6 +37,7 @@ export type FeatureFlags = {
   memograph_enabled: boolean;
   proactive_insights_enabled: boolean;
   confidence_enabled: boolean;
+  autopilot_enabled: boolean;
   default_model: string;
   default_language: string;
   web_search_min_level: AccessLevel;
@@ -71,6 +72,7 @@ export function parseFlags(raw: Record<string, string>): FeatureFlags {
     memograph_enabled: raw.memograph_enabled !== "false",
     proactive_insights_enabled: raw.proactive_insights_enabled !== "false",
     confidence_enabled: raw.confidence_enabled !== "false",
+    autopilot_enabled: raw.autopilot_enabled !== "false",
     default_model: raw.default_model ?? "gpt-4o-mini",
     default_language: raw.default_language ?? "English",
     web_search_min_level: (raw.web_search_min_level ?? "regular") as AccessLevel,
@@ -129,6 +131,11 @@ export async function updateAdminFeatures(flags: FeatureFlags): Promise<FeatureF
     slash_commands_enabled: String(flags.slash_commands_enabled),
     custom_api_keys_enabled: String(flags.custom_api_keys_enabled),
     video_import_enabled: String(flags.video_import_enabled),
+    email_enabled: String(flags.email_enabled),
+    memograph_enabled: String(flags.memograph_enabled),
+    proactive_insights_enabled: String(flags.proactive_insights_enabled),
+    confidence_enabled: String(flags.confidence_enabled),
+    autopilot_enabled: String(flags.autopilot_enabled),
     default_model: flags.default_model,
     default_language: flags.default_language,
     web_search_min_level: flags.web_search_min_level,

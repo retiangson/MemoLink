@@ -439,6 +439,11 @@ export function AdminPage({ onClose, currentUserId }: Props) {
                     { key: "slash_commands_enabled", label: "Slash Commands", desc: "Show the / command autocomplete picker in chat" },
                     { key: "custom_api_keys_enabled", label: "Custom API Keys", desc: "Allow users to add their own AI provider API keys" },
                     { key: "video_import_enabled", label: "Video Import", desc: "Allow importing note content from a video URL" },
+                    { key: "email_enabled", label: "Email Integration", desc: "Allow users to connect Gmail and sync emails as reminders" },
+                    { key: "memograph_enabled", label: "AI Memory Graph", desc: "Show the MemoGraph button to visualize entity relationships across notes" },
+                    { key: "proactive_insights_enabled", label: "Proactive Insights", desc: "Enable AI scanning of notes for missed deadlines, action items, and urgency signals" },
+                    { key: "confidence_enabled", label: "Answer Confidence", desc: "Show HIGH / MEDIUM / LOW confidence badge on each AI response" },
+                    { key: "autopilot_enabled", label: "AutoPilot Routing", desc: "Automatically select the best AI model based on the user's intent" },
                   ] as { key: keyof FeatureFlags; label: string; desc: string }[]).map(({ key, label, desc }) => (
                     <div key={key} className="flex items-center justify-between px-4 py-3.5 bg-[#1a1a24] border border-[#2a2a38] rounded-xl">
                       <div>
