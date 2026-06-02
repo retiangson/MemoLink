@@ -105,6 +105,7 @@ if os.getenv("MEMOLINK_SKIP_DB_BOOTSTRAP") != "1":
         _conn.execute(text("ALTER TABLE messages ADD COLUMN IF NOT EXISTS confidence VARCHAR(20)"))
         _conn.execute(text("ALTER TABLE messages ADD COLUMN IF NOT EXISTS confidence_reason TEXT"))
         _conn.execute(text("INSERT INTO feature_flags (key, value) VALUES ('confidence_enabled', 'true') ON CONFLICT (key) DO NOTHING"))
+        _conn.execute(text("INSERT INTO feature_flags (key, value) VALUES ('autopilot_enabled', 'true') ON CONFLICT (key) DO NOTHING"))
         _conn.execute(text("ALTER TABLE feedback ADD COLUMN IF NOT EXISTS title VARCHAR(200)"))
         _conn.execute(text("""
             CREATE TABLE IF NOT EXISTS feedback (

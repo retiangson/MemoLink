@@ -32,13 +32,14 @@ interface MessageListProps {
   translationEnabled?: boolean;
   modelAttributionEnabled?: boolean;
   confidenceEnabled?: boolean;
+  autopilotEnabled?: boolean;
 }
 
 export function MessageList({
   messages, loading, streaming, activeConversation,
   messagesContainerRef, bottomRef,
   onLoadOlder, onAddToNotes, onDeleteMessage, onDropFiles,
-  onApplyNoteEdit, onOpenNote, onSaveNote, hasOpenNote, translationEnabled = true, modelAttributionEnabled = true, confidenceEnabled = true,
+  onApplyNoteEdit, onOpenNote, onSaveNote, hasOpenNote, translationEnabled = true, modelAttributionEnabled = true, confidenceEnabled = true, autopilotEnabled = true,
 }: MessageListProps) {
   return (
     <div
@@ -69,6 +70,8 @@ export function MessageList({
               confidence={msg.confidence}
               confidenceReason={msg.confidence_reason}
               confidenceEnabled={confidenceEnabled}
+              routingReason={msg.routing_reason}
+              autopilotEnabled={autopilotEnabled}
             />
           );
         })}

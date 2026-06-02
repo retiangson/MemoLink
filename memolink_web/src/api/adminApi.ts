@@ -37,6 +37,7 @@ export type FeatureFlags = {
   memograph_enabled: boolean;
   proactive_insights_enabled: boolean;
   confidence_enabled: boolean;
+  autopilot_enabled: boolean;
   default_model: string;
   default_language: string;
   web_search_min_level: AccessLevel;
@@ -71,6 +72,7 @@ export function parseFlags(raw: Record<string, string>): FeatureFlags {
     memograph_enabled: raw.memograph_enabled !== "false",
     proactive_insights_enabled: raw.proactive_insights_enabled !== "false",
     confidence_enabled: raw.confidence_enabled !== "false",
+    autopilot_enabled: raw.autopilot_enabled !== "false",
     default_model: raw.default_model ?? "gpt-4o-mini",
     default_language: raw.default_language ?? "English",
     web_search_min_level: (raw.web_search_min_level ?? "regular") as AccessLevel,

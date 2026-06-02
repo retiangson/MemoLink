@@ -9,6 +9,7 @@ export interface Message {
   model?: string;
   confidence?: ConfidenceLevel;
   confidence_reason?: string;
+  routing_reason?: string;   // set when AutoPilot selected this model (e.g. "Deep Research")
 }
 
 export interface Conversation {

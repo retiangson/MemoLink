@@ -32,6 +32,7 @@ from memolink_backend.business.interfaces.i_chat_service import IChatService
 from memolink_backend.utils.file_extractor import extract_text_local
 from memolink_backend.utils.web_search import brave_search
 from memolink_backend.contracts.chat_dtos import ChatResponseDTO, ChatAnswerSource, ChatRequestDTO, ChatAttachmentDTO
+from memolink_backend.business.services.autopilot_service import route as autopilot_route
 
 _GEMINI_MODELS = {
     "gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.5-pro",
@@ -544,6 +545,17 @@ class ChatService(IChatService):
 
         model = dto.model or settings.openai_chat_model
         user_keys = self._resolve_user_keys(dto.user_id)
+
+        # AutoPilot: route to the best model for this prompt (only when on default)
+        model, routing_reason = autopilot_route(
+            prompt=user_text,
+            selected_model=model,
+            default_model=settings.openai_chat_model,
+            gemini_key=settings.gemini_api_key,
+            deepseek_key=settings.deepseek_api_key,
+            openai_key=settings.openai_api_key,
+        )
+
         conversation_id, messages, sources, pre_conf_level, pre_conf_reason = self._build_chat_context(dto)
 
         if _is_image_request(user_text):
@@ -585,11 +597,10 @@ class ChatService(IChatService):
             answer = f"⚠ All available AI models are currently unavailable. Please try again later.\n\n*Last error: {last_error}*"
 
         clean_answer, conf_level, conf_reason = _parse_confidence(answer)
-        # Fall back to server-computed confidence if the LLM didn't output the tag
         final_conf = conf_level or pre_conf_level
         final_reason = conf_reason or pre_conf_reason
         assistant_msg = self.repo_conv.add_message(conversation_id, "assistant", clean_answer, model=used_model, confidence=final_conf, confidence_reason=final_reason)
-        return ChatResponseDTO(answer=clean_answer, sources=sources, message_id=assistant_msg.id)
+        return ChatResponseDTO(answer=clean_answer, sources=sources, message_id=assistant_msg.id, routing_reason=routing_reason)
 
     def ask_stream(self, dto: ChatRequestDTO) -> Iterator[str]:
         """Yield SSE-formatted chunks. Each event is JSON: {"t":"<token>"} or {"done":true,"id":<int>}."""
@@ -601,6 +612,17 @@ class ChatService(IChatService):
 
         model = dto.model or settings.openai_chat_model
         user_keys = self._resolve_user_keys(dto.user_id)
+
+        # AutoPilot: route to the best model for this prompt (only when on default)
+        model, routing_reason = autopilot_route(
+            prompt=user_text,
+            selected_model=model,
+            default_model=settings.openai_chat_model,
+            gemini_key=settings.gemini_api_key,
+            deepseek_key=settings.deepseek_api_key,
+            openai_key=settings.openai_api_key,
+        )
+
         conversation_id, messages, _, pre_conf_level, pre_conf_reason = self._build_chat_context(dto)
 
         note_name = _extract_improve_note_name(user_text)
@@ -659,11 +681,10 @@ class ChatService(IChatService):
             yield f"data: {json.dumps({'t': full_answer})}\n\n"
 
         clean_answer, conf_level, conf_reason = _parse_confidence(full_answer)
-        # Fall back to server-computed confidence if the LLM didn't output the tag
         final_conf = conf_level or pre_conf_level
         final_reason = conf_reason or pre_conf_reason
         assistant_msg = self.repo_conv.add_message(conversation_id, "assistant", clean_answer, model=used_model, confidence=final_conf, confidence_reason=final_reason)
-        yield f"data: {json.dumps({'done': True, 'id': assistant_msg.id, 'model': used_model, 'confidence': final_conf, 'confidence_reason': final_reason})}\n\n"
+        yield f"data: {json.dumps({'done': True, 'id': assistant_msg.id, 'model': used_model, 'confidence': final_conf, 'confidence_reason': final_reason, 'routing_reason': routing_reason})}\n\n"
 
     async def handle_file_upload(
         self,

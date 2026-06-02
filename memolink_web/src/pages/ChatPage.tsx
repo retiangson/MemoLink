@@ -771,6 +771,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                     translationEnabled={flags.translation_enabled}
                     modelAttributionEnabled={modelAttributionEnabled}
                     confidenceEnabled={flags.confidence_enabled}
+                    autopilotEnabled={flags.autopilot_enabled}
                   />
                 </div>
               </main>
