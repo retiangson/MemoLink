@@ -36,12 +36,95 @@ export function RightPanel({
 }: RightPanelProps) {
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState<SuggestionItem | null>(null);
+  const [showNoteReminders, setShowNoteReminders] = useState(true);
+  const [showEmailReminders, setShowEmailReminders] = useState(true);
 
   if (!open) return null;
 
   const _d = new Date();
   const today = `${_d.getFullYear()}-${String(_d.getMonth() + 1).padStart(2, "0")}-${String(_d.getDate()).padStart(2, "0")}`;
   const doneCount = items.filter((i) => i.done).length;
+
+  const noteItems  = items.filter((i) => !i.email_record_id);
+  const emailItems = items.filter((i) => !!i.email_record_id);
+
+  const renderCard = (item: SuggestionItem) => {
+    const isToday   = !item.done && item.due_date === today;
+    const isOverdue = !item.done && !!item.due_date && item.due_date < today;
+    return (
+      <div
+        key={item.id}
+        onClick={() => setSelectedItem(item)}
+        className={`group flex items-start gap-2.5 p-2.5 rounded-xl border transition-all cursor-pointer ${
+          item.done
+            ? "bg-[#0a0a0f]/60 border-[#1a1a22] opacity-50 hover:opacity-70"
+            : isOverdue
+              ? "bg-[#1a0a0a] border-red-500/30 hover:border-red-400/50"
+              : isToday
+                ? "bg-[#1a1a10] border-amber-500/40 hover:border-amber-400/60"
+                : "bg-[#1a1a24] border-[#2a2a38] hover:border-indigo-500/40"
+        }`}
+      >
+        <button
+          onClick={(e) => { e.stopPropagation(); onToggleDone(item.id); }}
+          className={`mt-0.5 w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${
+            item.done ? "bg-indigo-600 border-indigo-600" : "border-gray-600 hover:border-indigo-400"
+          }`}
+        >
+          {item.done && (
+            <svg className="w-2 h-2 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+          )}
+        </button>
+
+        <div className="flex-1 min-w-0">
+          <p className={`text-xs leading-snug break-words ${item.done ? "line-through text-gray-600" : "text-gray-200"}`}>
+            {item.text}
+          </p>
+          {item.description && (
+            <p className={`text-[11px] mt-0.5 leading-snug break-words line-clamp-2 ${item.done ? "text-gray-700" : "text-gray-500"}`}>
+              {item.description}
+            </p>
+          )}
+          <div className="flex items-center gap-2 mt-1 flex-wrap">
+            {item.type === "ai" && !item.email_record_id && (
+              <span className="inline-flex items-center gap-0.5 text-[10px] text-indigo-400/60 uppercase tracking-wider">✦ AI</span>
+            )}
+            {item.due_date && (
+              <span className={`text-[10px] ${
+                isOverdue ? "text-red-400 font-medium" : isToday ? "text-amber-400 font-medium" : "text-gray-600"
+              }`}>
+                {isOverdue ? "⚠ Overdue" : isToday ? "⚠ Today" : item.due_date}
+                {item.due_time && ` · ${item.due_time}`}
+              </span>
+            )}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition">
+          {item.due_date && (
+            <a
+              href={buildGoogleCalendarUrl(item.text, item.description, item.due_date, item.due_time)}
+              target="_blank" rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              title="Add to Google Calendar"
+              className="w-5 h-5 flex items-center justify-center text-gray-700 hover:text-indigo-400 transition"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" fill="currentColor" viewBox="0 0 16 16">
+                <path d="M3.5 0a.5.5 0 0 1 .5.5V1h8V.5a.5.5 0 0 1 1 0V1h1a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2h1V.5a.5.5 0 0 1 .5-.5M1 4v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V4z"/>
+              </svg>
+            </a>
+          )}
+          <button
+            onClick={(e) => { e.stopPropagation(); onRemove(item.id); }}
+            className="w-5 h-5 flex items-center justify-center text-gray-700 hover:text-red-400 transition text-sm leading-none"
+            title="Delete"
+          >×</button>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="w-72 h-full flex flex-col bg-[#0f0f13] border-l border-[#1e1e2a] shrink-0">
@@ -161,116 +244,83 @@ export function RightPanel({
         </button>
       </div>
 
-      {/* Proactive AI Insights */}
+      {/* ── Section 1: Notes Reminders ── */}
+      <div className="border-b border-[#1e1e2a]">
+        <button
+          onClick={() => setShowNoteReminders((v) => !v)}
+          className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-[#1a1a24] transition text-left"
+        >
+          <div className="flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 text-indigo-400 shrink-0" fill="currentColor" viewBox="0 0 16 16">
+              <path d="M2.5 1A1.5 1.5 0 0 0 1 2.5v11A1.5 1.5 0 0 0 2.5 15h6.086a1.5 1.5 0 0 0 1.06-.44l4.915-4.914A1.5 1.5 0 0 0 15 8.586V2.5A1.5 1.5 0 0 0 13.5 1zm6 8.5a1 1 0 0 1 1-1h4.396l-5.396 5.397z"/>
+            </svg>
+            <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Notes</span>
+            {noteItems.length > 0 && (
+              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-400">
+                {noteItems.length}
+              </span>
+            )}
+          </div>
+          <svg xmlns="http://www.w3.org/2000/svg" className={`w-3 h-3 text-gray-600 transition-transform ${showNoteReminders ? "" : "-rotate-90"}`} fill="currentColor" viewBox="0 0 16 16">
+            <path d="M7.247 11.14 2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z"/>
+          </svg>
+        </button>
+
+        {showNoteReminders && (
+          <div className="px-3 pb-3 flex flex-col gap-2">
+            {noteItems.length === 0 && !isGenerating && (
+              <p className="text-[11px] text-gray-600 text-center py-3">
+                No note reminders yet — use Generate from Notes above.
+              </p>
+            )}
+            {noteItems.map(renderCard)}
+          </div>
+        )}
+      </div>
+
+      {/* ── Section 2: Email Reminders (only shown when connected or items exist) ── */}
+      {(emailConnected || emailItems.length > 0) && (
+        <div className="border-b border-[#1e1e2a]">
+          <button
+            onClick={() => setShowEmailReminders((v) => !v)}
+            className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-[#1a1a24] transition text-left"
+          >
+            <div className="flex items-center gap-2">
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 text-blue-400 shrink-0" fill="currentColor" viewBox="0 0 16 16">
+                <path d="M0 4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2zm2-1a1 1 0 0 0-1 1v.217l7 4.2 7-4.2V4a1 1 0 0 0-1-1zm13 2.383-4.708 2.825L15 11.105zm-.034 6.876-5.64-3.471L8 9.583l-1.326-.795-5.64 3.47A1 1 0 0 0 2 13h12a1 1 0 0 0 .966-.741M1 11.105l4.708-2.897L1 5.383z"/>
+              </svg>
+              <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Email</span>
+              {emailItems.length > 0 && (
+                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-blue-500/20 text-blue-400">
+                  {emailItems.length}
+                </span>
+              )}
+            </div>
+            <svg xmlns="http://www.w3.org/2000/svg" className={`w-3 h-3 text-gray-600 transition-transform ${showEmailReminders ? "" : "-rotate-90"}`} fill="currentColor" viewBox="0 0 16 16">
+              <path d="M7.247 11.14 2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z"/>
+            </svg>
+          </button>
+
+          {showEmailReminders && (
+            <div className="px-3 pb-3 flex flex-col gap-2">
+              {emailItems.length === 0 && (
+                <p className="text-[11px] text-gray-600 text-center py-3">
+                  No email reminders yet — sync your email above.
+                </p>
+              )}
+              {emailItems.map(renderCard)}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Section 3: AI Insights ── */}
       {insightsEnabled && (
         <InsightsPanel
           workspaceId={workspaceId ?? null}
           onOpenNote={onOpenNote}
         />
       )}
-
-      {/* Items list */}
-      <div className="p-3 flex flex-col gap-2">
-        {items.length === 0 && !isGenerating && (
-          <div className="text-center mt-10 px-4">
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-8 h-8 text-gray-700 mx-auto mb-3" fill="currentColor" viewBox="0 0 16 16">
-              <path d="M2 6a6 6 0 1 1 10.174 4.31c-.203.196-.359.4-.453.619l-.762 1.769A.5.5 0 0 1 10.5 13h-5a.5.5 0 0 1-.46-.302l-.761-1.77a2 2 0 0 0-.453-.618A5.98 5.98 0 0 1 2 6m3 8.5a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 0 1l-.224.447a1 1 0 0 1-.894.553H6.618a1 1 0 0 1-.894-.553L5.5 15a.5.5 0 0 1-.5-.5"/>
-            </svg>
-            <p className="text-xs text-gray-600 leading-relaxed">
-              Save a note to get AI suggestions, or add a reminder above.
-            </p>
-          </div>
-        )}
-
-        {items.map((item) => {
-          const isToday = !item.done && item.due_date === today;
-          const isOverdue = !item.done && !!item.due_date && item.due_date < today;
-          return (
-            <div
-              key={item.id}
-              onClick={() => setSelectedItem(item)}
-              className={`group flex items-start gap-2.5 p-2.5 rounded-xl border transition-all cursor-pointer ${
-                item.done
-                  ? "bg-[#0a0a0f]/60 border-[#1a1a22] opacity-50 hover:opacity-70"
-                  : isOverdue
-                    ? "bg-[#1a0a0a] border-red-500/30 hover:border-red-400/50"
-                    : isToday
-                      ? "bg-[#1a1a10] border-amber-500/40 hover:border-amber-400/60"
-                      : "bg-[#1a1a24] border-[#2a2a38] hover:border-indigo-500/40"
-              }`}
-            >
-              {/* Checkbox */}
-              <button
-                onClick={(e) => { e.stopPropagation(); onToggleDone(item.id); }}
-                className={`mt-0.5 w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${
-                  item.done
-                    ? "bg-indigo-600 border-indigo-600"
-                    : "border-gray-600 hover:border-indigo-400"
-                }`}
-              >
-                {item.done && (
-                  <svg className="w-2 h-2 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                  </svg>
-                )}
-              </button>
-
-              {/* Text + meta */}
-              <div className="flex-1 min-w-0">
-                <p className={`text-xs leading-snug break-words ${item.done ? "line-through text-gray-600" : "text-gray-200"}`}>
-                  {item.text}
-                </p>
-                {item.description && (
-                  <p className={`text-[11px] mt-0.5 leading-snug break-words line-clamp-2 ${item.done ? "text-gray-700" : "text-gray-500"}`}>
-                    {item.description}
-                  </p>
-                )}
-                <div className="flex items-center gap-2 mt-1 flex-wrap">
-                  {item.type === "ai" && (
-                    <span className="inline-flex items-center gap-0.5 text-[10px] text-indigo-400/60 uppercase tracking-wider">
-                      ✦ AI
-                    </span>
-                  )}
-                  {item.due_date && (
-                    <span className={`text-[10px] ${
-                      isOverdue ? "text-red-400 font-medium" :
-                      isToday ? "text-amber-400 font-medium" : "text-gray-600"
-                    }`}>
-                      {isOverdue ? "⚠ Overdue" : isToday ? "⚠ Today" : item.due_date}
-                      {item.due_time && ` · ${item.due_time}`}
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              {/* Actions */}
-              <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition">
-                {item.due_date && (
-                  <a
-                    href={buildGoogleCalendarUrl(item.text, item.description, item.due_date, item.due_time)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={(e) => e.stopPropagation()}
-                    title="Add to Google Calendar"
-                    className="w-5 h-5 flex items-center justify-center text-gray-700 hover:text-indigo-400 transition"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" fill="currentColor" viewBox="0 0 16 16">
-                      <path d="M3.5 0a.5.5 0 0 1 .5.5V1h8V.5a.5.5 0 0 1 1 0V1h1a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2h1V.5a.5.5 0 0 1 .5-.5M1 4v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V4z"/>
-                    </svg>
-                  </a>
-                )}
-                <button
-                  onClick={(e) => { e.stopPropagation(); onRemove(item.id); }}
-                  className="w-5 h-5 flex items-center justify-center text-gray-700 hover:text-red-400 transition text-sm leading-none"
-                  title="Delete"
-                >
-                  ×
-                </button>
-              </div>
-            </div>
-          );
-        })}
-      </div>
 
       </div>{/* end scrollable body */}
 
