@@ -36,6 +36,7 @@ export function RightPanel({
 }: RightPanelProps) {
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState<SuggestionItem | null>(null);
+  const [showActions, setShowActions] = useState(true);
   const [showNoteReminders, setShowNoteReminders] = useState(true);
   const [showEmailReminders, setShowEmailReminders] = useState(true);
 
@@ -172,8 +173,24 @@ export function RightPanel({
       {/* Scrollable body — everything between header and footer scrolls together */}
       <div className="flex-1 overflow-y-auto flex flex-col min-h-0">
 
-      {/* Action row: Generate + Add */}
-      <div className="px-3 pt-3 pb-3 border-b border-[#1e1e2a] flex flex-col gap-2 shrink-0">
+      {/* ── Action row (collapsible) ── */}
+      <div className="border-b border-[#1e1e2a] shrink-0">
+        <button
+          onClick={() => setShowActions((v) => !v)}
+          className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-[#1a1a24] transition text-left"
+        >
+          <div className="flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 text-indigo-400 shrink-0" fill="currentColor" viewBox="0 0 16 16">
+              <path d="M11.251.068a.5.5 0 0 1 .227.58L9.677 6.5H13a.5.5 0 0 1 .364.843l-8 8.5a.5.5 0 0 1-.842-.49L6.323 9.5H3a.5.5 0 0 1-.364-.843l8-8.5a.5.5 0 0 1 .615-.09z"/>
+            </svg>
+            <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Actions</span>
+          </div>
+          <svg xmlns="http://www.w3.org/2000/svg" className={`w-3 h-3 text-gray-600 transition-transform ${showActions ? "" : "-rotate-90"}`} fill="currentColor" viewBox="0 0 16 16">
+            <path d="M7.247 11.14 2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z"/>
+          </svg>
+        </button>
+
+        {showActions && <div className="px-3 pb-3 flex flex-col gap-2">
         <button
           onClick={onGenerate}
           disabled={isGenerating}
@@ -242,7 +259,8 @@ export function RightPanel({
           </svg>
           Add Reminder
         </button>
-      </div>
+        </div>}{/* end showActions */}
+      </div>{/* end action collapsible */}
 
       {/* ── Section 1: Notes Reminders ── */}
       <div className="border-b border-[#1e1e2a]">
