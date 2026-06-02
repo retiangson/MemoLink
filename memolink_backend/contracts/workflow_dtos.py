@@ -35,6 +35,17 @@ class WorkflowPlanResponse(BaseModel):
     actions: List[WorkflowAction]
 
 
+# ── Suggest ──────────────────────────────────────────────────────────────────
+
+class WorkflowSuggestRequest(BaseModel):
+    message: str
+    workspace_id: Optional[int] = None
+
+
+class WorkflowSuggestResponse(BaseModel):
+    actions: List[WorkflowAction]
+
+
 # ── Phase 2: Execute ──────────────────────────────────────────────────────────
 
 class WorkflowExecuteRequest(BaseModel):

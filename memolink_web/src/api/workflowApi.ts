@@ -16,6 +16,32 @@ export interface WorkflowPlan {
   actions: WorkflowAction[];
 }
 
+export async function suggestActions(
+  message: string,
+  workspace_id: number | null,
+): Promise<WorkflowAction[]> {
+  try {
+    const res = await api.post("/workflow/suggest", { message, workspace_id });
+    return res.data.actions ?? [];
+  } catch {
+    return [];
+  }
+}
+
+export async function executeAction(
+  conversation_id: number,
+  action: WorkflowAction,
+  workspace_id: number | null,
+): Promise<{ ok: boolean; result: string }> {
+  for await (const event of executeWorkflow(conversation_id, [action], workspace_id, null)) {
+    if (event.workflow_done) {
+      const d = event.workflow_done as { ok: boolean; result: string };
+      return { ok: d.ok, result: d.result };
+    }
+  }
+  return { ok: true, result: "Done" };
+}
+
 export async function planWorkflow(
   conversation_id: number,
   prompt: string,

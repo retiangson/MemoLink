@@ -5,6 +5,7 @@ import { translateText } from "../api/chatApi";
 import { MODELS } from "../constants/models";
 import { QuizRenderer } from "./QuizRenderer";
 import { WorkflowApprovalCard } from "./WorkflowApprovalCard";
+import { WorkflowActionBar } from "./WorkflowActionBar";
 import "highlight.js/styles/github-dark.css";
 import "../styles/markdown.css";
 
@@ -133,6 +134,7 @@ interface Props {
   routingReason?: string;
   autopilotEnabled?: boolean;
   workflowContext?: { conversationId: number; workspaceId: number | null; model: string | null };
+  workflowActions?: { id: string; type: string; label: string; preview: string; params: Record<string, unknown> }[];
 }
 
 const TRANSLATE_LANGUAGES = [
@@ -181,7 +183,7 @@ function ImageGeneratingSpinner() {
   );
 }
 
-export default function ChatBubble({ role, content, model, streaming, onAdd, onDelete, onApplyEdit, onOpenNote, onSaveNote, hasOpenNote, translationEnabled = true, modelAttributionEnabled = true, confidence, confidenceReason, confidenceEnabled = true, routingReason, autopilotEnabled = true, workflowContext }: Props) {
+export default function ChatBubble({ role, content, model, streaming, onAdd, onDelete, onApplyEdit, onOpenNote, onSaveNote, hasOpenNote, translationEnabled = true, modelAttributionEnabled = true, confidence, confidenceReason, confidenceEnabled = true, routingReason, autopilotEnabled = true, workflowContext, workflowActions }: Props) {
   const isUser = role === "user";
   const [copied, setCopied] = useState(false);
   const [showLangPicker, setShowLangPicker] = useState(false);
@@ -541,6 +543,14 @@ export default function ChatBubble({ role, content, model, streaming, onAdd, onD
               );
             })()}
           </div>
+        )}
+        {/* Workflow action buttons — appear below AI message when suggestions are ready */}
+        {!streaming && workflowActions && workflowActions.length > 0 && workflowContext && (
+          <WorkflowActionBar
+            actions={workflowActions}
+            conversationId={workflowContext.conversationId}
+            workspaceId={workflowContext.workspaceId}
+          />
         )}
         </div>
       )}

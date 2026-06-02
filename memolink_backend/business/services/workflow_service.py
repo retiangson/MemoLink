@@ -113,6 +113,69 @@ class WorkflowService:
         self._embed    = embedding_service or EmbeddingService()
         self._client   = OpenAI(api_key=settings.openai_api_key)
 
+    # ── Suggest ───────────────────────────────────────────────────────────────
+
+    def suggest(
+        self,
+        message: str,
+        workspace_id: Optional[int],
+        user_id: int,
+    ) -> list[WorkflowAction]:
+        """
+        Analyse an AI response and return 0–3 suggested quick actions.
+        Called automatically after every chat response when workflow is enabled.
+        Uses a cheap GPT call; returns empty list when nothing actionable is found.
+        """
+        if len(message.strip()) < 80:
+            return []
+
+        _OPENAI_PREFIXES = ("gpt-", "o1-", "o3-", "o4-")
+        model = settings.openai_chat_model
+        if not any(model.startswith(p) for p in _OPENAI_PREFIXES):
+            model = "gpt-4o-mini"
+
+        system = (
+            "You analyse AI assistant responses and suggest up to 3 quick follow-up actions.\n"
+            "Return ONLY valid JSON:\n"
+            '{"actions": [\n'
+            '  {"id":"a1","type":"create_note","label":"Save as Note","params":{"title":"...","content":"..."}},\n'
+            '  {"id":"a2","type":"create_reminder","label":"Add Reminder: Task by Friday","params":{"title":"...","due_date":"YYYY-MM-DD"}},\n'
+            '  {"id":"a3","type":"search_web","label":"Search: topic","params":{"query":"..."}}\n'
+            ']}\n\n'
+            "Rules:\n"
+            "- suggest create_note  : response contains a study plan, steps, list, or reference info worth saving\n"
+            "- suggest create_reminder : response mentions a deadline, due date, task, or time-sensitive item\n"
+            "- suggest search_web   : response suggests external info or further reading would help\n"
+            "- suggest extract_tasks: response contains multiple action items or to-dos\n"
+            "- return empty array when response is conversational, a greeting, or simple Q&A (< 3 sentences)\n"
+            "- max 3 actions, labels must be short action phrases\n"
+            f"- today's date is {__import__('datetime').date.today()}"
+        )
+
+        resp = self._client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": system},
+                {"role": "user",   "content": f"AI response:\n{message[:3000]}"},
+            ],
+            max_tokens=400,
+        )
+        raw = (resp.choices[0].message.content or "").strip()
+        raw = re.sub(r"^```(?:json)?\s*", "", raw)
+        raw = re.sub(r"\s*```$", "", raw)
+        data = json.loads(raw)
+        return [
+            WorkflowAction(
+                id=a.get("id", f"s{i}"),
+                type=a.get("type", ""),
+                label=a.get("label", ""),
+                preview=a.get("preview", ""),
+                params=a.get("params", {}),
+            )
+            for i, a in enumerate(data.get("actions", []))
+            if a.get("type")
+        ]
+
     # ── Phase 1: Plan ──────────────────────────────────────────────────────────
 
     def plan(

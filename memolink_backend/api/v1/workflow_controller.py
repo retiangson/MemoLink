@@ -16,9 +16,28 @@ from memolink_backend.di.request_container import get_request_container, Request
 from memolink_backend.contracts.workflow_dtos import (
     WorkflowPlanRequest, WorkflowPlanResponse,
     WorkflowExecuteRequest,
+    WorkflowSuggestRequest, WorkflowSuggestResponse,
 )
 
 router = APIRouter(prefix="/workflow", tags=["workflow"])
+
+
+@router.post("/suggest", response_model=WorkflowSuggestResponse)
+def suggest_actions(
+    body: WorkflowSuggestRequest,
+    user_id: int = Depends(get_current_user),
+    container: RequestContainer = Depends(get_request_container),
+):
+    """
+    Analyse an AI response and return 0–3 suggested quick actions.
+    Called automatically by the frontend after every chat response when workflow is enabled.
+    """
+    actions = container.workflow().suggest(
+        message=body.message,
+        workspace_id=body.workspace_id,
+        user_id=user_id,
+    )
+    return WorkflowSuggestResponse(actions=actions)
 
 
 @router.post("/plan", response_model=WorkflowPlanResponse)
