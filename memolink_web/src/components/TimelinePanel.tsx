@@ -100,7 +100,7 @@ export function TimelinePanel({ noteId, onJump }: Props) {
 
   if (loading) {
     return (
-      <div className="flex-1 flex items-center justify-center py-16">
+      <div className="flex items-center justify-center py-16">
         <div className="relative w-8 h-8">
           <div className="absolute inset-0 rounded-full border-[3px] border-indigo-500/20 border-t-indigo-400 animate-spin" />
         </div>
@@ -109,7 +109,7 @@ export function TimelinePanel({ noteId, onJump }: Props) {
   }
 
   return (
-    <div className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-4 px-1 py-2">
+    <div className="flex flex-col gap-4 px-1 py-2">
 
       {/* Header row */}
       <div className="flex items-center justify-between gap-3">
