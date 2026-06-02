@@ -52,6 +52,7 @@ from memolink_backend.api.v1 import (
     email_controller,
     memograph_controller,
     proactive_insight_controller,
+    study_controller,
 )
 
 # Register all models so SQLAlchemy sees them
@@ -273,6 +274,7 @@ if os.getenv("MEMOLINK_SKIP_DB_BOOTSTRAP") != "1":
         """))
         _conn.execute(text("CREATE INDEX IF NOT EXISTS ix_proactive_insights_workspace ON proactive_insights(user_id, workspace_id)"))
         _conn.execute(text("INSERT INTO feature_flags (key, value) VALUES ('proactive_insights_enabled', 'true') ON CONFLICT (key) DO NOTHING"))
+        _conn.execute(text("INSERT INTO feature_flags (key, value) VALUES ('study_mode_enabled', 'true') ON CONFLICT (key) DO NOTHING"))
         # Auto-promote first user as admin if none exists
         _conn.execute(text("""
             UPDATE users SET is_admin = TRUE
@@ -429,6 +431,7 @@ app.include_router(slash_command_controller.router, prefix="/api")
 app.include_router(email_controller.router, prefix="/api")
 app.include_router(memograph_controller.router, prefix="/api")
 app.include_router(proactive_insight_controller.router, prefix="/api")
+app.include_router(study_controller.router, prefix="/api")
 
 # AWS Lambda handler — only active when running inside Lambda
 if os.getenv("AWS_LAMBDA_FUNCTION_NAME"):

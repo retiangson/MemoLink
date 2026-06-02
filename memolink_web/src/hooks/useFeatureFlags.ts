@@ -19,6 +19,7 @@ const DEFAULT_FLAGS: FeatureFlags = {
   proactive_insights_enabled: true,
   confidence_enabled: true,
   autopilot_enabled: true,
+  study_mode_enabled: true,
   default_model: "gpt-4o-mini",
   default_language: "English",
   web_search_min_level: "regular",

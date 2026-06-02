@@ -18,6 +18,7 @@ import { DeleteModal } from "../components/DeleteModal";
 import { SettingsModal } from "../components/SettingsModal";
 import { HelpModal } from "../components/HelpModal";
 import { MemoGraphModal } from "../components/MemoGraphModal";
+import { StudyModeModal } from "../components/StudyModeModal";
 import { FeedbackModal } from "../components/FeedbackModal";
 import { TTSPlayerBar } from "../components/TTSPlayerBar";
 import { WorkspaceManagerModal } from "../components/WorkspaceManagerModal";
@@ -59,6 +60,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
   const [showSettings, setShowSettings] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [showMemoGraph, setShowMemoGraph] = useState(false);
+  const [showStudyMode, setShowStudyMode] = useState(false);
   const [showWorkspaceManager, setShowWorkspaceManager] = useState(false);
   const [showAdmin, setShowAdmin] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
@@ -672,6 +674,19 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                     </button>
                   )}
 
+                  {/* Study Mode */}
+                  {flags.study_mode_enabled && activeWorkspaceId && (
+                    <button
+                      onClick={() => { setUserMenuOpen(false); setShowStudyMode(true); }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-emerald-300 hover:bg-emerald-500/10 hover:text-emerald-200 transition"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 shrink-0" fill="currentColor" viewBox="0 0 16 16">
+                        <path d="M8.5 2.687c.654-.689 1.782-.886 3.112-.752 1.234.124 2.503.523 3.388.893v9.923c-.918-.35-2.107-.692-3.287-.81-1.094-.111-2.278-.039-3.213.492zM8 1.783C7.015.936 5.587.81 4.287.94c-1.514.153-3.042.672-3.994 1.105A.5.5 0 0 0 0 2.5v11a.5.5 0 0 0 .707.455c.882-.4 2.303-.881 3.68-1.02 1.409-.142 2.59.087 3.223.877a.5.5 0 0 0 .78 0c.633-.79 1.814-1.019 3.222-.877 1.378.139 2.8.62 3.681 1.02A.5.5 0 0 0 16 13.5v-11a.5.5 0 0 0-.293-.455c-.952-.433-2.48-.952-3.994-1.105C10.413.809 8.985.936 8 1.783"/>
+                      </svg>
+                      Study Mode
+                    </button>
+                  )}
+
                   {/* Admin Panel — only shown to admins */}
                   {user.is_admin && (
                     <button
@@ -1047,6 +1062,13 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
           const note = notes.find((n) => n.id === noteId);
           if (note) handleOpenNote(note);
         }}
+      />
+
+      <StudyModeModal
+        show={showStudyMode}
+        onClose={() => setShowStudyMode(false)}
+        workspaceId={activeWorkspaceId}
+        notes={notes.map(n => ({ id: n.id, title: n.title }))}
       />
 
       {showWorkspaceManager && (

@@ -87,6 +87,14 @@ class ServiceInstaller:
             note_repo=self._domain.get_note_repository(),
         )
 
+    def get_study_service(self):
+        from memolink_backend.business.services.study_service import StudyService
+        return StudyService(
+            note_repo=self._domain.get_note_repository(),
+            conv_repo=self._domain.get_conversation_repository(),
+            db=self._domain.get_db(),
+        )
+
     def get_slash_command_service(self):
         from memolink_backend.business.services.slash_command_service import SlashCommandService
         return SlashCommandService(
