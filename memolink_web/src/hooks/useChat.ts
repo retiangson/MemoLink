@@ -1,6 +1,8 @@
 import { useState, useRef } from "react";
 import { streamChat, streamAgentChat, streamResearch, uploadChat } from "../api/chatApi";
+import { streamCommand } from "../api/commandApi";
 import { createConversation, renameConversation } from "../api/conversationApi";
+import { useTTS } from "./useTTS";
 import type { Conversation, Message } from "../types";
 import { TEMP_ID } from "../types";
 
@@ -14,12 +16,15 @@ interface UseChatDeps {
   workspaceId?: number | null;
   model?: string | null;
   onCloseNote?: (noteId: number) => void;
+  onOpenNote?: (noteId: number) => void;
+  onNoteUpdated?: (noteId: number) => void;
 }
 
-export function useChat({ activeConversation, setActiveConversation, setConversations, bottomRef, workspaceId, model, onCloseNote }: UseChatDeps) {
+export function useChat({ activeConversation, setActiveConversation, setConversations, bottomRef, workspaceId, model, onCloseNote, onOpenNote, onNoteUpdated }: UseChatDeps) {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [streaming, setStreaming] = useState(false);
+  const tts = useTTS();
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [webSearch, setWebSearch] = useState(false);
   const [agentMode, setAgentMode] = useState(false);
@@ -84,16 +89,56 @@ export function useChat({ activeConversation, setActiveConversation, setConversa
         let toolStatus = "";   // tool-call status lines shown above the answer
         let accum = "";
         let firstContent = true;
+        const isSlashCommand = trimmed.startsWith("/");
 
-        const stream = researchMode
-          ? streamResearch(conversationId, trimmed, workspaceId, model)
-          : agentMode
-            ? streamAgentChat(conversationId, trimmed, workspaceId, model)
-            : streamChat(conversationId, trimmed, 5, workspaceId, model, webSearch);
+        const stream = isSlashCommand
+          ? streamCommand(trimmed, conversationId, workspaceId ?? null, model ?? null)
+          : researchMode
+            ? streamResearch(conversationId, trimmed, workspaceId, model)
+            : agentMode
+              ? streamAgentChat(conversationId, trimmed, workspaceId, model)
+              : streamChat(conversationId, trimmed, 5, workspaceId, model, webSearch);
 
         for await (const event of stream) {
           if (event.close_note !== undefined) {
             onCloseNote?.(event.close_note);
+            continue;
+          }
+
+          if (event.open_note !== undefined) {
+            onOpenNote?.(event.open_note);
+            continue;
+          }
+
+          if (event.speak !== undefined) {
+            tts.speak(event.speak);
+            continue;
+          }
+
+          if (event.note_updated !== undefined) {
+            onNoteUpdated?.(event.note_updated);
+            continue;
+          }
+
+          if (event.cmd_running !== undefined) {
+            const content = `__CMD_RUNNING__:${event.cmd_running}`;
+            accum = content;
+            setActiveConversation((prev) => {
+              if (!prev) return prev;
+              return { ...prev, messages: prev.messages.map((m) => m.id === STREAMING_ID ? { ...m, content } : m) };
+            });
+            if (firstContent) { firstContent = false; setLoading(false); setStreaming(true); }
+            continue;
+          }
+
+          if (event.quiz !== undefined) {
+            const quizContent = `__QUIZ__:${JSON.stringify(event.quiz)}`;
+            accum = quizContent;
+            setActiveConversation((prev) => {
+              if (!prev) return prev;
+              return { ...prev, messages: prev.messages.map((m) => m.id === STREAMING_ID ? { ...m, content: quizContent } : m) };
+            });
+            if (firstContent) { firstContent = false; setLoading(false); setStreaming(true); }
             continue;
           }
 
@@ -172,6 +217,7 @@ export function useChat({ activeConversation, setActiveConversation, setConversa
           }
 
           if (event.t) {
+            if (accum.startsWith("__CMD_RUNNING__:")) accum = "";
             accum += event.t;
             const content = toolStatus ? toolStatus + "\n\n" + accum : accum;
             if (firstContent) {
@@ -209,5 +255,6 @@ export function useChat({ activeConversation, setActiveConversation, setConversa
     webSearch, setWebSearch,
     agentMode, setAgentMode,
     researchMode, setResearchMode,
+    tts,
   };
 }

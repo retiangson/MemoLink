@@ -47,6 +47,8 @@ from memolink_backend.api.v1 import (
     research_controller,
     logs_controller,
     s3_upload_controller,
+    user_settings_controller,
+    slash_command_controller,
 )
 
 # Register all models so SQLAlchemy sees them
@@ -59,6 +61,7 @@ import memolink_backend.domain.models.reminder         # noqa: F401
 import memolink_backend.domain.models.workspace        # noqa: F401
 import memolink_backend.domain.models.system_log       # noqa: F401
 import memolink_backend.domain.models.translation_cache # noqa: F401
+import memolink_backend.domain.models.user_api_key      # noqa: F401
 
 if os.getenv("MEMOLINK_SKIP_DB_BOOTSTRAP") != "1":
     with engine.connect() as _conn:
@@ -117,11 +120,15 @@ if os.getenv("MEMOLINK_SKIP_DB_BOOTSTRAP") != "1":
             ("translation_enabled", "true"), ("file_upload_enabled", "true"),
             ("research_mode_enabled", "true"),
             ("model_attribution_enabled", "true"),
+            ("tts_enabled", "true"), ("slash_commands_enabled", "true"),
+            ("custom_api_keys_enabled", "true"), ("video_import_enabled", "true"),
             ("default_model", "gpt-4o-mini"), ("default_language", "English"),
             ("web_search_min_level", "regular"), ("agent_mode_min_level", "regular"),
             ("model_selection_min_level", "regular"), ("image_generation_min_level", "regular"),
             ("translation_min_level", "regular"), ("file_upload_min_level", "regular"),
             ("research_mode_min_level", "regular"), ("model_attribution_min_level", "regular"),
+            ("tts_min_level", "regular"), ("slash_commands_min_level", "regular"),
+            ("custom_api_keys_min_level", "regular"), ("video_import_min_level", "regular"),
         ]:
             _conn.execute(text("INSERT INTO feature_flags (key, value) VALUES (:k, :v) ON CONFLICT (key) DO NOTHING"), {"k": _k, "v": _v})
         # Translation cache table
@@ -140,6 +147,29 @@ if os.getenv("MEMOLINK_SKIP_DB_BOOTSTRAP") != "1":
             )
         """))
         _conn.execute(text("CREATE INDEX IF NOT EXISTS ix_translation_cache_text_hash ON translation_cache(text_hash)"))
+        # User API keys table
+        _conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS user_api_keys (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                provider VARCHAR(100) NOT NULL,
+                encrypted_key TEXT NOT NULL,
+                base_url TEXT,
+                model VARCHAR(100),
+                created_at TIMESTAMPTZ DEFAULT now(),
+                updated_at TIMESTAMPTZ DEFAULT now(),
+                UNIQUE(user_id, provider)
+            )
+        """))
+        _conn.execute(text("ALTER TABLE user_api_keys ADD COLUMN IF NOT EXISTS base_url TEXT"))
+        _conn.execute(text("ALTER TABLE user_api_keys ADD COLUMN IF NOT EXISTS model VARCHAR(100)"))
+        # Slash command undo snapshot columns
+        _conn.execute(text("ALTER TABLE notes ADD COLUMN IF NOT EXISTS undo_title TEXT"))
+        _conn.execute(text("ALTER TABLE notes ADD COLUMN IF NOT EXISTS undo_content TEXT"))
+        _conn.execute(text("ALTER TABLE notes ADD COLUMN IF NOT EXISTS undo_command VARCHAR(50)"))
+        _conn.execute(text("ALTER TABLE notes ADD COLUMN IF NOT EXISTS undo_instruction TEXT"))
+        _conn.execute(text("ALTER TABLE notes ADD COLUMN IF NOT EXISTS undo_created_at TIMESTAMPTZ"))
+        _conn.execute(text("ALTER TABLE notes ADD COLUMN IF NOT EXISTS undo_available BOOLEAN DEFAULT FALSE"))
         # System logs table
         _conn.execute(text("""
             CREATE TABLE IF NOT EXISTS system_logs (
@@ -303,6 +333,8 @@ app.include_router(features_controller.router, prefix="/api")
 app.include_router(research_controller.router, prefix="/api")
 app.include_router(logs_controller.router, prefix="/api")
 app.include_router(s3_upload_controller.router, prefix="/api")
+app.include_router(user_settings_controller.router, prefix="/api")
+app.include_router(slash_command_controller.router, prefix="/api")
 
 # AWS Lambda handler — only active when running inside Lambda
 if os.getenv("AWS_LAMBDA_FUNCTION_NAME"):

@@ -12,6 +12,9 @@ import Color from "@tiptap/extension-color";
 import { TextStyle } from "@tiptap/extension-text-style";
 import Image from "@tiptap/extension-image";
 import { Table, TableRow, TableCell, TableHeader } from "@tiptap/extension-table";
+import { Extension } from "@tiptap/core";
+import { Plugin, PluginKey } from "prosemirror-state";
+import { Decoration, DecorationSet } from "prosemirror-view";
 import { marked } from "marked";
 import "../styles/editor.css";
 
@@ -20,6 +23,7 @@ interface RichNoteEditorProps {
   onChange: (html: string) => void;
   noteKey: string | number;  // changes when a different note is opened
   disabled?: boolean;
+  editorRef?: React.MutableRefObject<any>;
 }
 
 function isHtml(s: string) {
@@ -90,7 +94,26 @@ function Divider() {
   return <span className="w-px h-4 bg-[#2a2a3a] mx-0.5 shrink-0" />;
 }
 
-export function RichNoteEditor({ value, onChange, noteKey, disabled }: RichNoteEditorProps) {
+export const ttsHighlightKey = new PluginKey<{ from: number; to: number } | null>("tts-highlight");
+
+const ttsHighlightPlugin = new Plugin({
+  key: ttsHighlightKey,
+  state: {
+    init: () => null as { from: number; to: number } | null,
+    apply: (tr, old) => tr.getMeta(ttsHighlightKey) ?? old,
+  },
+  props: {
+    decorations(state) {
+      const range = ttsHighlightKey.getState(state);
+      if (!range) return DecorationSet.empty;
+      return DecorationSet.create(state.doc, [
+        Decoration.inline(range.from, range.to, { class: "tts-highlight" }),
+      ]);
+    },
+  },
+});
+
+export function RichNoteEditor({ value, onChange, noteKey, disabled, editorRef }: RichNoteEditorProps) {
   const lastSent = useRef<string>("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -111,6 +134,7 @@ export function RichNoteEditor({ value, onChange, noteKey, disabled }: RichNoteE
       TableRow,
       TableHeader,
       TableCell,
+      Extension.create({ name: "ttsHighlight", addProseMirrorPlugins: () => [ttsHighlightPlugin] }),
     ],
     editorProps: {
       attributes: { class: "tiptap-content" },
@@ -159,6 +183,9 @@ export function RichNoteEditor({ value, onChange, noteKey, disabled }: RichNoteE
       onChange(html);
     },
   });
+
+  // Expose editor instance to parent via ref
+  useEffect(() => { if (editorRef) editorRef.current = editor; }, [editor]);
 
   // Reinitialise when noteKey changes (switching notes)
   useEffect(() => {

@@ -27,6 +27,7 @@ interface MessageListProps {
   onDropFiles: (files: File[]) => void;
   onApplyNoteEdit: (content: string, noteId: number | null) => void;
   onOpenNote?: (noteId: number) => void;
+  onSaveNote?: (title: string, content: string) => void;
   hasOpenNote: boolean;
   translationEnabled?: boolean;
   modelAttributionEnabled?: boolean;
@@ -36,7 +37,7 @@ export function MessageList({
   messages, loading, streaming, activeConversation,
   messagesContainerRef, bottomRef,
   onLoadOlder, onAddToNotes, onDeleteMessage, onDropFiles,
-  onApplyNoteEdit, onOpenNote, hasOpenNote, translationEnabled = true, modelAttributionEnabled = true,
+  onApplyNoteEdit, onOpenNote, onSaveNote, hasOpenNote, translationEnabled = true, modelAttributionEnabled = true,
 }: MessageListProps) {
   return (
     <div
@@ -60,6 +61,7 @@ export function MessageList({
               onDelete={!isStreamingMsg ? () => onDeleteMessage(msg.id, msg.content, idx) : undefined}
               onApplyEdit={!isStreamingMsg && msg.role === "assistant" ? onApplyNoteEdit : undefined}
               onOpenNote={!isStreamingMsg && msg.role === "assistant" ? onOpenNote : undefined}
+              onSaveNote={!isStreamingMsg && msg.role === "assistant" ? onSaveNote : undefined}
               hasOpenNote={hasOpenNote}
               translationEnabled={translationEnabled}
               modelAttributionEnabled={modelAttributionEnabled}

@@ -10,6 +10,10 @@ const DEFAULT_FLAGS: FeatureFlags = {
   file_upload_enabled: true,
   research_mode_enabled: true,
   model_attribution_enabled: true,
+  tts_enabled: true,
+  slash_commands_enabled: true,
+  custom_api_keys_enabled: true,
+  video_import_enabled: true,
   default_model: "gpt-4o-mini",
   default_language: "English",
   web_search_min_level: "regular",
@@ -20,6 +24,10 @@ const DEFAULT_FLAGS: FeatureFlags = {
   file_upload_min_level: "regular",
   research_mode_min_level: "regular",
   model_attribution_min_level: "regular",
+  tts_min_level: "regular",
+  slash_commands_min_level: "regular",
+  custom_api_keys_min_level: "regular",
+  video_import_min_level: "regular",
 };
 
 export function useFeatureFlags() {

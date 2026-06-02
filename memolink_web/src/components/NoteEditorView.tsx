@@ -1,5 +1,6 @@
-import React, { useState } from "react";
-import { RichNoteEditor } from "./RichNoteEditor";
+import React, { useState, useRef, useEffect } from "react";
+import { RichNoteEditor, ttsHighlightKey } from "./RichNoteEditor";
+import { splitSentences } from "../hooks/useTTS";
 import { exportNote, EXPORT_FORMATS } from "../utils/noteExport";
 import type { ExportFormat } from "../utils/noteExport";
 import { VideoImportModal } from "./VideoImportModal";
@@ -17,6 +18,15 @@ interface NoteEditorViewProps {
   isTranscribing: boolean;
   onStartRecording: (source: "mic" | "computer", language: string) => void;
   onStopRecording: () => void;
+  onPlay?: (text: string) => void;
+  ttsPlaying?: boolean;
+  ttsPaused?: boolean;
+  onTtsStop?: () => void;
+  onTtsPauseResume?: () => void;
+  ttsSentenceIdx?: number;
+  ttsSentences?: string[];
+  ttsEnabled?: boolean;
+  videoImportEnabled?: boolean;
 }
 
 const LANGUAGES = [
@@ -43,10 +53,92 @@ export function NoteEditorView({
   noteContentDraft, setNoteContentDraft,
   isNoteDirty, onSave, onDiscard,
   isRecording, isTranscribing, onStartRecording, onStopRecording,
+  onPlay, ttsPlaying, ttsPaused, onTtsStop, onTtsPauseResume,
+  ttsSentenceIdx, ttsSentences,
+  ttsEnabled = true, videoImportEnabled = true,
 }: NoteEditorViewProps) {
   const [showPicker, setShowPicker] = useState(false);
   const [showExport, setShowExport] = useState(false);
   const [showVideoImport, setShowVideoImport] = useState(false);
+  const editorRef = useRef<any>(null);
+  const speakStartDocPos = useRef(0);
+  const speakDocText = useRef("");
+  const speakDocTrimOffset = useRef(0);
+  const speakDocSentenceOffset = useRef(0);
+
+  function handlePlay() {
+    if (!onPlay) return;
+    const editor = editorRef.current;
+    let fromPos = 0;
+    let rawDocText = "";
+    if (editor) {
+      const { from } = editor.state.selection;
+      const doc = editor.state.doc;
+      fromPos = from <= 1 ? 0 : from;
+      rawDocText = doc.textBetween(fromPos, doc.content.size, " ");
+      if (!rawDocText.trim()) { fromPos = 0; rawDocText = doc.textBetween(0, doc.content.size, " "); }
+    } else {
+      rawDocText = noteContentDraft.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
+    }
+    const trimmedDocText = rawDocText.trim();
+    speakStartDocPos.current = fromPos;
+    speakDocTrimOffset.current = rawDocText.length - rawDocText.trimStart().length;
+    speakDocText.current = trimmedDocText;
+    const titlePrefix = noteTitleDraft ? `${noteTitleDraft}. ` : "";
+    if (titlePrefix && trimmedDocText) {
+      const allSents = splitSentences(titlePrefix + trimmedDocText);
+      const docSents = splitSentences(trimmedDocText);
+      speakDocSentenceOffset.current = allSents.length - docSents.length;
+    } else {
+      speakDocSentenceOffset.current = 0;
+    }
+    onPlay(titlePrefix + trimmedDocText);
+  }
+
+  useEffect(() => {
+    const editor = editorRef.current;
+    if (!editor) return;
+    if (ttsSentenceIdx == null || ttsSentenceIdx < 0 || !ttsSentences?.length) {
+      editor.view.dispatch(editor.view.state.tr.setMeta(ttsHighlightKey, null));
+      return;
+    }
+    const docSentenceIdx = ttsSentenceIdx - speakDocSentenceOffset.current;
+    if (docSentenceIdx < 0) return;
+    const docSentences = splitSentences(speakDocText.current);
+    if (docSentenceIdx >= docSentences.length) return;
+
+    let searchFrom = 0;
+    let sentenceStart = -1;
+    for (let i = 0; i <= docSentenceIdx; i++) {
+      const idx = speakDocText.current.indexOf(docSentences[i], searchFrom);
+      if (idx === -1) return;
+      if (i === docSentenceIdx) sentenceStart = idx;
+      searchFrom = idx + docSentences[i].length;
+    }
+    if (sentenceStart < 0) return;
+    const sentenceEnd = sentenceStart + docSentences[docSentenceIdx].length;
+    const trimOffset = speakDocTrimOffset.current;
+
+    const charToDoc: number[] = [];
+    let separated = true;
+    const startDocPos = speakStartDocPos.current;
+    editor.state.doc.nodesBetween(startDocPos, editor.state.doc.content.size, (node: any, pos: number) => {
+      if (node.isText) {
+        const text: string = node.text;
+        const textStart = Math.max(startDocPos, pos) - pos;
+        for (let i = textStart; i < text.length; i++) charToDoc.push(pos + i);
+        separated = false;
+      } else if (!node.isLeaf) {
+        if (!separated) { charToDoc.push(pos); separated = true; }
+      }
+    });
+
+    const from = charToDoc[sentenceStart + trimOffset];
+    const toChar = charToDoc[sentenceEnd - 1 + trimOffset];
+    if (from == null) return;
+    const to = (toChar ?? from) + 1;
+    editor.view.dispatch(editor.view.state.tr.setMeta(ttsHighlightKey, { from, to }));
+  }, [ttsSentenceIdx, ttsSentences]);
   const [language, setLanguage] = useState("");
   const [exporting, setExporting] = useState<ExportFormat | null>(null);
   const [activeTab, setActiveTab] = useState<"editor" | "source">("editor");
@@ -104,6 +196,7 @@ export function NoteEditorView({
           noteKey={noteKey}
           value={noteContentDraft}
           onChange={(html) => setNoteContentDraft(html)}
+          editorRef={editorRef}
         />
       </div>
 
@@ -226,7 +319,7 @@ export function NoteEditorView({
         </div>
 
         {/* Video Import */}
-        <button
+        {videoImportEnabled && <button
           onClick={() => setShowVideoImport(true)}
           title="Import from video URL"
           className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs text-gray-500 hover:text-red-400 hover:bg-red-400/10 border border-transparent hover:border-red-400/20 transition shrink-0"
@@ -236,7 +329,47 @@ export function NoteEditorView({
             <path d="M0 4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2zm2-1a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V4a1 1 0 0 0-1-1z"/>
           </svg>
           Video
-        </button>
+        </button>}
+
+        {/* TTS play / stop */}
+        {ttsEnabled && onPlay && (
+          ttsPlaying ? (
+            <div className="flex items-center gap-1 shrink-0">
+              <button
+                onClick={onTtsPauseResume}
+                title={ttsPaused ? "Resume" : "Pause"}
+                className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs text-indigo-400 bg-indigo-400/10 border border-indigo-400/20 hover:bg-indigo-400/20 transition"
+              >
+                {ttsPaused ? (
+                  <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                ) : (
+                  <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+                )}
+                {ttsPaused ? "Resume" : "Pause"}
+              </button>
+              <button
+                onClick={onTtsStop}
+                title="Stop reading"
+                className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs text-red-400 bg-red-400/10 border border-red-400/20 hover:bg-red-400/20 transition"
+              >
+                <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 24 24"><path d="M6 6h12v12H6z"/></svg>
+                Stop
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={handlePlay}
+              disabled={!noteContentDraft.trim()}
+              title="Read note aloud from cursor position"
+              className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs text-gray-500 hover:text-indigo-400 hover:bg-indigo-400/10 border border-transparent hover:border-indigo-400/20 disabled:opacity-30 transition shrink-0"
+            >
+              <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M8 5v14l11-7z"/>
+              </svg>
+              Read
+            </button>
+          )
+        )}
 
         <span className="flex-1 text-center text-xs truncate px-1 italic">
           {isTranscribing

@@ -1,5 +1,5 @@
 import axios from "axios";
-import { getToken } from "../utils/auth";
+import { getToken, getUser, logout } from "../utils/auth";
 
 export const API_BASE = (import.meta.env.VITE_API_BASE_URL as string)?.replace(/\/$/, "") ?? "";
 
@@ -10,6 +10,21 @@ api.interceptors.request.use((config) => {
   if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
+
+// Auto-logout when a stored session token is rejected by the backend.
+// Skips auth endpoints (wrong-password 401 should not log you out).
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const is401 = error?.response?.status === 401;
+    const isAuthRoute = error?.config?.url?.includes("/auth/");
+    if (is401 && !isAuthRoute && getUser()) {
+      logout();
+      window.location.reload();
+    }
+    return Promise.reject(error);
+  }
+);
 
 // Notes
 export async function createNote(title: string | null, content: string, source: string | null = null, workspace_id?: number | null) {

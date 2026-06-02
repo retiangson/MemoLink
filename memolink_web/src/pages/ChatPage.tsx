@@ -18,6 +18,7 @@ import { DeleteModal } from "../components/DeleteModal";
 import { SettingsModal } from "../components/SettingsModal";
 import { HelpModal } from "../components/HelpModal";
 import { FeedbackModal } from "../components/FeedbackModal";
+import { TTSPlayerBar } from "../components/TTSPlayerBar";
 import { WorkspaceManagerModal } from "../components/WorkspaceManagerModal";
 import { useSuggestions } from "../hooks/useSuggestions";
 import { useReminderNotifications } from "../hooks/useReminderNotifications";
@@ -109,6 +110,22 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
     editor.setNoteContentDraft((prev) => prev ? prev + `<p>${text}</p>` : `<p>${text}</p>`);
   });
   const convs = useConversations(activeWorkspaceId);
+  async function handleNoteUpdated(noteId: number) {
+    try {
+      const fresh = await getNote(noteId);
+      setNotes((p) => p.map((n) => n.id === noteId ? fresh : n));
+      editor.syncNoteById(noteId, fresh);
+    } catch {}
+  }
+
+  async function handleOpenNote(noteId: number) {
+    try {
+      const note = notes.find((n) => n.id === noteId) ?? await getNote(noteId);
+      await editor.openNote(note);
+      setActiveTabType("note");
+    } catch {}
+  }
+
   const chat = useChat({
     activeConversation: convs.activeConversation,
     setActiveConversation: convs.setActiveConversation,
@@ -117,6 +134,8 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
     workspaceId: activeWorkspaceId,
     model: selectedModel,
     onCloseNote: editor.closeNoteById,
+    onNoteUpdated: handleNoteUpdated,
+    onOpenNote: handleOpenNote,
   });
 
   useEffect(() => {
@@ -669,6 +688,15 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                 isTranscribing={recording.isTranscribing}
                 onStartRecording={(src, lang) => recording.startRecording(src, lang)}
                 onStopRecording={recording.stopRecording}
+                onPlay={chat.tts.speak}
+                ttsPlaying={chat.tts.playing}
+                ttsPaused={chat.tts.paused}
+                onTtsStop={chat.tts.stop}
+                onTtsPauseResume={chat.tts.paused ? chat.tts.resume : chat.tts.pause}
+                ttsSentenceIdx={chat.tts.currentSentenceIdx}
+                ttsSentences={chat.tts.sentencesList}
+                ttsEnabled={flags.tts_enabled}
+                videoImportEnabled={flags.video_import_enabled}
               />
             </main>
           ) : (
@@ -688,12 +716,27 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                     onDropFiles={(files) => chat.setPendingFiles((p) => [...p, ...files])}
                     onApplyNoteEdit={handleApplyNoteEdit}
                     onOpenNote={handleOpenNoteById}
+                    onSaveNote={(title, content) => addNote(title, content)}
                     hasOpenNote={isNoteActive}
                     translationEnabled={flags.translation_enabled}
                     modelAttributionEnabled={modelAttributionEnabled}
                   />
                 </div>
               </main>
+              {chat.tts.playing && (
+                <TTSPlayerBar
+                  paused={chat.tts.paused}
+                  rate={chat.tts.rate}
+                  voices={chat.tts.voices}
+                  selectedVoice={chat.tts.selectedVoice}
+                  onPauseResume={chat.tts.paused ? chat.tts.resume : chat.tts.pause}
+                  onStop={chat.tts.stop}
+                  onBack={chat.tts.back}
+                  onForward={chat.tts.forward}
+                  onRateChange={chat.tts.setRate}
+                  onVoiceChange={chat.tts.setSelectedVoice}
+                />
+              )}
               <ChatInput
                 input={chat.input}
                 setInput={chat.setInput}
@@ -711,6 +754,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                 researchMode={chat.researchMode}
                 onToggleResearchMode={() => chat.setResearchMode((v) => !v)}
                 flags={flags}
+                notes={notes}
               />
             </>
           )
@@ -768,12 +812,28 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                       onDeleteMessage={(id, content, index) => { setDeleteTarget({ id, content, index }); setShowDeleteModal(true); }}
                       onDropFiles={(files) => chat.setPendingFiles((p) => [...p, ...files])}
                       onApplyNoteEdit={handleApplyNoteEdit}
+                      onSaveNote={(title, content) => addNote(title, content)}
                       hasOpenNote={editor.openNotes.length > 0}
                       translationEnabled={flags.translation_enabled}
                       modelAttributionEnabled={modelAttributionEnabled}
                     />
                   </div>
                 </main>
+                {chat.speaking && (
+                  <div className="flex justify-center pb-1">
+                    <button
+                      onClick={chat.stopSpeaking}
+                      className="flex items-center gap-2 px-3 py-1.5 bg-indigo-500/15 border border-indigo-500/30 rounded-full text-xs text-indigo-300 hover:bg-indigo-500/25 transition"
+                    >
+                      <span className="flex gap-[3px] items-end h-3.5">
+                        {[0,1,2].map(i => (
+                          <span key={i} className="w-[3px] bg-indigo-400 rounded-full animate-pulse" style={{height:`${8+i*3}px`,animationDelay:`${i*0.15}s`}} />
+                        ))}
+                      </span>
+                      Reading aloud — click to stop
+                    </button>
+                  </div>
+                )}
                 <ChatInput
                   input={chat.input}
                   setInput={chat.setInput}
@@ -791,6 +851,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                   researchMode={chat.researchMode}
                   onToggleResearchMode={() => chat.setResearchMode((v) => !v)}
                   flags={flags}
+                  notes={notes}
                 />
               </div>
             }
@@ -844,6 +905,15 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                       isTranscribing={recording.isTranscribing}
                       onStartRecording={(src, lang) => recording.startRecording(src, lang)}
                       onStopRecording={recording.stopRecording}
+                      onPlay={chat.tts.speak}
+                      ttsPlaying={chat.tts.playing}
+                      ttsPaused={chat.tts.paused}
+                      onTtsStop={chat.tts.stop}
+                      onTtsPauseResume={chat.tts.paused ? chat.tts.resume : chat.tts.pause}
+                      ttsSentenceIdx={chat.tts.currentSentenceIdx}
+                      ttsSentences={chat.tts.sentencesList}
+                      ttsEnabled={flags.tts_enabled}
+                      videoImportEnabled={flags.video_import_enabled}
                     />
                   </main>
                 ) : (
@@ -903,7 +973,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
         />
       )}
 
-      <SettingsModal show={showSettings} user={user} onClose={() => setShowSettings(false)} selectedModel={selectedModel} onModelChange={handleModelChange} modelSelectionEnabled={flags.model_selection_enabled} />
+      <SettingsModal show={showSettings} user={user} onClose={() => setShowSettings(false)} selectedModel={selectedModel} onModelChange={handleModelChange} modelSelectionEnabled={flags.model_selection_enabled} customApiKeysEnabled={flags.custom_api_keys_enabled} ttsEnabled={flags.tts_enabled} />
       <HelpModal show={showHelp} onClose={() => setShowHelp(false)} />
       <FeedbackModal show={showFeedback} onClose={() => setShowFeedback(false)} />
 

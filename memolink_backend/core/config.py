@@ -30,6 +30,8 @@ class Settings(BaseSettings):
     smtp_from: str = ""
     frontend_url: str = "http://localhost:5173"
 
+    encryption_key: str = ""
+
     aws_access_key_id: str = ""       # Optional — Lambda uses IAM role automatically
     aws_secret_access_key: str = ""   # Optional — Lambda uses IAM role automatically
     aws_session_token: str = ""       # Required when using STS temporary credentials explicitly

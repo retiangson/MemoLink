@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from typing import List, Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import text, func
@@ -80,6 +81,30 @@ class NoteRepository:
         self.db.delete(note)
         self.db.commit()
         return True
+
+    def save_undo_snapshot(self, note_id: int, title: str | None, content: str, command: str, instruction: str | None) -> None:
+        note = self.get_by_id(note_id)
+        if not note:
+            return
+        note.undo_title = title
+        note.undo_content = content
+        note.undo_command = command
+        note.undo_instruction = instruction
+        note.undo_created_at = datetime.now(timezone.utc)
+        note.undo_available = True
+        self.db.commit()
+
+    def clear_undo_snapshot(self, note_id: int) -> None:
+        note = self.get_by_id(note_id)
+        if not note:
+            return
+        note.undo_title = None
+        note.undo_content = None
+        note.undo_command = None
+        note.undo_instruction = None
+        note.undo_created_at = None
+        note.undo_available = False
+        self.db.commit()
 
     def find_by_title_for_user(self, user_id: int, name: str, workspace_id: int | None = None) -> Optional[Note]:
         """Fuzzy title search: exact → starts-with → contains."""

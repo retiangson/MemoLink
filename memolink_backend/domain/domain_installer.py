@@ -10,6 +10,7 @@ from memolink_backend.domain.repositories.note_repository import NoteRepository
 from memolink_backend.domain.repositories.conversation_repository import ConversationRepository
 from memolink_backend.domain.repositories.system_log_repository import SystemLogRepository
 from memolink_backend.domain.repositories.translation_cache_repository import TranslationCacheRepository
+from memolink_backend.domain.repositories.user_api_key_repository import UserApiKeyRepository
 from memolink_backend.business.services.embedding_service import EmbeddingService
 
 
@@ -37,3 +38,6 @@ class DomainInstaller:
 
     def get_translation_cache_repository(self) -> TranslationCacheRepository:
         return TranslationCacheRepository(self._db)
+
+    def get_user_api_key_repository(self) -> UserApiKeyRepository:
+        return UserApiKeyRepository(self._db)

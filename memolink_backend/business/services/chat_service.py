@@ -49,7 +49,12 @@ _PROVIDER_FALLBACK = {
 }
 
 
-def _get_client(model: str) -> OpenAI:
+def _get_client(model: str, user_keys: dict | None = None) -> OpenAI:
+    """Build an OpenAI-compatible client. User's custom provider takes priority over server keys."""
+    keys = user_keys or {}
+    if model in keys:
+        cfg = keys[model]
+        return OpenAI(api_key=cfg["key"], base_url=cfg.get("base_url") or None)
     if model in _GEMINI_MODELS:
         return OpenAI(api_key=settings.gemini_api_key, base_url=_GEMINI_BASE_URL)
     if model in _DEEPSEEK_MODELS:
@@ -83,11 +88,22 @@ def _extract_improve_note_name(text: str) -> str | None:
     return None
 
 
-def _build_fallback_chain(primary: str) -> list[str]:
-    """Return ordered list of models to try, starting with primary, then other available providers."""
+def _build_fallback_chain(primary: str, user_keys: dict | None = None) -> list[str]:
+    """Return ordered list of models to try:
+    1. Primary (selected model)
+    2. User's other configured custom models
+    3. Server-configured providers
+    4. Server default (always last resort)
+    """
+    keys = user_keys or {}
     chain = [primary]
+    # User's other custom model IDs (try user keys before server keys)
+    for m in keys:
+        if m not in chain:
+            chain.append(m)
+    # Server-configured fallbacks
     candidates = [
-        settings.openai_chat_model,                                           # GPT — always available
+        settings.openai_chat_model,
         "gemini-2.0-flash" if settings.gemini_api_key else None,
         "deepseek-chat"    if settings.deepseek_api_key else None,
     ]
@@ -257,6 +273,7 @@ class ChatService(IChatService):
         conv_repo: Optional[IConversationRepository] = None,
         note_repo: Optional[INoteRepository] = None,
         log_service=None,
+        user_api_key_repo=None,
     ):
         if conv_repo is not None and note_repo is not None:
             self.repo_conv: IConversationRepository = conv_repo
@@ -269,6 +286,7 @@ class ChatService(IChatService):
 
         self.embedding = embedding_service or EmbeddingService()
         self._log = log_service
+        self._user_api_key_repo = user_api_key_repo
 
     def _syslog(self, level: str, message: str, details: dict, user_id: int | None = None):
         if self._log is None:
@@ -277,6 +295,14 @@ class ChatService(IChatService):
             getattr(self._log, level.lower())("chat", message, details, user_id)
         except Exception:
             pass
+
+    def _resolve_user_keys(self, user_id: int | None) -> dict:
+        if not user_id or not self._user_api_key_repo:
+            return {}
+        try:
+            return self._user_api_key_repo.get_all_decrypted(user_id)
+        except Exception:
+            return {}
 
     def _build_chat_context(self, dto: ChatRequestDTO):
         """Prepare conversation id, OpenAI messages list, and sources for a chat request."""
@@ -364,11 +390,12 @@ class ChatService(IChatService):
             {"role": "user", "content": f"Note title: {note.title}\n\nContent:\n{plain[:5000]}"},
         ]
 
+        user_keys = self._resolve_user_keys(dto.user_id)
         chain = _build_fallback_chain(dto.model or settings.openai_chat_model)
         improved_html: str | None = None
         for attempt in chain:
             try:
-                completion = _get_client(attempt).chat.completions.create(
+                completion = _get_client(attempt, user_keys).chat.completions.create(
                     model=attempt, messages=improve_messages,
                 )
                 improved_html = (completion.choices[0].message.content or "").strip()
@@ -404,6 +431,7 @@ class ChatService(IChatService):
             return ChatResponseDTO(answer="I didn't receive any message.", sources=[])
 
         model = dto.model or settings.openai_chat_model
+        user_keys = self._resolve_user_keys(dto.user_id)
         conversation_id, messages, sources = self._build_chat_context(dto)
 
         if _is_image_request(user_text):
@@ -423,7 +451,7 @@ class ChatService(IChatService):
 
         for attempt in chain:
             try:
-                completion = _get_client(attempt).chat.completions.create(
+                completion = _get_client(attempt, user_keys).chat.completions.create(
                     model=attempt,
                     messages=messages,
                 )
@@ -456,6 +484,7 @@ class ChatService(IChatService):
             return
 
         model = dto.model or settings.openai_chat_model
+        user_keys = self._resolve_user_keys(dto.user_id)
         conversation_id, messages, _ = self._build_chat_context(dto)
 
         note_name = _extract_improve_note_name(user_text)
@@ -472,7 +501,6 @@ class ChatService(IChatService):
                 answer = f"![Generated image]({data_url})\n\n*{revised}*"
             except Exception as exc:
                 answer = f"⚠ Image generation failed: {exc}"
-            # Replace the loading text with the final image content
             yield f"data: {json.dumps({'replace': answer})}\n\n"
             assistant_msg = self.repo_conv.add_message(conversation_id, "assistant", answer, model=img_model)
             yield f"data: {json.dumps({'done': True, 'id': assistant_msg.id, 'model': img_model})}\n\n"
@@ -486,7 +514,7 @@ class ChatService(IChatService):
 
         for attempt in chain:
             try:
-                stream = _get_client(attempt).chat.completions.create(
+                stream = _get_client(attempt, user_keys).chat.completions.create(
                     model=attempt,
                     messages=messages,
                     stream=True,
