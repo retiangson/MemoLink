@@ -47,6 +47,9 @@ class RequestContainer:
     def study(self):
         return self.services.get_study_service()
 
+    def workflow(self):
+        return self.services.get_workflow_service()
+
     def timeline(self):
         return self.services.get_timeline_service()
 

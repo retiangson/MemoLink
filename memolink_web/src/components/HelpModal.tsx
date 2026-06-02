@@ -28,6 +28,7 @@ const NAV: Section[] = [
   { id: "proactive",  label: "Proactive Insights", icon: <path d="M2 6a6 6 0 1 1 10.174 4.31c-.203.196-.359.4-.453.619l-.762 1.769A.5.5 0 0 1 10.5 13a.5.5 0 0 1 0 1 .5.5 0 0 1 0 1l-.224.447a1 1 0 0 1-.894.553H6.618a1 1 0 0 1-.894-.553L5.5 15a.5.5 0 0 1 0-1 .5.5 0 0 1 0-1 .5.5 0 0 1-.46-.302l-.761-1.77a2 2 0 0 0-.453-.618A5.98 5.98 0 0 1 2 6m6-5a5 5 0 0 0-3.479 8.592c.263.254.514.564.676.941L5.83 12h4.342l.632-1.467c.162-.377.413-.687.676-.941A5 5 0 0 0 8 1"/> },
   { id: "confidence", label: "Answer Confidence",  icon: <path d="M5.072.56C6.157.265 7.31 0 8 0s1.843.265 2.928.56c1.11.3 2.229.655 2.887.87a1.54 1.54 0 0 1 1.044 1.262c.596 4.477-.787 7.795-2.465 9.99a11.8 11.8 0 0 1-2.517 2.453 7 7 0 0 1-1.048.625c-.28.132-.581.24-.829.24s-.548-.108-.829-.24a7 7 0 0 1-1.048-.625 11.8 11.8 0 0 1-2.517-2.453C1.928 10.487.545 7.169 1.141 2.692A1.54 1.54 0 0 1 2.185 1.43 63 63 0 0 1 5.072.56"/> },
   { id: "autopilot",  label: "AutoPilot Routing",  icon: <path d="M11.251.068a.5.5 0 0 1 .227.58L9.677 6.5H13a.5.5 0 0 1 .364.843l-8 8.5a.5.5 0 0 1-.842-.49L6.323 9.5H3a.5.5 0 0 1-.364-.843l8-8.5a.5.5 0 0 1 .615-.09z"/> },
+  { id: "timeline",   label: "Lecture Timeline",   icon: <><path d="M8 3.5a.5.5 0 0 0-1 0V9a.5.5 0 0 0 .252.434l3.5 2a.5.5 0 0 0 .496-.868L8 8.71z"/><path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16m7-8A7 7 0 1 1 1 8a7 7 0 0 1 14 0"/></> },
   { id: "tips",       label: "Tips & Shortcuts",  icon: <path d="M2 2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v13.5a.5.5 0 0 1-.777.416L8 13.101l-5.223 2.815A.5.5 0 0 1 2 15.5zm2-1a1 1 0 0 0-1 1v12.566l4.723-2.482a.5.5 0 0 1 .554 0L13 14.566V2a1 1 0 0 0-1-1z"/> },
 ];
 
@@ -51,6 +52,7 @@ const CONTENT: Record<string, React.ReactNode> = {
           { label: "Proactive Insights", desc: "AI scans notes to surface missed deadlines, action items, and urgency signals" },
           { label: "Answer Confidence", desc: "HIGH / MEDIUM / LOW confidence badge on every AI response" },
           { label: "AutoPilot Routing", desc: "Automatically selects the best AI model based on your question's intent" },
+          { label: "Lecture Timeline", desc: "Timestamped chapters, action items, and key moments for any transcript note" },
           { label: "Custom API Keys", desc: "Use your own OpenAI, Gemini, or any compatible key" },
         ].map((f) => (
           <div key={f.label} className="bg-[#12121a] border border-[#2a2a38] rounded-xl p-3">
@@ -605,6 +607,55 @@ const CONTENT: Record<string, React.ReactNode> = {
     </div>
   ),
 
+  timeline: (
+    <div className="space-y-4 text-sm text-gray-400 leading-relaxed">
+      <p>Open any note that was created from an audio or video recording and click the <span className="text-white font-medium">⏱ Timeline</span> tab (next to Editor | Source). One AI call analyses the full transcript and returns a structured timeline.</p>
+
+      <div className="space-y-3">
+        {[
+          {
+            title: "Generate / Regenerate",
+            desc: "Click Generate Timeline to run the analysis (one GPT call). Results are cached — switching to the Timeline tab later is instant. Click Regenerate any time to refresh after editing the note.",
+          },
+          {
+            title: "Chapters",
+            desc: "Major topic sections with timestamps — e.g. 00:03:12 Assessment requirement explained. Timestamps are estimated from word position at 130 wpm (average lecture speaking rate), accurate to ±30–90 seconds.",
+          },
+          {
+            title: "Action Items",
+            desc: "Detected tasks, assignments, and follow-ups with the person responsible (if mentioned). Each item carries a timestamp showing roughly when it was said.",
+          },
+          {
+            title: "Important Moments",
+            desc: "Key statements tagged by type: ⚖️ Decision · ⚠️ Warning · 💡 Key Point · ⏰ Deadline · ❓ Question. Shown as near-exact quotes from the transcript.",
+          },
+          {
+            title: "Jump → to section",
+            desc: "Every chapter, action item, and moment has a Jump → button. Clicking it switches to the Editor tab, finds the exact phrase in the transcript, highlights it, and scrolls to it — no manual searching through thousands of words.",
+          },
+        ].map((t) => (
+          <div key={t.title}>
+            <p className="text-xs font-semibold text-indigo-300 mb-1">{t.title}</p>
+            <p>{t.desc}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="bg-amber-500/5 border border-amber-500/20 rounded-xl p-3">
+        <p className="text-xs font-semibold text-amber-400 mb-1.5">Works best with</p>
+        <ul className="space-y-1">
+          {[
+            "Lecture recordings imported via the Video Import modal (YouTube URL or uploaded file)",
+            "Voice memos recorded directly in MemoLink with the microphone button",
+            "Meeting recordings uploaded as MP4, M4A, WebM, MOV, MP3, or WAV",
+          ].map((t, i) => (
+            <li key={i} className="flex gap-2 text-[11px] text-gray-400"><span className="text-amber-500 shrink-0 mt-0.5">•</span><span>{t}</span></li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  ),
+
   tips: (
     <div className="space-y-3 text-sm text-gray-400 leading-relaxed">
       <ul className="space-y-2">
@@ -633,6 +684,9 @@ const CONTENT: Record<string, React.ReactNode> = {
           "The Answer Confidence badge tells you how grounded each AI reply is. UNSUPPORTED means the topic isn't in your notes — try uploading a relevant document first.",
           "AutoPilot automatically routes coding questions to DeepSeek Coder — just mention any language name (Python, Go, Rust, SQL…) in your message.",
           "AutoPilot routes research and analysis questions to GPT-4o. For quick factual questions it stays on the default fast model. The violet ⚡ chip shows when a routing decision was made.",
+          "Open the Timeline tab on any lecture or meeting transcript note to get chapters, action items, and key moments with timestamps — no manual note-taking needed.",
+          "The Jump → button in the Timeline tab finds the exact phrase in the transcript and scrolls the editor to it — useful for long recordings where scrolling manually would take too long.",
+          "Timeline results are cached — clicking Regenerate re-runs the AI analysis after you've edited or improved the transcript note.",
         ].map((item, i) => (
           <li key={i} className="flex gap-2"><span className="text-indigo-500 shrink-0 mt-0.5">•</span><span>{item}</span></li>
         ))}

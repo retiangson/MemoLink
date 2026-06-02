@@ -20,6 +20,8 @@ interface ChatInputProps {
   onToggleWebSearch: () => void;
   agentMode: boolean;
   onToggleAgentMode: () => void;
+  workflowMode: boolean;
+  onToggleWorkflowMode: () => void;
   researchMode: boolean;
   onToggleResearchMode: () => void;
   flags?: {
@@ -28,6 +30,7 @@ interface ChatInputProps {
     file_upload_enabled: boolean;
     research_mode_enabled: boolean;
     slash_commands_enabled: boolean;
+    workflow_enabled?: boolean;
   };
   notes?: Note[];
 }
@@ -37,7 +40,7 @@ const ALL_SUPPORT = new Set(["improve","enhance","summarize","quiz","discussion"
 export function ChatInput({
   input, setInput, loading, pendingFiles, setPendingFiles,
   textareaRef, attachmentInputRef, onSend, autoResize,
-  webSearch, onToggleWebSearch, agentMode, onToggleAgentMode, researchMode, onToggleResearchMode, flags, notes = [],
+  webSearch, onToggleWebSearch, agentMode, onToggleAgentMode, workflowMode, onToggleWorkflowMode, researchMode, onToggleResearchMode, flags, notes = [],
 }: ChatInputProps) {
   const [showLangPicker, setShowLangPicker] = useState(false);
   const [slashPickerIndex, setSlashPickerIndex] = useState(0);

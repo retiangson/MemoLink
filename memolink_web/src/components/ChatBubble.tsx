@@ -4,6 +4,8 @@ import MarkdownRenderer from "./MarkdownRenderer";
 import { translateText } from "../api/chatApi";
 import { MODELS } from "../constants/models";
 import { QuizRenderer } from "./QuizRenderer";
+import { WorkflowApprovalCard } from "./WorkflowApprovalCard";
+import { WorkflowActionBar } from "./WorkflowActionBar";
 import "highlight.js/styles/github-dark.css";
 import "../styles/markdown.css";
 
@@ -131,6 +133,9 @@ interface Props {
   confidenceEnabled?: boolean;
   routingReason?: string;
   autopilotEnabled?: boolean;
+  workflowContext?: { conversationId: number; workspaceId: number | null; model: string | null };
+  workflowActions?: { id: string; type: string; label: string; preview: string; params: Record<string, unknown> }[];
+  onWorkflowActionDone?: (type: string) => void;
 }
 
 const TRANSLATE_LANGUAGES = [
@@ -179,7 +184,7 @@ function ImageGeneratingSpinner() {
   );
 }
 
-export default function ChatBubble({ role, content, model, streaming, onAdd, onDelete, onApplyEdit, onOpenNote, onSaveNote, hasOpenNote, translationEnabled = true, modelAttributionEnabled = true, confidence, confidenceReason, confidenceEnabled = true, routingReason, autopilotEnabled = true }: Props) {
+export default function ChatBubble({ role, content, model, streaming, onAdd, onDelete, onApplyEdit, onOpenNote, onSaveNote, hasOpenNote, translationEnabled = true, modelAttributionEnabled = true, confidence, confidenceReason, confidenceEnabled = true, routingReason, autopilotEnabled = true, workflowContext, workflowActions, onWorkflowActionDone }: Props) {
   const isUser = role === "user";
   const [copied, setCopied] = useState(false);
   const [showLangPicker, setShowLangPicker] = useState(false);
@@ -197,9 +202,11 @@ export default function ChatBubble({ role, content, model, streaming, onAdd, onD
   const improvingNoteTitle = isImprovingNote ? content.slice("__IMPROVING_NOTE__:".length) : "";
   const isQuiz = content.startsWith("__QUIZ__:");
   const quizData = isQuiz ? (() => { try { return JSON.parse(content.slice("__QUIZ__:".length)); } catch { return null; } })() : null;
+  const isWorkflowPlan = content.startsWith("__WORKFLOW_PLAN__:");
+  const workflowPlanData = isWorkflowPlan ? (() => { try { return JSON.parse(content.slice("__WORKFLOW_PLAN__:".length)); } catch { return null; } })() : null;
   const isCmdRunning = content.startsWith("__CMD_RUNNING__:");
   const cmdRunningMsg = isCmdRunning ? content.slice("__CMD_RUNNING__:".length) : "";
-  const { pre, edit, noteId, post } = (isImageGenerating || isImprovingNote || isQuiz || isCmdRunning) ? { pre: "", edit: null, noteId: null, post: "" } : parseNoteEdit(content);
+  const { pre, edit, noteId, post } = (isImageGenerating || isImprovingNote || isQuiz || isWorkflowPlan || isCmdRunning) ? { pre: "", edit: null, noteId: null, post: "" } : parseNoteEdit(content);
 
   async function handleCopy() {
     const textToCopy = translation ?? content;
@@ -288,7 +295,15 @@ export default function ChatBubble({ role, content, model, streaming, onAdd, onD
         className={`max-w-[740px] px-5 py-4 rounded-2xl text-[16px] leading-relaxed backdrop-blur-sm shadow-sm
           ${isUser ? "bg-[#2F2F3F]/80 text-gray-100" : "text-white"}`}
       >
-        {isQuiz && quizData ? (
+        {isWorkflowPlan && workflowPlanData && workflowContext ? (
+          <WorkflowApprovalCard
+            understanding={workflowPlanData.understanding ?? ""}
+            actions={workflowPlanData.actions ?? []}
+            conversationId={workflowContext.conversationId}
+            workspaceId={workflowContext.workspaceId}
+            model={workflowContext.model}
+          />
+        ) : isQuiz && quizData ? (
           <QuizRenderer quiz={quizData} onSaveNote={onSaveNote} />
         ) : isCmdRunning ? (
           <div className="flex items-center gap-3 py-1">
@@ -529,6 +544,15 @@ export default function ChatBubble({ role, content, model, streaming, onAdd, onD
               );
             })()}
           </div>
+        )}
+        {/* Workflow action buttons — appear below AI message when suggestions are ready */}
+        {!streaming && workflowActions && workflowActions.length > 0 && workflowContext && (
+          <WorkflowActionBar
+            actions={workflowActions}
+            conversationId={workflowContext.conversationId}
+            workspaceId={workflowContext.workspaceId}
+            onActionDone={onWorkflowActionDone}
+          />
         )}
         </div>
       )}

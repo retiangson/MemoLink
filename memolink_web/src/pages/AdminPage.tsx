@@ -446,6 +446,7 @@ export function AdminPage({ onClose, currentUserId }: Props) {
                     { key: "autopilot_enabled", label: "AutoPilot Routing", desc: "Automatically select the best AI model based on the user's intent" },
                     { key: "study_mode_enabled", label: "Study Mode", desc: "Enable AI Study Mode — flashcards, exam review, study plans, weak topic detection, and summaries" },
                     { key: "timeline_enabled", label: "Meeting/Lecture Timeline", desc: "Show Timeline tab in note editor — chapters, action items, and important moments with timestamps" },
+                    { key: "workflow_enabled", label: "Workflow Agent", desc: "Enable Workflow mode — AI proposes actions for user approval before executing" },
                   ] as { key: keyof FeatureFlags; label: string; desc: string }[]).map(({ key, label, desc }) => (
                     <div key={key} className="flex items-center justify-between px-4 py-3.5 bg-[#1a1a24] border border-[#2a2a38] rounded-xl">
                       <div>

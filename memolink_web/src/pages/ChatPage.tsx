@@ -32,6 +32,7 @@ import { useFeatureFlags } from "../hooks/useFeatureFlags";
 import { fetchAdminFeedback } from "../api/adminApi";
 import { getEmailStatus, autoProcessEmails } from "../api/emailApi";
 import { AdminPage } from "./AdminPage";
+import { suggestActions, type WorkflowAction } from "../api/workflowApi";
 
 type WorkspaceHook = ReturnType<typeof useWorkspace>;
 type LayoutMode = "stacked" | "columns" | "rows";
@@ -61,6 +62,8 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
   const [showHelp, setShowHelp] = useState(false);
   const [showMemoGraph, setShowMemoGraph] = useState(false);
   const [showStudyMode, setShowStudyMode] = useState(false);
+  const [workflowSuggestions, setWorkflowSuggestions] = useState<Record<number, WorkflowAction[]>>({});
+  const prevStreamingRef = useRef(false);
   const [showWorkspaceManager, setShowWorkspaceManager] = useState(false);
   const [showAdmin, setShowAdmin] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
@@ -207,6 +210,39 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
     window.addEventListener("click", close);
     return () => window.removeEventListener("click", close);
   }, []);
+
+  // ── Auto-suggest workflow actions after each AI response ─────────────────
+  useEffect(() => {
+    const wasStreaming = prevStreamingRef.current;
+    prevStreamingRef.current = chat.streaming;
+
+    if (!wasStreaming || chat.streaming) return;           // only on streaming → false transition
+    if (!flags.workflow_enabled) return;
+    if (localStorage.getItem("memolink_workflow_suggestions") === "false") return;
+
+    const messages = convs.activeConversation?.messages;
+    if (!messages?.length) return;
+
+    // Find the last assistant message that was just finalized
+    const last = messages[messages.length - 1];
+    if (!last || last.role !== "assistant") return;
+    if (last.id <= 0) return;                             // still temp/streaming ID
+    if (last.content.startsWith("__")) return;            // quiz, plan, etc.
+    if (last.content.length < 80) return;                 // too short to be useful
+
+    // Already have suggestions for this message
+    if (workflowSuggestions[last.id]) return;
+
+    // Find the user message that immediately preceded this assistant response
+    const precedingUser = [...messages].reverse().find((m, i) => i > 0 && m.role === "user");
+    const userMsg = precedingUser?.content ?? undefined;
+
+    suggestActions(last.content, activeWorkspaceId, userMsg).then(actions => {
+      if (actions.length > 0) {
+        setWorkflowSuggestions(prev => ({ ...prev, [last.id]: actions }));
+      }
+    });
+  }, [chat.streaming]);
 
   // ── Chat tab actions ──────────────────────────────────────────────────────
   async function handleActivateChat(chatId: number) {
@@ -789,6 +825,14 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                     modelAttributionEnabled={modelAttributionEnabled}
                     confidenceEnabled={flags.confidence_enabled}
                     autopilotEnabled={flags.autopilot_enabled}
+                    workflowContext={convs.activeConversation?.id && convs.activeConversation.id !== TEMP_ID ? { conversationId: convs.activeConversation.id, workspaceId: activeWorkspaceId, model: selectedModel } : undefined}
+                    workflowSuggestions={workflowSuggestions}
+                    onWorkflowActionDone={(type) => {
+                      const notesActions = new Set(["create_note","summarise_workspace","organise_notes","extract_tasks","prepare_report_outline","suggest_title"]);
+                      const reminderActions = new Set(["create_reminder"]);
+                      if (notesActions.has(type)) reloadNotes();
+                      if (reminderActions.has(type)) suggestions.reload();
+                    }}
                   />
                 </div>
               </main>
@@ -820,6 +864,8 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                 onToggleWebSearch={() => chat.setWebSearch((v) => !v)}
                 agentMode={chat.agentMode}
                 onToggleAgentMode={() => chat.setAgentMode((v) => !v)}
+                workflowMode={false}
+                onToggleWorkflowMode={() => {}}
                 researchMode={chat.researchMode}
                 onToggleResearchMode={() => chat.setResearchMode((v) => !v)}
                 flags={flags}
@@ -917,6 +963,8 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                   onToggleWebSearch={() => chat.setWebSearch((v) => !v)}
                   agentMode={chat.agentMode}
                   onToggleAgentMode={() => chat.setAgentMode((v) => !v)}
+                  workflowMode={false}
+                  onToggleWorkflowMode={() => {}}
                   researchMode={chat.researchMode}
                   onToggleResearchMode={() => chat.setResearchMode((v) => !v)}
                   flags={flags}
@@ -1054,7 +1102,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
         />
       )}
 
-      <SettingsModal show={showSettings} user={user} onClose={() => setShowSettings(false)} selectedModel={selectedModel} onModelChange={handleModelChange} modelSelectionEnabled={flags.model_selection_enabled} customApiKeysEnabled={flags.custom_api_keys_enabled} ttsEnabled={flags.tts_enabled} emailEnabled={flags.email_enabled} />
+      <SettingsModal show={showSettings} user={user} onClose={() => setShowSettings(false)} selectedModel={selectedModel} onModelChange={handleModelChange} modelSelectionEnabled={flags.model_selection_enabled} customApiKeysEnabled={flags.custom_api_keys_enabled} ttsEnabled={flags.tts_enabled} emailEnabled={flags.email_enabled} workflowEnabled={flags.workflow_enabled} />
       <HelpModal show={showHelp} onClose={() => setShowHelp(false)} />
       <FeedbackModal show={showFeedback} onClose={() => setShowFeedback(false)} />
       <MemoGraphModal

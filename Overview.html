@@ -216,6 +216,9 @@
     <span class="pill">Proactive Insights</span>
     <span class="pill">Answer Confidence</span>
     <span class="pill">AutoPilot Routing</span>
+    <span class="pill">Lecture Timeline</span>
+    <span class="pill">Timestamped Chapters</span>
+    <span class="pill">Jump to Section</span>
   </div>
 </div>
 
@@ -353,7 +356,7 @@
       <div class="card">
         <div class="card-icon">&#x1F3F3;&#xFE0F;</div>
         <h3>Feature Flags</h3>
-        <p>System-wide flags stored in the <code>feature_flags</code> table: web search, agent mode, model selection, image generation, translation, file upload, research mode, TTS, slash commands, custom API keys, video import, email integration, AI memory graph (<code>memograph_enabled</code>), proactive insights (<code>proactive_insights_enabled</code>), answer confidence (<code>confidence_enabled</code>), AutoPilot routing (<code>autopilot_enabled</code>), default model, and default language. Each feature also has a <code>*_min_level</code> flag (<code>regular</code> / <code>plus</code> / <code>pro</code>) that controls the minimum access tier required. Admins configure both toggles and minimum levels via the Admin Panel; the frontend fetches them on login and hides disabled controls accordingly.</p>
+        <p>System-wide flags stored in the <code>feature_flags</code> table: web search, agent mode, model selection, image generation, translation, file upload, research mode, TTS, slash commands, custom API keys, video import, email integration, AI memory graph (<code>memograph_enabled</code>), proactive insights (<code>proactive_insights_enabled</code>), answer confidence (<code>confidence_enabled</code>), AutoPilot routing (<code>autopilot_enabled</code>), meeting/lecture timeline (<code>timeline_enabled</code>), default model, and default language. Each feature also has a <code>*_min_level</code> flag (<code>regular</code> / <code>plus</code> / <code>pro</code>) that controls the minimum access tier required. Admins configure both toggles and minimum levels via the Admin Panel; the frontend fetches them on login and hides disabled controls accordingly.</p>
       </div>
       <div class="card">
         <div class="card-icon">&#x1F3C5;</div>
@@ -445,6 +448,11 @@
         <h3>AutoPilot Model Routing</h3>
         <p>An intelligent, zero-latency routing layer that automatically selects the best AI model for each prompt — with no extra API calls. Rules are evaluated in priority order: <strong>Translation</strong> (language regex) → <strong>Code / Debug</strong> (any programming language name, or ≥2 code keywords) → <strong>Deep Research</strong> (analysis/research keywords) → <strong>Long Context</strong> (prompt &gt;250 words) → <strong>Simple Query</strong> (≤12 words, stays on default). Translation and Long Context route to <em>Gemini 2.5 Flash</em> (large context window); Code routes to <em>DeepSeek Coder</em>; Deep Research to <em>GPT-4o</em>. Rules skip gracefully if a model's API key is not configured. A violet <strong>⚡ AutoPilot · {Reason}</strong> chip appears inline with the model attribution, hidden for Simple Query. Controlled via the <code>autopilot_enabled</code> feature flag.</p>
       </div>
+      <div class="card">
+        <div class="card-icon">&#x23F1;&#xFE0F;</div>
+        <h3>Meeting / Lecture Timeline</h3>
+        <p>A <strong>Timeline</strong> tab appears in the note editor for any note containing transcribed audio or video content. One GPT-4o-mini call analyses the transcript and returns: <strong>Chapters</strong> — major topic sections with timestamps (<code>00:03:12 Assessment requirement explained</code>); <strong>Action Items</strong> — tasks and follow-ups with the responsible person; <strong>Important Moments</strong> — key statements tagged as Decision ⚖️, Warning ⚠️, Key Point 💡, Deadline ⏰, or Question ❓. Timestamps are estimated from word position at 130 wpm (±30–90 s accuracy for lectures). Every entry has a <strong>Jump →</strong> button that uses TipTap's <code>doc.descendants()</code> to locate the exact phrase in the transcript and scrolls the editor to it. Results are cached in the <code>note_timelines</code> table; <strong>Regenerate</strong> overwrites the cache. Controlled via the <code>timeline_enabled</code> feature flag.</p>
+      </div>
     </div>
   </section>
 
@@ -478,7 +486,7 @@
         <tr>
           <td><strong>Business</strong></td>
           <td><code>business/services/</code></td>
-          <td>Application logic — chat, notes, auth, conversations, reminders, video, workspaces, admin, feature flags, feedback, email, memograph, proactive insights, autopilot routing</td>
+          <td>Application logic — chat, notes, auth, conversations, reminders, video, workspaces, admin, feature flags, feedback, email, memograph, proactive insights, autopilot routing, lecture timeline</td>
           <td><span class="tag tag-py">Python</span></td>
         </tr>
         <tr>
@@ -557,6 +565,12 @@
           <td><strong>Proactive Insights</strong></td>
           <td><code>business/services/proactive_insight_service</code></td>
           <td>Two-pass detection: rule-based filename regex (unreviewed uploads) + GPT batch analysis (8 notes/call) for missing_reminder, incomplete_actions, urgency_signal; results persisted in proactive_insights table; dismiss soft-deletes</td>
+          <td><span class="tag tag-ai">OpenAI</span><span class="tag tag-py">Python</span></td>
+        </tr>
+        <tr>
+          <td><strong>Lecture Timeline</strong></td>
+          <td><code>business/services/timeline_service</code></td>
+          <td>GPT-4o-mini call on transcript text; estimates timestamps at 130 wpm; returns chapters, action items, and important moments; upserts to note_timelines; key_phrase stored per entry for Jump → text-search in editor</td>
           <td><span class="tag tag-ai">OpenAI</span><span class="tag tag-py">Python</span></td>
         </tr>
         <tr>
@@ -695,7 +709,8 @@
            <strong>graph_edges table</strong> — directed relationships between graph nodes (source_node_id, target_node_id, relationship); CASCADE delete from nodes<br/>
            <strong>proactive_insights table</strong> — AI-detected insight records (note_id, type, title, description, severity, dismissed flag, created_at)<br/>
            <strong>messages.confidence</strong> — VARCHAR(20) column storing HIGH | MEDIUM | LOW | UNSUPPORTED per assistant message<br/>
-           <strong>messages.confidence_reason</strong> — TEXT column storing the LLM's or server-side fallback reasoning for the confidence level</p>
+           <strong>messages.confidence_reason</strong> — TEXT column storing the LLM's or server-side fallback reasoning for the confidence level<br/>
+           <strong>note_timelines table</strong> — one cached timeline per note (UNIQUE note_id); summary TEXT, chapters/action_items/important_moments JSON, estimated_duration_seconds, word_count, generated_at</p>
       </div>
       <div class="card">
         <h3>AI &amp; Media</h3>

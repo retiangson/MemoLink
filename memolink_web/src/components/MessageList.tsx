@@ -33,13 +33,16 @@ interface MessageListProps {
   modelAttributionEnabled?: boolean;
   confidenceEnabled?: boolean;
   autopilotEnabled?: boolean;
+  workflowContext?: { conversationId: number; workspaceId: number | null; model: string | null };
+  workflowSuggestions?: Record<number, { id: string; type: string; label: string; preview: string; params: Record<string, unknown> }[]>;
+  onWorkflowActionDone?: (type: string) => void;
 }
 
 export function MessageList({
   messages, loading, streaming, activeConversation,
   messagesContainerRef, bottomRef,
   onLoadOlder, onAddToNotes, onDeleteMessage, onDropFiles,
-  onApplyNoteEdit, onOpenNote, onSaveNote, hasOpenNote, translationEnabled = true, modelAttributionEnabled = true, confidenceEnabled = true, autopilotEnabled = true,
+  onApplyNoteEdit, onOpenNote, onSaveNote, hasOpenNote, translationEnabled = true, modelAttributionEnabled = true, confidenceEnabled = true, autopilotEnabled = true, workflowContext, workflowSuggestions, onWorkflowActionDone,
 }: MessageListProps) {
   return (
     <div
@@ -72,6 +75,9 @@ export function MessageList({
               confidenceEnabled={confidenceEnabled}
               routingReason={msg.routing_reason}
               autopilotEnabled={autopilotEnabled}
+              workflowContext={workflowContext}
+              workflowActions={workflowSuggestions?.[msg.id]}
+              onWorkflowActionDone={onWorkflowActionDone}
             />
           );
         })}

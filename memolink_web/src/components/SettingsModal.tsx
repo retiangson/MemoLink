@@ -18,9 +18,10 @@ interface SettingsModalProps {
   customApiKeysEnabled?: boolean;
   ttsEnabled?: boolean;
   emailEnabled?: boolean;
+  workflowEnabled?: boolean;
 }
 
-type Tab = "profile" | "security" | "ai" | "keys" | "tts" | "email";
+type Tab = "profile" | "security" | "ai" | "keys" | "tts" | "email" | "workflow";
 
 const BLANK_FORM = { name: "", key: "", model: "", base_url: "" };
 
@@ -34,6 +35,7 @@ export function SettingsModal({
   customApiKeysEnabled = true,
   ttsEnabled = true,
   emailEnabled = true,
+  workflowEnabled = true,
 }: SettingsModalProps) {
   const [tab, setTab] = useState<Tab>("profile");
 
@@ -57,6 +59,15 @@ export function SettingsModal({
   const [editError, setEditError] = useState<string | null>(null);
   const [editLoading, setEditLoading] = useState(false);
   const [deleteLoadingId, setDeleteLoadingId] = useState<number | null>(null);
+
+  // Workflow user preference (localStorage-backed, must be declared here with all other hooks)
+  const [wfSuggestions, setWfSuggestions] = useState(
+    () => localStorage.getItem("memolink_workflow_suggestions") !== "false"
+  );
+  function toggleWfSuggestions(val: boolean) {
+    setWfSuggestions(val);
+    localStorage.setItem("memolink_workflow_suggestions", String(val));
+  }
 
   // Email connection state
   const [emailStatus, setEmailStatus] = useState<EmailStatus>({ connected: false, email: null });
@@ -287,6 +298,7 @@ export function SettingsModal({
     ...(customApiKeysEnabled ? [{ id: "keys" as Tab, label: "API Keys" }] : []),
     ...(ttsEnabled ? [{ id: "tts" as Tab, label: "Text-to-Speech" }] : []),
     ...(emailEnabled ? [{ id: "email" as Tab, label: "Email" }] : []),
+    ...(workflowEnabled ? [{ id: "workflow" as Tab, label: "Workflow" }] : []),
   ];
 
   const inputCls = "w-full bg-[#12121a] border border-[#2a2a38] rounded-xl px-3 py-2 text-sm text-gray-200 outline-none focus:border-indigo-500 transition";
@@ -817,6 +829,61 @@ export function SettingsModal({
                     <p className="text-[11px] text-gray-600">You'll be redirected to Google to authorise access. MemoLink never stores your password.</p>
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* ── Workflow ── */}
+            {tab === "workflow" && (
+              <div className="space-y-5">
+                <div>
+                  <h3 className="text-sm font-semibold text-white mb-1">Workflow Action Suggestions</h3>
+                  <p className="text-xs text-gray-500 leading-relaxed">
+                    When enabled, MemoLink automatically analyses each AI response and shows quick action buttons — like Save as Note or Add Reminder — directly below relevant messages. Nothing executes without you clicking.
+                  </p>
+                </div>
+
+                {/* Main toggle */}
+                <div className="flex items-center justify-between px-4 py-3.5 bg-[#12121a] border border-[#2a2a38] rounded-xl">
+                  <div>
+                    <p className="text-sm font-medium text-gray-200">Action suggestions</p>
+                    <p className="text-xs text-gray-500 mt-0.5">Show action buttons below AI responses when relevant</p>
+                  </div>
+                  <button
+                    onClick={() => toggleWfSuggestions(!wfSuggestions)}
+                    className={`relative w-11 h-6 rounded-full transition-colors shrink-0 ${wfSuggestions ? "bg-indigo-600" : "bg-[#252533]"}`}
+                  >
+                    <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${wfSuggestions ? "translate-x-5" : "translate-x-0"}`} />
+                  </button>
+                </div>
+
+                {/* Action types reference */}
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Available actions</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {[
+                      { icon: "📝", label: "Save as Note", desc: "Save the AI response as a searchable note" },
+                      { icon: "⏰", label: "Add Reminder", desc: "Create a reminder from a detected deadline" },
+                      { icon: "🌐", label: "Search Web", desc: "Search for additional context online" },
+                      { icon: "✅", label: "Extract Tasks", desc: "Pull out action items as a checklist note" },
+                      { icon: "📋", label: "Summarise Workspace", desc: "Summarise all notes into one document" },
+                      { icon: "📄", label: "Report Outline", desc: "Create a structured outline from notes" },
+                    ].map(({ icon, label, desc }) => (
+                      <div key={label} className="flex items-start gap-2.5 px-3 py-2.5 bg-[#12121a] border border-[#2a2a38] rounded-xl">
+                        <span className="text-base shrink-0 mt-0.5">{icon}</span>
+                        <div>
+                          <p className="text-xs font-medium text-gray-200">{label}</p>
+                          <p className="text-[10px] text-gray-600 mt-0.5 leading-relaxed">{desc}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="bg-indigo-500/5 border border-indigo-500/15 rounded-xl px-4 py-3">
+                  <p className="text-xs text-gray-500 leading-relaxed">
+                    Suggestions appear only when the AI response is actionable — short replies and simple questions will not show any buttons. Actions execute only when you click them.
+                  </p>
+                </div>
               </div>
             )}
 
