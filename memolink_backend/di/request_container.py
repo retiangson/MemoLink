@@ -47,6 +47,9 @@ class RequestContainer:
     def study(self):
         return self.services.get_study_service()
 
+    def timeline(self):
+        return self.services.get_timeline_service()
+
 
 def get_request_container(db: Session = Depends(get_db)) -> RequestContainer:
     return RequestContainer(db)

@@ -53,6 +53,7 @@ from memolink_backend.api.v1 import (
     memograph_controller,
     proactive_insight_controller,
     study_controller,
+    timeline_controller,
 )
 
 # Register all models so SQLAlchemy sees them
@@ -71,6 +72,7 @@ import memolink_backend.domain.models.email_record      # noqa: F401
 import memolink_backend.domain.models.graph_node        # noqa: F401
 import memolink_backend.domain.models.graph_edge        # noqa: F401
 import memolink_backend.domain.models.proactive_insight # noqa: F401
+import memolink_backend.domain.models.note_timeline      # noqa: F401
 
 if os.getenv("MEMOLINK_SKIP_DB_BOOTSTRAP") != "1":
     with engine.connect() as _conn:
@@ -275,6 +277,21 @@ if os.getenv("MEMOLINK_SKIP_DB_BOOTSTRAP") != "1":
         _conn.execute(text("CREATE INDEX IF NOT EXISTS ix_proactive_insights_workspace ON proactive_insights(user_id, workspace_id)"))
         _conn.execute(text("INSERT INTO feature_flags (key, value) VALUES ('proactive_insights_enabled', 'true') ON CONFLICT (key) DO NOTHING"))
         _conn.execute(text("INSERT INTO feature_flags (key, value) VALUES ('study_mode_enabled', 'true') ON CONFLICT (key) DO NOTHING"))
+        _conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS note_timelines (
+                id SERIAL PRIMARY KEY,
+                note_id INTEGER NOT NULL UNIQUE REFERENCES notes(id) ON DELETE CASCADE,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                summary TEXT,
+                chapters JSONB NOT NULL DEFAULT '[]',
+                action_items JSONB NOT NULL DEFAULT '[]',
+                important_moments JSONB NOT NULL DEFAULT '[]',
+                estimated_duration_seconds INTEGER,
+                word_count INTEGER,
+                generated_at TIMESTAMPTZ DEFAULT now()
+            )
+        """))
+        _conn.execute(text("INSERT INTO feature_flags (key, value) VALUES ('timeline_enabled', 'true') ON CONFLICT (key) DO NOTHING"))
         # Auto-promote first user as admin if none exists
         _conn.execute(text("""
             UPDATE users SET is_admin = TRUE
@@ -432,6 +449,7 @@ app.include_router(email_controller.router, prefix="/api")
 app.include_router(memograph_controller.router, prefix="/api")
 app.include_router(proactive_insight_controller.router, prefix="/api")
 app.include_router(study_controller.router, prefix="/api")
+app.include_router(timeline_controller.router, prefix="/api")
 
 # AWS Lambda handler — only active when running inside Lambda
 if os.getenv("AWS_LAMBDA_FUNCTION_NAME"):

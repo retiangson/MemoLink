@@ -4,6 +4,7 @@ import { splitSentences } from "../hooks/useTTS";
 import { exportNote, EXPORT_FORMATS } from "../utils/noteExport";
 import type { ExportFormat } from "../utils/noteExport";
 import { VideoImportModal } from "./VideoImportModal";
+import { TimelinePanel } from "./TimelinePanel";
 
 interface NoteEditorViewProps {
   noteKey: string | number;
@@ -27,6 +28,8 @@ interface NoteEditorViewProps {
   ttsSentences?: string[];
   ttsEnabled?: boolean;
   videoImportEnabled?: boolean;
+  timelineEnabled?: boolean;
+  noteId?: number | null;
 }
 
 const LANGUAGES = [
@@ -56,6 +59,7 @@ export function NoteEditorView({
   onPlay, ttsPlaying, ttsPaused, onTtsStop, onTtsPauseResume,
   ttsSentenceIdx, ttsSentences,
   ttsEnabled = true, videoImportEnabled = true,
+  timelineEnabled = true, noteId = null,
 }: NoteEditorViewProps) {
   const [showPicker, setShowPicker] = useState(false);
   const [showExport, setShowExport] = useState(false);
@@ -141,7 +145,7 @@ export function NoteEditorView({
   }, [ttsSentenceIdx, ttsSentences]);
   const [language, setLanguage] = useState("");
   const [exporting, setExporting] = useState<ExportFormat | null>(null);
-  const [activeTab, setActiveTab] = useState<"editor" | "source">("editor");
+  const [activeTab, setActiveTab] = useState<"editor" | "source" | "timeline">("editor");
   const [rawContent, setRawContent] = useState(noteContentDraft);
 
   // Capture the raw DB content (Markdown) when the note changes,
@@ -151,6 +155,28 @@ export function NoteEditorView({
     setActiveTab("editor");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [noteKey]);
+
+  function jumpToText(phrase: string) {
+    if (!phrase) return;
+    const editor = editorRef.current;
+    if (!editor) return;
+    // Switch to editor tab first so the ProseMirror view is visible
+    setActiveTab("editor");
+    const search = phrase.slice(0, 40).toLowerCase();
+    const doc = editor.state.doc;
+    let found = false;
+    doc.descendants((node: any, pos: number) => {
+      if (found || !node.isText) return;
+      const idx = (node.text as string).toLowerCase().indexOf(search);
+      if (idx >= 0) {
+        found = true;
+        const from = pos + idx;
+        const to = from + search.length;
+        editor.commands.setTextSelection({ from, to });
+        editor.commands.scrollIntoView();
+      }
+    });
+  }
 
   async function handleExport(format: ExportFormat) {
     setShowExport(false);
@@ -187,6 +213,18 @@ export function NoteEditorView({
         >
           Source
         </button>
+        {timelineEnabled && noteId && (
+          <button
+            onClick={() => setActiveTab("timeline")}
+            className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium transition ${activeTab === "timeline" ? "bg-indigo-600 text-white" : "text-gray-500 hover:text-gray-300"}`}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" fill="currentColor" viewBox="0 0 16 16">
+              <path d="M8 3.5a.5.5 0 0 0-1 0V9a.5.5 0 0 0 .252.434l3.5 2a.5.5 0 0 0 .496-.868L8 8.71z"/>
+              <path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16m7-8A7 7 0 1 1 1 8a7 7 0 0 1 14 0"/>
+            </svg>
+            Timeline
+          </button>
+        )}
       </div>
 
       {/* Rich editor */}
@@ -208,6 +246,13 @@ export function NoteEditorView({
             value={rawContent}
             className="w-full h-full bg-transparent text-gray-400 text-xs font-mono p-4 resize-none focus:outline-none"
           />
+        </div>
+      )}
+
+      {/* Timeline tab */}
+      {activeTab === "timeline" && noteId && (
+        <div className="flex-1 min-h-0 overflow-y-auto border border-[#1e1e2a] rounded-xl bg-[#0a0a0f] p-4">
+          <TimelinePanel noteId={noteId} onJump={jumpToText} />
         </div>
       )}
 
