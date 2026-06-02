@@ -23,6 +23,7 @@ const NAV: Section[] = [
   { id: "noteai",     label: "Note Improvement",  icon: <><path d="M10.5 8a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0"/><path d="M0 8s3-5.5 8-5.5S16 8 16 8s-3 5.5-8 5.5S0 8 0 8m8 3.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7"/></> },
   { id: "commands",   label: "Slash Commands",    icon: <path d="M14 4.5V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h5.5zm-3 0A1.5 1.5 0 0 1 9.5 3V1L14 5.5zM8.646 6.646a.5.5 0 1 0-.707.708L9.293 8.5l-1.354 1.646a.5.5 0 0 0 .707.708L9.707 9.5H11a.5.5 0 0 0 0-1H9.707zM5.5 8.5a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 0 1H6a.5.5 0 0 1-.5-.5"/> },
   { id: "apikeys",    label: "Custom API Keys",   icon: <path d="M0 8a4 4 0 0 1 7.465-2H14a.5.5 0 0 1 .354.146l1.5 1.5a.5.5 0 0 1 0 .708l-1.5 1.5a.5.5 0 0 1-.708 0L13 9.207l-.646.647a.5.5 0 0 1-.708 0L11 9.207l-.646.647a.5.5 0 0 1-.708 0L9 9.207l-.646.647A.5.5 0 0 1 8 10h-.535A4 4 0 0 1 0 8m4-3a3 3 0 1 0 2.712 4.285A.5.5 0 0 1 7.163 9h.63l.853-.854a.5.5 0 0 1 .708 0l.646.647.646-.647a.5.5 0 0 1 .708 0l.646.647.646-.647a.5.5 0 0 1 .708 0l.646.647.793-.793-1-1h-6.63a.5.5 0 0 1-.451-.285A3 3 0 0 0 4 5m0 3.5a.5.5 0 1 1 0-1 .5.5 0 0 1 0 1"/> },
+  { id: "email",      label: "Gmail Email",       icon: <path d="M.05 3.555A2 2 0 0 1 2 2h12a2 2 0 0 1 1.95 1.555L8 8.414zM0 4.697v7.104l5.803-3.558zM6.761 8.83l-6.57 4.027A2 2 0 0 0 2 14h12a2 2 0 0 0 1.808-1.144l-6.57-4.027L8 9.586zm3.436-.586L16 11.801V4.697z"/> },
   { id: "tips",       label: "Tips & Shortcuts",  icon: <path d="M2 2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v13.5a.5.5 0 0 1-.777.416L8 13.101l-5.223 2.815A.5.5 0 0 1 2 15.5zm2-1a1 1 0 0 0-1 1v12.566l4.723-2.482a.5.5 0 0 1 .554 0L13 14.566V2a1 1 0 0 0-1-1z"/> },
 ];
 
@@ -41,6 +42,7 @@ const CONTENT: Record<string, React.ReactNode> = {
           { label: "AI Tools", desc: "Web search, agent mode, research, image generation" },
           { label: "Reminders", desc: "Auto-detected from notes or set manually" },
           { label: "Slash Commands", desc: "14 commands — /Improve, /Quiz, /Discuss and more" },
+          { label: "Gmail Email", desc: "Connect Gmail, auto-sync important emails to notes and reminders, reply in-app" },
           { label: "Custom API Keys", desc: "Use your own OpenAI, Gemini, or any compatible key" },
         ].map((f) => (
           <div key={f.label} className="bg-[#12121a] border border-[#2a2a38] rounded-xl p-3">
@@ -181,6 +183,8 @@ const CONTENT: Record<string, React.ReactNode> = {
           "A pulsing amber bell in the top bar means you have reminders due today.",
           "Browser notifications are sent when a reminder fires (grant permission when prompted).",
           "Reminders are scoped to the active workspace, keeping study and work tasks separate.",
+          "Connect Gmail in Settings → Email to sync important emails. A \"Sync from Email\" button appears in the Reminders panel — email-sourced reminders are global and appear across all workspaces.",
+          "Click an email-sourced reminder to see the original email and reply to it directly from MemoLink without leaving the app.",
         ].map((item, i) => (
           <li key={i} className="flex gap-2"><span className="text-indigo-500 shrink-0 mt-0.5">•</span><span>{item}</span></li>
         ))}
@@ -456,6 +460,59 @@ const CONTENT: Record<string, React.ReactNode> = {
     </div>
   ),
 
+  email: (
+    <div className="space-y-4 text-sm text-gray-400 leading-relaxed">
+      <p>Connect your Gmail account to automatically sync important emails, turn them into notes and reminders, and reply directly from MemoLink — without switching apps.</p>
+
+      <div className="space-y-3">
+        {[
+          {
+            title: "Connect Gmail",
+            desc: "Go to Settings → Email → Connect Gmail. MemoLink uses Google OAuth 2.0 — it never stores your password. You can disconnect at any time from the same settings tab.",
+          },
+          {
+            title: "Auto-Sync on Email Tab Open",
+            desc: "Every time you open Settings → Email, MemoLink fetches new unread and important emails, scores their importance with AI (1–5), and saves those scoring ≥ 3. Only new emails are fetched — already-synced ones are skipped.",
+          },
+          {
+            title: "Sync from Email button",
+            desc: "A blue \"Sync from Email\" button appears in the Reminders panel (right sidebar) when Gmail is connected. Clicking it runs auto-process: syncs new emails, appends them to your Email Digest note, and creates reminders for any emails that mention a deadline.",
+          },
+          {
+            title: "Email Digest Note",
+            desc: "Important emails are appended to a global note called \"Email Digest\". This note is created automatically on first sync and updated on each subsequent sync — only new emails are added, never duplicated. It appears in every workspace.",
+          },
+          {
+            title: "Importance Badges",
+            desc: "🔴 Urgent (score ≥ 4.5)  ·  🟠 Important (score ≥ 3.5)  ·  🔵 Notable (score = 3). Emails scoring below 3 are filtered out entirely — newsletters and promotions are excluded from the sync query.",
+          },
+          {
+            title: "Email-sourced Reminders",
+            desc: "When AI detects a deadline in an email, a reminder is automatically created and linked back to that email. These reminders are global — they appear in all workspaces, not just the active one. Click any email-sourced reminder to see the original email.",
+          },
+          {
+            title: "In-App Email Reply",
+            desc: "Open a reminder that originated from an email, or open the email detail in Settings → Email — a collapsible reply panel appears. Choose a tone (Formal / Friendly / Brief), optionally click \"Suggest Reply\" to get 3 AI-drafted options, edit if needed, then click \"Send Reply\". The reply threads correctly in Gmail.",
+          },
+          {
+            title: "Save as Note / Add Reminder manually",
+            desc: "From the email detail view in Settings → Email, you can save any email as a standalone note or manually create a reminder from it with the action buttons.",
+          },
+        ].map((t) => (
+          <div key={t.title}>
+            <p className="text-xs font-semibold text-indigo-300 mb-1">{t.title}</p>
+            <p>{t.desc}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="bg-amber-500/5 border border-amber-500/20 rounded-xl p-3">
+        <p className="text-xs font-semibold text-amber-400 mb-1.5">Privacy note</p>
+        <p className="text-[11px] text-gray-400">OAuth tokens are encrypted at rest using Fernet symmetric encryption. Email bodies are fetched on demand — only subject, sender, and snippet are stored in the database after scoring. Your Gmail password is never seen or stored by MemoLink.</p>
+      </div>
+    </div>
+  ),
+
   tips: (
     <div className="space-y-3 text-sm text-gray-400 leading-relaxed">
       <ul className="space-y-2">
@@ -475,6 +532,9 @@ const CONTENT: Record<string, React.ReactNode> = {
           "Use /Read to hear a note read aloud. The TTS player bar lets you pause, skip by sentence, and adjust speed (0.75× – 2×). Works in any browser without extra setup.",
           "Custom providers added in Settings → API Keys automatically join /Discussion as extra participants — each model gives its own perspective on the note.",
           "After a /Quiz submission, click \"Save Results to Notes\" to store questions, your answers, correct answers, and explanations as a searchable note.",
+          "Connect Gmail in Settings → Email to automatically sync important emails to an \"Email Digest\" note and create deadline reminders. The \"Sync from Email\" button in the Reminders panel triggers a fresh sync at any time.",
+          "Email-sourced reminders are global — they appear in every workspace, not just the one that was active when they were created.",
+          "Reply to emails directly from a reminder detail or the email list in Settings → Email — MemoLink builds 3 AI-drafted options based on your notes, and sends the reply threaded correctly in Gmail.",
         ].map((item, i) => (
           <li key={i} className="flex gap-2"><span className="text-indigo-500 shrink-0 mt-0.5">•</span><span>{item}</span></li>
         ))}
