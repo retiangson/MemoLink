@@ -39,7 +39,7 @@ export function SlashCommandPicker({ query, activeIndex, onSelect, onClose }: Pr
                   /{cmd.cmd}
                 </span>
                 <span className={`text-[11px] truncate transition ${active ? "text-gray-300" : "text-gray-500"}`}>
-                  {cmd.desc}{cmd.hasAll ? " · All" : ""}
+                  {cmd.desc}{("hasAll" in cmd && cmd.hasAll) ? " · All" : ""}
                 </span>
                 {active && <span className="ml-auto text-[10px] text-indigo-500/60 shrink-0">↵</span>}
               </button>

@@ -99,7 +99,8 @@ export function useChat({ activeConversation, setActiveConversation, setConversa
               ? streamAgentChat(conversationId, trimmed, workspaceId, model)
               : streamChat(conversationId, trimmed, 5, workspaceId, model, webSearch);
 
-        for await (const event of stream) {
+        for await (const rawEvent of stream) {
+          const event = rawEvent as any;
           if (event.close_note !== undefined) {
             onCloseNote?.(event.close_note);
             continue;

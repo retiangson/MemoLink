@@ -118,14 +118,6 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
     } catch {}
   }
 
-  async function handleOpenNote(noteId: number) {
-    try {
-      const note = notes.find((n) => n.id === noteId) ?? await getNote(noteId);
-      await editor.openNote(note);
-      setActiveTabType("note");
-    } catch {}
-  }
-
   const chat = useChat({
     activeConversation: convs.activeConversation,
     setActiveConversation: convs.setActiveConversation,
@@ -135,7 +127,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
     model: selectedModel,
     onCloseNote: editor.closeNoteById,
     onNoteUpdated: handleNoteUpdated,
-    onOpenNote: handleOpenNote,
+    onOpenNote: handleOpenNoteById,
   });
 
   useEffect(() => {
@@ -819,10 +811,10 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                     />
                   </div>
                 </main>
-                {chat.speaking && (
+                {chat.tts.playing && (
                   <div className="flex justify-center pb-1">
                     <button
-                      onClick={chat.stopSpeaking}
+                      onClick={chat.tts.stop}
                       className="flex items-center gap-2 px-3 py-1.5 bg-indigo-500/15 border border-indigo-500/30 rounded-full text-xs text-indigo-300 hover:bg-indigo-500/25 transition"
                     >
                       <span className="flex gap-[3px] items-end h-3.5">
