@@ -124,6 +124,9 @@ class WorkflowService:
         model: Optional[str],
     ) -> WorkflowPlanResponse:
         model = model or settings.openai_chat_model
+        _OPENAI_PREFIXES = ("gpt-", "o1-", "o3-", "o4-")
+        if not any(model.startswith(p) for p in _OPENAI_PREFIXES):
+            model = "gpt-4o-mini"
 
         # Save user message
         self._convs.add_message(conversation_id, "user", prompt)
@@ -186,6 +189,9 @@ class WorkflowService:
         model: Optional[str],
     ) -> Iterator[str]:
         model = model or settings.openai_chat_model
+        _OPENAI_PREFIXES = ("gpt-", "o1-", "o3-", "o4-")
+        if not any(model.startswith(p) for p in _OPENAI_PREFIXES):
+            model = "gpt-4o-mini"
         total = len(actions)
         results: list[str] = []
 
