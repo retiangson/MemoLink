@@ -341,6 +341,20 @@ export function MemoGraphModal({
     return { x: e.clientX - rect.left, y: e.clientY - rect.top };
   }
 
+  // Release drag if mouse is released anywhere on the page (not just the canvas)
+  useEffect(() => {
+    const globalUp = () => {
+      if (dragRef.current) {
+        dragRef.current.node.fx = null;
+        dragRef.current.node.fy = null;
+        dragRef.current = null;
+        simRef.current?.alphaTarget(0);
+      }
+    };
+    window.addEventListener("mouseup", globalUp);
+    return () => window.removeEventListener("mouseup", globalUp);
+  }, []);
+
   const onMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const { x, y } = canvasCoords(e);
     const node = getNodeAt(x, y);
@@ -412,11 +426,8 @@ export function MemoGraphModal({
   const edgeCount = linksRef.current.length;
 
   return (
-    <div className="fixed inset-0 bg-black/80 z-50 flex flex-col" onClick={onClose}>
-      <div
-        className="flex flex-col w-full h-full"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <div className="fixed inset-0 bg-black/80 z-50 flex flex-col">
+      <div className="flex flex-col w-full h-full">
         {/* ── Header ── */}
         <div className="flex items-center gap-3 px-5 py-3 border-b border-[#2a2a38] bg-[#12121a] shrink-0">
           <div className="flex items-center gap-2">
