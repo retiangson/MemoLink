@@ -44,9 +44,10 @@ type FbStatus = "all" | "open" | "read" | "resolved";
 interface Props {
   onClose: () => void;
   currentUserId: number;
+  onResetWalkthrough?: () => void;
 }
 
-export function AdminPage({ onClose, currentUserId }: Props) {
+export function AdminPage({ onClose, currentUserId, onResetWalkthrough }: Props) {
   const [tab, setTab] = useState<Tab>("feedback");
 
   // Feedback state
@@ -626,9 +627,24 @@ export function AdminPage({ onClose, currentUserId }: Props) {
           {/* USERS TAB */}
           {tab === "users" && (
             <div>
-              <div className="mb-4">
-                <h2 className="text-lg font-semibold text-white">Users</h2>
-                <p className="text-xs text-gray-500 mt-0.5">{users.length} registered user{users.length !== 1 ? "s" : ""}</p>
+              <div className="mb-4 flex items-start justify-between gap-4">
+                <div>
+                  <h2 className="text-lg font-semibold text-white">Users</h2>
+                  <p className="text-xs text-gray-500 mt-0.5">{users.length} registered user{users.length !== 1 ? "s" : ""}</p>
+                </div>
+                {onResetWalkthrough && (
+                  <button
+                    onClick={() => { onResetWalkthrough(); onClose(); }}
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs bg-indigo-600/20 text-indigo-400 hover:bg-indigo-600/30 border border-indigo-500/20 transition shrink-0"
+                    title="Clears your walkthrough flag and replays the tour"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 16 16">
+                      <path d="M11.534 7h3.932a.25.25 0 0 1 .192.41l-1.966 2.36a.25.25 0 0 1-.384 0l-1.966-2.36a.25.25 0 0 1 .192-.41m-11 2h3.932a.25.25 0 0 0 .192-.41L2.692 6.23a.25.25 0 0 0-.384 0L.342 8.59A.25.25 0 0 0 .534 9"/>
+                      <path fillRule="evenodd" d="M8 3c-1.552 0-2.94.707-3.857 1.818a.5.5 0 1 1-.771-.636A6.002 6.002 0 0 1 13.917 7H12.9A5 5 0 0 0 8 3M3.1 9a5.002 5.002 0 0 0 8.757 2.182.5.5 0 1 1 .771.636A6.002 6.002 0 0 1 2.083 9z"/>
+                    </svg>
+                    Reset Walkthrough (Me)
+                  </button>
+                )}
               </div>
               {usersLoading ? (
                 <div className="flex items-center justify-center py-12 text-gray-600 text-sm">Loading…</div>

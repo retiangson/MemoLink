@@ -127,7 +127,7 @@ export function RightPanel({
   };
 
   return (
-    <div className="w-72 h-full flex flex-col bg-[#0f0f13] border-l border-[#1e1e2a] shrink-0">
+    <div id="tour-right-panel" className="w-72 h-full flex flex-col bg-[#0f0f13] border-l border-[#1e1e2a] shrink-0">
 
       {/* Header */}
       <div className="h-10 flex items-center justify-between px-4 border-b border-[#1e1e2a] shrink-0 bg-[#0a0a0f]">
