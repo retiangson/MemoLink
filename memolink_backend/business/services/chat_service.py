@@ -6,6 +6,7 @@ from datetime import date
 import json
 import logging
 import re
+import time
 import base64
 import mimetypes
 
@@ -368,6 +369,7 @@ class ChatService(IChatService):
         log_service=None,
         user_api_key_repo=None,
         graph_repo=None,
+        eval_service=None,
     ):
         if conv_repo is not None and note_repo is not None:
             self.repo_conv: IConversationRepository = conv_repo
@@ -382,6 +384,7 @@ class ChatService(IChatService):
         self._log = log_service
         self._user_api_key_repo = user_api_key_repo
         self._graph_repo = graph_repo  # optional; None = no graph enhancement
+        self._eval = eval_service      # optional; records evaluation analytics
 
     def _syslog(self, level: str, message: str, details: dict, user_id: int | None = None):
         if self._log is None:
@@ -642,7 +645,10 @@ class ChatService(IChatService):
             openai_key=settings.openai_api_key,
         )
 
-        conversation_id, messages, _, pre_conf_level, pre_conf_reason = self._build_chat_context(dto)
+        t_total = time.perf_counter()
+        t_ctx = time.perf_counter()
+        conversation_id, messages, sources, pre_conf_level, pre_conf_reason = self._build_chat_context(dto)
+        ctx_ms = int((time.perf_counter() - t_ctx) * 1000)
 
         note_name = _extract_improve_note_name(user_text)
         if note_name:
@@ -668,9 +674,13 @@ class ChatService(IChatService):
         used_model = model
         succeeded = False
         last_error = ""
+        first_token_ms: int | None = None
+        llm_ms: int | None = None
+        fallback_attempts = 0
 
         for attempt in chain:
             try:
+                t_llm = time.perf_counter()
                 stream = _get_client(attempt, user_keys).chat.completions.create(
                     model=attempt,
                     messages=messages,
@@ -681,12 +691,16 @@ class ChatService(IChatService):
                 for chunk in stream:
                     delta = chunk.choices[0].delta.content or ""
                     if delta:
+                        if first_token_ms is None:
+                            first_token_ms = int((time.perf_counter() - t_llm) * 1000)
                         full_answer += delta
                         yield f"data: {json.dumps({'t': delta})}\n\n"
                 used_model = attempt
+                llm_ms = int((time.perf_counter() - t_llm) * 1000)
                 succeeded = True
                 break
             except Exception as e:
+                fallback_attempts += 1
                 last_error = str(e)
                 logger.warning("Model %s failed (stream): %s", attempt, e)
                 if attempt != model:
@@ -704,6 +718,51 @@ class ChatService(IChatService):
         final_reason = conf_reason or pre_conf_reason
         assistant_msg = self.repo_conv.add_message(conversation_id, "assistant", clean_answer, model=used_model, confidence=final_conf, confidence_reason=final_reason)
         yield f"data: {json.dumps({'done': True, 'id': assistant_msg.id, 'model': used_model, 'confidence': final_conf, 'confidence_reason': final_reason, 'routing_reason': routing_reason})}\n\n"
+
+        # ── Evaluation analytics (safe, gated, never breaks chat) ──────────────
+        if self._eval is not None:
+            try:
+                total_ms = int((time.perf_counter() - t_total) * 1000)
+                stream_ms = (llm_ms - first_token_ms) if (llm_ms is not None and first_token_ms is not None) else None
+                src_ids = [s.note_id for s in (sources or []) if getattr(s, "note_id", None) is not None]
+                self._eval.record_ai_metrics(
+                    user_id=dto.user_id,
+                    feature_name="rag_chat",
+                    data={
+                        "conversation_id": conversation_id,
+                        "message_id": assistant_msg.id,
+                        "prompt_length_chars": len(user_text),
+                        "prompt_length_words": len(user_text.split()),
+                        "answer_length_chars": len(clean_answer),
+                        "answer_length_words": len(clean_answer.split()),
+                        "selected_model": dto.model or settings.openai_chat_model,
+                        "actual_model_used": used_model,
+                        "autopilot_used": bool(routing_reason),
+                        "autopilot_reason": routing_reason,
+                        "fallback_used": used_model != model,
+                        "fallback_attempt_count": fallback_attempts,
+                        "web_search_enabled": bool(getattr(dto, "web_search", False)),
+                        "graph_rag_enabled": self._graph_repo is not None,
+                        "top_k_requested": getattr(dto, "top_k", None),
+                        "retrieved_note_count": len(src_ids),
+                        "citation_count": len(src_ids),
+                        "source_note_ids": src_ids[:50],
+                        "confidence_level": final_conf,
+                        "confidence_reason": final_reason,
+                        "confidence_method": "llm" if conf_level else "fallback",
+                        "first_token_latency_ms": first_token_ms,
+                        "total_response_time_ms": total_ms,
+                        "stream_duration_ms": stream_ms,
+                        "retrieval_time_ms": ctx_ms,
+                        "llm_time_ms": llm_ms,
+                    },
+                )
+                # Auto-track core workflow tasks from the real action
+                self._eval.mark_task(dto.user_id, "ask_rag_question", "Ask a question based on the note", "rag_chat")
+                if len(src_ids) > 0:
+                    self._eval.mark_task(dto.user_id, "check_citation", "Review the source citation", "rag_chat")
+            except Exception:
+                pass  # analytics must never break chat
 
     async def handle_file_upload(
         self,

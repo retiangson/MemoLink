@@ -20,6 +20,8 @@ import { HelpModal } from "../components/HelpModal";
 import { MemoGraphModal } from "../components/MemoGraphModal";
 import { StudyModeModal } from "../components/StudyModeModal";
 import { SurveyModal } from "../components/SurveyModal";
+import { useEvaluationHeartbeat } from "../hooks/useEvaluationHeartbeat";
+import { getMyRatings } from "../api/evaluationApi";
 import { FeedbackModal } from "../components/FeedbackModal";
 import { TTSPlayerBar } from "../components/TTSPlayerBar";
 import { WorkspaceManagerModal } from "../components/WorkspaceManagerModal";
@@ -72,6 +74,9 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
   const [openFeedbackCount, setOpenFeedbackCount] = useState(0);
   const [selectedModel, setSelectedModel] = useState<string>(getSavedModel);
   const { flags } = useFeatureFlags();
+  const evalStatus = useEvaluationHeartbeat(flags.evaluation_analytics_enabled);
+  const evaluationActive = flags.evaluation_analytics_enabled && !evalStatus.exhausted;
+  const [evalRatings, setEvalRatings] = useState<Record<string, Record<string, number | string>>>({});
   const [emailConnected, setEmailConnected] = useState(false);
   const [isSyncingEmail, setIsSyncingEmail] = useState(false);
   const [emailSyncResult, setEmailSyncResult] = useState<string | null>(null);
@@ -158,6 +163,13 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
     editor.setNoteContentDraft((prev) => prev ? prev + `<p>${text}</p>` : `<p>${text}</p>`);
   });
   const convs = useConversations(activeWorkspaceId);
+
+  // Load the user's saved answer ratings so selections persist across reloads.
+  useEffect(() => {
+    if (!flags.evaluation_analytics_enabled) return;
+    getMyRatings().then(setEvalRatings).catch(() => {});
+  }, [flags.evaluation_analytics_enabled, convs.activeConversation?.id]);
+
   async function handleNoteUpdated(noteId: number) {
     try {
       const fresh = await getNote(noteId);
@@ -528,6 +540,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
           await workspaceHook.switchWorkspace(ws);
         }}
         onManageWorkspaces={() => setShowWorkspaceManager(true)}
+        evalStatus={evalStatus}
       />
 
       <div className="flex-1 flex flex-col h-full overflow-hidden">
@@ -875,6 +888,8 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                       if (reminderActions.has(type)) suggestions.reload();
                     }}
                     onWorkflowConversationMessages={appendWorkflowMessages}
+                    evaluationActive={evaluationActive}
+                    evalRatings={evalRatings}
                   />
                 </div>
               </main>
@@ -984,6 +999,8 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                         if (reminderActions.has(type)) suggestions.reload();
                       }}
                       onWorkflowConversationMessages={appendWorkflowMessages}
+                    evaluationActive={evaluationActive}
+                    evalRatings={evalRatings}
                     />
                   </div>
                 </main>

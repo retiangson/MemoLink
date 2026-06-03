@@ -37,13 +37,15 @@ interface MessageListProps {
   workflowSuggestions?: Record<number, { id: string; type: string; label: string; preview: string; params: Record<string, unknown> }[]>;
   onWorkflowActionDone?: (type: string) => void;
   onWorkflowConversationMessages?: (messages: Message[]) => void;
+  evaluationActive?: boolean;
+  evalRatings?: Record<string, Record<string, number | string>>;
 }
 
 export function MessageList({
   messages, loading, streaming, activeConversation,
   messagesContainerRef, bottomRef,
   onLoadOlder, onAddToNotes, onDeleteMessage, onDropFiles,
-  onApplyNoteEdit, onOpenNote, onSaveNote, hasOpenNote, translationEnabled = true, modelAttributionEnabled = true, confidenceEnabled = true, autopilotEnabled = true, workflowContext, workflowSuggestions, onWorkflowActionDone, onWorkflowConversationMessages,
+  onApplyNoteEdit, onOpenNote, onSaveNote, hasOpenNote, translationEnabled = true, modelAttributionEnabled = true, confidenceEnabled = true, autopilotEnabled = true, workflowContext, workflowSuggestions, onWorkflowActionDone, onWorkflowConversationMessages, evaluationActive = false, evalRatings,
 }: MessageListProps) {
   return (
     <div
@@ -80,6 +82,9 @@ export function MessageList({
               workflowActions={workflowSuggestions?.[msg.id]}
               onWorkflowActionDone={onWorkflowActionDone}
               onWorkflowConversationMessages={onWorkflowConversationMessages}
+              messageId={msg.id}
+              evaluationActive={evaluationActive}
+              evalRating={evalRatings?.[String(msg.id)]}
             />
           );
         })}

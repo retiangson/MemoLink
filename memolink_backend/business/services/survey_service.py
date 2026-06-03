@@ -9,6 +9,7 @@ import io
 import csv
 import json
 import re
+from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
 
 from memolink_backend.domain.repositories.survey_repository import SurveyRepository
@@ -21,6 +22,7 @@ from memolink_backend.contracts.survey_dtos import (
     QuestionUpsertRequest,
     QuestionReportDTO, SurveyReportDTO,
     SurveyResponseRowDTO, SurveyResponsesDTO,
+    MySurveyResponseDTO,
 )
 
 SURVEY_TITLE = "MemoLink Prototype Evaluation Survey"
@@ -85,25 +87,50 @@ class SurveyService:
             sections=sections,
         )
 
+    def get_my_response(self, user_id: Optional[int]) -> MySurveyResponseDTO:
+        """The current user's existing survey response (one per account) so the
+        form can be pre-filled for editing. Returns exists=False if none yet."""
+        existing = self._repo.get_response_by_user(user_id) if user_id is not None else None
+        if not existing:
+            return MySurveyResponseDTO(exists=False, participant_code=None, answers={})
+        answers: Dict[str, Any] = {}
+        for a in self._repo.answers_for_response(existing.id):
+            answers[a.question_key] = _parse_stored(a.answer_value, a.answer_type or "short")
+        return MySurveyResponseDTO(
+            exists=True, participant_code=existing.participant_code, answers=answers,
+        )
+
     def submit(self, user_id: Optional[int], req: SurveySubmitRequest) -> SurveySubmitResponse:
         if not req.consent_confirmed:
             raise ValueError("Consent is required before submitting the survey.")
-
-        code = f"P{self._repo.max_participant_number() + 1:03d}"
 
         # Pull background fields onto the response row for convenient reporting/export
         answer_map = {a.question_key: a.answer_value for a in req.answers}
         role = answer_map.get("role")
         freq = answer_map.get("ai_tool_usage_frequency")
 
-        response = self._repo.create_response(
-            user_id=user_id,
-            workspace_id=req.workspace_id,
-            participant_code=code,
-            role=str(role) if isinstance(role, str) else None,
-            ai_tool_usage_frequency=str(freq) if isinstance(freq, str) else None,
-            consent_confirmed=True,
-        )
+        # One response per account: update the existing one (keeping its
+        # participant_code) instead of creating a duplicate.
+        existing = self._repo.get_response_by_user(user_id) if user_id is not None else None
+        if existing:
+            existing.role = str(role) if isinstance(role, str) else None
+            existing.ai_tool_usage_frequency = str(freq) if isinstance(freq, str) else None
+            existing.consent_confirmed = True
+            existing.workspace_id = req.workspace_id
+            existing.submitted_at = datetime.now(timezone.utc)
+            response = existing
+            code = existing.participant_code or ""
+            self._repo.delete_answers_for_response(existing.id)
+        else:
+            code = f"P{self._repo.max_participant_number() + 1:03d}"
+            response = self._repo.create_response(
+                user_id=user_id,
+                workspace_id=req.workspace_id,
+                participant_code=code,
+                role=str(role) if isinstance(role, str) else None,
+                ai_tool_usage_frequency=str(freq) if isinstance(freq, str) else None,
+                consent_confirmed=True,
+            )
 
         for ans in req.answers:
             q = self._repo.get_question_by_key(ans.question_key)

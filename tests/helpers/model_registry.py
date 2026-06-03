@@ -6,3 +6,14 @@ def register_models() -> None:
     import memolink_backend.domain.models.reminder  # noqa: F401
     import memolink_backend.domain.models.user_model  # noqa: F401
     import memolink_backend.domain.models.workspace  # noqa: F401
+    import memolink_backend.domain.models.email_account  # noqa: F401
+    import memolink_backend.domain.models.email_record  # noqa: F401
+    import memolink_backend.domain.models.system_log  # noqa: F401
+    import memolink_backend.domain.models.translation_cache  # noqa: F401
+    import memolink_backend.domain.models.user_api_key  # noqa: F401
+    import memolink_backend.domain.models.graph_node  # noqa: F401
+    import memolink_backend.domain.models.graph_edge  # noqa: F401
+    import memolink_backend.domain.models.proactive_insight  # noqa: F401
+    import memolink_backend.domain.models.note_timeline  # noqa: F401
+    import memolink_backend.domain.models.survey  # noqa: F401
+    import memolink_backend.domain.models.evaluation  # noqa: F401

@@ -1,0 +1,915 @@
+You are working on the MemoLink project.
+
+Task:
+Implement a quantitative evaluation analytics module inside MemoLink.
+
+Goal:
+The app must automatically collect measurable research/evaluation data during prototype testing, then generate reports, charts, summaries, and CSV exports for Assessment 2 and later Assessment 3.
+
+Important:
+This is not the qualitative survey. The qualitative survey is separate.
+This task is for quantitative data collection, system telemetry, measurable metrics, report dashboard, graphs, and exportable evaluation evidence.
+
+Do not break existing features:
+- normal chat
+- RAG
+- notes
+- workspaces
+- reminders
+- transcription
+- translation
+- slash commands
+- quiz/study mode
+- timeline
+- confidence level
+- feature flags
+- admin panel
+- system logs
+- authentication
+- conversations
+- user API keys
+- Gmail integration
+- existing feedback/bug report system
+
+Main concept:
+Create a dedicated “Evaluation Analytics” system separate from normal system_logs and separate from feedback/bug reports.
+
+system_logs = debugging and operational logs.
+feedback = bug reports and suggestions.
+evaluation analytics = research data for measurable capstone evaluation.
+
+Do not rely only on system_logs because they are not structured enough for research reporting.
+
+Add a feature flag:
+evaluation_analytics_enabled = true/false
+evaluation_survey_enabled = true/false
+evaluation_admin_export_enabled = true/false
+
+All analytics collection must be disabled when evaluation_analytics_enabled = false.
+
+Privacy and ethics requirements:
+- Add an evaluation consent screen before starting an evaluation session.
+- Do not collect real names.
+- Use participant_code such as P001, P002, P003.
+- Do not store full private note content, full prompts, full AI answers, or uploaded files in analytics tables.
+- Store IDs, counts, timings, ratings, hashes, and short non-sensitive metadata only.
+- If prompt/content reference is needed, store message_id or note_id, not the full content.
+- Optional: store prompt_length_chars and answer_length_words instead of raw text.
+- Do not expose analytics data to normal users.
+- Admin only can view/export reports.
+- Ensure all analytics records are scoped to user_id and workspace_id where applicable.
+- Do not include API keys, secrets, stack traces, raw Gmail content, or private file contents in analytics.
+- Add clear wording: “This evaluation records performance metrics and user ratings for academic assessment. It does not store your private note content inside the analytics dataset.”
+
+Recommended database tables:
+
+1. evaluation_sessions
+
+Purpose:
+Tracks one participant evaluation run.
+
+Fields:
+- id UUID or INTEGER PK
+- participant_code VARCHAR(50) NOT NULL
+- user_id INTEGER nullable FK users.id
+- workspace_id INTEGER nullable FK workspaces.id
+- consent_confirmed BOOLEAN DEFAULT false
+- role VARCHAR(100) nullable
+- ai_tool_usage_frequency VARCHAR(50) nullable
+- device_type VARCHAR(50) nullable
+- browser VARCHAR(100) nullable
+- operating_system VARCHAR(100) nullable
+- started_at TIMESTAMPTZ NOT NULL DEFAULT now()
+- ended_at TIMESTAMPTZ nullable
+- total_time_seconds INTEGER nullable
+- completed BOOLEAN DEFAULT false
+- notes TEXT nullable for admin/internal notes only, not user private content
+
+2. evaluation_tasks
+
+Purpose:
+Tracks completion time and success/failure of each assigned evaluation task.
+
+Fields:
+- id UUID or INTEGER PK
+- session_id FK evaluation_sessions.id
+- user_id INTEGER nullable
+- workspace_id INTEGER nullable
+- task_key VARCHAR(100) NOT NULL
+- task_name VARCHAR(255) NOT NULL
+- feature_name VARCHAR(100) nullable
+- started_at TIMESTAMPTZ NOT NULL
+- completed_at TIMESTAMPTZ nullable
+- time_taken_ms INTEGER nullable
+- completed BOOLEAN DEFAULT false
+- success BOOLEAN nullable
+- error_count INTEGER DEFAULT 0
+- retry_count INTEGER DEFAULT 0
+- click_count INTEGER nullable
+- created_object_type VARCHAR(100) nullable
+- created_object_id INTEGER nullable
+- notes TEXT nullable
+
+Example task_key values:
+- create_note
+- upload_file
+- transcribe_audio
+- ask_rag_question
+- check_citation
+- create_reminder
+- generate_quiz
+- translate_text
+- generate_timeline
+- complete_survey
+
+3. evaluation_events
+
+Purpose:
+Generic quantitative event tracking for feature performance.
+
+Fields:
+- id UUID or INTEGER PK
+- session_id FK evaluation_sessions.id nullable
+- task_id FK evaluation_tasks.id nullable
+- user_id INTEGER nullable
+- workspace_id INTEGER nullable
+- conversation_id INTEGER nullable
+- message_id INTEGER nullable
+- note_id INTEGER nullable
+- feature_name VARCHAR(100) NOT NULL
+- operation_name VARCHAR(100) NOT NULL
+- event_type VARCHAR(100) NOT NULL
+- status VARCHAR(30) NOT NULL
+- started_at TIMESTAMPTZ nullable
+- ended_at TIMESTAMPTZ nullable
+- duration_ms INTEGER nullable
+- error_type VARCHAR(100) nullable
+- error_code VARCHAR(100) nullable
+- error_message_safe TEXT nullable
+- metadata JSONB nullable
+- created_at TIMESTAMPTZ DEFAULT now()
+
+Example feature_name:
+- rag_chat
+- note_upload
+- transcription
+- translation
+- reminder
+- proactive_insight
+- quiz
+- study_mode
+- timeline
+- command
+- autopilot
+- smart_action
+- gmail
+- tts
+
+Example operation_name:
+- embed_prompt
+- vector_search
+- llm_response
+- stream_response
+- transcribe_audio
+- translate_text
+- generate_quiz
+- create_reminder
+- generate_timeline
+- execute_command
+
+4. evaluation_ai_metrics
+
+Purpose:
+Detailed AI/RAG/LLM measurement.
+
+Fields:
+- id UUID or INTEGER PK
+- session_id FK evaluation_sessions.id nullable
+- task_id FK evaluation_tasks.id nullable
+- user_id INTEGER nullable
+- workspace_id INTEGER nullable
+- conversation_id INTEGER nullable
+- message_id INTEGER nullable
+- feature_name VARCHAR(100) NOT NULL
+- prompt_length_chars INTEGER nullable
+- prompt_length_words INTEGER nullable
+- answer_length_chars INTEGER nullable
+- answer_length_words INTEGER nullable
+- selected_model VARCHAR(100) nullable
+- actual_model_used VARCHAR(100) nullable
+- provider VARCHAR(100) nullable
+- autopilot_used BOOLEAN DEFAULT false
+- autopilot_reason VARCHAR(255) nullable
+- fallback_used BOOLEAN DEFAULT false
+- fallback_attempt_count INTEGER DEFAULT 0
+- failed_models JSONB nullable
+- web_search_enabled BOOLEAN DEFAULT false
+- graph_rag_enabled BOOLEAN DEFAULT false
+- top_k_requested INTEGER nullable
+- retrieved_note_count INTEGER nullable
+- citation_count INTEGER nullable
+- source_note_ids JSONB nullable
+- retrieval_min_score FLOAT nullable
+- retrieval_max_score FLOAT nullable
+- retrieval_avg_score FLOAT nullable
+- confidence_level VARCHAR(30) nullable
+- confidence_reason TEXT nullable
+- confidence_method VARCHAR(50) nullable
+- input_tokens INTEGER nullable
+- output_tokens INTEGER nullable
+- total_tokens INTEGER nullable
+- estimated_cost_usd NUMERIC(12,6) nullable
+- first_token_latency_ms INTEGER nullable
+- total_response_time_ms INTEGER nullable
+- stream_duration_ms INTEGER nullable
+- embedding_time_ms INTEGER nullable
+- retrieval_time_ms INTEGER nullable
+- llm_time_ms INTEGER nullable
+- created_at TIMESTAMPTZ DEFAULT now()
+
+Important:
+Capture separate timing fields:
+- embedding_time_ms
+- retrieval_time_ms
+- llm_time_ms
+- first_token_latency_ms
+- stream_duration_ms
+- total_response_time_ms
+
+This is needed to identify whether slowness comes from embedding, vector search, model response, or streaming.
+
+5. evaluation_user_ratings
+
+Purpose:
+Stores numeric user ratings connected to an event, task, or AI answer.
+
+Fields:
+- id UUID or INTEGER PK
+- session_id FK evaluation_sessions.id
+- task_id FK evaluation_tasks.id nullable
+- event_id FK evaluation_events.id nullable
+- ai_metric_id FK evaluation_ai_metrics.id nullable
+- message_id INTEGER nullable
+- rating_type VARCHAR(100) NOT NULL
+- rating_value INTEGER NOT NULL
+- rating_scale_min INTEGER DEFAULT 1
+- rating_scale_max INTEGER DEFAULT 5
+- choice_value VARCHAR(100) nullable
+- comment TEXT nullable
+- created_at TIMESTAMPTZ DEFAULT now()
+
+Example rating_type:
+- answer_relevance
+- citation_usefulness
+- answer_trust
+- answer_supported_by_notes
+- task_difficulty
+- system_speed
+- note_quality
+- transcript_accuracy
+- reminder_usefulness
+- translation_quality
+- quiz_usefulness
+- timeline_usefulness
+- overall_usefulness
+
+For answer_supported_by_notes, use choice_value:
+- yes
+- partially
+- no
+- not_sure
+
+6. evaluation_translation_metrics
+
+Purpose:
+Tracks translation quality and speed.
+
+Fields:
+- id UUID or INTEGER PK
+- session_id FK evaluation_sessions.id nullable
+- task_id FK evaluation_tasks.id nullable
+- user_id INTEGER nullable
+- workspace_id INTEGER nullable
+- message_id INTEGER nullable
+- source_language VARCHAR(100) nullable
+- target_language VARCHAR(100) NOT NULL
+- model_used VARCHAR(100) nullable
+- accuracy_score INTEGER nullable
+- refinement_rounds INTEGER DEFAULT 0
+- cached BOOLEAN DEFAULT false
+- force_retranslate BOOLEAN DEFAULT false
+- fallback_used BOOLEAN DEFAULT false
+- translation_time_ms INTEGER nullable
+- source_text_length_chars INTEGER nullable
+- translated_text_length_chars INTEGER nullable
+- user_quality_rating INTEGER nullable
+- created_at TIMESTAMPTZ DEFAULT now()
+
+7. evaluation_transcription_metrics
+
+Purpose:
+Tracks upload/transcription performance.
+
+Fields:
+- id UUID or INTEGER PK
+- session_id FK evaluation_sessions.id nullable
+- task_id FK evaluation_tasks.id nullable
+- user_id INTEGER nullable
+- workspace_id INTEGER nullable
+- note_id INTEGER nullable
+- file_type VARCHAR(50) nullable
+- file_size_bytes BIGINT nullable
+- file_size_mb FLOAT nullable
+- duration_seconds INTEGER nullable
+- transcription_service_used VARCHAR(100) nullable
+- fallback_used BOOLEAN DEFAULT false
+- transcription_success BOOLEAN DEFAULT false
+- transcription_time_ms INTEGER nullable
+- transcript_word_count INTEGER nullable
+- note_created BOOLEAN DEFAULT false
+- error_type VARCHAR(100) nullable
+- user_transcript_accuracy_rating INTEGER nullable
+- user_note_quality_rating INTEGER nullable
+- created_at TIMESTAMPTZ DEFAULT now()
+
+8. evaluation_reminder_metrics
+
+Purpose:
+Tracks action-item/reminder/proactive insight usefulness.
+
+Fields:
+- id UUID or INTEGER PK
+- session_id FK evaluation_sessions.id nullable
+- task_id FK evaluation_tasks.id nullable
+- user_id INTEGER nullable
+- workspace_id INTEGER nullable
+- source_note_id INTEGER nullable
+- reminder_id INTEGER nullable
+- proactive_insight_id INTEGER nullable
+- detection_type VARCHAR(100) nullable
+  values: missing_reminder, incomplete_action, urgency_signal, manual, ai_suggestion
+- generated_count INTEGER DEFAULT 0
+- accepted_count INTEGER DEFAULT 0
+- dismissed_count INTEGER DEFAULT 0
+- completed_count INTEGER DEFAULT 0
+- false_positive_marked BOOLEAN DEFAULT false
+- missed_action_reported BOOLEAN DEFAULT false
+- usefulness_rating INTEGER nullable
+- created_at TIMESTAMPTZ DEFAULT now()
+
+9. evaluation_quiz_metrics
+
+Purpose:
+Tracks quiz/study mode performance.
+
+Fields:
+- id UUID or INTEGER PK
+- session_id FK evaluation_sessions.id nullable
+- task_id FK evaluation_tasks.id nullable
+- user_id INTEGER nullable
+- workspace_id INTEGER nullable
+- note_id INTEGER nullable
+- source_type VARCHAR(50) nullable
+  values: note, all_notes, workspace
+- question_count INTEGER nullable
+- single_choice_count INTEGER nullable
+- multi_choice_count INTEGER nullable
+- correct_count INTEGER nullable
+- incorrect_count INTEGER nullable
+- score_percent FLOAT nullable
+- time_taken_ms INTEGER nullable
+- attempt_number INTEGER DEFAULT 1
+- saved_results_to_notes BOOLEAN DEFAULT false
+- difficulty_rating INTEGER nullable
+- usefulness_rating INTEGER nullable
+- created_at TIMESTAMPTZ DEFAULT now()
+
+10. evaluation_timeline_metrics
+
+Purpose:
+Tracks meeting/lecture timeline usefulness and performance.
+
+Fields:
+- id UUID or INTEGER PK
+- session_id FK evaluation_sessions.id nullable
+- task_id FK evaluation_tasks.id nullable
+- user_id INTEGER nullable
+- workspace_id INTEGER nullable
+- note_id INTEGER nullable
+- transcript_word_count INTEGER nullable
+- generation_time_ms INTEGER nullable
+- chapter_count INTEGER nullable
+- action_item_count INTEGER nullable
+- important_moment_count INTEGER nullable
+- jump_clicked_count INTEGER DEFAULT 0
+- jump_success_count INTEGER DEFAULT 0
+- usefulness_rating INTEGER nullable
+- created_at TIMESTAMPTZ DEFAULT now()
+
+11. evaluation_feature_usage
+
+Purpose:
+Tracks what features are used during evaluation.
+
+Fields:
+- id UUID or INTEGER PK
+- session_id FK evaluation_sessions.id nullable
+- user_id INTEGER nullable
+- workspace_id INTEGER nullable
+- feature_name VARCHAR(100) NOT NULL
+- action_name VARCHAR(100) NOT NULL
+- count INTEGER DEFAULT 1
+- first_used_at TIMESTAMPTZ DEFAULT now()
+- last_used_at TIMESTAMPTZ DEFAULT now()
+
+Implementation rules:
+- Use idempotent migrations.
+- Use existing project architecture and naming conventions.
+- Do not create duplicate authentication or admin systems.
+- Reuse current user/workspace context.
+- Add indexes for:
+  - evaluation_sessions.participant_code
+  - evaluation_tasks.session_id
+  - evaluation_events.session_id
+  - evaluation_events.feature_name
+  - evaluation_events.created_at
+  - evaluation_ai_metrics.message_id
+  - evaluation_ai_metrics.confidence_level
+  - evaluation_user_ratings.rating_type
+  - all created_at fields used in reporting
+
+Backend services to create:
+
+EvaluationService:
+- start_session()
+- end_session()
+- start_task()
+- complete_task()
+- record_event()
+- record_ai_metrics()
+- record_rating()
+- record_translation_metrics()
+- record_transcription_metrics()
+- record_reminder_metrics()
+- record_quiz_metrics()
+- record_timeline_metrics()
+- record_feature_usage()
+
+EvaluationReportService:
+- get_summary()
+- get_task_completion_report()
+- get_response_time_report()
+- get_rag_report()
+- get_confidence_alignment_report()
+- get_translation_report()
+- get_transcription_report()
+- get_reminder_report()
+- get_quiz_report()
+- get_timeline_report()
+- get_feature_usage_report()
+- export_csv()
+- export_report_json()
+
+Timing measurement requirements:
+Use monotonic backend timing for backend operations.
+
+In Python:
+- Use time.perf_counter() or time.monotonic() for duration measurement.
+- Store duration in milliseconds.
+- Do not rely only on created_at timestamps for precision.
+
+In frontend:
+- Use performance.now() for UI task timing and first visible response timing.
+
+Capture these speed fields where possible:
+- request_started_at
+- request_completed_at
+- duration_ms
+- first_token_latency_ms
+- stream_duration_ms
+- embedding_time_ms
+- retrieval_time_ms
+- llm_time_ms
+- upload_time_ms
+- transcription_time_ms
+- translation_time_ms
+- quiz_generation_time_ms
+- timeline_generation_time_ms
+- page_interaction_time_ms if useful
+
+API endpoints:
+
+User/evaluation endpoints:
+- POST /api/v1/evaluation/session/start
+- POST /api/v1/evaluation/session/end
+- POST /api/v1/evaluation/task/start
+- POST /api/v1/evaluation/task/complete
+- POST /api/v1/evaluation/event
+- POST /api/v1/evaluation/rating
+
+Admin report endpoints:
+- GET /api/v1/admin/evaluation/summary
+- GET /api/v1/admin/evaluation/tasks
+- GET /api/v1/admin/evaluation/rag
+- GET /api/v1/admin/evaluation/confidence
+- GET /api/v1/admin/evaluation/performance
+- GET /api/v1/admin/evaluation/translation
+- GET /api/v1/admin/evaluation/transcription
+- GET /api/v1/admin/evaluation/reminders
+- GET /api/v1/admin/evaluation/quiz
+- GET /api/v1/admin/evaluation/timeline
+- GET /api/v1/admin/evaluation/feature-usage
+- GET /api/v1/admin/evaluation/export/csv
+- GET /api/v1/admin/evaluation/export/json
+
+All admin endpoints must require admin access.
+All user endpoints must require authentication.
+Evaluation session records must not expose other users’ data.
+
+Frontend UI:
+
+1. Evaluation Start Modal
+
+Add a modal or page called:
+“MemoLink Evaluation Session”
+
+Fields:
+- participant_code
+- role
+- AI tool usage frequency
+- consent checkbox
+
+Consent text:
+“I understand that this evaluation records quantitative usage metrics such as completion time, response time, ratings, confidence level, and feature success/failure for academic evaluation. The analytics dataset will not store private note content, full prompts, full AI answers, uploaded files, or API keys.”
+
+Buttons:
+- Start Evaluation
+- Cancel
+
+2. Evaluation Task Checklist
+
+After starting session, show a small evaluation panel with tasks:
+
+Core tasks:
+1. Create or upload a note.
+2. Ask a question based on the note.
+3. Review source citation.
+4. Generate or create a reminder/action item.
+5. Rate the answer and citation.
+6. Complete the qualitative survey.
+
+Optional tasks:
+7. Translate a short text.
+8. Generate a quiz.
+9. Generate a lecture timeline.
+10. Use slash command.
+
+The panel should track:
+- started
+- completed
+- time taken
+- success/failure
+
+3. Inline rating components
+
+After an evaluated AI answer, show optional compact rating buttons:
+
+Answer relevance:
+1 2 3 4 5
+
+Citation usefulness:
+1 2 3 4 5
+
+Trust:
+1 2 3 4 5
+
+Was the answer supported by your notes?
+Yes / Partially / No / Not sure
+
+Do not show this after every normal chat unless evaluation session is active.
+
+4. Feature-specific rating prompts
+
+After translation:
+- Translation quality 1–5
+
+After transcription:
+- Transcript accuracy 1–5
+- Generated note quality 1–5
+
+After reminder/proactive insight:
+- Was this reminder useful? 1–5
+- Correct / Partially correct / Incorrect
+
+After quiz:
+- Quiz usefulness 1–5
+- Difficulty 1–5
+
+After timeline:
+- Timeline usefulness 1–5
+- Did Jump to Section work? Yes/No
+
+5. Admin Evaluation Dashboard
+
+Add a new Admin Panel tab:
+“Evaluation”
+
+Inside this tab, show:
+
+Summary cards:
+- Total participants
+- Completed sessions
+- Average total session time
+- Task completion rate
+- Average RAG relevance rating
+- Average citation usefulness rating
+- Average trust rating
+- Average response time
+- Average first-token latency
+- Average confidence alignment
+- Transcription success rate
+- Translation average accuracy
+- Quiz average score
+- Reminder acceptance/usefulness rate
+
+Graphs:
+Use the existing frontend chart library if available. If none exists, add a lightweight chart library such as Recharts.
+
+Required charts:
+1. Task completion rate by task
+   - Bar chart
+
+2. Average task completion time by task
+   - Bar chart
+
+3. RAG answer ratings
+   - Bar chart for relevance, citation usefulness, trust
+
+4. Confidence alignment
+   - Bar chart or grouped chart:
+     HIGH / MEDIUM / LOW / UNSUPPORTED vs average user trust rating
+   - Also show count per confidence level
+
+5. Response time by feature
+   - Bar chart:
+     RAG chat, transcription, translation, quiz, timeline, reminder
+
+6. First token latency over time
+   - Line chart
+
+7. Model usage and fallback rate
+   - Bar chart:
+     model used count
+     fallback count
+
+8. Translation report
+   - Average accuracy by target language
+   - Cached vs non-cached average time
+   - Cache hit rate
+
+9. Transcription report
+   - Success rate by service
+   - Average transcription time by file size group
+   - Whisper vs Deepgram usage count
+
+10. Reminder/action-item report
+   - Generated vs accepted vs dismissed vs completed
+   - Usefulness rating average
+
+11. Quiz report
+   - Average score
+   - Score distribution
+   - Average completion time
+
+12. Feature usage count
+   - Bar chart by feature
+
+Add filters:
+- date range
+- participant_code
+- workspace
+- feature
+- model
+- confidence level
+- completed sessions only
+
+Exports:
+- Export all quantitative data as CSV ZIP or individual CSV files.
+- Export summary report as JSON.
+- Export report tables as CSV.
+- Optional: Export dashboard as printable HTML.
+
+Report generator:
+
+Add a button:
+“Generate Evaluation Report”
+
+The generated report should include:
+- total participants
+- completed sessions
+- average task completion rate
+- average task completion time
+- average RAG relevance rating
+- average citation usefulness
+- average trust rating
+- confidence alignment summary
+- average response time
+- first-token latency
+- transcription success rate
+- translation average accuracy
+- reminder usefulness/acceptance
+- quiz score average
+- limitations
+
+The report should produce a Markdown section that can be pasted into Assessment 2.
+
+Example generated report text:
+
+“Quantitative evaluation data was collected from {n} participant sessions. The core workflow achieved a task completion rate of {x}%. The average time to complete the RAG question-answering task was {x} seconds. AI answers received an average relevance rating of {x}/5, citation usefulness of {x}/5, and trust rating of {x}/5. HIGH-confidence answers received an average trust rating of {x}/5 compared with {y}/5 for LOW-confidence answers. The average AI response time was {x} ms, with first-token latency of {y} ms. These results suggest that MemoLink’s core workflow supports contextual retrieval and task support, although further testing with a larger participant group is required.”
+
+Instrumentation requirements:
+
+RAG chat:
+When processing chat/RAG:
+- record prompt length
+- record selected model
+- record actual model used
+- record provider
+- record top_k
+- record retrieved_note_count
+- record citation_count
+- record source_note_ids
+- record retrieval scores if available
+- record confidence_level and confidence_reason
+- record embedding_time_ms
+- record retrieval_time_ms
+- record llm_time_ms
+- record first_token_latency_ms
+- record total_response_time_ms
+- record stream_duration_ms
+- record fallback_used and fallback_attempt_count
+- record autopilot_used and autopilot_reason
+- record web_search_enabled
+- record graph_rag_enabled if applicable
+- record token counts and estimated cost if available
+
+Translation:
+- record target language
+- record accuracy score
+- record model used
+- record cached true/false
+- record force re-translate true/false
+- record refinement rounds
+- record fallback
+- record translation_time_ms
+- record user quality rating if evaluation session active
+
+Transcription:
+- record file type
+- record file size
+- record duration if available
+- record service used: Whisper or Deepgram
+- record fallback
+- record success/failure
+- record transcription_time_ms
+- record transcript word count
+- record note created true/false
+
+Reminder/action items:
+- record generated reminders count
+- record accepted count
+- record dismissed count
+- record completed count
+- record usefulness rating
+- record false positive if user marks not useful/wrong
+
+Quiz/study mode:
+- record question count
+- record question type counts
+- record score
+- record score percent
+- record time taken
+- record saved_to_notes
+- record usefulness and difficulty ratings
+
+Timeline:
+- record generation time
+- record transcript word count
+- record chapter count
+- record action item count
+- record important moment count
+- record jump clicked count
+- record jump success count
+- record usefulness rating
+
+Commands:
+- record command name
+- record success/failure
+- record duration
+- record affected note count
+- record undo used true/false where applicable
+
+Smart Actions:
+- record suggested action type
+- record accepted/rejected
+- record execution success/failure
+- record duration
+- record created object type/id
+
+Admin dashboard calculations:
+
+Task completion rate:
+completed tasks / assigned tasks
+
+Average task time:
+average completed_at - started_at
+
+RAG relevance:
+average rating where rating_type = answer_relevance
+
+Citation usefulness:
+average rating where rating_type = citation_usefulness
+
+Trust:
+average rating where rating_type = answer_trust
+
+Confidence alignment:
+group by confidence_level and calculate:
+- count
+- average trust rating
+- average relevance rating
+- percentage marked supported_by_notes = yes/partially/no
+
+Response time:
+average total_response_time_ms by feature/model
+
+First token latency:
+average first_token_latency_ms by model
+
+Transcription success rate:
+successful transcriptions / total transcription attempts
+
+Translation accuracy:
+average accuracy_score
+cache hit rate = cached translations / total translations
+
+Reminder acceptance rate:
+accepted_count / generated_count
+
+Quiz score:
+average score_percent
+
+Fallback rate:
+fallback_used count / AI event count
+
+Feature usage:
+sum usage count by feature_name
+
+Quality rules:
+- If evaluation_analytics_enabled is false, do not record anything.
+- If there is no active evaluation session, record only anonymous aggregated operational metrics if already allowed; otherwise skip.
+- Keep evaluation analytics lightweight and non-blocking.
+- Analytics failure must never break the main user action.
+- Wrap analytics writes in try/catch and log safe warning only.
+- Do not delay chat/transcription/translation just because analytics failed.
+- Use async/background tasks where possible.
+
+Testing requirements:
+
+Add tests for:
+- starting and ending evaluation session
+- starting and completing task
+- recording AI metrics
+- recording user rating
+- admin-only access enforcement
+- CSV export
+- report summary calculation
+- disabled feature flag prevents collection
+- analytics failure does not break chat
+- no full prompt/full answer/private note content stored in analytics table
+
+Implementation priority:
+
+Phase 1:
+- DB tables
+- EvaluationService
+- session start/end
+- task start/complete
+- RAG AI metrics
+- ratings
+- admin summary dashboard
+- CSV export
+
+Phase 2:
+- translation/transcription/reminder/quiz/timeline metrics
+- charts
+- report generator
+
+Phase 3:
+- advanced filters
+- feature usage analytics
+- smart actions and command analytics
+- printable report
+
+Final result:
+MemoLink should be able to run a complete evaluation session, collect quantitative data automatically, allow users to rate outputs during the evaluation, and let the admin export charts/tables/report evidence for Assessment 2.

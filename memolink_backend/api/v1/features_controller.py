@@ -20,6 +20,8 @@ DEFAULT_FLAGS: Dict[str, str] = {
     "custom_api_keys_enabled": "true",
     "video_import_enabled": "true",
     "evaluation_survey_enabled": "true",
+    "evaluation_analytics_enabled": "true",
+    "evaluation_admin_export_enabled": "true",
     "default_model": "gpt-4o-mini",
     "default_language": "English",
     "web_search_min_level": "regular",
