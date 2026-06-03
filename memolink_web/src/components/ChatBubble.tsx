@@ -6,6 +6,7 @@ import { MODELS } from "../constants/models";
 import { QuizRenderer } from "./QuizRenderer";
 import { WorkflowApprovalCard } from "./WorkflowApprovalCard";
 import { WorkflowActionBar } from "./WorkflowActionBar";
+import { EvaluationRatingBar } from "./EvaluationRatingBar";
 import type { Message } from "../types";
 import "highlight.js/styles/github-dark.css";
 import "../styles/markdown.css";
@@ -138,6 +139,9 @@ interface Props {
   workflowActions?: { id: string; type: string; label: string; preview: string; params: Record<string, unknown> }[];
   onWorkflowActionDone?: (type: string) => void;
   onWorkflowConversationMessages?: (messages: Message[]) => void;
+  messageId?: number;
+  evaluationActive?: boolean;
+  evalRating?: Record<string, number | string>;
 }
 
 const TRANSLATE_LANGUAGES = [
@@ -186,7 +190,7 @@ function ImageGeneratingSpinner() {
   );
 }
 
-export default function ChatBubble({ role, content, model, streaming, onAdd, onDelete, onApplyEdit, onOpenNote, onSaveNote, hasOpenNote, translationEnabled = true, modelAttributionEnabled = true, confidence, confidenceReason, confidenceEnabled = true, routingReason, autopilotEnabled = true, workflowContext, workflowActions, onWorkflowActionDone, onWorkflowConversationMessages }: Props) {
+export default function ChatBubble({ role, content, model, streaming, onAdd, onDelete, onApplyEdit, onOpenNote, onSaveNote, hasOpenNote, translationEnabled = true, modelAttributionEnabled = true, confidence, confidenceReason, confidenceEnabled = true, routingReason, autopilotEnabled = true, workflowContext, workflowActions, onWorkflowActionDone, onWorkflowConversationMessages, messageId, evaluationActive, evalRating }: Props) {
   const isUser = role === "user";
   const [copied, setCopied] = useState(false);
   const [showLangPicker, setShowLangPicker] = useState(false);
@@ -557,6 +561,10 @@ export default function ChatBubble({ role, content, model, streaming, onAdd, onD
             onActionDone={onWorkflowActionDone}
             onConversationMessages={onWorkflowConversationMessages}
           />
+        )}
+        {/* Evaluation rating bar — shown when admin has evaluation analytics on */}
+        {!streaming && role === "assistant" && evaluationActive && messageId != null && (
+          <EvaluationRatingBar messageId={messageId} initial={evalRating} />
         )}
         </div>
       )}

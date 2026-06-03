@@ -56,6 +56,12 @@ class RequestContainer:
     def survey(self):
         return self.services.get_survey_service()
 
+    def evaluation(self):
+        return self.services.get_evaluation_service()
+
+    def evaluation_report(self):
+        return self.services.get_evaluation_report_service()
+
 
 def get_request_container(db: Session = Depends(get_db)) -> RequestContainer:
     return RequestContainer(db)

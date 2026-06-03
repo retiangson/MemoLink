@@ -51,6 +51,12 @@ class SurveySubmitResponse(BaseModel):
     participant_code: str
 
 
+class MySurveyResponseDTO(BaseModel):
+    exists: bool
+    participant_code: Optional[str] = None
+    answers: Dict[str, Any] = {}
+
+
 # ── Admin: question management ───────────────────────────────────────────────
 
 class QuestionUpsertRequest(BaseModel):

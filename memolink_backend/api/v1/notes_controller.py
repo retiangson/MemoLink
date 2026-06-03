@@ -21,7 +21,10 @@ def create_note(
     current_user_id: int = Depends(get_current_user),
     c: RequestContainer = Depends(get_request_container),
 ):
-    return c.notes().create_note(dto.model_copy(update={"user_id": current_user_id}))
+    note = c.notes().create_note(dto.model_copy(update={"user_id": current_user_id}))
+    c.evaluation().mark_task(current_user_id, "create_note", "Create or upload a note", "note",
+                             "note", getattr(note, "id", None))
+    return note
 
 
 @router.post("/get", response_model=NoteResponseDTO | None)

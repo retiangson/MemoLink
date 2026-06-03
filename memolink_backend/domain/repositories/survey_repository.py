@@ -75,6 +75,19 @@ class SurveyRepository:
     def get_response(self, response_id: int) -> Optional[SurveyResponse]:
         return self._db.query(SurveyResponse).filter(SurveyResponse.id == response_id).first()
 
+    def get_response_by_user(self, user_id: int) -> Optional[SurveyResponse]:
+        return (
+            self._db.query(SurveyResponse)
+            .filter(SurveyResponse.user_id == user_id)
+            .order_by(SurveyResponse.id.asc())
+            .first()
+        )
+
+    def delete_answers_for_response(self, response_id: int) -> None:
+        self._db.query(SurveyAnswer).filter(
+            SurveyAnswer.survey_response_id == response_id
+        ).delete(synchronize_session=False)
+
     def answers_for_response(self, response_id: int) -> List[SurveyAnswer]:
         return (
             self._db.query(SurveyAnswer)

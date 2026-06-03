@@ -39,6 +39,17 @@ export async function getActiveSurvey(): Promise<ActiveSurvey> {
   return res.data;
 }
 
+export interface MySurveyResponse {
+  exists: boolean;
+  participant_code: string | null;
+  answers: Record<string, string | string[]>;
+}
+
+export async function getMySurveyResponse(): Promise<MySurveyResponse> {
+  const res = await api.get("/survey/me");
+  return res.data;
+}
+
 export async function submitSurvey(
   consent_confirmed: boolean,
   answers: SurveyAnswerInput[],
