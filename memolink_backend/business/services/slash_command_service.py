@@ -40,22 +40,28 @@ def _parse(text: str) -> Optional[ParsedCommand]:
     args = parts[1].strip() if len(parts) > 1 else ""
 
     # Split instruction after " : "
+    instruction = None
     if " : " in args:
         target_part, instruction = args.split(" : ", 1)
         instruction = instruction.strip()
     else:
         target_part = args
-        instruction = None
 
     target_part = target_part.strip()
 
     if target_part.lower() == "all":
         return ParsedCommand(raw=text, command=command, target=None, is_all=True, instruction=instruction)
 
-    # Unquote
-    if (target_part.startswith('"') and target_part.endswith('"')) or \
-       (target_part.startswith("'") and target_part.endswith("'")):
-        target_part = target_part[1:-1].strip()
+    # Quoted target — unquote. Any text after the closing quote becomes the
+    # instruction, e.g.  /Discussion "My Note" how do we improve this?
+    if target_part and target_part[0] in ('"', "'"):
+        q = target_part[0]
+        end = target_part.find(q, 1)
+        if end != -1:
+            trailing = target_part[end + 1:].strip()
+            target_part = target_part[1:end].strip()
+            if trailing and not instruction:
+                instruction = trailing
 
     return ParsedCommand(raw=text, command=command, target=target_part or None, is_all=False, instruction=instruction)
 
@@ -617,39 +623,85 @@ Base questions ONLY on the provided notes. Do not invent facts not in the notes.
         # Strip names for _get_client (it only needs key + base_url)
         user_keys = {m: {"key": v["key"], "base_url": v.get("base_url")} for m, v in user_keys_named.items()}
 
-        sys_prompt = f"You are participating in a multi-AI discussion about the following notes. Provide a concise (3-5 sentence) perspective, analysis, or insight grounded in the content. Stay focused on what the notes actually say.\n\nNotes:\n{context}"
+        if not discussion_models:
+            yield _sse({"t": "No discussion models are configured."})
+            return
+
+        # The discussion goal is whatever the user asked after the note name,
+        # e.g.  /Discussion "Chat Snippet" how do we improve this?
+        question = (p.instruction or "How can this note be improved? Suggest concrete, specific improvements.").strip()
+
+        base_sys = (
+            "You are {name}, collaborating with other AI models to reach ONE agreed answer to the user's request "
+            "about a note. Read the note and the discussion so far, then contribute concretely — build on or "
+            "respectfully challenge the others' points and move the group toward consensus. Keep your contribution "
+            "to 3-5 sentences. End your message with a tag on its own line: write [AGREE] if you fully support the "
+            "current best approach with no further changes, or [REFINE] if you still want changes."
+            f"\n\nUser's request: {question}\n\nNote ({topic}):\n{context}"
+        )
 
         yield _sse({"t": f"## Discussion: {topic}\n\n"})
+        yield _sse({"t": f"*Goal:* {question}\n\n"})
 
-        perspectives = []
-        for name, disc_model in discussion_models:
-            yield _sse({"t": f"**{name}:**\n"})
-            try:
-                response = _get_client(disc_model, user_keys).chat.completions.create(
-                    model=disc_model,
-                    messages=[{"role": "system", "content": sys_prompt}, {"role": "user", "content": "Share your perspective on these notes."}],
+        MAX_ROUNDS = 4
+        # With multiple models, require at least one round where everyone has seen
+        # the others before accepting consensus; a lone model agrees after round 1.
+        min_rounds = 1 if len(discussion_models) == 1 else 2
+
+        transcript = ""
+        agreed = False
+        round_num = 0
+        while round_num < MAX_ROUNDS and not agreed:
+            round_num += 1
+            yield _sse({"t": f"### Round {round_num}\n\n"})
+            round_agrees: list[bool] = []
+            for name, disc_model in discussion_models:
+                yield _sse({"t": f"**{name}:** "})
+                user_msg = (
+                    f"Discussion so far:\n{transcript[-8000:] or '(no one has spoken yet — you are first)'}\n\n"
+                    f"Contribute your view as {name} (round {round_num})."
                 )
-                perspective = response.choices[0].message.content or ""
-                perspectives.append(f"**{name}:** {perspective}")
-                yield _sse({"t": perspective + "\n\n"})
-            except Exception as exc:
-                msg = f"*(unavailable: {exc})*"
-                perspectives.append(f"**{name}:** {msg}")
-                yield _sse({"t": msg + "\n\n"})
+                try:
+                    resp = _get_client(disc_model, user_keys).chat.completions.create(
+                        model=disc_model,
+                        messages=[
+                            {"role": "system", "content": base_sys.format(name=name)},
+                            {"role": "user", "content": user_msg},
+                        ],
+                    ).choices[0].message.content or ""
+                except Exception as exc:
+                    resp = f"*(unavailable: {exc})* [AGREE]"
+                up = resp.upper()
+                agrees = "[AGREE]" in up and "[REFINE]" not in up
+                round_agrees.append(agrees)
+                clean = re.sub(r"\[(AGREE|REFINE)\]", "", resp, flags=re.IGNORECASE).strip()
+                stance = "✅ agrees" if agrees else "✎ wants changes"
+                yield _sse({"t": f"{clean}\n\n_{stance}_\n\n"})
+                transcript += f"\n{name}: {clean}\n"
+            if round_agrees and all(round_agrees) and round_num >= min_rounds:
+                agreed = True
 
-        # Synthesis — use first available model
-        if len(perspectives) > 1:
-            yield _sse({"t": "**Synthesis:**\n"})
-            synth_model = discussion_models[0][1]  # primary participant's model
-            synth_prompt = "Based on these perspectives from multiple AI models, write a brief synthesis comparing and connecting the key themes.\n\n" + "\n\n".join(perspectives)
-            try:
-                synth = _get_client(synth_model, user_keys).chat.completions.create(
-                    model=synth_model,
-                    messages=[{"role": "user", "content": synth_prompt}],
-                ).choices[0].message.content or ""
-                yield _sse({"t": synth})
-            except Exception:
-                pass
+        # Final conclusion — the agreed best approach
+        yield _sse({"t": "## Conclusion — Best Approach\n\n"})
+        if agreed:
+            yield _sse({"t": f"*The models reached agreement after {round_num} round(s).*\n\n"})
+        else:
+            yield _sse({"t": f"*No full consensus after {round_num} rounds — summarising the strongest points.*\n\n"})
+        synth_model = discussion_models[0][1]
+        synth_prompt = (
+            f"User's request: {question}\n\nNote: {topic}\n\nFull discussion:\n{transcript[-12000:]}\n\n"
+            "Write the final conclusion that directly answers the user's request, synthesising the strongest "
+            "agreed points into a clear, actionable recommendation. Use concise Markdown bullet points. "
+            "Do not include any [AGREE] or [REFINE] tags."
+        )
+        try:
+            synth = _get_client(synth_model, user_keys).chat.completions.create(
+                model=synth_model,
+                messages=[{"role": "user", "content": synth_prompt}],
+            ).choices[0].message.content or ""
+            yield _sse({"t": synth})
+        except Exception:
+            pass
 
     # ── /Read ─────────────────────────────────────────────────────────────────
 

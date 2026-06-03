@@ -19,6 +19,7 @@ DEFAULT_FLAGS: Dict[str, str] = {
     "slash_commands_enabled": "true",
     "custom_api_keys_enabled": "true",
     "video_import_enabled": "true",
+    "evaluation_survey_enabled": "true",
     "default_model": "gpt-4o-mini",
     "default_language": "English",
     "web_search_min_level": "regular",

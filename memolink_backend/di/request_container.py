@@ -53,6 +53,9 @@ class RequestContainer:
     def timeline(self):
         return self.services.get_timeline_service()
 
+    def survey(self):
+        return self.services.get_survey_service()
+
 
 def get_request_container(db: Session = Depends(get_db)) -> RequestContainer:
     return RequestContainer(db)

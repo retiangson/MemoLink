@@ -219,6 +219,10 @@
     <span class="pill">Lecture Timeline</span>
     <span class="pill">Timestamped Chapters</span>
     <span class="pill">Jump to Section</span>
+    <span class="pill">AI Study Mode</span>
+    <span class="pill">Flashcards &amp; Quiz</span>
+    <span class="pill">Smart Actions</span>
+    <span class="pill">Text-to-Speech</span>
   </div>
 </div>
 
@@ -356,7 +360,7 @@
       <div class="card">
         <div class="card-icon">&#x1F3F3;&#xFE0F;</div>
         <h3>Feature Flags</h3>
-        <p>System-wide flags stored in the <code>feature_flags</code> table: web search, agent mode, model selection, image generation, translation, file upload, research mode, TTS, slash commands, custom API keys, video import, email integration, AI memory graph (<code>memograph_enabled</code>), proactive insights (<code>proactive_insights_enabled</code>), answer confidence (<code>confidence_enabled</code>), AutoPilot routing (<code>autopilot_enabled</code>), meeting/lecture timeline (<code>timeline_enabled</code>), default model, and default language. Each feature also has a <code>*_min_level</code> flag (<code>regular</code> / <code>plus</code> / <code>pro</code>) that controls the minimum access tier required. Admins configure both toggles and minimum levels via the Admin Panel; the frontend fetches them on login and hides disabled controls accordingly.</p>
+        <p>System-wide flags stored in the <code>feature_flags</code> table: web search, agent mode, model selection, image generation, translation, file upload, research mode, TTS, slash commands, custom API keys, video import, email integration, AI memory graph (<code>memograph_enabled</code>), proactive insights (<code>proactive_insights_enabled</code>), answer confidence (<code>confidence_enabled</code>), AutoPilot routing (<code>autopilot_enabled</code>), meeting/lecture timeline (<code>timeline_enabled</code>), AI study mode (<code>study_mode_enabled</code>), smart actions / workflow agent (<code>workflow_enabled</code>), default model, and default language. Each feature also has a <code>*_min_level</code> flag (<code>regular</code> / <code>plus</code> / <code>pro</code>) that controls the minimum access tier required. Admins configure both toggles and minimum levels via the Admin Panel; the frontend fetches them on login and hides disabled controls accordingly.</p>
       </div>
       <div class="card">
         <div class="card-icon">&#x1F3C5;</div>
@@ -453,6 +457,21 @@
         <h3>Meeting / Lecture Timeline</h3>
         <p>A <strong>Timeline</strong> tab appears in the note editor for any note containing transcribed audio or video content. One GPT-4o-mini call analyses the transcript and returns: <strong>Chapters</strong> — major topic sections with timestamps (<code>00:03:12 Assessment requirement explained</code>); <strong>Action Items</strong> — tasks and follow-ups with the responsible person; <strong>Important Moments</strong> — key statements tagged as Decision ⚖️, Warning ⚠️, Key Point 💡, Deadline ⏰, or Question ❓. Timestamps are estimated from word position at 130 wpm (±30–90 s accuracy for lectures). Every entry has a <strong>Jump →</strong> button that uses TipTap's <code>doc.descendants()</code> to locate the exact phrase in the transcript and scrolls the editor to it. Results are cached in the <code>note_timelines</code> table; <strong>Regenerate</strong> overwrites the cache. Controlled via the <code>timeline_enabled</code> feature flag.</p>
       </div>
+      <div class="card">
+        <div class="card-icon">&#x1F393;</div>
+        <h3>AI Study Mode</h3>
+        <p>A full-screen study workspace opened from the user menu, with six tools built on demand from the active workspace's notes: <strong>Flashcards</strong> (flippable Q/A cards from a note or all notes), <strong>Quiz</strong> (interactive single/multi-choice with scoring, explanations, and save-to-note — the same engine as <code>/Quiz</code>), <strong>Exam Review</strong> (key concepts, definitions, important facts, likely questions, and focus topics across selected notes), <strong>Study Plan</strong> (a day-by-day plan from a goal and time frame, each day listing focus topics, tasks, and notes to revise), <strong>Weak Topics</strong> (detects recurring topics from your questions and explains each simply with a study tip), and <strong>Summary</strong> (short / medium / detailed levels with optional bullet points). All endpoints live under <code>business/services/study_service</code> and are gated by the <code>study_mode_enabled</code> feature flag.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">&#x2728;</div>
+        <h3>Smart Actions (Workflow Agent)</h3>
+        <p>After a normal chat reply, MemoLink silently analyses the exchange (<code>POST /api/workflow/suggest</code>) and, when a useful follow-up is possible, renders conversational action buttons beneath the message — no mode or toggle required. Approving an action records the user's click as a chat message, executes it, and streams the result back as a saved assistant reply, so the full exchange survives a reload. Eight actions are supported: <strong>create reminder</strong>, <strong>create note</strong>, <strong>summarise workspace</strong>, <strong>search web</strong>, <strong>organise notes</strong>, <strong>suggest title</strong>, <strong>extract tasks</strong>, and <strong>prepare report outline</strong>. Non-OpenAI models fall back to GPT-4o-mini for the tool-calling step. Per-user suggestions toggle in <strong>Settings → Workflow</strong>; admin kill-switch via the <code>workflow_enabled</code> feature flag. After an action runs, the Notes or Reminders panel refreshes automatically.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">&#x1F50A;</div>
+        <h3>Text-to-Speech Reading</h3>
+        <p>Any note can be read aloud via the <code>/Read</code> command or the play button in the note editor, using the browser's free Web Speech API (no API cost). Playback <strong>starts from the cursor position and skips the note title</strong>, so you can begin reading from any paragraph. The player bar offers play/pause, stop, ◀◀ / ▶▶ sentence navigation, and speed control (0.75×–2×), with the voice selectable in Settings. The sentence currently being spoken is highlighted live in the editor using non-destructive ProseMirror decorations — visual overlays that never modify the document. Gated by the <code>tts_enabled</code> feature flag.</p>
+      </div>
     </div>
   </section>
 
@@ -486,7 +505,7 @@
         <tr>
           <td><strong>Business</strong></td>
           <td><code>business/services/</code></td>
-          <td>Application logic — chat, notes, auth, conversations, reminders, video, workspaces, admin, feature flags, feedback, email, memograph, proactive insights, autopilot routing, lecture timeline</td>
+          <td>Application logic — chat, notes, auth, conversations, reminders, video, workspaces, admin, feature flags, feedback, email, memograph, proactive insights, autopilot routing, lecture timeline, AI study mode, smart actions / workflow</td>
           <td><span class="tag tag-py">Python</span></td>
         </tr>
         <tr>
@@ -578,6 +597,18 @@
           <td><code>business/services/autopilot_service</code></td>
           <td>Pure heuristic intent classification — Translation → Gemini 2.5 Flash, Code/Debug (any language name) → DeepSeek Coder, Deep Research → GPT-4o, Long Context → Gemini 2.5 Flash, Simple → default. Zero extra API calls; skips rules when API key absent; routing_reason returned in done SSE event</td>
           <td><span class="tag tag-py">Python</span></td>
+        </tr>
+        <tr>
+          <td><strong>AI Study Mode</strong></td>
+          <td><code>business/services/study_service</code></td>
+          <td>Six on-demand generators over workspace notes — flashcards, quiz (single/multi-choice with scoring), exam review, day-by-day study plan, weak-topic detection from recurring questions, and multi-level summaries (short/medium/detailed); all scoped to the active workspace</td>
+          <td><span class="tag tag-ai">OpenAI</span><span class="tag tag-db">pgvector</span></td>
+        </tr>
+        <tr>
+          <td><strong>Smart Actions (Workflow)</strong></td>
+          <td><code>business/services/workflow_service</code></td>
+          <td>Analyses each chat reply and suggests 0–3 conversational actions (create reminder/note, summarise workspace, search web, organise notes, suggest title, extract tasks, report outline); approval saves the user turn + streamed assistant result to the conversation; non-OpenAI models fall back to GPT-4o-mini for tool-calling</td>
+          <td><span class="tag tag-ai">OpenAI</span><span class="tag tag-py">Python</span></td>
         </tr>
         <tr>
           <td><strong>Deployment</strong></td>

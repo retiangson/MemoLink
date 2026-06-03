@@ -31,6 +31,7 @@ DEFAULT_FLAGS: Dict[str, str] = {
     "study_mode_enabled": "true",
     "timeline_enabled": "true",
     "workflow_enabled": "true",
+    "evaluation_survey_enabled": "true",
     "default_model": "gpt-4o-mini",
     "default_language": "English",
     # Minimum access level required per feature

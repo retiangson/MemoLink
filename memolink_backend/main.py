@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 import sys
@@ -55,6 +56,7 @@ from memolink_backend.api.v1 import (
     study_controller,
     timeline_controller,
     workflow_controller,
+    survey_controller,
 )
 
 # Register all models so SQLAlchemy sees them
@@ -74,6 +76,7 @@ import memolink_backend.domain.models.graph_node        # noqa: F401
 import memolink_backend.domain.models.graph_edge        # noqa: F401
 import memolink_backend.domain.models.proactive_insight # noqa: F401
 import memolink_backend.domain.models.note_timeline      # noqa: F401
+import memolink_backend.domain.models.survey              # noqa: F401
 
 if os.getenv("MEMOLINK_SKIP_DB_BOOTSTRAP") != "1":
     with engine.connect() as _conn:
@@ -294,6 +297,71 @@ if os.getenv("MEMOLINK_SKIP_DB_BOOTSTRAP") != "1":
         """))
         _conn.execute(text("INSERT INTO feature_flags (key, value) VALUES ('timeline_enabled', 'true') ON CONFLICT (key) DO NOTHING"))
         _conn.execute(text("INSERT INTO feature_flags (key, value) VALUES ('workflow_enabled', 'true') ON CONFLICT (key) DO NOTHING"))
+        # ── Evaluation Survey tables (research data — kept separate from feedback) ──
+        _conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS survey_questions (
+                id SERIAL PRIMARY KEY,
+                section VARCHAR(120) NOT NULL DEFAULT 'General',
+                question_key VARCHAR(120) NOT NULL UNIQUE,
+                question_text TEXT NOT NULL,
+                answer_type VARCHAR(20) NOT NULL DEFAULT 'likert',
+                options JSONB NOT NULL DEFAULT '[]',
+                order_index INTEGER NOT NULL DEFAULT 0,
+                required BOOLEAN NOT NULL DEFAULT FALSE,
+                active BOOLEAN NOT NULL DEFAULT TRUE,
+                created_at TIMESTAMPTZ DEFAULT now(),
+                updated_at TIMESTAMPTZ DEFAULT now()
+            )
+        """))
+        _conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS survey_responses (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                workspace_id INTEGER,
+                participant_code VARCHAR(50),
+                role VARCHAR(120),
+                ai_tool_usage_frequency VARCHAR(120),
+                consent_confirmed BOOLEAN NOT NULL DEFAULT FALSE,
+                created_at TIMESTAMPTZ DEFAULT now(),
+                submitted_at TIMESTAMPTZ DEFAULT now()
+            )
+        """))
+        _conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS survey_answers (
+                id SERIAL PRIMARY KEY,
+                survey_response_id INTEGER NOT NULL REFERENCES survey_responses(id) ON DELETE CASCADE,
+                question_key VARCHAR(120) NOT NULL,
+                question_text TEXT,
+                answer_type VARCHAR(20),
+                answer_value TEXT,
+                created_at TIMESTAMPTZ DEFAULT now()
+            )
+        """))
+        _conn.execute(text("CREATE INDEX IF NOT EXISTS ix_survey_answers_response ON survey_answers(survey_response_id)"))
+        _conn.execute(text("INSERT INTO feature_flags (key, value) VALUES ('evaluation_survey_enabled', 'true') ON CONFLICT (key) DO NOTHING"))
+        # Seed the default evaluation survey questions if none exist yet
+        _existing_q = _conn.execute(text("SELECT COUNT(*) FROM survey_questions")).scalar()
+        if not _existing_q:
+            from memolink_backend.domain.survey_seed import DEFAULT_SURVEY_QUESTIONS
+            for _i, _q in enumerate(DEFAULT_SURVEY_QUESTIONS):
+                _conn.execute(
+                    text("""
+                        INSERT INTO survey_questions
+                            (section, question_key, question_text, answer_type, options, order_index, required, active)
+                        VALUES
+                            (:section, :key, :qtext, :atype, CAST(:options AS JSONB), :ord, :req, TRUE)
+                        ON CONFLICT (question_key) DO NOTHING
+                    """),
+                    {
+                        "section": _q["section"],
+                        "key": _q["question_key"],
+                        "qtext": _q["question_text"],
+                        "atype": _q["answer_type"],
+                        "options": json.dumps(_q.get("options", [])),
+                        "ord": _i,
+                        "req": _q.get("required", False),
+                    },
+                )
         # Auto-promote first user as admin if none exists
         _conn.execute(text("""
             UPDATE users SET is_admin = TRUE
@@ -453,6 +521,7 @@ app.include_router(proactive_insight_controller.router, prefix="/api")
 app.include_router(study_controller.router, prefix="/api")
 app.include_router(timeline_controller.router, prefix="/api")
 app.include_router(workflow_controller.router, prefix="/api")
+app.include_router(survey_controller.router, prefix="/api")
 
 # AWS Lambda handler — only active when running inside Lambda
 if os.getenv("AWS_LAMBDA_FUNCTION_NAME"):

@@ -5,6 +5,7 @@ import { exportNote, EXPORT_FORMATS } from "../utils/noteExport";
 import type { ExportFormat } from "../utils/noteExport";
 import { VideoImportModal } from "./VideoImportModal";
 import { TimelinePanel } from "./TimelinePanel";
+import { TTSPlayerBar } from "./TTSPlayerBar";
 
 interface NoteEditorViewProps {
   noteKey: string | number;
@@ -24,8 +25,16 @@ interface NoteEditorViewProps {
   ttsPaused?: boolean;
   onTtsStop?: () => void;
   onTtsPauseResume?: () => void;
+  onTtsBack?: () => void;
+  onTtsForward?: () => void;
+  ttsRate?: number;
+  ttsVoices?: SpeechSynthesisVoice[];
+  ttsSelectedVoice?: SpeechSynthesisVoice | null;
+  onTtsRateChange?: (r: number) => void;
+  onTtsVoiceChange?: (v: SpeechSynthesisVoice | null) => void;
   ttsSentenceIdx?: number;
   ttsSentences?: string[];
+  ttsWord?: { start: number; end: number } | null;
   ttsEnabled?: boolean;
   videoImportEnabled?: boolean;
   timelineEnabled?: boolean;
@@ -57,7 +66,9 @@ export function NoteEditorView({
   isNoteDirty, onSave, onDiscard,
   isRecording, isTranscribing, onStartRecording, onStopRecording,
   onPlay, ttsPlaying, ttsPaused, onTtsStop, onTtsPauseResume,
-  ttsSentenceIdx, ttsSentences,
+  onTtsBack, onTtsForward, ttsRate = 1.0, ttsVoices = [], ttsSelectedVoice = null,
+  onTtsRateChange, onTtsVoiceChange,
+  ttsSentenceIdx, ttsSentences, ttsWord = null,
   ttsEnabled = true, videoImportEnabled = true,
   timelineEnabled = true, noteId = null,
 }: NoteEditorViewProps) {
@@ -78,7 +89,19 @@ export function NoteEditorView({
     if (editor) {
       const { from } = editor.state.selection;
       const doc = editor.state.doc;
-      fromPos = from <= 1 ? 0 : from;
+      // Snap to the start of the sentence the cursor sits in, so reading
+      // begins at that sentence — never mid-sentence, and not the whole paragraph.
+      if (from <= 1) {
+        fromPos = 0;
+      } else {
+        const $from = doc.resolve(from);
+        const paraStart = $from.depth > 0 ? $from.start($from.depth) : 0;
+        // Text from the paragraph start up to the cursor; the last sentence
+        // terminator (. ! ? or newline) before the cursor marks the sentence start.
+        const before = doc.textBetween(paraStart, from, " ");
+        const m = before.match(/[\s\S]*[.!?\n]\s*/);
+        fromPos = paraStart + (m ? m[0].length : 0);
+      }
       rawDocText = doc.textBetween(fromPos, doc.content.size, " ");
       if (!rawDocText.trim()) { fromPos = 0; rawDocText = doc.textBetween(0, doc.content.size, " "); }
     } else {
@@ -88,15 +111,9 @@ export function NoteEditorView({
     speakStartDocPos.current = fromPos;
     speakDocTrimOffset.current = rawDocText.length - rawDocText.trimStart().length;
     speakDocText.current = trimmedDocText;
-    const titlePrefix = noteTitleDraft ? `${noteTitleDraft}. ` : "";
-    if (titlePrefix && trimmedDocText) {
-      const allSents = splitSentences(titlePrefix + trimmedDocText);
-      const docSents = splitSentences(trimmedDocText);
-      speakDocSentenceOffset.current = allSents.length - docSents.length;
-    } else {
-      speakDocSentenceOffset.current = 0;
-    }
-    onPlay(titlePrefix + trimmedDocText);
+    // Read only the body, starting from the cursor — never the title.
+    speakDocSentenceOffset.current = 0;
+    onPlay(trimmedDocText);
   }
 
   useEffect(() => {
@@ -120,7 +137,17 @@ export function NoteEditorView({
       searchFrom = idx + docSentences[i].length;
     }
     if (sentenceStart < 0) return;
-    const sentenceEnd = sentenceStart + docSentences[docSentenceIdx].length;
+    const sentLen = docSentences[docSentenceIdx].length;
+    // Narrow to the current word if the browser reported a boundary;
+    // otherwise highlight the whole sentence.
+    let hlStart = sentenceStart;
+    let hlEnd = sentenceStart + sentLen;
+    if (ttsWord && ttsWord.end > ttsWord.start) {
+      const ws = Math.min(Math.max(0, ttsWord.start), sentLen);
+      const we = Math.min(Math.max(ws, ttsWord.end), sentLen);
+      hlStart = sentenceStart + ws;
+      hlEnd = sentenceStart + we;
+    }
     const trimOffset = speakDocTrimOffset.current;
 
     const charToDoc: number[] = [];
@@ -137,12 +164,12 @@ export function NoteEditorView({
       }
     });
 
-    const from = charToDoc[sentenceStart + trimOffset];
-    const toChar = charToDoc[sentenceEnd - 1 + trimOffset];
+    const from = charToDoc[hlStart + trimOffset];
+    const toChar = charToDoc[hlEnd - 1 + trimOffset];
     if (from == null) return;
     const to = (toChar ?? from) + 1;
     editor.view.dispatch(editor.view.state.tr.setMeta(ttsHighlightKey, { from, to }));
-  }, [ttsSentenceIdx, ttsSentences]);
+  }, [ttsSentenceIdx, ttsSentences, ttsWord]);
   const [language, setLanguage] = useState("");
   const [exporting, setExporting] = useState<ExportFormat | null>(null);
   const [activeTab, setActiveTab] = useState<"editor" | "source" | "timeline">("editor");
@@ -190,6 +217,24 @@ export function NoteEditorView({
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden w-full max-w-[740px] mx-auto">
+
+      {/* Floating TTS player — identical to the /read command player */}
+      {ttsEnabled && ttsPlaying && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40">
+          <TTSPlayerBar
+            paused={!!ttsPaused}
+            rate={ttsRate}
+            voices={ttsVoices}
+            selectedVoice={ttsSelectedVoice}
+            onPauseResume={onTtsPauseResume ?? (() => {})}
+            onStop={onTtsStop ?? (() => {})}
+            onBack={onTtsBack ?? (() => {})}
+            onForward={onTtsForward ?? (() => {})}
+            onRateChange={onTtsRateChange ?? (() => {})}
+            onVoiceChange={onTtsVoiceChange ?? (() => {})}
+          />
+        </div>
+      )}
 
       {/* Title */}
       <input
@@ -376,31 +421,18 @@ export function NoteEditorView({
           Video
         </button>}
 
-        {/* TTS play / stop */}
+        {/* TTS play — the floating player bar (same as /read) handles controls while playing */}
         {ttsEnabled && onPlay && (
           ttsPlaying ? (
-            <div className="flex items-center gap-1 shrink-0">
-              <button
-                onClick={onTtsPauseResume}
-                title={ttsPaused ? "Resume" : "Pause"}
-                className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs text-indigo-400 bg-indigo-400/10 border border-indigo-400/20 hover:bg-indigo-400/20 transition"
-              >
-                {ttsPaused ? (
-                  <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-                ) : (
-                  <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
-                )}
-                {ttsPaused ? "Resume" : "Pause"}
-              </button>
-              <button
-                onClick={onTtsStop}
-                title="Stop reading"
-                className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs text-red-400 bg-red-400/10 border border-red-400/20 hover:bg-red-400/20 transition"
-              >
-                <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 24 24"><path d="M6 6h12v12H6z"/></svg>
-                Stop
-              </button>
-            </div>
+            <span className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs text-indigo-400 bg-indigo-400/10 border border-indigo-400/20 shrink-0">
+              <span className="flex gap-[2px] items-end h-3">
+                {[0,1,2].map(i => (
+                  <span key={i} className={`w-[2px] bg-indigo-400 rounded-full ${ttsPaused ? "opacity-30" : "animate-pulse"}`}
+                    style={{ height: `${5 + i * 2}px`, animationDelay: `${i * 0.12}s` }} />
+                ))}
+              </span>
+              Reading…
+            </span>
           ) : (
             <button
               onClick={handlePlay}
