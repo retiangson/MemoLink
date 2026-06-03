@@ -48,7 +48,7 @@ export interface RatingBody {
 }
 
 export async function recordRating(body: RatingBody): Promise<void> {
-  // Fire-and-forget — analytics must never block the UI.
+  // Fire-and-forget - analytics must never block the UI.
   try { await api.post("/evaluation/rating", body); } catch { /* ignore */ }
 }
 

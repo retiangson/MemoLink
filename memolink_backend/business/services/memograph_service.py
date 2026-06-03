@@ -1,5 +1,5 @@
 """
-MemoGraph Service — AI Knowledge Graph Builder
+MemoGraph Service - AI Knowledge Graph Builder
 ===============================================
 
 This service analyses a user's notes and builds a structured knowledge graph that maps
@@ -36,7 +36,7 @@ HOW IT WORKS
 COST
 ----
 Building a 20-note workspace makes ~4 GPT-4o-mini calls (batches of 5).
-Subsequent views are free — results are stored in the database.
+Subsequent views are free - results are stored in the database.
 Graph-enhanced RAG adds no extra API calls; traversal is a SQL query.
 
 NODE TYPES  →  10 types, each with a distinct colour in the frontend canvas
@@ -85,7 +85,7 @@ def _extract_entities_batch(notes_batch: list[dict]) -> list[dict]:
     )
     prompt = (
         "Extract structured entities from each note below.\n"
-        "Return ONLY a JSON array — one object per note:\n"
+        "Return ONLY a JSON array - one object per note:\n"
         "[\n"
         '  {"note_index": 1, "people": [], "topics": [], "projects": [],\n'
         '   "deadlines": [], "decisions": [], "action_items": [],\n'
@@ -125,7 +125,7 @@ class MemographService:
 
     def build(self, user_id: int, workspace_id: int, db) -> dict:
         """Extract entities from all workspace notes and build the knowledge graph."""
-        # Start fresh — clear previous graph
+        # Start fresh - clear previous graph
         self.graph_repo.clear(user_id, workspace_id)
 
         notes = self.note_repo.get_for_user(user_id, workspace_id)

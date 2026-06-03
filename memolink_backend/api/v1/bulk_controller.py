@@ -32,14 +32,14 @@ async def bulk_upload(
 
             if ext in _AUDIO_VIDEO_EXTS and len(content_bytes) > _WHISPER_LIMIT_BYTES:
                 if settings.deepgram_api_key:
-                    c.logs().info("bulk.upload", f"File '{filename}' exceeds 25 MB — falling back to Deepgram Nova-2", {"filename": filename, "size_mb": size_mb, "fallback": "deepgram"}, current_user_id)
+                    c.logs().info("bulk.upload", f"File '{filename}' exceeds 25 MB - falling back to Deepgram Nova-2", {"filename": filename, "size_mb": size_mb, "fallback": "deepgram"}, current_user_id)
                 else:
-                    c.logs().warning("bulk.upload", f"File '{filename}' exceeds 25 MB Whisper limit — no Deepgram key, transcription will be skipped", {"filename": filename, "size_mb": size_mb}, current_user_id)
+                    c.logs().warning("bulk.upload", f"File '{filename}' exceeds 25 MB Whisper limit - no Deepgram key, transcription will be skipped", {"filename": filename, "size_mb": size_mb}, current_user_id)
 
             html_content = extract_formatted_html(content_bytes, filename).replace("\x00", "")
 
             if "[Transcription skipped]" in html_content:
-                c.logs().warning("bulk.upload", f"Transcription skipped for '{filename}' — file exceeds Whisper 25 MB limit", {"filename": filename, "size_mb": size_mb}, current_user_id)
+                c.logs().warning("bulk.upload", f"Transcription skipped for '{filename}' - file exceeds Whisper 25 MB limit", {"filename": filename, "size_mb": size_mb}, current_user_id)
 
             if not html_content.strip() or html_content.strip() == "<p></p>":
                 reason = "No text could be extracted (scanned or image-only file?)"

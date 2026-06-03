@@ -42,7 +42,7 @@ export function SurveyModal({ show, onClose, workspaceId }: Props) {
             for (const q of sec.questions) {
               const v = prefill[q.question_key];
               if (q.answer_type === "single" && typeof v === "string" && v && !q.options.includes(v)) {
-                // a custom "Other" value was stored — restore it into the Other field
+                // a custom "Other" value was stored - restore it into the Other field
                 other[q.question_key] = v;
                 prefill[q.question_key] = "Other";
               }
@@ -149,7 +149,7 @@ export function SurveyModal({ show, onClose, workspaceId }: Props) {
             <div className="space-y-4">
               {editing && (
                 <div className="bg-indigo-500/10 border border-indigo-500/25 rounded-xl px-4 py-2.5 text-[12px] text-indigo-200">
-                  You've already completed this survey{participantCode ? ` (${participantCode})` : ""}. Your previous answers are loaded — review and update them, then re-submit to save changes.
+                  You've already completed this survey{participantCode ? ` (${participantCode})` : ""}. Your previous answers are loaded - review and update them, then re-submit to save changes.
                 </div>
               )}
               <p className="text-sm text-gray-400 leading-relaxed">{survey.intro}</p>

@@ -1,5 +1,5 @@
 """
-MemoGraph Controller — REST API for the AI Knowledge Graph feature.
+MemoGraph Controller - REST API for the AI Knowledge Graph feature.
 
 Endpoints
 ---------

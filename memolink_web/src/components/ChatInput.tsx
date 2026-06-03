@@ -46,7 +46,7 @@ export function ChatInput({
   const [slashPickerIndex, setSlashPickerIndex] = useState(0);
   const [notePickerIndex, setNotePickerIndex] = useState(0);
 
-  // Stage 1: command picker — /something with no space
+  // Stage 1: command picker - /something with no space
   const SLASH_PICKER_VISIBLE = (flags?.slash_commands_enabled !== false) && input.startsWith("/") && !input.slice(1).includes(" ");
   const slashFilter = SLASH_PICKER_VISIBLE ? input.slice(1).toLowerCase() : "";
   const filteredSlashCmds = SLASH_COMMANDS.filter(
@@ -54,7 +54,7 @@ export function ChatInput({
   );
   const clampedSlashIdx = Math.min(slashPickerIndex, Math.max(0, filteredSlashCmds.length - 1));
 
-  // Stage 2: note picker — /Command <text> where note not yet fully selected
+  // Stage 2: note picker - /Command <text> where note not yet fully selected
   const cmdArgsMatch = /^\/(\w+)\s+(.*)$/.exec(input);
   const commandWord = cmdArgsMatch?.[1] ?? "";
   const afterSpace  = cmdArgsMatch?.[2] ?? "";
@@ -87,7 +87,7 @@ export function ChatInput({
     setTimeout(() => textareaRef.current?.focus(), 0);
   }
 
-  // Voice recording for chat — appends transcribed text to the input
+  // Voice recording for chat - appends transcribed text to the input
   const recording = useRecording((text) => {
     setInput((input ? input + " " : "") + text);
   });
@@ -162,7 +162,7 @@ export function ChatInput({
             onClose={() => setInput("")}
           />
         )}
-        {/* Stage 2: note/All picker — only for note commands */}
+        {/* Stage 2: note/All picker - only for note commands */}
         {showNotePicker && !SLASH_PICKER_VISIBLE && (
           <NotePickerForCommand
             command={commandWord}
@@ -173,7 +173,7 @@ export function ChatInput({
             onClose={() => { const w = /^\/\w+/.exec(input)?.[0] ?? ""; setInput(w); }}
           />
         )}
-        {/* Stage 2: format hint — for commands that take free text */}
+        {/* Stage 2: format hint - for commands that take free text */}
         {showFormatHint && !SLASH_PICKER_VISIBLE && (
           <CommandFormatHint
             command={commandWord}
@@ -185,7 +185,7 @@ export function ChatInput({
           onDragOver={(e) => e.preventDefault()}
           onDrop={(e) => { e.preventDefault(); setPendingFiles((p) => [...p, ...Array.from(e.dataTransfer.files)]); }}
         >
-          {/* Pending file chips — inside the box */}
+          {/* Pending file chips - inside the box */}
           {pendingFiles.length > 0 && (
             <div className="flex flex-wrap gap-2 px-4 pt-3">
               {pendingFiles.map((file, i) => (
@@ -223,13 +223,13 @@ export function ChatInput({
             value={input}
             onChange={(e) => { setInput(e.target.value); autoResize(); }}
             onKeyDown={(e) => {
-              // Arrow navigation — slash command picker
+              // Arrow navigation - slash command picker
               if (SLASH_PICKER_VISIBLE && filteredSlashCmds.length > 0) {
                 if (e.key === "ArrowDown") { e.preventDefault(); setSlashPickerIndex(i => Math.min(i + 1, filteredSlashCmds.length - 1)); return; }
                 if (e.key === "ArrowUp")   { e.preventDefault(); setSlashPickerIndex(i => Math.max(0, i - 1)); return; }
               }
 
-              // Arrow navigation — note picker
+              // Arrow navigation - note picker
               if (showNotePicker && pickerItems.length > 0) {
                 if (e.key === "ArrowDown") { e.preventDefault(); setNotePickerIndex(i => Math.min(i + 1, pickerItems.length - 1)); return; }
                 if (e.key === "ArrowUp")   { e.preventDefault(); setNotePickerIndex(i => Math.max(0, i - 1)); return; }
@@ -281,7 +281,7 @@ export function ChatInput({
 
           {/* Toolbar row */}
           <div className="flex items-center justify-between px-3 pb-3 pt-1">
-            {/* Left side — attachment */}
+            {/* Left side - attachment */}
             <div className="flex items-center gap-1">
               {(!flags || flags.file_upload_enabled) && (
                 <>
@@ -313,7 +313,7 @@ export function ChatInput({
               {(!flags || flags.web_search_enabled) && (
                 <button
                   onClick={onToggleWebSearch}
-                  title={webSearch ? "Web search on — click to disable" : "Enable web search"}
+                  title={webSearch ? "Web search on - click to disable" : "Enable web search"}
                   className={`flex items-center gap-1.5 px-2.5 h-8 rounded-xl text-xs font-medium transition ${
                     webSearch
                       ? "bg-sky-500/15 border border-sky-500/40 text-sky-400 hover:bg-sky-500/25"
@@ -332,7 +332,7 @@ export function ChatInput({
               {(!flags || flags.agent_mode_enabled) && (
                 <button
                   onClick={onToggleAgentMode}
-                  title={agentMode ? "Agent mode on — AI can create notes, add reminders, and more" : "Enable Agent mode"}
+                  title={agentMode ? "Agent mode on - AI can create notes, add reminders, and more" : "Enable Agent mode"}
                   className={`flex items-center gap-1.5 px-2.5 h-8 rounded-xl text-xs font-medium transition ${
                     agentMode
                       ? "bg-violet-500/15 border border-violet-500/40 text-violet-400 hover:bg-violet-500/25"
@@ -350,7 +350,7 @@ export function ChatInput({
               {/* Research mode toggle */}
               {(!flags || flags.research_mode_enabled) && <button
                 onClick={onToggleResearchMode}
-                title={researchMode ? "Research mode on — deep multi-source analysis with academic papers" : "Enable Research mode"}
+                title={researchMode ? "Research mode on - deep multi-source analysis with academic papers" : "Enable Research mode"}
                 className={`flex items-center gap-1.5 px-2.5 h-8 rounded-xl text-xs font-medium transition ${
                   researchMode
                     ? "bg-emerald-500/15 border border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/25"
@@ -382,7 +382,7 @@ export function ChatInput({
               )}
             </div>
 
-            {/* Right side — mic + send */}
+            {/* Right side - mic + send */}
             <div className="flex items-center gap-2">
               {/* Mic button */}
               <button

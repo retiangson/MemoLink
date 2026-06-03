@@ -1,5 +1,5 @@
 """
-Survey service — business logic for the MemoLink Evaluation Survey.
+Survey service - business logic for the MemoLink Evaluation Survey.
 
 Keeps research data (survey_*) separate from product feedback (feedback table).
 Questions are fully dynamic and admin-editable; answers are stored long-format
@@ -296,7 +296,7 @@ class SurveyService:
         return SurveyResponsesDTO(total=len(rows), responses=rows)
 
     def export_csv(self) -> str:
-        """Wide CSV — one row per response, one column per question."""
+        """Wide CSV - one row per response, one column per question."""
         questions = self._repo.list_questions(active_only=False)
         responses = self._repo.list_responses()
 

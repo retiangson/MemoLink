@@ -66,7 +66,7 @@ export function useRecording(onFinalText: (text: string) => void) {
           video: true,
           audio: true,
         });
-        // discard video — we only want the audio track
+        // discard video - we only want the audio track
         stream.getVideoTracks().forEach((t) => t.stop());
         if (stream.getAudioTracks().length === 0) {
           stream.getTracks().forEach((t) => t.stop());

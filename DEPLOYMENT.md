@@ -20,7 +20,7 @@ during setup. You do not write or manage the frontend workflow yourself.
 
 ---
 
-## Part 1 — AWS Setup
+## Part 1 - AWS Setup
 
 ### 1.1 Create an IAM User for GitHub Actions
 
@@ -35,7 +35,7 @@ GitHub Actions needs AWS credentials to push to ECR and update Lambda.
 5. Click **Create user**
 6. Open the user → **Security credentials** tab → **Create access key**
 7. Choose **"Application running outside AWS"**
-8. Copy the values — you only see the secret once:
+8. Copy the values - you only see the secret once:
 
 ```
 AWS_ACCESS_KEY_ID     = AKIA...
@@ -118,7 +118,7 @@ Add every variable from your `.env` file:
 | `DEEPSEEK_API_KEY` | Your DeepSeek key (optional) |
 | `BRAVE_SEARCH_API_KEY` | Your Brave key |
 | `SEMANTIC_SCHOLAR_API_KEY` | Optional |
-| `JWT_SECRET_KEY` | Long random string — generate with: `python -c "import secrets; print(secrets.token_hex(32))"` |
+| `JWT_SECRET_KEY` | Long random string - generate with: `python -c "import secrets; print(secrets.token_hex(32))"` |
 | `JWT_ALGORITHM` | `HS256` |
 | `SMTP_HOST` | `smtp.gmail.com` |
 | `SMTP_PORT` | `587` |
@@ -145,7 +145,7 @@ Copy the **Invoke URL** from the API overview page:
 https://xxxxxxxxxx.execute-api.ap-southeast-2.amazonaws.com
 ```
 
-This is your `VITE_API_BASE_URL` — used in Part 2 and Part 3.
+This is your `VITE_API_BASE_URL` - used in Part 2 and Part 3.
 
 **Enable CORS:**
 
@@ -156,7 +156,7 @@ Open the API → **CORS → Configure**, set:
 
 ---
 
-## Part 2 — Azure Static Web Apps Setup
+## Part 2 - Azure Static Web Apps Setup
 
 Azure manages the frontend CI/CD entirely. When you connect your GitHub repo
 during setup, Azure:
@@ -210,7 +210,7 @@ Go back to **Lambda → Environment variables** and set `FRONTEND_URL` to this v
 
 ---
 
-## Part 3 — GitHub Actions Secrets (Backend Only)
+## Part 3 - GitHub Actions Secrets (Backend Only)
 
 Azure already added its own secret automatically. You only need to add the AWS secrets.
 
@@ -218,15 +218,15 @@ Go to your GitHub repo → **Settings → Secrets and variables → Actions → 
 
 | Secret name | Value | Where to get it |
 |---|---|---|
-| `AWS_ACCESS_KEY_ID` | `AKIA...` | Part 1.1 — IAM user access key |
-| `AWS_SECRET_ACCESS_KEY` | `wJalr...` | Part 1.1 — IAM user secret key |
+| `AWS_ACCESS_KEY_ID` | `AKIA...` | Part 1.1 - IAM user access key |
+| `AWS_SECRET_ACCESS_KEY` | `wJalr...` | Part 1.1 - IAM user secret key |
 | `AWS_REGION` | e.g. `ap-southeast-2` | The region you chose in AWS |
-| `ECR_REPOSITORY` | `memolink-backend` | Part 1.2 — ECR repo name |
-| `LAMBDA_FUNCTION_NAME` | `memolink-api` | Part 1.4 — Lambda function name |
+| `ECR_REPOSITORY` | `memolink-backend` | Part 1.2 - ECR repo name |
+| `LAMBDA_FUNCTION_NAME` | `memolink-api` | Part 1.4 - Lambda function name |
 
 ---
 
-## Part 4 — First Deployment
+## Part 4 - First Deployment
 
 Push to `main` to trigger both pipelines:
 
@@ -236,12 +236,12 @@ git push origin main
 
 Go to **GitHub → Actions** to watch progress:
 
-- `Deploy Backend to AWS Lambda` — builds Docker image, pushes to ECR, updates Lambda (~3-5 min)
-- `Azure Static Web Apps CI/CD` — Azure-generated workflow builds and deploys the frontend (~2 min)
+- `Deploy Backend to AWS Lambda` - builds Docker image, pushes to ECR, updates Lambda (~3-5 min)
+- `Azure Static Web Apps CI/CD` - Azure-generated workflow builds and deploys the frontend (~2 min)
 
 ---
 
-## Part 5 — Verify
+## Part 5 - Verify
 
 ### Backend health check
 ```
@@ -253,7 +253,7 @@ Expected:
 ```
 
 ### Frontend
-Open your Azure URL — you should see the MemoLink login page.
+Open your Azure URL - you should see the MemoLink login page.
 
 ---
 
@@ -261,12 +261,12 @@ Open your Azure URL — you should see the MemoLink login page.
 
 | Feature | Behaviour |
 |---|---|
-| AI chat streaming | Buffered — full answer appears at once after generation completes |
+| AI chat streaming | Buffered - full answer appears at once after generation completes |
 | Research Mode | Works but may be slow on complex queries (120s timeout) |
 | All other features | Work normally |
 
 Chat streaming is buffered because API Gateway does not support Server-Sent Events.
-The answer content is still complete and correct — it just appears all at once.
+The answer content is still complete and correct - it just appears all at once.
 
 ---
 
@@ -274,7 +274,7 @@ The answer content is still complete and correct — it just appears all at once
 
 ```
 # GitHub Actions secrets (repo → Settings → Secrets → Actions)
-# Azure adds its own token automatically — you only add the AWS ones below.
+# Azure adds its own token automatically - you only add the AWS ones below.
 
 AWS_ACCESS_KEY_ID          IAM user access key        (Part 1.1)
 AWS_SECRET_ACCESS_KEY      IAM user secret key        (Part 1.1)

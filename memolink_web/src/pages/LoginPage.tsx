@@ -53,7 +53,7 @@ export function LoginPage({ onLogin, initialResetToken }: { onLogin: () => void;
     } catch {
       if (mode === "login") setError("Invalid email or password.");
       else if (mode === "register") setError("Registration failed. Email may already exist.");
-      else if (mode === "reset") setError("Reset failed. The link may have expired — request a new one.");
+      else if (mode === "reset") setError("Reset failed. The link may have expired - request a new one.");
       else setError("Something went wrong. Please try again.");
     } finally {
       setLoading(false);
@@ -92,7 +92,7 @@ export function LoginPage({ onLogin, initialResetToken }: { onLogin: () => void;
   return (
     <div className="h-screen w-screen flex bg-[#0f0f13] text-white">
 
-      {/* LEFT — Form */}
+      {/* LEFT - Form */}
       <div className="flex flex-col justify-center items-center w-full md:w-1/2 p-8">
         <div className="w-full max-w-sm">
 
@@ -109,7 +109,7 @@ export function LoginPage({ onLogin, initialResetToken }: { onLogin: () => void;
           <p className="text-gray-400 text-sm mb-7">{subheading}</p>
 
           <div className="flex flex-col gap-3">
-            {/* Email field — shown for login, register, forgot */}
+            {/* Email field - shown for login, register, forgot */}
             {mode !== "reset" && (
               <input
                 className="w-full p-3 rounded-xl bg-[#1e1e2a] border border-[#2a2a38] text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 transition"
@@ -121,7 +121,7 @@ export function LoginPage({ onLogin, initialResetToken }: { onLogin: () => void;
               />
             )}
 
-            {/* Password field — shown for login, register, reset */}
+            {/* Password field - shown for login, register, reset */}
             {mode !== "forgot" && (
               <input
                 className="w-full p-3 rounded-xl bg-[#1e1e2a] border border-[#2a2a38] text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 transition"
@@ -133,7 +133,7 @@ export function LoginPage({ onLogin, initialResetToken }: { onLogin: () => void;
               />
             )}
 
-            {/* Confirm password — register + reset */}
+            {/* Confirm password - register + reset */}
             {(mode === "register" || mode === "reset") && (
               <input
                 className="w-full p-3 rounded-xl bg-[#1e1e2a] border border-[#2a2a38] text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 transition"
@@ -145,7 +145,7 @@ export function LoginPage({ onLogin, initialResetToken }: { onLogin: () => void;
               />
             )}
 
-            {/* Forgot password link — only on login */}
+            {/* Forgot password link - only on login */}
             {mode === "login" && (
               <div className="flex justify-end -mt-1">
                 <button
@@ -198,7 +198,7 @@ export function LoginPage({ onLogin, initialResetToken }: { onLogin: () => void;
         </div>
       </div>
 
-      {/* RIGHT — Brand panel */}
+      {/* RIGHT - Brand panel */}
       <div className="hidden md:flex flex-col justify-center items-center w-1/2 relative overflow-hidden bg-gradient-to-br from-[#0f0f1a] to-[#1a1a40]">
         <div className="absolute inset-0 opacity-20"
           style={{ backgroundImage: "radial-gradient(circle at 30% 50%, #6366f1 0%, transparent 60%), radial-gradient(circle at 70% 30%, #818cf8 0%, transparent 50%)" }}

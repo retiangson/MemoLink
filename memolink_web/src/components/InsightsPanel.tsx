@@ -72,7 +72,7 @@ export function InsightsPanel({ workspaceId, onOpenNote }: InsightsPanelProps) {
     try {
       setInsights(await getInsights(workspaceId));
     } catch {
-      // Silently keep empty — non-critical feature
+      // Silently keep empty - non-critical feature
     }
   }, [workspaceId]);
 
@@ -156,7 +156,7 @@ export function InsightsPanel({ workspaceId, onOpenNote }: InsightsPanelProps) {
           {/* Insight cards */}
           {insights.length === 0 && !scanning && (
             <p className="text-[11px] text-gray-600 text-center py-2">
-              No insights yet — click Scan Notes to analyse your workspace.
+              No insights yet - click Scan Notes to analyse your workspace.
             </p>
           )}
 

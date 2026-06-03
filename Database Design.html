@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>MemoLink — Database Design</title>
+  <title>MemoLink - Database Design</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -195,7 +195,7 @@
     <div class="section-label">ERD</div>
     <h2>Entity-Relationship Overview</h2>
     <p>Nine core tables: <code>users</code>, <code>workspaces</code>, <code>notes</code>, <code>embeddings</code>, <code>conversations</code>, <code>messages</code>, <code>reminders</code>, <code>feature_flags</code>, and <code>feedback</code>. All user-scoped tables cascade-delete when the user is removed. Notes, conversations, and workspaces carry a <code>deleted_at</code> column for soft-delete support. Notes, conversations, and reminders each carry a <code>workspace_id</code> foreign key so every piece of content is scoped to a workspace. Embeddings remain linked to notes; retrieval is workspace-scoped by joining through the note's <code>workspace_id</code>.</p>
-  <p style="margin-top:.7rem;"><strong style="color:var(--text)">Schema stability for most new features:</strong> AI image generation (with fallback chain), multi-model chat, translation, web search, agent mode, and password reset are all stateless at the database layer — they require no additional tables or columns. Generated images are embedded as base64 data URLs inside the existing <code>messages.content</code> TEXT column (base64 is stripped from context before OpenAI calls to prevent token overflow). Model attribution is carried in the SSE stream and rendered client-side. Rich HTML from bulk file upload is stored in <code>notes.content</code>, which already accepts arbitrary HTML including embedded <code>&lt;img&gt;</code> tags.</p>
+  <p style="margin-top:.7rem;"><strong style="color:var(--text)">Schema stability for most new features:</strong> AI image generation (with fallback chain), multi-model chat, translation, web search, agent mode, and password reset are all stateless at the database layer - they require no additional tables or columns. Generated images are embedded as base64 data URLs inside the existing <code>messages.content</code> TEXT column (base64 is stripped from context before OpenAI calls to prevent token overflow). Model attribution is carried in the SSE stream and rendered client-side. Rich HTML from bulk file upload is stored in <code>notes.content</code>, which already accepts arbitrary HTML including embedded <code>&lt;img&gt;</code> tags.</p>
   <p style="margin-top:.7rem;"><strong style="color:var(--text)">New tables for admin features:</strong> The <code>feature_flags</code> table stores system-wide feature toggles, defaults, and per-feature minimum access levels. The <code>feedback</code> table stores user-submitted bug reports and suggestions. The <code>users</code> table gains an <code>is_admin BOOLEAN</code> column and an <code>access_level VARCHAR</code> column (<code>'regular'</code> | <code>'plus'</code> | <code>'pro'</code>). JWT tokens embed both <code>is_admin</code> and <code>access_level</code> claims; the <code>get_current_user_info</code> dependency decodes them for stateless access-level enforcement without a DB lookup on every request.</p>
 
     <div class="erd-wrap">
@@ -313,7 +313,7 @@
   <section>
     <div class="section-label">Table</div>
     <h2>users</h2>
-    <p>Stores registered user accounts. The root entity — all other tables are scoped to a user via foreign keys. The <code>is_admin</code> column controls access to admin-only API endpoints; the first registered user is auto-promoted to admin on application startup. The <code>access_level</code> column (<code>'regular'</code> / <code>'plus'</code> / <code>'pro'</code>) gates premium features; admins can change any user's level via <code>PATCH /api/admin/users/{id}/level</code>. Both <code>is_admin</code> and <code>access_level</code> are embedded in the JWT so feature enforcement is stateless.</p>
+    <p>Stores registered user accounts. The root entity - all other tables are scoped to a user via foreign keys. The <code>is_admin</code> column controls access to admin-only API endpoints; the first registered user is auto-promoted to admin on application startup. The <code>access_level</code> column (<code>'regular'</code> / <code>'plus'</code> / <code>'pro'</code>) gates premium features; admins can change any user's level via <code>PATCH /api/admin/users/{id}/level</code>. Both <code>is_admin</code> and <code>access_level</code> are embedded in the JWT so feature enforcement is stateless.</p>
     <div class="schema-card">
       <div class="schema-header">
         <span class="schema-icon">&#x1F464;</span>
@@ -347,13 +347,13 @@
             <td class="col-name">is_admin</td>
             <td class="col-type">BOOLEAN</td>
             <td>default: <code>false</code></td>
-            <td class="col-notes">Admin flag — when <code>true</code>, the user can access admin-only API endpoints and the Admin Panel UI. The first registered user is promoted to admin automatically on startup. Admins can promote or demote other users via <code>PATCH /api/admin/users/{id}/role</code>. Admin status bypasses all access-level checks. Added via ALTER TABLE IF NOT EXISTS at startup.</td>
+            <td class="col-notes">Admin flag - when <code>true</code>, the user can access admin-only API endpoints and the Admin Panel UI. The first registered user is promoted to admin automatically on startup. Admins can promote or demote other users via <code>PATCH /api/admin/users/{id}/role</code>. Admin status bypasses all access-level checks. Added via ALTER TABLE IF NOT EXISTS at startup.</td>
           </tr>
           <tr>
             <td class="col-name">access_level</td>
             <td class="col-type">VARCHAR</td>
             <td><span class="badge-nn">NOT NULL</span> default: <code>'regular'</code></td>
-            <td class="col-notes">Subscription tier: <code>'regular'</code>, <code>'plus'</code>, or <code>'pro'</code>. Controls which feature-flag-gated features the user can access. Admins change it via <code>PATCH /api/admin/users/{id}/level</code>. Embedded in the JWT on login — level changes require the user to re-login to take effect. Added via <code>ALTER TABLE users ADD COLUMN IF NOT EXISTS access_level VARCHAR NOT NULL DEFAULT 'regular'</code> at startup.</td>
+            <td class="col-notes">Subscription tier: <code>'regular'</code>, <code>'plus'</code>, or <code>'pro'</code>. Controls which feature-flag-gated features the user can access. Admins change it via <code>PATCH /api/admin/users/{id}/level</code>. Embedded in the JWT on login - level changes require the user to re-login to take effect. Added via <code>ALTER TABLE users ADD COLUMN IF NOT EXISTS access_level VARCHAR NOT NULL DEFAULT 'regular'</code> at startup.</td>
           </tr>
         </tbody>
       </table>
@@ -366,12 +366,12 @@
   <section>
     <div class="section-label">Table</div>
     <h2>workspaces</h2>
-    <p>Organises a user's knowledge into named, typed containers. Every note, conversation, and reminder belongs to a workspace. Workspaces are soft-deleted via <code>deleted_at</code> — a user must always have at least one non-deleted workspace. The <code>is_default</code> flag marks the workspace created during first-time onboarding. <code>last_accessed_at</code> is updated each time the user activates the workspace and is used to auto-select it on the next login.</p>
+    <p>Organises a user's knowledge into named, typed containers. Every note, conversation, and reminder belongs to a workspace. Workspaces are soft-deleted via <code>deleted_at</code> - a user must always have at least one non-deleted workspace. The <code>is_default</code> flag marks the workspace created during first-time onboarding. <code>last_accessed_at</code> is updated each time the user activates the workspace and is used to auto-select it on the next login.</p>
     <div class="schema-card">
       <div class="schema-header">
         <span class="schema-icon">&#x1F5C2;&#xFE0F;</span>
         <span class="schema-name">workspaces</span>
-        <span class="schema-desc">PostgreSQL table — created at startup via ALTER TABLE IF NOT EXISTS</span>
+        <span class="schema-desc">PostgreSQL table - created at startup via ALTER TABLE IF NOT EXISTS</span>
       </div>
       <table class="col-table">
         <thead>
@@ -388,13 +388,13 @@
             <td class="col-name">user_id</td>
             <td class="col-type">INTEGER</td>
             <td><span class="badge-fk">FK &rarr; users.id</span><span class="badge-nn">NOT NULL</span></td>
-            <td class="col-notes">Owner of this workspace — CASCADE DELETE when user is removed</td>
+            <td class="col-notes">Owner of this workspace - CASCADE DELETE when user is removed</td>
           </tr>
           <tr>
             <td class="col-name">name</td>
             <td class="col-type">VARCHAR(100)</td>
             <td><span class="badge-nn">NOT NULL</span><span class="badge-uq">UNIQUE per user</span></td>
-            <td class="col-notes">Display label — e.g. "Capstone Research", "Claims System". Unique within the user's workspaces (enforced by composite unique index on user_id + name).</td>
+            <td class="col-notes">Display label - e.g. "Capstone Research", "Claims System". Unique within the user's workspaces (enforced by composite unique index on user_id + name).</td>
           </tr>
           <tr>
             <td class="col-name">type</td>
@@ -406,7 +406,7 @@
             <td class="col-name">description</td>
             <td class="col-type">TEXT</td>
             <td>nullable</td>
-            <td class="col-notes">Optional freeform description — shown in the workspace management panel</td>
+            <td class="col-notes">Optional freeform description - shown in the workspace management panel</td>
           </tr>
           <tr>
             <td class="col-name">is_default</td>
@@ -436,7 +436,7 @@
             <td class="col-name">deleted_at</td>
             <td class="col-type">TIMESTAMPTZ</td>
             <td>nullable</td>
-            <td class="col-notes">Soft-delete timestamp — non-null means the workspace is hidden. The API blocks deletion if this would leave the user with zero active workspaces.</td>
+            <td class="col-notes">Soft-delete timestamp - non-null means the workspace is hidden. The API blocks deletion if this would leave the user with zero active workspaces.</td>
           </tr>
         </tbody>
       </table>
@@ -471,13 +471,13 @@
             <td class="col-name">user_id</td>
             <td class="col-type">INTEGER</td>
             <td><span class="badge-fk">FK &rarr; users.id</span><span class="badge-nn">NOT NULL</span></td>
-            <td class="col-notes">CASCADE DELETE — removing user removes all notes</td>
+            <td class="col-notes">CASCADE DELETE - removing user removes all notes</td>
           </tr>
           <tr>
             <td class="col-name">workspace_id</td>
             <td class="col-type">INTEGER</td>
             <td><span class="badge-fk">FK &rarr; workspaces.id</span><span class="badge-nn">NOT NULL</span><span class="badge-idx">INDEX</span></td>
-            <td class="col-notes">Scopes this note to a workspace. CASCADE DELETE — removing a workspace removes its notes. Added via ALTER TABLE IF NOT EXISTS at startup.</td>
+            <td class="col-notes">Scopes this note to a workspace. CASCADE DELETE - removing a workspace removes its notes. Added via ALTER TABLE IF NOT EXISTS at startup.</td>
           </tr>
           <tr>
             <td class="col-name">title</td>
@@ -495,7 +495,7 @@
             <td class="col-name">source</td>
             <td class="col-type">VARCHAR(255)</td>
             <td>nullable</td>
-            <td class="col-notes">Optional label — e.g. "Lecture 3", "uploaded PDF filename", "youtube: &lt;title&gt;"</td>
+            <td class="col-notes">Optional label - e.g. "Lecture 3", "uploaded PDF filename", "youtube: &lt;title&gt;"</td>
           </tr>
           <tr>
             <td class="col-name">created_at</td>
@@ -507,7 +507,7 @@
             <td class="col-name">deleted_at</td>
             <td class="col-type">TIMESTAMPTZ</td>
             <td>nullable</td>
-            <td class="col-notes">Soft-delete timestamp — non-null means the note is deleted. Added via ALTER TABLE IF NOT EXISTS at startup.</td>
+            <td class="col-notes">Soft-delete timestamp - non-null means the note is deleted. Added via ALTER TABLE IF NOT EXISTS at startup.</td>
           </tr>
         </tbody>
       </table>
@@ -525,7 +525,7 @@
       <div class="schema-header">
         <span class="schema-icon">&#x1F9E0;</span>
         <span class="schema-name">embeddings</span>
-        <span class="schema-desc">pgvector table — requires <code>CREATE EXTENSION vector</code></span>
+        <span class="schema-desc">pgvector table - requires <code>CREATE EXTENSION vector</code></span>
       </div>
       <table class="col-table">
         <thead>
@@ -542,13 +542,13 @@
             <td class="col-name">note_id</td>
             <td class="col-type">INTEGER</td>
             <td><span class="badge-fk">FK &rarr; notes.id</span><span class="badge-uq">UNIQUE</span></td>
-            <td class="col-notes">CASCADE DELETE — one embedding per note maximum</td>
+            <td class="col-notes">CASCADE DELETE - one embedding per note maximum</td>
           </tr>
           <tr>
             <td class="col-name">vector</td>
             <td class="col-type">VECTOR(1536)</td>
             <td></td>
-            <td class="col-notes">OpenAI text-embedding-3-small output — 1 536 float dimensions</td>
+            <td class="col-notes">OpenAI text-embedding-3-small output - 1 536 float dimensions</td>
           </tr>
         </tbody>
       </table>
@@ -607,7 +607,7 @@
             <td class="col-name">deleted_at</td>
             <td class="col-type">TIMESTAMPTZ</td>
             <td>nullable</td>
-            <td class="col-notes">Soft-delete timestamp — non-null means conversation is hidden. Added via ALTER TABLE IF NOT EXISTS at startup.</td>
+            <td class="col-notes">Soft-delete timestamp - non-null means conversation is hidden. Added via ALTER TABLE IF NOT EXISTS at startup.</td>
           </tr>
         </tbody>
       </table>
@@ -621,7 +621,7 @@
     <div class="section-label">Table</div>
     <h2>messages</h2>
     <p>Stores individual chat messages (both user and AI) within a conversation. Supports paginated retrieval via <code>before_id</code> cursor.</p>
-    <p style="margin-top:.6rem;"><strong style="color:var(--text)">Content format note:</strong> The <code>content</code> column stores free-form text which may contain Markdown, LaTeX, or — for AI image generation responses — a Markdown image tag embedding a base64 data URL (e.g. <code>![image](data:image/png;base64,...)</code>). Base64-embedded images are persistent and do not expire. For AI image replies, the content also includes DALL-E's revised prompt appended after the image. Translation responses are stored as plain text. No schema change is required for these content types — the <code>TEXT</code> column accommodates them without length restriction.</p>
+    <p style="margin-top:.6rem;"><strong style="color:var(--text)">Content format note:</strong> The <code>content</code> column stores free-form text which may contain Markdown, LaTeX, or - for AI image generation responses - a Markdown image tag embedding a base64 data URL (e.g. <code>![image](data:image/png;base64,...)</code>). Base64-embedded images are persistent and do not expire. For AI image replies, the content also includes DALL-E's revised prompt appended after the image. Translation responses are stored as plain text. No schema change is required for these content types - the <code>TEXT</code> column accommodates them without length restriction.</p>
     <div class="schema-card">
       <div class="schema-header">
         <span class="schema-icon">&#x1F4E8;</span>
@@ -643,7 +643,7 @@
             <td class="col-name">conversation_id</td>
             <td class="col-type">INTEGER</td>
             <td><span class="badge-fk">FK &rarr; conversations.id</span></td>
-            <td class="col-notes">CASCADE DELETE — messages deleted with conversation</td>
+            <td class="col-notes">CASCADE DELETE - messages deleted with conversation</td>
           </tr>
           <tr>
             <td class="col-name">role</td>
@@ -655,7 +655,7 @@
             <td class="col-name">content</td>
             <td class="col-type">TEXT</td>
             <td></td>
-            <td class="col-notes">Message body — Markdown and LaTeX supported. AI image generation replies include a Markdown <code>![image](data:image/...;base64,...)</code> tag with an embedded base64 data URL. Translation responses are stored as plain text. All content types are handled by the TEXT column without schema changes.</td>
+            <td class="col-notes">Message body - Markdown and LaTeX supported. AI image generation replies include a Markdown <code>![image](data:image/...;base64,...)</code> tag with an embedded base64 data URL. Translation responses are stored as plain text. All content types are handled by the TEXT column without schema changes.</td>
           </tr>
           <tr>
             <td class="col-name">created_at</td>
@@ -679,7 +679,7 @@
       <div class="schema-header">
         <span class="schema-icon">&#x23F0;</span>
         <span class="schema-name">reminders</span>
-        <span class="schema-desc">PostgreSQL table — migrated at startup</span>
+        <span class="schema-desc">PostgreSQL table - migrated at startup</span>
       </div>
       <table class="col-table">
         <thead>
@@ -696,7 +696,7 @@
             <td class="col-name">user_id</td>
             <td class="col-type">INTEGER</td>
             <td><span class="badge-fk">FK &rarr; users.id</span><span class="badge-nn">NOT NULL</span></td>
-            <td class="col-notes">Owner of this reminder — cascade delete when user is removed</td>
+            <td class="col-notes">Owner of this reminder - cascade delete when user is removed</td>
           </tr>
           <tr>
             <td class="col-name">workspace_id</td>
@@ -708,19 +708,19 @@
             <td class="col-name">text</td>
             <td class="col-type">VARCHAR(500)</td>
             <td><span class="badge-nn">NOT NULL</span></td>
-            <td class="col-notes">Short reminder title — AI instructions cap this at 60 characters</td>
+            <td class="col-notes">Short reminder title - AI instructions cap this at 60 characters</td>
           </tr>
           <tr>
             <td class="col-name">description</td>
             <td class="col-type">TEXT</td>
             <td>nullable</td>
-            <td class="col-notes">One-to-two sentence context — populated by AI suggestions, optional for manual entries</td>
+            <td class="col-notes">One-to-two sentence context - populated by AI suggestions, optional for manual entries</td>
           </tr>
           <tr>
             <td class="col-name">done</td>
             <td class="col-type">BOOLEAN</td>
             <td>default: <code>false</code></td>
-            <td class="col-notes">Completion flag — toggled from the reminder detail modal</td>
+            <td class="col-notes">Completion flag - toggled from the reminder detail modal</td>
           </tr>
           <tr>
             <td class="col-name">type</td>
@@ -732,13 +732,13 @@
             <td class="col-name">due_date</td>
             <td class="col-type">VARCHAR(50)</td>
             <td>nullable</td>
-            <td class="col-notes">ISO date string YYYY-MM-DD — optional, set by AI or user</td>
+            <td class="col-notes">ISO date string YYYY-MM-DD - optional, set by AI or user</td>
           </tr>
           <tr>
             <td class="col-name">due_time</td>
             <td class="col-type">VARCHAR(10)</td>
             <td>nullable</td>
-            <td class="col-notes">Time string HH:MM — optional, set by AI or user</td>
+            <td class="col-notes">Time string HH:MM - optional, set by AI or user</td>
           </tr>
           <tr>
             <td class="col-name">created_at</td>
@@ -762,7 +762,7 @@
       <div class="schema-header">
         <span class="schema-icon">&#x1F3F3;&#xFE0F;</span>
         <span class="schema-name">feature_flags</span>
-        <span class="schema-desc">PostgreSQL table — seeded at startup</span>
+        <span class="schema-desc">PostgreSQL table - seeded at startup</span>
       </div>
       <table class="col-table">
         <thead>
@@ -773,7 +773,7 @@
             <td class="col-name">key</td>
             <td class="col-type">VARCHAR(100)</td>
             <td><span class="badge-pk">PK</span><span class="badge-nn">NOT NULL</span></td>
-            <td class="col-notes">Flag identifier — primary key. Default keys: <code>web_search_enabled</code>, <code>agent_mode_enabled</code>, <code>model_selection_enabled</code>, <code>image_generation_enabled</code>, <code>translation_enabled</code>, <code>file_upload_enabled</code>, <code>default_model</code>, <code>default_language</code>.</td>
+            <td class="col-notes">Flag identifier - primary key. Default keys: <code>web_search_enabled</code>, <code>agent_mode_enabled</code>, <code>model_selection_enabled</code>, <code>image_generation_enabled</code>, <code>translation_enabled</code>, <code>file_upload_enabled</code>, <code>default_model</code>, <code>default_language</code>.</td>
           </tr>
           <tr>
             <td class="col-name">value</td>
@@ -803,7 +803,7 @@
       <div class="schema-header">
         <span class="schema-icon">&#x1F41B;</span>
         <span class="schema-name">feedback</span>
-        <span class="schema-desc">PostgreSQL table — created at startup</span>
+        <span class="schema-desc">PostgreSQL table - created at startup</span>
       </div>
       <table class="col-table">
         <thead>
@@ -820,13 +820,13 @@
             <td class="col-name">user_id</td>
             <td class="col-type">INTEGER</td>
             <td><span class="badge-fk">FK &rarr; users.id</span><span class="badge-nn">NOT NULL</span></td>
-            <td class="col-notes">The user who submitted the report. CASCADE DELETE — removing a user removes their feedback.</td>
+            <td class="col-notes">The user who submitted the report. CASCADE DELETE - removing a user removes their feedback.</td>
           </tr>
           <tr>
             <td class="col-name">user_email</td>
             <td class="col-type">VARCHAR</td>
             <td><span class="badge-nn">NOT NULL</span></td>
-            <td class="col-notes">Denormalised copy of the submitter's email at the time of submission — retained for admin display even if the user's email changes.</td>
+            <td class="col-notes">Denormalised copy of the submitter's email at the time of submission - retained for admin display even if the user's email changes.</td>
           </tr>
           <tr>
             <td class="col-name">type</td>
@@ -863,12 +863,12 @@
   <section>
     <div class="section-label">Table</div>
     <h2>system_logs</h2>
-    <p>Stores structured application events at three severity levels — INFO, WARNING, and ERROR. Written by the <code>SystemLogService</code> throughout the application (auth, transcription, translation, chat fallbacks, uploads). The table has no foreign keys; <code>user_id</code> is stored as a plain integer so log entries are preserved even after a user is deleted. Admins view, filter, paginate, and clear logs via the System Logs tab in the Admin Panel.</p>
+    <p>Stores structured application events at three severity levels - INFO, WARNING, and ERROR. Written by the <code>SystemLogService</code> throughout the application (auth, transcription, translation, chat fallbacks, uploads). The table has no foreign keys; <code>user_id</code> is stored as a plain integer so log entries are preserved even after a user is deleted. Admins view, filter, paginate, and clear logs via the System Logs tab in the Admin Panel.</p>
     <div class="schema-card">
       <div class="schema-header">
         <span class="schema-icon">&#x1F4CB;</span>
         <span class="schema-name">system_logs</span>
-        <span class="schema-desc">PostgreSQL table — created at startup via CREATE TABLE IF NOT EXISTS</span>
+        <span class="schema-desc">PostgreSQL table - created at startup via CREATE TABLE IF NOT EXISTS</span>
       </div>
       <table class="col-table">
         <thead>
@@ -891,25 +891,25 @@
             <td class="col-name">level</td>
             <td class="col-type">VARCHAR(10)</td>
             <td><span class="badge-nn">NOT NULL</span></td>
-            <td class="col-notes">Severity level: <code>INFO</code>, <code>WARNING</code>, or <code>ERROR</code>. Filterable in the Admin Panel — displayed with colour-coded badges (sky / amber / red).</td>
+            <td class="col-notes">Severity level: <code>INFO</code>, <code>WARNING</code>, or <code>ERROR</code>. Filterable in the Admin Panel - displayed with colour-coded badges (sky / amber / red).</td>
           </tr>
           <tr>
             <td class="col-name">source</td>
             <td class="col-type">VARCHAR(100)</td>
             <td><span class="badge-nn">NOT NULL</span></td>
-            <td class="col-notes">Module or subsystem that produced the event — e.g. <code>"auth.login"</code>, <code>"video.upload"</code>, <code>"translate"</code>, <code>"chat"</code>. Used as a substring filter in the Admin Panel.</td>
+            <td class="col-notes">Module or subsystem that produced the event - e.g. <code>"auth.login"</code>, <code>"video.upload"</code>, <code>"translate"</code>, <code>"chat"</code>. Used as a substring filter in the Admin Panel.</td>
           </tr>
           <tr>
             <td class="col-name">message</td>
             <td class="col-type">TEXT</td>
             <td><span class="badge-nn">NOT NULL</span></td>
-            <td class="col-notes">Human-readable description of the event — e.g. "Login failed for user 3", "File exceeds 25 MB — falling back to Deepgram Nova-2".</td>
+            <td class="col-notes">Human-readable description of the event - e.g. "Login failed for user 3", "File exceeds 25 MB - falling back to Deepgram Nova-2".</td>
           </tr>
           <tr>
             <td class="col-name">details</td>
             <td class="col-type">JSONB</td>
             <td>nullable</td>
-            <td class="col-notes">Optional structured context — file size, model names, error strings, fallback info. Displayed as expandable JSON in the Admin Panel.</td>
+            <td class="col-notes">Optional structured context - file size, model names, error strings, fallback info. Displayed as expandable JSON in the Admin Panel.</td>
           </tr>
           <tr>
             <td class="col-name">user_id</td>
@@ -928,12 +928,12 @@
   <section>
     <div class="section-label">Table</div>
     <h2>translation_cache</h2>
-    <p>Caches successful translation results to avoid redundant LLM calls. The cache key is the SHA-256 hash of <code>{source_text}::{target_language.lower()}</code>. On any subsequent translate request for the same text and language, the cached result is returned immediately with <code>cached: true</code> and the <code>hit_count</code> is incremented. A <code>force: true</code> field bypasses the cache, calls the LLM pipeline, and upserts the result. The table has no foreign keys and is not scoped to any user — all users share the same cache pool.</p>
+    <p>Caches successful translation results to avoid redundant LLM calls. The cache key is the SHA-256 hash of <code>{source_text}::{target_language.lower()}</code>. On any subsequent translate request for the same text and language, the cached result is returned immediately with <code>cached: true</code> and the <code>hit_count</code> is incremented. A <code>force: true</code> field bypasses the cache, calls the LLM pipeline, and upserts the result. The table has no foreign keys and is not scoped to any user - all users share the same cache pool.</p>
     <div class="schema-card">
       <div class="schema-header">
         <span class="schema-icon">&#x26A1;</span>
         <span class="schema-name">translation_cache</span>
-        <span class="schema-desc">PostgreSQL table — created at startup via CREATE TABLE IF NOT EXISTS</span>
+        <span class="schema-desc">PostgreSQL table - created at startup via CREATE TABLE IF NOT EXISTS</span>
       </div>
       <table class="col-table">
         <thead>
@@ -950,7 +950,7 @@
             <td class="col-name">text_hash</td>
             <td class="col-type">VARCHAR(64)</td>
             <td><span class="badge-uq">UNIQUE</span><span class="badge-nn">NOT NULL</span><span class="badge-idx">INDEX</span></td>
-            <td class="col-notes">SHA-256 hex digest of <code>{source_text}::{target_language.lower()}</code>. Primary lookup key — unique constraint ensures one cache entry per text+language combination.</td>
+            <td class="col-notes">SHA-256 hex digest of <code>{source_text}::{target_language.lower()}</code>. Primary lookup key - unique constraint ensures one cache entry per text+language combination.</td>
           </tr>
           <tr>
             <td class="col-name">source_text</td>
@@ -962,7 +962,7 @@
             <td class="col-name">target_language</td>
             <td class="col-type">VARCHAR(100)</td>
             <td><span class="badge-nn">NOT NULL</span></td>
-            <td class="col-notes">The target language name as submitted — e.g. <code>"Māori"</code>, <code>"Japanese"</code>, <code>"Tagalog"</code>. Lowercased when building the hash key.</td>
+            <td class="col-notes">The target language name as submitted - e.g. <code>"Māori"</code>, <code>"Japanese"</code>, <code>"Tagalog"</code>. Lowercased when building the hash key.</td>
           </tr>
           <tr>
             <td class="col-name">translation</td>
@@ -980,7 +980,7 @@
             <td class="col-name">model</td>
             <td class="col-type">VARCHAR(100)</td>
             <td><span class="badge-nn">NOT NULL</span></td>
-            <td class="col-notes">The model that produced this translation — e.g. <code>"gemini-2.0-flash-lite"</code>, <code>"gpt-4o-mini"</code>. Preserved across cache hits for display in the UI attribution badge.</td>
+            <td class="col-notes">The model that produced this translation - e.g. <code>"gemini-2.0-flash-lite"</code>, <code>"gpt-4o-mini"</code>. Preserved across cache hits for display in the UI attribution badge.</td>
           </tr>
           <tr>
             <td class="col-name">hit_count</td>
@@ -998,7 +998,7 @@
             <td class="col-name">updated_at</td>
             <td class="col-type">TIMESTAMPTZ</td>
             <td><span class="badge-nn">NOT NULL</span> default: <code>now()</code></td>
-            <td class="col-notes">Refreshed on upsert — i.e. when a <code>force: true</code> re-translate request replaces the cached entry with a fresh LLM result.</td>
+            <td class="col-notes">Refreshed on upsert - i.e. when a <code>force: true</code> re-translate request replaces the cached entry with a fresh LLM result.</td>
           </tr>
         </tbody>
       </table>
@@ -1075,20 +1075,20 @@
       <li class="rel-item">
         <span class="rel-from">feature_flags</span>
         <span class="rel-type">standalone</span>
-        <span class="rel-to">—</span>
+        <span class="rel-to">-</span>
         <span class="rel-note">feature_flags has no foreign keys. It is a global key-value configuration table not scoped to any user or workspace. All authenticated users can read; only admins can write.</span>
       </li>
       <li class="rel-item">
         <span class="rel-from">system_logs</span>
         <span class="rel-type">standalone</span>
-        <span class="rel-to">—</span>
+        <span class="rel-to">-</span>
         <span class="rel-note">system_logs has no foreign keys. user_id is stored as a plain integer so log entries survive user deletion. The table is global and admin-readable via GET /api/admin/logs. Admins can clear all logs via DELETE /api/admin/logs/clear.</span>
       </li>
       <li class="rel-item">
         <span class="rel-from">translation_cache</span>
         <span class="rel-type">standalone</span>
-        <span class="rel-to">—</span>
-        <span class="rel-note">translation_cache has no foreign keys. It is a shared global cache keyed by SHA-256 hash of source_text::target_language. Not scoped to any user — all users benefit from and contribute to the same cache pool.</span>
+        <span class="rel-to">-</span>
+        <span class="rel-note">translation_cache has no foreign keys. It is a shared global cache keyed by SHA-256 hash of source_text::target_language. Not scoped to any user - all users benefit from and contribute to the same cache pool.</span>
       </li>
     </ul>
   </section>
@@ -1104,19 +1104,19 @@
         <div class="index-table-label">users</div>
         <div class="index-name">idx_users_id</div>
         <div class="index-cols">users(id)</div>
-        <div class="index-purpose">Primary key index — auto-created</div>
+        <div class="index-purpose">Primary key index - auto-created</div>
       </div>
       <div class="index-card">
         <div class="index-table-label">users</div>
         <div class="index-name">idx_users_email_uq</div>
         <div class="index-cols">users(email) UNIQUE</div>
-        <div class="index-purpose">Login lookups by email — uniqueness enforced here</div>
+        <div class="index-purpose">Login lookups by email - uniqueness enforced here</div>
       </div>
       <div class="index-card">
         <div class="index-table-label">notes</div>
         <div class="index-name">idx_notes_id</div>
         <div class="index-cols">notes(id)</div>
-        <div class="index-purpose">Primary key — auto-created</div>
+        <div class="index-purpose">Primary key - auto-created</div>
       </div>
       <div class="index-card">
         <div class="index-table-label">notes</div>
@@ -1128,7 +1128,7 @@
         <div class="index-table-label">embeddings</div>
         <div class="index-name">idx_embeddings_id</div>
         <div class="index-cols">embeddings(id)</div>
-        <div class="index-purpose">Primary key — auto-created</div>
+        <div class="index-purpose">Primary key - auto-created</div>
       </div>
       <div class="index-card">
         <div class="index-table-label">embeddings</div>
@@ -1218,7 +1218,7 @@
         <div class="index-table-label">feature_flags</div>
         <div class="index-name">feature_flags_pkey</div>
         <div class="index-cols">feature_flags(key) PRIMARY KEY</div>
-        <div class="index-purpose">O(1) lookup of a flag by key name — auto-created from PK</div>
+        <div class="index-purpose">O(1) lookup of a flag by key name - auto-created from PK</div>
       </div>
       <div class="index-card">
         <div class="index-table-label">system_logs</div>
@@ -1240,13 +1240,13 @@
   <!-- MIGRATION NOTES -->
   <section>
     <div class="section-label">Migration</div>
-    <h2>Migration Notes — Knowledge Workspace &amp; Admin Features</h2>
+    <h2>Migration Notes - Knowledge Workspace &amp; Admin Features</h2>
     <p>The following changes are applied at application startup via <code>ALTER TABLE ... IF NOT EXISTS</code> or <code>CREATE TABLE IF NOT EXISTS</code> so existing deployments upgrade automatically without data loss.</p>
     <div class="schema-card" style="margin-top:1.4rem;">
       <div class="schema-header">
         <span class="schema-icon">&#x1F4CB;</span>
         <span class="schema-name">Startup migration steps</span>
-        <span class="schema-desc">Applied in order — idempotent</span>
+        <span class="schema-desc">Applied in order - idempotent</span>
       </div>
       <table class="col-table">
         <thead>
@@ -1281,7 +1281,7 @@
           <tr>
             <td class="col-name">6</td>
             <td class="col-notes">Backfill: for each existing user, create a default workspace named "My Workspace" (type: Other), then set <code>workspace_id</code> on all their orphaned rows</td>
-            <td class="col-notes">Run once — safe to skip if workspace_id is already populated</td>
+            <td class="col-notes">Run once - safe to skip if workspace_id is already populated</td>
           </tr>
           <tr>
             <td class="col-name">7</td>
@@ -1311,24 +1311,24 @@
           <tr>
             <td class="col-name">12</td>
             <td class="col-notes">First-user admin promotion: if no user has <code>is_admin = true</code>, set <code>is_admin = true</code> for the user with the lowest <code>id</code></td>
-            <td class="col-notes">Idempotent — safe to run on every startup; skipped if an admin already exists.</td>
+            <td class="col-notes">Idempotent - safe to run on every startup; skipped if an admin already exists.</td>
           </tr>
           <tr>
             <td class="col-name">13</td>
             <td class="col-notes"><code>CREATE TABLE IF NOT EXISTS system_logs (id SERIAL PRIMARY KEY, created_at TIMESTAMPTZ NOT NULL DEFAULT now(), level VARCHAR(10) NOT NULL, source VARCHAR(100) NOT NULL, message TEXT NOT NULL, details JSONB, user_id INTEGER); CREATE INDEX IF NOT EXISTS ix_system_logs_created_at ON system_logs(created_at)</code></td>
-            <td class="col-notes">Creates the system_logs table and its index. Standalone — no foreign keys. Applied on every startup; idempotent due to IF NOT EXISTS guards.</td>
+            <td class="col-notes">Creates the system_logs table and its index. Standalone - no foreign keys. Applied on every startup; idempotent due to IF NOT EXISTS guards.</td>
           </tr>
           <tr>
             <td class="col-name">14</td>
             <td class="col-notes"><code>CREATE TABLE IF NOT EXISTS translation_cache (id SERIAL PRIMARY KEY, text_hash VARCHAR(64) UNIQUE NOT NULL, source_text TEXT NOT NULL, target_language VARCHAR(100) NOT NULL, translation TEXT NOT NULL, accuracy INTEGER, model VARCHAR(100) NOT NULL, hit_count INTEGER NOT NULL DEFAULT 0, created_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now()); CREATE UNIQUE INDEX IF NOT EXISTS ix_translation_cache_text_hash ON translation_cache(text_hash)</code></td>
-            <td class="col-notes">Creates the translation_cache table and its unique index. Standalone — no foreign keys. Applied on every startup; idempotent due to IF NOT EXISTS guards.</td>
+            <td class="col-notes">Creates the translation_cache table and its unique index. Standalone - no foreign keys. Applied on every startup; idempotent due to IF NOT EXISTS guards.</td>
           </tr>
         </tbody>
       </table>
     </div>
-    <p style="margin-top:1rem;"><strong style="color:var(--text)">Risk (workspaces):</strong> Existing users with data but no workspace will have a synthetic "My Workspace" auto-created on first login. This is transparent to the user — they see their existing notes, conversations, and reminders already organised under one workspace and can rename or restructure from there.</p>
+    <p style="margin-top:1rem;"><strong style="color:var(--text)">Risk (workspaces):</strong> Existing users with data but no workspace will have a synthetic "My Workspace" auto-created on first login. This is transparent to the user - they see their existing notes, conversations, and reminders already organised under one workspace and can rename or restructure from there.</p>
     <p style="margin-top:.7rem;"><strong style="color:var(--text)">Risk (admin):</strong> Existing deployments will automatically promote the user with the lowest ID to admin on the next startup. This is expected and intentional. Admins can immediately use the Admin Panel to promote or demote other users.</p>
-    <p style="margin-top:.7rem;"><strong style="color:var(--text)">S3 pre-signed upload:</strong> The S3 upload feature (<code>POST /api/upload/presign</code> and <code>POST /api/upload/process</code>) requires no database changes. Uploaded files are processed transiently — Lambda downloads each S3 object, creates a note in the existing <code>notes</code> table, then deletes the S3 object. No new columns or tables are needed.</p>
+    <p style="margin-top:.7rem;"><strong style="color:var(--text)">S3 pre-signed upload:</strong> The S3 upload feature (<code>POST /api/upload/presign</code> and <code>POST /api/upload/process</code>) requires no database changes. Uploaded files are processed transiently - Lambda downloads each S3 object, creates a note in the existing <code>notes</code> table, then deletes the S3 object. No new columns or tables are needed.</p>
   </section>
 
 </div>

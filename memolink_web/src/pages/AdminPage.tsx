@@ -492,10 +492,10 @@ export function AdminPage({ onClose, currentUserId }: Props) {
                     { key: "proactive_insights_enabled", label: "Proactive Insights", desc: "Enable AI scanning of notes for missed deadlines, action items, and urgency signals" },
                     { key: "confidence_enabled", label: "Answer Confidence", desc: "Show HIGH / MEDIUM / LOW confidence badge on each AI response" },
                     { key: "autopilot_enabled", label: "AutoPilot Routing", desc: "Automatically select the best AI model based on the user's intent" },
-                    { key: "study_mode_enabled", label: "Study Mode", desc: "Enable AI Study Mode — flashcards, exam review, study plans, weak topic detection, and summaries" },
-                    { key: "timeline_enabled", label: "Meeting/Lecture Timeline", desc: "Show Timeline tab in note editor — chapters, action items, and important moments with timestamps" },
-                    { key: "workflow_enabled", label: "Workflow Agent", desc: "Enable Workflow mode — AI proposes actions for user approval before executing" },
-                    { key: "evaluation_survey_enabled", label: "Evaluation Survey", desc: "Show \"Take Evaluation Survey\" in the profile menu — research data collection, separate from feedback" },
+                    { key: "study_mode_enabled", label: "Study Mode", desc: "Enable AI Study Mode - flashcards, exam review, study plans, weak topic detection, and summaries" },
+                    { key: "timeline_enabled", label: "Meeting/Lecture Timeline", desc: "Show Timeline tab in note editor - chapters, action items, and important moments with timestamps" },
+                    { key: "workflow_enabled", label: "Workflow Agent", desc: "Enable Workflow mode - AI proposes actions for user approval before executing" },
+                    { key: "evaluation_survey_enabled", label: "Evaluation Survey", desc: "Show \"Take Evaluation Survey\" in the profile menu - research data collection, separate from feedback" },
                     { key: "evaluation_analytics_enabled", label: "Evaluation Analytics", desc: "Collect quantitative evaluation telemetry (session/task timings, AI metrics, ratings). Disabling stops all collection" },
                     { key: "evaluation_admin_export_enabled", label: "Evaluation Export", desc: "Allow admins to export evaluation analytics as CSV/JSON" },
                   ] as { key: keyof FeatureFlags; label: string; desc: string }[]).map(({ key, label, desc }) => (
@@ -552,7 +552,7 @@ export function AdminPage({ onClose, currentUserId }: Props) {
                   </div>
                 </div>
 
-                {/* Access Level Requirements — tabbed */}
+                {/* Access Level Requirements - tabbed */}
                 <div className="mt-8">
                   <h3 className="text-sm font-semibold text-gray-200 mb-1">Access Level Requirements</h3>
                   <p className="text-xs text-gray-500 mb-4">Configure which features each tier can access. Pro always inherits everything enabled for Plus and Regular.</p>
@@ -721,7 +721,7 @@ export function AdminPage({ onClose, currentUserId }: Props) {
                               />
                               <span className="text-[10px] text-gray-600">min</span>
                               <button onClick={() => applyUserBudget(u.id)} className="px-2 py-1 text-[11px] rounded-lg text-cyan-300 border border-cyan-500/30 hover:bg-cyan-500/10 transition">Set</button>
-                              <button onClick={() => resetUserBudget(u.id)} title="Reset the timer only — keeps collected data" className="px-2 py-1 text-[11px] rounded-lg text-amber-300 border border-amber-500/30 hover:bg-amber-500/10 transition">Reset</button>
+                              <button onClick={() => resetUserBudget(u.id)} title="Reset the timer only - keeps collected data" className="px-2 py-1 text-[11px] rounded-lg text-amber-300 border border-amber-500/30 hover:bg-amber-500/10 transition">Reset</button>
                               <button onClick={() => clearUserData(u.id, u.email)} title="Delete all this participant's evaluation data and restart" className="px-2 py-1 text-[11px] rounded-lg text-red-400 border border-red-500/30 hover:bg-red-500/10 transition">Clear data</button>
                             </div>
                           </div>

@@ -2,9 +2,9 @@
  * MemoGraph API client
  *
  * Wraps the three MemoGraph backend endpoints:
- *   GET    /api/memograph?workspace_id=   — fetch stored graph data
- *   POST   /api/memograph/build           — trigger entity extraction + graph build
- *   DELETE /api/memograph                 — clear graph for workspace
+ *   GET    /api/memograph?workspace_id=   - fetch stored graph data
+ *   POST   /api/memograph/build           - trigger entity extraction + graph build
+ *   DELETE /api/memograph                 - clear graph for workspace
  *
  * GraphNode types: note | reminder | person | topic | project |
  *                  deadline | decision | action_item | question | theme

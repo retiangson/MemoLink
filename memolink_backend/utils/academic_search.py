@@ -54,7 +54,7 @@ def _search_semantic_scholar(query: str, limit: int, api_key: str) -> list[dict]
             last_exc = exc
             if exc.code == 429 and delay is not None:
                 logger.debug(
-                    "Semantic Scholar 429 on attempt %d — backing off %ds", attempt + 1, delay
+                    "Semantic Scholar 429 on attempt %d - backing off %ds", attempt + 1, delay
                 )
                 time.sleep(delay)
                 continue
@@ -151,7 +151,7 @@ def format_papers_context(papers: list[dict]) -> str:
     for i, p in enumerate(papers, 1):
         line = f"{i}. **{p['title']}**"
         if p["authors"]:
-            line += f" — {p['authors']}"
+            line += f" - {p['authors']}"
         if p["year"]:
             line += f" ({p['year']})"
         if p["citations"]:

@@ -4,10 +4,10 @@ Meeting / Lecture Timeline Service
 
 Analyses a transcript note and produces a structured timeline:
 
-  • Chapters     — major topic sections with estimated timestamps
-  • Action Items — tasks, assignments, and follow-ups with who is responsible
-  • Important Moments — key statements, decisions, warnings, deadlines, notable quotes
-  • Summary      — 3–5 sentence overview of the entire recording
+  • Chapters     - major topic sections with estimated timestamps
+  • Action Items - tasks, assignments, and follow-ups with who is responsible
+  • Important Moments - key statements, decisions, warnings, deadlines, notable quotes
+  • Summary      - 3–5 sentence overview of the entire recording
 
 TIMESTAMP ESTIMATION
 --------------------
@@ -18,7 +18,7 @@ are estimated from word position:
     seconds = (word_index / total_words) × estimated_duration_seconds
 
 Estimated duration = word_count / WORDS_PER_MINUTE (default 130 wpm for lectures).
-For a 45-minute lecture (~5850 words) the error is typically ±30–90 seconds —
+For a 45-minute lecture (~5850 words) the error is typically ±30–90 seconds -
 precise enough for navigation.  Deepgram and Whisper both return
 speaking-rate-aware segments, so the 130 wpm assumption is a close fit for
 academic content.
@@ -94,7 +94,7 @@ class TimelineService:
         system = (
             "You are a meeting/lecture analysis assistant. "
             f"The transcript has approximately {word_count} words. "
-            f"Assume an average speaking rate of {_WORDS_PER_MINUTE} words per minute — "
+            f"Assume an average speaking rate of {_WORDS_PER_MINUTE} words per minute - "
             f"estimated total duration: {_fmt_timestamp(estimated_duration)}.\n\n"
             "Analyse the transcript and return ONLY valid JSON (no markdown fences):\n"
             "{\n"
@@ -113,7 +113,7 @@ class TimelineService:
             "}\n\n"
             "Rules:\n"
             "- timestamps must match seconds proportionally: seconds = (word_position / word_count) × estimated_duration\n"
-            "- key_phrase must be the EXACT first 6–10 words from the transcript at that location — used for text search\n"
+            "- key_phrase must be the EXACT first 6–10 words from the transcript at that location - used for text search\n"
             "- aim for 3–8 chapters, up to 10 action items, up to 10 important moments\n"
             "- use 'HH:MM:SS' format if duration exceeds 1 hour, else 'MM:SS'\n"
             "- if the transcript has no clear action items or moments, return empty arrays"

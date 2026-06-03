@@ -52,7 +52,7 @@ export function QuizRenderer({ quiz, onSaveNote }: Props) {
   function buildMarkdown(): string {
     const date = new Date().toLocaleDateString("en-NZ", { year: "numeric", month: "short", day: "numeric" });
     const lines: string[] = [
-      `# ${quiz.title} — Results`,
+      `# ${quiz.title} - Results`,
       ``,
       `**Score: ${score}/${quiz.questions.length} (${pct}%)** · ${date}`,
       ``,
@@ -91,7 +91,7 @@ export function QuizRenderer({ quiz, onSaveNote }: Props) {
 
   function handleSave() {
     if (!onSaveNote || saved) return;
-    const title = `${quiz.title} — Results (${pct}%)`;
+    const title = `${quiz.title} - Results (${pct}%)`;
     onSaveNote(title, buildMarkdown());
     setSaved(true);
   }
@@ -117,7 +117,7 @@ export function QuizRenderer({ quiz, onSaveNote }: Props) {
         }`}>
           <div>
             <p className={`text-base font-bold ${pct >= 80 ? "text-green-400" : pct >= 60 ? "text-amber-400" : "text-red-400"}`}>
-              {score}/{quiz.questions.length} correct — {pct}%
+              {score}/{quiz.questions.length} correct - {pct}%
             </p>
             <p className="text-xs text-gray-500 mt-0.5">
               {pct >= 80 ? "Great work!" : pct >= 60 ? "Not bad - review the topics below." : "Review the explanations below."}
@@ -214,7 +214,7 @@ export function QuizRenderer({ quiz, onSaveNote }: Props) {
         ) : (
           <>
             <p className="text-xs text-gray-600">
-              {pct >= 80 ? "Excellent result!" : pct >= 60 ? "Good effort — review missed topics." : "Review the explanations above."}
+              {pct >= 80 ? "Excellent result!" : pct >= 60 ? "Good effort - review missed topics." : "Review the explanations above."}
             </p>
             {onSaveNote && (
               <button

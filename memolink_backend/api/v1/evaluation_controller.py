@@ -92,7 +92,7 @@ def my_ratings(user_id: int = Depends(get_current_user),
 @router.post("/heartbeat", response_model=BudgetStatus)
 def heartbeat(body: HeartbeatRequest, user_id: int = Depends(get_current_user),
               container: RequestContainer = Depends(get_request_container)):
-    """Frontend active-time heartbeat — adds elapsed active seconds to the user's
+    """Frontend active-time heartbeat - adds elapsed active seconds to the user's
     lifetime 25-minute budget and returns how much is left."""
     return container.evaluation().add_active_time(user_id, body.delta_seconds)
 

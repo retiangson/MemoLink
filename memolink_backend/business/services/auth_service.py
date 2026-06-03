@@ -51,7 +51,7 @@ class AuthService(IAuthService):
     def forgot_password(self, dto: ForgotPasswordDTO) -> None:
         user = self.repo.get_by_email(dto.email)
         if not user:
-            return  # Silent — don't reveal whether email exists
+            return  # Silent - don't reveal whether email exists
         token = create_reset_token(dto.email)
         reset_url = f"{settings.frontend_url}?reset_token={token}"
         self._send_reset_email(dto.email, reset_url)
@@ -72,10 +72,10 @@ class AuthService(IAuthService):
             f"If you didn't request this, you can ignore this email."
         )
         if not settings.smtp_host:
-            logger.info("SMTP not configured — reset link: %s", reset_url)
+            logger.info("SMTP not configured - reset link: %s", reset_url)
             return
         msg = MIMEText(body)
-        msg["Subject"] = "MemoLink — Reset your password"
+        msg["Subject"] = "MemoLink - Reset your password"
         msg["From"] = settings.smtp_from or settings.smtp_user
         msg["To"] = to_email
         try:

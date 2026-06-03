@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>MemoLink — Requirements Analysis</title>
+  <title>MemoLink - Requirements Analysis</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -145,7 +145,7 @@
 
   <!-- FUNCTIONAL REQUIREMENTS -->
   <section>
-    <div class="section-label">FR — Functional Requirements</div>
+    <div class="section-label">FR - Functional Requirements</div>
     <h2>Functional Requirements</h2>
     <table class="req-table">
       <thead>
@@ -171,7 +171,7 @@
         </tr>
         <tr>
           <td class="req-id">FR-03</td>
-          <td class="req-text">Each user's notes and conversations must be isolated — users cannot access each other's data.</td>
+          <td class="req-text">Each user's notes and conversations must be isolated - users cannot access each other's data.</td>
           <td><span class="req-priority p-high">High</span></td>
           <td><span class="req-cat c-func">Auth</span></td>
         </tr>
@@ -249,7 +249,7 @@
         </tr>
         <tr>
           <td class="req-id">FR-16</td>
-          <td class="req-text">Conversation messages must be paginated — the client requests a limit and a cursor (before_id).</td>
+          <td class="req-text">Conversation messages must be paginated - the client requests a limit and a cursor (before_id).</td>
           <td><span class="req-priority p-med">Medium</span></td>
           <td><span class="req-cat c-func">Conversations</span></td>
         </tr>
@@ -297,7 +297,7 @@
         </tr>
         <tr>
           <td class="req-id">FR-24</td>
-          <td class="req-text">The note editor must support uploading audio/video files (MP4, M4A, WebM, MP3, WAV, MOV up to 200 MB) and transcribing them — files &lt;5 MB via OpenAI Whisper, files ≥5 MB via Deepgram Nova-2 (Whisper fallback up to 25 MB) — for use as note content.</td>
+          <td class="req-text">The note editor must support uploading audio/video files (MP4, M4A, WebM, MP3, WAV, MOV up to 200 MB) and transcribing them - files &lt;5 MB via OpenAI Whisper, files ≥5 MB via Deepgram Nova-2 (Whisper fallback up to 25 MB) - for use as note content.</td>
           <td><span class="req-priority p-high">High</span></td>
           <td><span class="req-cat c-func">Video</span></td>
         </tr>
@@ -309,7 +309,7 @@
         </tr>
         <tr>
           <td class="req-id">FR-26</td>
-          <td class="req-text">The entire MemoLink stack must be deployable via <code>docker compose up --build</code> using only a populated <code>.env</code> file — no manual server configuration required.</td>
+          <td class="req-text">The entire MemoLink stack must be deployable via <code>docker compose up --build</code> using only a populated <code>.env</code> file - no manual server configuration required.</td>
           <td><span class="req-priority p-med">Medium</span></td>
           <td><span class="req-cat c-func">Ops</span></td>
         </tr>
@@ -351,7 +351,7 @@
         </tr>
         <tr>
           <td class="req-id">FR-33</td>
-          <td class="req-text">When the active workspace changes, all visible content — notes list, conversation list, reminders panel, file uploads, and AI chat history — must update to show only data that belongs to the newly selected workspace.</td>
+          <td class="req-text">When the active workspace changes, all visible content - notes list, conversation list, reminders panel, file uploads, and AI chat history - must update to show only data that belongs to the newly selected workspace.</td>
           <td><span class="req-priority p-high">High</span></td>
           <td><span class="req-cat c-func">Workspaces</span></td>
         </tr>
@@ -369,13 +369,13 @@
         </tr>
         <tr>
           <td class="req-id">FR-36</td>
-          <td class="req-text">The system must not allow a user to delete their only remaining workspace. Soft-deletion is used — deleted workspaces are hidden from the dropdown but remain in the database. A workspace may only be soft-deleted when the user owns at least two active workspaces.</td>
+          <td class="req-text">The system must not allow a user to delete their only remaining workspace. Soft-deletion is used - deleted workspaces are hidden from the dropdown but remain in the database. A workspace may only be soft-deleted when the user owns at least two active workspaces.</td>
           <td><span class="req-priority p-high">High</span></td>
           <td><span class="req-cat c-func">Workspaces</span></td>
         </tr>
         <tr>
           <td class="req-id">FR-37</td>
-          <td class="req-text">Users must be able to request a password reset by submitting their email address. The system must send a signed JWT reset link (1-hour expiry, <code>purpose:"reset"</code> claim) to the user's registered email address via SMTP. When SMTP is not configured, the link must be logged to the console. The endpoint must always return HTTP 200 regardless of whether the email exists — to prevent email enumeration.</td>
+          <td class="req-text">Users must be able to request a password reset by submitting their email address. The system must send a signed JWT reset link (1-hour expiry, <code>purpose:"reset"</code> claim) to the user's registered email address via SMTP. When SMTP is not configured, the link must be logged to the console. The endpoint must always return HTTP 200 regardless of whether the email exists - to prevent email enumeration.</td>
           <td><span class="req-priority p-high">High</span></td>
           <td><span class="req-cat c-func">Auth</span></td>
         </tr>
@@ -393,7 +393,7 @@
         </tr>
         <tr>
           <td class="req-id">FR-40</td>
-          <td class="req-text">The Settings modal must allow users to select their preferred chat model from: GPT-4o Mini (default), GPT-4o, GPT-4 Turbo, GPT-3.5 Turbo, Gemini 2.0 Flash, Gemini 2.0 Flash Lite, Gemini 1.5 Flash 8B, and Gemini 1.5 Pro. Gemini models must be accessed via an OpenAI-compatible endpoint using <code>GEMINI_API_KEY</code>. When Gemini hits a <code>RateLimitError</code> during chat, the system must silently fall back to GPT-4o-mini and log a warning — no error must be shown to the user.</td>
+          <td class="req-text">The Settings modal must allow users to select their preferred chat model from: GPT-4o Mini (default), GPT-4o, GPT-4 Turbo, GPT-3.5 Turbo, Gemini 2.0 Flash, Gemini 2.0 Flash Lite, Gemini 1.5 Flash 8B, and Gemini 1.5 Pro. Gemini models must be accessed via an OpenAI-compatible endpoint using <code>GEMINI_API_KEY</code>. When Gemini hits a <code>RateLimitError</code> during chat, the system must silently fall back to GPT-4o-mini and log a warning - no error must be shown to the user.</td>
           <td><span class="req-priority p-high">High</span></td>
           <td><span class="req-cat c-func">AI/Chat</span></td>
         </tr>
@@ -483,19 +483,19 @@
         </tr>
         <tr>
           <td class="req-id">FR-55</td>
-          <td class="req-text">The Admin Panel must be accessible as a full-screen overlay from the user menu (avatar button) and must only be visible to admin users. It must contain three tabs: (1) Feedback — list and manage reports; (2) Feature Flags — toggle boolean flags and set string defaults; (3) Users — list all users and change admin status. Non-admin users must not see the Admin Panel option in the UI.</td>
+          <td class="req-text">The Admin Panel must be accessible as a full-screen overlay from the user menu (avatar button) and must only be visible to admin users. It must contain three tabs: (1) Feedback - list and manage reports; (2) Feature Flags - toggle boolean flags and set string defaults; (3) Users - list all users and change admin status. Non-admin users must not see the Admin Panel option in the UI.</td>
           <td><span class="req-priority p-med">Medium</span></td>
           <td><span class="req-cat c-func">Admin</span></td>
         </tr>
         <tr>
           <td class="req-id">FR-56</td>
-          <td class="req-text">The image generation pipeline must attempt models in the following fallback order: <strong>gpt-image-2</strong> → <strong>gpt-image-1</strong> → <strong>DALL-E 3</strong> → <strong>DALL-E 2</strong> → <strong>Pollinations.ai</strong> (free HTTP API, no API key). If all paid models fail, the Pollinations.ai URL-based endpoint must be called as a final fallback. Images must always be stored as base64 data URLs in <code>messages.content</code> — no file storage. Base64 image content must be stripped from the conversation history and RAG context before sending to OpenAI to prevent token overflow. An animated spinner must be shown in the UI while the image is generating.</td>
+          <td class="req-text">The image generation pipeline must attempt models in the following fallback order: <strong>gpt-image-2</strong> → <strong>gpt-image-1</strong> → <strong>DALL-E 3</strong> → <strong>DALL-E 2</strong> → <strong>Pollinations.ai</strong> (free HTTP API, no API key). If all paid models fail, the Pollinations.ai URL-based endpoint must be called as a final fallback. Images must always be stored as base64 data URLs in <code>messages.content</code> - no file storage. Base64 image content must be stripped from the conversation history and RAG context before sending to OpenAI to prevent token overflow. An animated spinner must be shown in the UI while the image is generating.</td>
           <td><span class="req-priority p-high">High</span></td>
           <td><span class="req-cat c-func">AI/Chat</span></td>
         </tr>
         <tr>
           <td class="req-id">FR-57</td>
-          <td class="req-text">The system must support a <strong>Research Mode</strong> accessible via a dedicated toggle in ChatInput. When active, the frontend must call <code>streamResearch()</code> targeting <code>POST /api/research/stream</code>. The backend must execute a four-step pipeline over SSE: (1) hybrid note retrieval — vector top-30 candidates re-ranked by keyword scoring; (2) optional live web search via Brave Search API; (3) academic paper search via OpenAlex (free, no key) or Semantic Scholar (with API key); (4) structured LLM synthesis. The SSE stream must emit <code>{tool_call, label}</code> and <code>{tool_result, ok}</code> events for each step so progress is shown in the UI. The final report must follow a fixed markdown structure: Research Summary, Key Findings (From Your Notes / From Web &amp; Academic Sources), Knowledge Gaps, Contradictions &amp; Tensions, Academic References, and Suggested Follow-up Research.</td>
+          <td class="req-text">The system must support a <strong>Research Mode</strong> accessible via a dedicated toggle in ChatInput. When active, the frontend must call <code>streamResearch()</code> targeting <code>POST /api/research/stream</code>. The backend must execute a four-step pipeline over SSE: (1) hybrid note retrieval - vector top-30 candidates re-ranked by keyword scoring; (2) optional live web search via Brave Search API; (3) academic paper search via OpenAlex (free, no key) or Semantic Scholar (with API key); (4) structured LLM synthesis. The SSE stream must emit <code>{tool_call, label}</code> and <code>{tool_result, ok}</code> events for each step so progress is shown in the UI. The final report must follow a fixed markdown structure: Research Summary, Key Findings (From Your Notes / From Web &amp; Academic Sources), Knowledge Gaps, Contradictions &amp; Tensions, Academic References, and Suggested Follow-up Research.</td>
           <td><span class="req-priority p-high">High</span></td>
           <td><span class="req-cat c-func">AI/Research</span></td>
         </tr>
@@ -519,19 +519,19 @@
         </tr>
         <tr>
           <td class="req-id">FR-61</td>
-          <td class="req-text">The system must support three user <strong>access levels</strong> — <strong>Regular</strong>, <strong>Plus</strong>, and <strong>Pro</strong> — stored as an <code>access_level</code> column on the <code>users</code> table (default: <code>regular</code>). The access level must be embedded in the JWT token at login/register and propagated in the <code>TokenResponse</code>. Admin users bypass all level checks regardless of their own <code>access_level</code>.</td>
+          <td class="req-text">The system must support three user <strong>access levels</strong> - <strong>Regular</strong>, <strong>Plus</strong>, and <strong>Pro</strong> - stored as an <code>access_level</code> column on the <code>users</code> table (default: <code>regular</code>). The access level must be embedded in the JWT token at login/register and propagated in the <code>TokenResponse</code>. Admin users bypass all level checks regardless of their own <code>access_level</code>.</td>
           <td><span class="req-priority p-high">High</span></td>
           <td><span class="req-cat c-func">Auth</span></td>
         </tr>
         <tr>
           <td class="req-id">FR-62</td>
-          <td class="req-text">The Admin Panel must allow administrators to: (1) view and change any user's access level (<code>PATCH /api/admin/users/{id}/level</code>) from the Users tab — each user row shows a colour-coded tier badge (Regular = grey, Plus = blue, Pro = purple) and a level dropdown; (2) configure a <strong>minimum access level per feature</strong> from the Feature Flags tab via a three-tab panel (Regular / Plus / Pro), where toggling a feature on/off for a given tab updates the feature's <code>*_min_level</code> flag. The Pro tab is read-only, always showing full access. Feature flags now include <code>research_mode_enabled</code> plus seven <code>*_min_level</code> flags (<code>web_search_min_level</code>, <code>agent_mode_min_level</code>, <code>research_mode_min_level</code>, <code>image_generation_min_level</code>, <code>model_selection_min_level</code>, <code>translation_min_level</code>, <code>file_upload_min_level</code>).</td>
+          <td class="req-text">The Admin Panel must allow administrators to: (1) view and change any user's access level (<code>PATCH /api/admin/users/{id}/level</code>) from the Users tab - each user row shows a colour-coded tier badge (Regular = grey, Plus = blue, Pro = purple) and a level dropdown; (2) configure a <strong>minimum access level per feature</strong> from the Feature Flags tab via a three-tab panel (Regular / Plus / Pro), where toggling a feature on/off for a given tab updates the feature's <code>*_min_level</code> flag. The Pro tab is read-only, always showing full access. Feature flags now include <code>research_mode_enabled</code> plus seven <code>*_min_level</code> flags (<code>web_search_min_level</code>, <code>agent_mode_min_level</code>, <code>research_mode_min_level</code>, <code>image_generation_min_level</code>, <code>model_selection_min_level</code>, <code>translation_min_level</code>, <code>file_upload_min_level</code>).</td>
           <td><span class="req-priority p-high">High</span></td>
           <td><span class="req-cat c-func">Admin</span></td>
         </tr>
         <tr>
           <td class="req-id">FR-63</td>
-          <td class="req-text">The backend must enforce access level checks at the API layer — not just in the frontend UI. The <code>GET /api/features</code> endpoint must read the requesting user's access level from the JWT and return each feature as disabled if the user's level is below the configured <code>*_min_level</code> flag. The <code>POST /api/research/stream</code> endpoint must independently validate the user's level against <code>research_mode_min_level</code> and the <code>research_mode_enabled</code> global toggle, returning <code>HTTP 403</code> if access is denied. Admin users always bypass level restrictions.</td>
+          <td class="req-text">The backend must enforce access level checks at the API layer - not just in the frontend UI. The <code>GET /api/features</code> endpoint must read the requesting user's access level from the JWT and return each feature as disabled if the user's level is below the configured <code>*_min_level</code> flag. The <code>POST /api/research/stream</code> endpoint must independently validate the user's level against <code>research_mode_min_level</code> and the <code>research_mode_enabled</code> global toggle, returning <code>HTTP 403</code> if access is denied. Admin users always bypass level restrictions.</td>
           <td><span class="req-priority p-high">High</span></td>
           <td><span class="req-cat c-func">Auth</span></td>
         </tr>
@@ -549,7 +549,7 @@
         </tr>
         <tr>
           <td class="req-id">FR-66</td>
-          <td class="req-text">The audio/video transcription upload limit must be <strong>200 MB</strong>. Files &lt;5 MB must be transcribed via <strong>OpenAI Whisper</strong>. Files ≥5 MB must be routed to <strong>Deepgram Nova-2</strong>, configured via the <code>DEEPGRAM_API_KEY</code> environment variable (free $200 credit at deepgram.com, no credit card required); if Deepgram fails, Whisper must be used as a fallback for files up to 25 MB. The transcription routing must be implemented in <code>file_extractor.py</code> <code>transcribe_audio()</code> and must be transparent to controllers — they receive the transcript regardless of which service was used. Each transcription event (service used, file size, success/failure) must be written to <code>system_logs</code>.</td>
+          <td class="req-text">The audio/video transcription upload limit must be <strong>200 MB</strong>. Files &lt;5 MB must be transcribed via <strong>OpenAI Whisper</strong>. Files ≥5 MB must be routed to <strong>Deepgram Nova-2</strong>, configured via the <code>DEEPGRAM_API_KEY</code> environment variable (free $200 credit at deepgram.com, no credit card required); if Deepgram fails, Whisper must be used as a fallback for files up to 25 MB. The transcription routing must be implemented in <code>file_extractor.py</code> <code>transcribe_audio()</code> and must be transparent to controllers - they receive the transcript regardless of which service was used. Each transcription event (service used, file size, success/failure) must be written to <code>system_logs</code>.</td>
           <td><span class="req-priority p-high">High</span></td>
           <td><span class="req-cat c-func">Video</span></td>
         </tr>
@@ -573,13 +573,13 @@
         </tr>
         <tr>
           <td class="req-id">FR-70</td>
-          <td class="req-text">The chat interface must detect note improvement intent from natural language prompts matching patterns such as "improve my note X", "reformat note X", "clean up my note X", "polish note X", "rewrite note X" — detected via the <code>_IMPROVE_NOTE_RE</code> regex in ChatService. On detection, the system must: (1) close the note's editor tab if currently open via a <code>close_note</code> SSE event; (2) show an animated dual-ring spinner in the chat with "Improving [title]…" via an <code>improving_note</code> SSE event; (3) find the note by fuzzy title match (exact → starts-with → contains → name-in-title); (4) call the AI to improve the HTML content using the fallback chain; (5) auto-save the improved content to the database; (6) stream a success response via a <code>replace</code> SSE event containing a clickable "Open Note: X →" button rendered from the <code>[[NOTE_LINK:id:title]]</code> marker. No user confirmation is required before saving. The <code>onCloseNote</code> and <code>onOpenNote</code> callbacks must be wired from the chat hook through to the message renderer.</td>
+          <td class="req-text">The chat interface must detect note improvement intent from natural language prompts matching patterns such as "improve my note X", "reformat note X", "clean up my note X", "polish note X", "rewrite note X" - detected via the <code>_IMPROVE_NOTE_RE</code> regex in ChatService. On detection, the system must: (1) close the note's editor tab if currently open via a <code>close_note</code> SSE event; (2) show an animated dual-ring spinner in the chat with "Improving [title]…" via an <code>improving_note</code> SSE event; (3) find the note by fuzzy title match (exact → starts-with → contains → name-in-title); (4) call the AI to improve the HTML content using the fallback chain; (5) auto-save the improved content to the database; (6) stream a success response via a <code>replace</code> SSE event containing a clickable "Open Note: X →" button rendered from the <code>[[NOTE_LINK:id:title]]</code> marker. No user confirmation is required before saving. The <code>onCloseNote</code> and <code>onOpenNote</code> callbacks must be wired from the chat hook through to the message renderer.</td>
           <td><span class="req-priority p-med">Medium</span></td>
           <td><span class="req-cat c-func">AI/Chat</span></td>
         </tr>
         <tr>
           <td class="req-id">FR-71</td>
-          <td class="req-text">The system must support direct-to-S3 file uploads to bypass AWS Lambda's 6 MB payload limit. When <code>S3_UPLOAD_BUCKET</code> is configured, the upload flow must be: (1) client requests a pre-signed S3 PUT URL from <code>POST /api/upload/presign</code>; (2) client uploads file bytes directly to S3 using the pre-signed URL — Lambda is not in the upload path; (3) client calls <code>POST /api/upload/process</code> with the S3 key; (4) Lambda downloads, processes, and creates the note, then deletes the S3 object. Files up to 200 MB must be supported. The pre-signed URL must expire in 3600 seconds. The <code>AWS_ACCESS_KEY_ID</code> and <code>AWS_SECRET_ACCESS_KEY</code> env vars are optional — on Lambda the execution role's credentials are used automatically.</td>
+          <td class="req-text">The system must support direct-to-S3 file uploads to bypass AWS Lambda's 6 MB payload limit. When <code>S3_UPLOAD_BUCKET</code> is configured, the upload flow must be: (1) client requests a pre-signed S3 PUT URL from <code>POST /api/upload/presign</code>; (2) client uploads file bytes directly to S3 using the pre-signed URL - Lambda is not in the upload path; (3) client calls <code>POST /api/upload/process</code> with the S3 key; (4) Lambda downloads, processes, and creates the note, then deletes the S3 object. Files up to 200 MB must be supported. The pre-signed URL must expire in 3600 seconds. The <code>AWS_ACCESS_KEY_ID</code> and <code>AWS_SECRET_ACCESS_KEY</code> env vars are optional - on Lambda the execution role's credentials are used automatically.</td>
           <td><span class="req-priority p-high">High</span></td>
           <td><span class="req-cat c-func">Files</span></td>
         </tr>
@@ -591,7 +591,7 @@
 
   <!-- NON-FUNCTIONAL REQUIREMENTS -->
   <section>
-    <div class="section-label">NFR — Non-Functional Requirements</div>
+    <div class="section-label">NFR - Non-Functional Requirements</div>
     <h2>Non-Functional Requirements</h2>
     <table class="req-table">
       <thead>
@@ -629,7 +629,7 @@
         </tr>
         <tr>
           <td class="req-id">NFR-05</td>
-          <td class="req-text">The system must follow Clean Architecture — controllers must not contain business or persistence logic.</td>
+          <td class="req-text">The system must follow Clean Architecture - controllers must not contain business or persistence logic.</td>
           <td><span class="req-priority p-high">High</span></td>
           <td><span class="req-cat c-non">Maintainability</span></td>
         </tr>
@@ -659,13 +659,13 @@
         </tr>
         <tr>
           <td class="req-id">NFR-10</td>
-          <td class="req-text">The system must be deployable with a single environment-variable file (.env) — no hard-coded configuration.</td>
+          <td class="req-text">The system must be deployable with a single environment-variable file (.env) - no hard-coded configuration.</td>
           <td><span class="req-priority p-med">Medium</span></td>
           <td><span class="req-cat c-non">Portability</span></td>
         </tr>
         <tr>
           <td class="req-id">NFR-11</td>
-          <td class="req-text">The system must be fully deployable via <code>docker compose up</code> with only <code>.env</code> configuration — no ffmpeg, yt-dlp, or other host-level tool installations required.</td>
+          <td class="req-text">The system must be fully deployable via <code>docker compose up</code> with only <code>.env</code> configuration - no ffmpeg, yt-dlp, or other host-level tool installations required.</td>
           <td><span class="req-priority p-med">Medium</span></td>
           <td><span class="req-cat c-non">Portability</span></td>
         </tr>
@@ -689,13 +689,13 @@
         </tr>
         <tr>
           <td class="req-id">NFR-15</td>
-          <td class="req-text">All admin-only endpoints must return HTTP 403 for any request whose JWT does not carry <code>is_admin: true</code>. The <code>is_admin</code> claim must be verified server-side on every request — no client-side-only enforcement is acceptable.</td>
+          <td class="req-text">All admin-only endpoints must return HTTP 403 for any request whose JWT does not carry <code>is_admin: true</code>. The <code>is_admin</code> claim must be verified server-side on every request - no client-side-only enforcement is acceptable.</td>
           <td><span class="req-priority p-high">High</span></td>
           <td><span class="req-cat c-non">Security</span></td>
         </tr>
         <tr>
           <td class="req-id">NFR-16</td>
-          <td class="req-text">Base64-encoded image data embedded in message content must be stripped from all conversation history and RAG context arrays before they are sent to the OpenAI API, to prevent token overflow errors. The stripping operation must be transparent to the user — stored messages must retain the full base64 content for display.</td>
+          <td class="req-text">Base64-encoded image data embedded in message content must be stripped from all conversation history and RAG context arrays before they are sent to the OpenAI API, to prevent token overflow errors. The stripping operation must be transparent to the user - stored messages must retain the full base64 content for display.</td>
           <td><span class="req-priority p-high">High</span></td>
           <td><span class="req-cat c-non">Reliability</span></td>
         </tr>
@@ -713,7 +713,7 @@
 
   <!-- USE CASES -->
   <section>
-    <div class="section-label">UC — Use Cases</div>
+    <div class="section-label">UC - Use Cases</div>
     <h2>Use Cases</h2>
     <div class="uc-grid">
       <div class="uc-card">
@@ -764,7 +764,7 @@
       <div class="uc-card">
         <div class="uc-actor">Actor: Logged-in User</div>
         <div class="uc-title">UC-10 &middot; Voice Input Chat</div>
-        <div class="uc-desc">User taps the mic button in ChatInput. The <code>useRecording</code> hook captures audio, the system transcribes it, and inserts the text as the prompt — no typing required.</div>
+        <div class="uc-desc">User taps the mic button in ChatInput. The <code>useRecording</code> hook captures audio, the system transcribes it, and inserts the text as the prompt - no typing required.</div>
       </div>
       <div class="uc-card">
         <div class="uc-actor">Actor: Logged-in User</div>
@@ -844,7 +844,7 @@
       <div class="uc-card">
         <div class="uc-actor">Actor: Logged-in User</div>
         <div class="uc-title">UC-26 &middot; Bulk Upload Formatted Document</div>
-        <div class="uc-desc">User uploads a DOCX report via the bulk-upload dialog. MemoLink extracts headings, bold text, lists, tables, and embedded images — preserving full formatting as HTML. The resulting note is stored with rich structure and embedded base64 images ready for retrieval.</div>
+        <div class="uc-desc">User uploads a DOCX report via the bulk-upload dialog. MemoLink extracts headings, bold text, lists, tables, and embedded images - preserving full formatting as HTML. The resulting note is stored with rich structure and embedded base64 images ready for retrieval.</div>
       </div>
       <div class="uc-card">
         <div class="uc-actor">Actor: Logged-in User</div>
@@ -859,7 +859,7 @@
       <div class="uc-card">
         <div class="uc-actor">Actor: Admin User</div>
         <div class="uc-title">UC-29 &middot; Manage Feature Flags</div>
-        <div class="uc-desc">Admin opens the Admin Panel from the user menu and navigates to the Feature Flags tab. Admin toggles "web_search_enabled" off. All users now see the web search globe icon hidden in ChatInput. Admin sets "default_model" to "gpt-4o" — users without model selection enabled will use that model.</div>
+        <div class="uc-desc">Admin opens the Admin Panel from the user menu and navigates to the Feature Flags tab. Admin toggles "web_search_enabled" off. All users now see the web search globe icon hidden in ChatInput. Admin sets "default_model" to "gpt-4o" - users without model selection enabled will use that model.</div>
       </div>
       <div class="uc-card">
         <div class="uc-actor">Actor: Admin User</div>
@@ -893,7 +893,7 @@
 
   <!-- USER STORIES -->
   <section>
-    <div class="section-label">US — User Stories</div>
+    <div class="section-label">US - User Stories</div>
     <h2>User Stories</h2>
 
     <div class="story">

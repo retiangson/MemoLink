@@ -16,7 +16,7 @@ GitHub push to main
 
 ---
 
-## Part 1 — AWS Setup
+## Part 1 - AWS Setup
 
 ### 1.1 Create an IAM User for GitHub Actions
 
@@ -31,7 +31,7 @@ GitHub Actions needs AWS credentials to push to ECR and update Lambda.
 5. Click **Create user**
 6. Open the user → **Security credentials** tab → **Create access key**
 7. Choose **"Application running outside AWS"**
-8. Copy the values — you only see the secret once:
+8. Copy the values - you only see the secret once:
 
 ```
 AWS_ACCESS_KEY_ID     = AKIA...
@@ -159,7 +159,7 @@ This becomes `VITE_API_BASE_URL` in GitHub secrets.
 
 ---
 
-## Part 2 — Azure Static Web Apps Setup
+## Part 2 - Azure Static Web Apps Setup
 
 ### 2.1 Create the Static Web App
 
@@ -194,7 +194,7 @@ Use this as `FRONTEND_URL` in the Lambda environment variables (Part 1.5).
 
 ---
 
-## Part 3 — GitHub Actions Secrets
+## Part 3 - GitHub Actions Secrets
 
 Go to your GitHub repo → **Settings → Secrets and variables → Actions → New repository secret**
 
@@ -204,8 +204,8 @@ Add each secret below exactly as named (case-sensitive):
 
 | Secret name | Where to get it |
 |---|---|
-| `AWS_ACCESS_KEY_ID` | Part 1.1 — IAM user access key |
-| `AWS_SECRET_ACCESS_KEY` | Part 1.1 — IAM user secret key |
+| `AWS_ACCESS_KEY_ID` | Part 1.1 - IAM user access key |
+| `AWS_SECRET_ACCESS_KEY` | Part 1.1 - IAM user secret key |
 | `AWS_REGION` | The AWS region you used (e.g. `ap-southeast-2`) |
 | `ECR_REPOSITORY` | `memolink-backend` (the ECR repo name from Part 1.2) |
 | `LAMBDA_FUNCTION_NAME` | `memolink-api` (the Lambda function name from Part 1.4) |
@@ -214,12 +214,12 @@ Add each secret below exactly as named (case-sensitive):
 
 | Secret name | Where to get it |
 |---|---|
-| `AZURE_STATIC_WEB_APPS_API_TOKEN` | Part 2.2 — Azure deployment token |
-| `VITE_API_BASE_URL` | Part 1.6 — API Gateway Invoke URL (no trailing slash) |
+| `AZURE_STATIC_WEB_APPS_API_TOKEN` | Part 2.2 - Azure deployment token |
+| `VITE_API_BASE_URL` | Part 1.6 - API Gateway Invoke URL (no trailing slash) |
 
 ---
 
-## Part 4 — First Deployment
+## Part 4 - First Deployment
 
 Once all secrets are set, trigger CI/CD by pushing to `main`:
 
@@ -229,12 +229,12 @@ git push origin main
 
 Go to your repo → **Actions** tab to watch the workflows run.
 
-- `Deploy Backend to AWS Lambda` — builds the Docker image, pushes to ECR, updates Lambda (~3-5 min)
-- `Deploy Frontend to Azure Static Web Apps` — builds Vite, deploys to Azure (~2 min)
+- `Deploy Backend to AWS Lambda` - builds the Docker image, pushes to ECR, updates Lambda (~3-5 min)
+- `Deploy Frontend to Azure Static Web Apps` - builds Vite, deploys to Azure (~2 min)
 
 ---
 
-## Part 5 — Verify
+## Part 5 - Verify
 
 ### Check the backend
 ```
@@ -255,11 +255,11 @@ Open your Azure URL in a browser. You should see the MemoLink login page.
 
 | Feature | Behaviour |
 |---|---|
-| AI chat streaming | Disabled — full answer appears at once after generation completes |
+| AI chat streaming | Disabled - full answer appears at once after generation completes |
 | Research Mode | Works but may be slow on complex queries (120s timeout) |
 | All other features | Work normally |
 
-Chat streaming is buffered because API Gateway does not support Server-Sent Events. The answer is still correct — it just appears all at once instead of token-by-token.
+Chat streaming is buffered because API Gateway does not support Server-Sent Events. The answer is still correct - it just appears all at once instead of token-by-token.
 
 ---
 

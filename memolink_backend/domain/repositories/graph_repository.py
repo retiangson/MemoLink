@@ -1,27 +1,27 @@
 """
-GraphRepository — Persistence layer for MemoGraph nodes and edges.
+GraphRepository - Persistence layer for MemoGraph nodes and edges.
 
 Tables
 ------
-graph_nodes  — one row per unique entity within a workspace.
+graph_nodes  - one row per unique entity within a workspace.
                Unique key: (user_id, workspace_id, node_type, label).
                Deduplication means the same person/topic mentioned in multiple notes
                maps to a single node rather than duplicates.
 
-graph_edges  — directed relationships between nodes.
+graph_edges  - directed relationships between nodes.
                Unique key: (source_node_id, target_node_id, relationship).
                Edges cascade-delete when either endpoint node is removed.
 
 Key methods
 -----------
-upsert_node            — get-or-create a node; safe to call multiple times.
-upsert_edge            — get-or-create an edge; safe to call multiple times.
-get_graph              — returns {nodes, links} JSON consumed by the frontend canvas.
-get_related_note_ids   — graph traversal used by ChatService for graph-enhanced RAG:
+upsert_node            - get-or-create a node; safe to call multiple times.
+upsert_edge            - get-or-create an edge; safe to call multiple times.
+get_graph              - returns {nodes, links} JSON consumed by the frontend canvas.
+get_related_note_ids   - graph traversal used by ChatService for graph-enhanced RAG:
                          given a list of seed note IDs (from vector search), returns
                          IDs of OTHER notes that share entity nodes with the seeds.
                          Traversal: seed_note → (edge) → entity → (edge) → other_note.
-clear                  — deletes all nodes for a workspace; edges cascade automatically.
+clear                  - deletes all nodes for a workspace; edges cascade automatically.
 """
 
 from typing import Optional
@@ -124,13 +124,13 @@ class GraphRepository:
         """Return IDs of notes connected to the seed notes through shared entity nodes.
 
         Traversal: seed_note_node → (edge) → entity_node → (edge) → other_note_node.
-        Only entity types (person, topic, project, etc.) bridge the connection —
+        Only entity types (person, topic, project, etc.) bridge the connection -
         reminder nodes are excluded so we only follow meaningful knowledge links.
         """
         if not seed_note_ids:
             return []
 
-        # Step 1 — find the graph node IDs for the seed notes
+        # Step 1 - find the graph node IDs for the seed notes
         seed_graph_ids_q = (
             self.db.query(GraphNode.id)
             .filter(
@@ -141,7 +141,7 @@ class GraphRepository:
             )
         )
 
-        # Step 2 — entity nodes these seed notes connect to (note → entity edges)
+        # Step 2 - entity nodes these seed notes connect to (note → entity edges)
         entity_ids_q = (
             self.db.query(GraphEdge.target_node_id)
             .join(GraphNode, GraphNode.id == GraphEdge.target_node_id)
@@ -151,7 +151,7 @@ class GraphRepository:
             )
         )
 
-        # Step 3 — other note nodes that point to those same entity nodes
+        # Step 3 - other note nodes that point to those same entity nodes
         related = (
             self.db.query(GraphNode.source_id)
             .join(GraphEdge, GraphEdge.source_node_id == GraphNode.id)

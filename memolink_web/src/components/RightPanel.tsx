@@ -152,7 +152,7 @@ export function RightPanel({
             onClick={notificationPermission === "granted" ? undefined : onRequestNotificationPermission}
             title={
               notificationPermission === "granted" ? "Browser alerts enabled" :
-              notificationPermission === "denied" ? "Notifications blocked — enable in browser settings" :
+              notificationPermission === "denied" ? "Notifications blocked - enable in browser settings" :
               "Enable browser alerts for due reminders"
             }
             className={`w-6 h-6 flex items-center justify-center rounded-md transition ${
@@ -178,7 +178,7 @@ export function RightPanel({
         </div>
       </div>
 
-      {/* Scrollable body — everything between header and footer scrolls together */}
+      {/* Scrollable body - everything between header and footer scrolls together */}
       <div className="flex-1 overflow-y-auto flex flex-col min-h-0">
 
       {/* ── Section 1: Notes ── */}
@@ -296,7 +296,7 @@ export function RightPanel({
 
       </div>{/* end scrollable body */}
 
-      {/* Footer: clear done — pinned at bottom */}
+      {/* Footer: clear done - pinned at bottom */}
       {doneCount > 0 && (
         <div className="px-3 py-2 border-t border-[#1e1e2a] shrink-0">
           <button
@@ -316,7 +316,7 @@ export function RightPanel({
         />
       )}
 
-      {/* Detail modal — keep up-to-date version of item from list */}
+      {/* Detail modal - keep up-to-date version of item from list */}
       <ReminderDetailModal
         item={selectedItem ? (items.find((i) => i.id === selectedItem.id) ?? selectedItem) : null}
         onClose={() => setSelectedItem(null)}

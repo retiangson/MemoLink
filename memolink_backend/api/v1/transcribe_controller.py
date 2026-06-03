@@ -23,9 +23,9 @@ async def transcribe(
 
     if size_mb >= _DEEPGRAM_THRESHOLD_MB:
         if settings.deepgram_api_key:
-            c.logs().info("transcribe", f"File '{filename}' is ≥ 5 MB — routing to Deepgram Nova-2", {"filename": filename, "size_mb": size_mb, "service": "deepgram"}, user_id)
+            c.logs().info("transcribe", f"File '{filename}' is ≥ 5 MB - routing to Deepgram Nova-2", {"filename": filename, "size_mb": size_mb, "service": "deepgram"}, user_id)
         else:
-            c.logs().warning("transcribe", f"File '{filename}' is ≥ 5 MB but no Deepgram key — will attempt Whisper fallback", {"filename": filename, "size_mb": size_mb}, user_id)
+            c.logs().warning("transcribe", f"File '{filename}' is ≥ 5 MB but no Deepgram key - will attempt Whisper fallback", {"filename": filename, "size_mb": size_mb}, user_id)
 
     text = transcribe_audio(audio_bytes, filename, ext, language=language or None)
 

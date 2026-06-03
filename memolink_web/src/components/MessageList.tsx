@@ -57,7 +57,11 @@ export function MessageList({
     >
       <div className="max-w-[740px] mx-auto flex flex-col gap-4">
         {messages.map((msg, idx) => {
-          const isStreamingMsg = streaming && idx === messages.length - 1 && msg.role === "assistant";
+          const isLast = idx === messages.length - 1;
+          const isStreamingMsg = streaming && isLast && msg.role === "assistant";
+          // Only offer the evaluation rating once the AI has fully finished this
+          // reply — never while it's still thinking (loading) or streaming.
+          const ratingReady = evaluationActive && !(isLast && (loading || streaming));
           return (
             <ChatBubble
               key={msg.id}
@@ -83,7 +87,7 @@ export function MessageList({
               onWorkflowActionDone={onWorkflowActionDone}
               onWorkflowConversationMessages={onWorkflowConversationMessages}
               messageId={msg.id}
-              evaluationActive={evaluationActive}
+              evaluationActive={ratingReady}
               evalRating={evalRatings?.[String(msg.id)]}
             />
           );

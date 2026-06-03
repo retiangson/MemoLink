@@ -23,7 +23,7 @@ class NoteService(INoteService):
         note = self.repo.create_note(user_id=dto.user_id, title=dto.title, content=dto.content, source=dto.source, workspace_id=getattr(dto, "workspace_id", None))
         if self.embedding_service and self.db:
             try:
-                with self.db.begin_nested():  # savepoint — rolls back only embedding on failure
+                with self.db.begin_nested():  # savepoint - rolls back only embedding on failure
                     vector = self.embedding_service.embed_text(dto.content)
                     self.repo.save_embedding(note.id, vector)
             except Exception:

@@ -1,5 +1,5 @@
 """
-Timeline DTOs — request/response contracts for the Meeting/Lecture Timeline feature.
+Timeline DTOs - request/response contracts for the Meeting/Lecture Timeline feature.
 """
 
 from typing import List, Optional
@@ -11,7 +11,7 @@ class TimelineChapter(BaseModel):
     seconds: int
     title: str
     summary: str
-    key_phrase: str         # exact text fragment — used by frontend to scroll to position
+    key_phrase: str         # exact text fragment - used by frontend to scroll to position
 
 
 class TimelineActionItem(BaseModel):

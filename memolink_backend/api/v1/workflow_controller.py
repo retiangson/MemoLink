@@ -2,8 +2,8 @@
 Workflow Agent Controller
 =========================
 
-POST /api/workflow/plan     Phase 1 — analyse prompt, return proposed actions (JSON)
-POST /api/workflow/execute  Phase 2 — execute approved actions (SSE stream)
+POST /api/workflow/plan     Phase 1 - analyse prompt, return proposed actions (JSON)
+POST /api/workflow/execute  Phase 2 - execute approved actions (SSE stream)
 
 Both endpoints require a valid JWT.
 """

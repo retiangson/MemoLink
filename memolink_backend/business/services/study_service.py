@@ -304,10 +304,10 @@ class StudyService:
             return QuizResponse(title="Quiz", questions=[])
 
         if len(notes) == 1:
-            quiz_title = f"Quiz — {notes[0].title or 'Untitled'}"
+            quiz_title = f"Quiz - {notes[0].title or 'Untitled'}"
             context = _strip_html(notes[0].content or "")[:6000]
         else:
-            quiz_title = "Quiz — All Notes"
+            quiz_title = "Quiz - All Notes"
             context = "\n\n---\n\n".join(
                 f"## {n.title or 'Untitled'}\n{_strip_html(n.content or '')[:2000]}"
                 for n in notes[:10]

@@ -128,7 +128,7 @@ export function SettingsModal({
     setActionLoading("reminder"); setActionResult(null);
     try {
       const res = await emailToReminder(id);
-      const due = res.due_date ? ` — due ${res.due_date}${res.due_time ? " " + res.due_time : ""}` : "";
+      const due = res.due_date ? ` - due ${res.due_date}${res.due_time ? " " + res.due_time : ""}` : "";
       setActionResult(`✓ Reminder added: "${res.text}"${due}`);
     } catch { setActionResult("Failed to add reminder."); }
     finally { setActionLoading(null); }
@@ -155,7 +155,7 @@ export function SettingsModal({
     }
   }
 
-  // TTS settings — local voice list + saved preferences
+  // TTS settings - local voice list + saved preferences
   const [ttsVoices, setTtsVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [ttsVoiceName, setTtsVoiceNameState] = useState<string>(() => localStorage.getItem("memolink_tts_voice") ?? "");
   const [ttsRate, setTtsRateState] = useState<number>(() => parseFloat(localStorage.getItem("memolink_tts_rate") ?? "1.0"));
@@ -583,7 +583,7 @@ export function SettingsModal({
             {/* ── Text-to-Speech ── */}
             {tab === "tts" && (
               <div className="space-y-5">
-                <p className="text-sm text-gray-400">Configure the voice used when reading notes and chat messages aloud. Changes apply to the next reading. Uses your browser's built-in speech engine — <span className="text-gray-300">no API key or internet connection required</span>.</p>
+                <p className="text-sm text-gray-400">Configure the voice used when reading notes and chat messages aloud. Changes apply to the next reading. Uses your browser's built-in speech engine - <span className="text-gray-300">no API key or internet connection required</span>.</p>
 
                 {/* Speed */}
                 <div>
@@ -838,7 +838,7 @@ export function SettingsModal({
                 <div>
                   <h3 className="text-sm font-semibold text-white mb-1">Workflow Action Suggestions</h3>
                   <p className="text-xs text-gray-500 leading-relaxed">
-                    When enabled, MemoLink automatically analyses each AI response and shows quick action buttons — like Save as Note or Add Reminder — directly below relevant messages. Nothing executes without you clicking.
+                    When enabled, MemoLink automatically analyses each AI response and shows quick action buttons - like Save as Note or Add Reminder - directly below relevant messages. Nothing executes without you clicking.
                   </p>
                 </div>
 
@@ -881,7 +881,7 @@ export function SettingsModal({
 
                 <div className="bg-indigo-500/5 border border-indigo-500/15 rounded-xl px-4 py-3">
                   <p className="text-xs text-gray-500 leading-relaxed">
-                    Suggestions appear only when the AI response is actionable — short replies and simple questions will not show any buttons. Actions execute only when you click them.
+                    Suggestions appear only when the AI response is actionable - short replies and simple questions will not show any buttons. Actions execute only when you click them.
                   </p>
                 </div>
               </div>

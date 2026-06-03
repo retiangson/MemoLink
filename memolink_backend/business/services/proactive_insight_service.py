@@ -3,28 +3,28 @@ Proactive Insight Service
 =========================
 
 Analyses a user's notes and existing reminders to surface actionable alerts that
-the user may have missed — without waiting for them to ask.
+the user may have missed - without waiting for them to ask.
 
 INSIGHT TYPES
 -------------
-missing_reminder   — Note mentions a specific deadline, due date, or scheduled event
+missing_reminder   - Note mentions a specific deadline, due date, or scheduled event
                      but no reminder exists to track it.
                      Example: "You mentioned a submission date in 'Assignment Brief'
                      but no reminder exists yet."
 
-incomplete_actions — Note contains clear action items, TODOs, or tasks that appear
+incomplete_actions - Note contains clear action items, TODOs, or tasks that appear
                      unfinished and untracked.
                      Example: "Lecture 3 has 3 action items that still have no
                      corresponding reminders."
 
-unreviewed_upload  — A recently uploaded file or recording has had no follow-up
+unreviewed_upload  - A recently uploaded file or recording has had no follow-up
                      activity (no reminders created, no conversations referencing it).
                      Example: "You uploaded a lecture recording 3 days ago but
                      haven't reviewed or summarised it yet."
 
-urgency_signal     — Note contains language suggesting something is time-critical
+urgency_signal     - Note contains language suggesting something is time-critical
                      ("ASAP", "urgent", "due tomorrow", "overdue", "deadline approaching").
-                     Example: "Project Plan uses urgent language — you may want to
+                     Example: "Project Plan uses urgent language - you may want to
                      set a reminder."
 
 ANALYSIS FLOW
@@ -38,7 +38,7 @@ ANALYSIS FLOW
 COST
 ----
 ~$0.001 per scan for a typical 20-note workspace (all GPT-4o-mini, low token count).
-Users trigger scans manually — no cost on regular page load.
+Users trigger scans manually - no cost on regular page load.
 """
 
 import json
@@ -80,13 +80,13 @@ def _analyse_batch(batch: list[dict]) -> list[dict]:
         "You are a proactive study/work companion. Analyse each note below and identify "
         "specific, actionable insights the user may have missed.\n\n"
         "Look for:\n"
-        "1. MISSING_REMINDER — a specific deadline, due date, exam, meeting, or scheduled "
+        "1. MISSING_REMINDER - a specific deadline, due date, exam, meeting, or scheduled "
         "   event is mentioned but no reminder was created for it.\n"
-        "2. INCOMPLETE_ACTIONS — clear action items, TODOs, or tasks appear unfinished "
+        "2. INCOMPLETE_ACTIONS - clear action items, TODOs, or tasks appear unfinished "
         "   and untracked (e.g. 'need to submit', 'must review', 'TODO:').\n"
-        "3. URGENCY_SIGNAL — language signals the topic is time-critical or overdue "
+        "3. URGENCY_SIGNAL - language signals the topic is time-critical or overdue "
         "   (e.g. 'ASAP', 'urgent', 'due tomorrow', 'overdue', 'deadline approaching').\n\n"
-        "Return ONLY a JSON array — empty [] if nothing found:\n"
+        "Return ONLY a JSON array - empty [] if nothing found:\n"
         "[\n"
         '  {"note_index": 1, "type": "missing_reminder|incomplete_actions|urgency_signal",\n'
         '   "title": "short alert title (max 80 chars)",\n'
@@ -152,7 +152,7 @@ class ProactiveInsightService:
                     new_insights.append({
                         "insight_type": "unreviewed_upload",
                         "title": f"Unreviewed upload: {title[:60]}",
-                        "description": f"Uploaded {age_label} — consider adding a summary or setting a review reminder.",
+                        "description": f"Uploaded {age_label} - consider adding a summary or setting a review reminder.",
                         "note_id": note.id,
                         "severity": "info",
                     })

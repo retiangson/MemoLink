@@ -76,7 +76,7 @@ export function WorkflowActionBar({ actions, conversationId, workspaceId, model,
     }
   }
 
-  // Single action — show a full conversational prompt
+  // Single action - show a full conversational prompt
   if (actions.length === 1) {
     const action = actions[0];
     const state = states[action.id] ?? "idle";
@@ -148,7 +148,7 @@ export function WorkflowActionBar({ actions, conversationId, workspaceId, model,
     );
   }
 
-  // Multiple actions — show a "I can help with:" prompt with individual buttons
+  // Multiple actions - show a "I can help with:" prompt with individual buttons
   return (
     <div className="mt-3 pt-3 border-t border-[#2a2a38]/60 space-y-2">
       {!allSettled && (

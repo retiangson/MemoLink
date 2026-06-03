@@ -26,7 +26,7 @@ _YT_PATTERNS = [
 ]
 
 MAX_UPLOAD_BYTES = 200 * 1024 * 1024  # 200 MB
-WHISPER_LIMIT = 25 * 1024 * 1024     # 25 MB — Whisper API hard limit
+WHISPER_LIMIT = 25 * 1024 * 1024     # 25 MB - Whisper API hard limit
 ACCEPTED_EXT = {".mp3", ".mp4", ".m4a", ".wav", ".webm", ".mpeg", ".mpga", ".mov"}
 
 
@@ -53,14 +53,14 @@ def _to_html(text: str, words_per_para: int = 80) -> str:
 
 
 def _seg_text(s) -> str:
-    """Extract text from a transcript segment — handles both dict and object formats."""
+    """Extract text from a transcript segment - handles both dict and object formats."""
     if isinstance(s, dict):
         return s.get("text") or ""
     return getattr(s, "text", None) or ""
 
 
 def _yt_title(url: str, fallback: str) -> str:
-    """Fetch YouTube title via oEmbed — no API key required."""
+    """Fetch YouTube title via oEmbed - no API key required."""
     try:
         oembed = f"https://www.youtube.com/oembed?url={url}&format=json"
         with urllib.request.urlopen(oembed, timeout=5) as r:
@@ -72,12 +72,12 @@ def _yt_title(url: str, fallback: str) -> str:
 
 def _import_youtube(url: str) -> dict:
     video_id = _extract_video_id(url)
-    fallback_title = f"YouTube — {video_id}"
+    fallback_title = f"YouTube - {video_id}"
 
     try:
         from youtube_transcript_api import YouTubeTranscriptApi
 
-        # v0.6.x+ requires instantiation — static/class methods no longer exist
+        # v0.6.x+ requires instantiation - static/class methods no longer exist
         ytt = YouTubeTranscriptApi()
         raw = None
 
@@ -168,7 +168,7 @@ async def upload_video(
     data = await file.read()
     size_mb = round(len(data) / 1024 / 1024, 1)
     if len(data) > MAX_UPLOAD_BYTES:
-        log_repo.create("WARNING", "video.upload", f"Rejected oversized file ({size_mb} MB) — limit is 200 MB", {"filename": file.filename, "size_mb": size_mb}, user_id)
+        log_repo.create("WARNING", "video.upload", f"Rejected oversized file ({size_mb} MB) - limit is 200 MB", {"filename": file.filename, "size_mb": size_mb}, user_id)
         raise HTTPException(
             status_code=422,
             detail=f"File is too large ({size_mb} MB). Maximum is 200 MB.",
@@ -177,9 +177,9 @@ async def upload_video(
     use_deepgram = len(data) > WHISPER_LIMIT
     if use_deepgram:
         if settings.deepgram_api_key:
-            log_repo.create("INFO", "video.upload", f"File '{file.filename}' exceeds 25 MB — falling back to Deepgram Nova-2", {"filename": file.filename, "size_mb": size_mb, "fallback": "deepgram"}, user_id)
+            log_repo.create("INFO", "video.upload", f"File '{file.filename}' exceeds 25 MB - falling back to Deepgram Nova-2", {"filename": file.filename, "size_mb": size_mb, "fallback": "deepgram"}, user_id)
         else:
-            log_repo.create("WARNING", "video.upload", f"File '{file.filename}' exceeds 25 MB Whisper limit — no Deepgram key configured", {"filename": file.filename, "size_mb": size_mb}, user_id)
+            log_repo.create("WARNING", "video.upload", f"File '{file.filename}' exceeds 25 MB Whisper limit - no Deepgram key configured", {"filename": file.filename, "size_mb": size_mb}, user_id)
             raise HTTPException(status_code=422, detail=f"File is {size_mb} MB. Files over 25 MB require a Deepgram API key to be configured.")
     else:
         log_repo.create("INFO", "video.upload", f"Transcribing '{file.filename}' ({size_mb} MB) via Whisper", {"filename": file.filename, "size_mb": size_mb, "service": "whisper"}, user_id)
