@@ -131,5 +131,5 @@ def get_active_workspace(
     repo = WorkspaceRepository(db)
     ws = repo.get_active_for_user(user_id)
     if not ws:
-        raise HTTPException(status_code=404, detail="No workspace found — redirect to onboarding")
+        raise HTTPException(status_code=404, detail="No workspace found - redirect to onboarding")
     return _serialize(ws, repo.get_alert_count(ws.id))

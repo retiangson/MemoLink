@@ -55,3 +55,34 @@ def test_chat_service_uses_notes_as_context_and_saves_assistant_message(monkeypa
     assert result.sources[0].note_id == note.id
     assert any("USER NOTES CONTEXT" in m["content"] for m in fake_chat.last_messages)
     assert list(conv_repo.messages.values())[-1].role == "assistant"
+
+
+# ── Large-context re-routing guard ───────────────────────────────────────────
+
+def test_reroute_large_request_to_gemini_when_oversized():
+    # Oversized request on a low-TPM OpenAI model → Gemini (key present)
+    model, reason = chat_module._reroute_large_request(
+        "gpt-4o", est_tokens=40000, gemini_key="g-key", default_model="gpt-4o-mini",
+    )
+    assert model == "gemini-2.5-flash" and reason and "Gemini" in reason
+
+
+def test_reroute_large_request_to_mini_without_gemini_key():
+    model, reason = chat_module._reroute_large_request(
+        "gpt-4o", est_tokens=40000, gemini_key="", default_model="gpt-4o-mini",
+    )
+    assert model == "gpt-4o-mini" and reason
+
+
+def test_reroute_keeps_small_requests_on_gpt4o():
+    model, reason = chat_module._reroute_large_request(
+        "gpt-4o", est_tokens=5000, gemini_key="g-key", default_model="gpt-4o-mini",
+    )
+    assert model == "gpt-4o" and reason is None
+
+
+def test_reroute_ignores_mini_and_other_models():
+    # mini already has high TPM; gemini/deepseek have big windows — never re-routed
+    for m in ("gpt-4o-mini", "gemini-2.5-flash", "deepseek-chat"):
+        model, reason = chat_module._reroute_large_request(m, 99999, "g-key", "gpt-4o-mini")
+        assert model == m and reason is None

@@ -1,4 +1,4 @@
-"""Run once to seed initial data. Safe to re-run — skips existing records."""
+"""Run once to seed initial data. Safe to re-run - skips existing records."""
 import os
 import sys
 

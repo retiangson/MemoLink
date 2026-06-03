@@ -4,7 +4,7 @@ import {
   type EvaluationSummary,
 } from "../api/evaluationApi";
 
-function fmt(v: number | null | undefined, suffix = "", dash = "—"): string {
+function fmt(v: number | null | undefined, suffix = "", dash = "-"): string {
   return v == null ? dash : `${v}${suffix}`;
 }
 
@@ -115,7 +115,7 @@ export function AdminEvaluationPanel() {
       <div className="flex items-center justify-between mb-4">
         <div>
           <h2 className="text-lg font-semibold text-white">Evaluation Analytics</h2>
-          <p className="text-xs text-gray-500">Quantitative research telemetry — separate from logs and feedback.</p>
+          <p className="text-xs text-gray-500">Quantitative research telemetry - separate from logs and feedback.</p>
         </div>
         <div className="flex gap-2">
           <button onClick={generate} disabled={busy === "report"} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-indigo-600 hover:bg-indigo-500 text-white disabled:opacity-40 transition">
@@ -127,7 +127,7 @@ export function AdminEvaluationPanel() {
       </div>
 
       <p className="text-[11px] text-gray-600 mb-4">
-        Stats are gathered automatically while <span className="text-gray-400">Evaluation Analytics</span> is on, up to a per-participant <span className="text-gray-400">collection window (default 30 minutes of usage time)</span> — switching tabs or logging out pauses it; it never resets on its own. Set each participant's window and reset their budget in <span className="text-gray-400">Users → Evaluation</span>.
+        Stats are gathered automatically while <span className="text-gray-400">Evaluation Analytics</span> is on, up to a per-participant <span className="text-gray-400">collection window (default 30 minutes of usage time)</span> - switching tabs or logging out pauses it; it never resets on its own. Set each participant's window and reset their budget in <span className="text-gray-400">Users → Evaluation</span>.
       </p>
 
       {/* Summary cards */}
@@ -135,10 +135,10 @@ export function AdminEvaluationPanel() {
         <Card label="Participants" value={String(s.total_participants)} />
         <Card label="Completed sessions" value={`${s.completed_sessions}/${s.total_sessions}`} />
         <Card label="Avg session time" value={fmt(s.avg_session_time_seconds, "s")} />
-        <Card label="Task completion" value={s.task_completion_rate != null ? `${Math.round(s.task_completion_rate * 100)}%` : "—"} hint={`${s.completed_tasks}/${s.total_tasks} tasks`} />
+        <Card label="Task completion" value={s.task_completion_rate != null ? `${Math.round(s.task_completion_rate * 100)}%` : "-"} hint={`${s.completed_tasks}/${s.total_tasks} tasks`} />
         <Card label="Avg response time" value={fmt(s.avg_response_time_ms, " ms")} />
         <Card label="First-token latency" value={fmt(s.avg_first_token_latency_ms, " ms")} />
-        <Card label="Fallback rate" value={s.fallback_rate != null ? `${Math.round(s.fallback_rate * 100)}%` : "—"} hint={`${s.ai_metric_count} samples`} />
+        <Card label="Fallback rate" value={s.fallback_rate != null ? `${Math.round(s.fallback_rate * 100)}%` : "-"} hint={`${s.ai_metric_count} samples`} />
         <Card label="Relevance / Citation / Trust" value={`${fmt(s.avg_relevance_rating)} / ${fmt(s.avg_citation_rating)} / ${fmt(s.avg_trust_rating)}`} hint="avg /5" />
       </div>
 
@@ -148,10 +148,10 @@ export function AdminEvaluationPanel() {
           <BarChart title="Average user rating by question (out of 5)" data={relabel(s.ratings_by_type)} />
         )}
         {s.supported_by_notes && Object.keys(s.supported_by_notes).length > 0 && (
-          <BarChart title="“Was this answer supported by your own notes?” — responses" data={relabel(s.supported_by_notes)} />
+          <BarChart title="“Was this answer supported by your own notes?” - responses" data={relabel(s.supported_by_notes)} />
         )}
         {Object.keys(confidenceChart).length > 0 && (
-          <BarChart title="Confidence alignment — answers per confidence level (with avg trust rating)" data={confidenceChart} />
+          <BarChart title="Confidence alignment - answers per confidence level (with avg trust rating)" data={confidenceChart} />
         )}
         {Object.keys(s.response_time_by_feature).length > 0 && (
           <BarChart title="Average response time by feature (ms)" data={relabel(s.response_time_by_feature)} suffix=" ms" />

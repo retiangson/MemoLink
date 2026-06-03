@@ -215,7 +215,7 @@ function FlashcardsTab({ workspaceId, notes }: { workspaceId: number | null; not
             className="cursor-pointer min-h-[180px] bg-[#12121a] border-2 border-[#2a2a38] hover:border-indigo-500/40 rounded-2xl p-6 flex flex-col items-center justify-center text-center select-none transition"
           >
             <p className="text-[10px] text-gray-600 uppercase tracking-wider mb-3">
-              {revealed ? "Answer" : "Question — click to reveal"}
+              {revealed ? "Answer" : "Question - click to reveal"}
             </p>
             <p className={`text-base font-medium leading-relaxed transition-all ${revealed ? "text-emerald-300" : "text-white"}`}>
               {revealed ? card.answer : card.question}
@@ -242,7 +242,7 @@ function FlashcardsTab({ workspaceId, notes }: { workspaceId: number | null; not
           </div>
 
           <div className="flex justify-end">
-            <SaveNoteButton content={saveContent} title={`Flashcards — ${new Date().toLocaleDateString()}`} workspaceId={workspaceId} />
+            <SaveNoteButton content={saveContent} title={`Flashcards - ${new Date().toLocaleDateString()}`} workspaceId={workspaceId} />
           </div>
         </>
       )}
@@ -367,7 +367,7 @@ function ExamReviewTab({ workspaceId, notes }: { workspaceId: number | null; not
           )}
 
           <div className="flex justify-end">
-            <SaveNoteButton content={saveContent} title={`Exam Review — ${new Date().toLocaleDateString()}`} workspaceId={workspaceId} />
+            <SaveNoteButton content={saveContent} title={`Exam Review - ${new Date().toLocaleDateString()}`} workspaceId={workspaceId} />
           </div>
         </div>
       )}
@@ -397,7 +397,7 @@ function StudyPlanTab({ workspaceId }: { workspaceId: number | null }) {
   const saveContent = plan ? [
     `Study Plan: ${plan.overall_goal}`,
     ...plan.plan.map(d =>
-      `\n${d.label} — ${d.focus}\nTopics: ${d.topics.join(", ")}\nTasks:\n${d.tasks.map(t => `• ${t}`).join("\n")}`,
+      `\n${d.label} - ${d.focus}\nTopics: ${d.topics.join(", ")}\nTasks:\n${d.tasks.map(t => `• ${t}`).join("\n")}`,
     ),
   ].join("\n") : "";
 
@@ -480,7 +480,7 @@ function StudyPlanTab({ workspaceId }: { workspaceId: number | null }) {
           </div>
 
           <div className="flex justify-end">
-            <SaveNoteButton content={saveContent} title={`Study Plan — ${plan.overall_goal}`} workspaceId={workspaceId} />
+            <SaveNoteButton content={saveContent} title={`Study Plan - ${plan.overall_goal}`} workspaceId={workspaceId} />
           </div>
         </div>
       )}
@@ -558,7 +558,7 @@ function WeakTopicsTab({ workspaceId }: { workspaceId: number | null }) {
           )}
 
           {result.topics.length === 0 && !result.message && (
-            <p className="text-sm text-gray-500 text-center py-8">No recurring patterns found. Great — you ask diverse questions!</p>
+            <p className="text-sm text-gray-500 text-center py-8">No recurring patterns found. Great - you ask diverse questions!</p>
           )}
         </>
       )}
@@ -636,7 +636,7 @@ function SummaryTab({ workspaceId, notes }: { workspaceId: number | null; notes:
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <p className="text-xs text-gray-500">{result.note_title} · <span className="capitalize">{result.level}</span></p>
-            <SaveNoteButton content={saveContent} title={`Summary (${result.level}) — ${result.note_title}`} workspaceId={workspaceId} />
+            <SaveNoteButton content={saveContent} title={`Summary (${result.level}) - ${result.note_title}`} workspaceId={workspaceId} />
           </div>
 
           {result.bullet_points ? (

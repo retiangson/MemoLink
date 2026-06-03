@@ -38,7 +38,7 @@ export function useSuggestions(workspaceId?: number | null) {
       }));
       setItems((prev) => [...newItems, ...prev]);
     } catch {
-      // silent — suggestions are non-critical
+      // silent - suggestions are non-critical
     } finally {
       setIsGenerating(false);
     }

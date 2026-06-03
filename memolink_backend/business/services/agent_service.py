@@ -1,5 +1,5 @@
 """
-Agent service — orchestrates OpenAI tool-calling to let the AI take actions
+Agent service - orchestrates OpenAI tool-calling to let the AI take actions
 (search notes, create notes, create reminders, web search, edit notes) before
 producing a final streamed answer.
 """
@@ -213,7 +213,7 @@ class AgentService:
         model: Optional[str] = None,
     ) -> Iterator[str]:
         model = model or settings.openai_chat_model
-        # Tool calling requires an OpenAI model — Gemini and DeepSeek are not
+        # Tool calling requires an OpenAI model - Gemini and DeepSeek are not
         # routed through the OpenAI client and will return 404 if passed here.
         # Fall back to gpt-4o-mini when any non-OpenAI model is selected.
         _OPENAI_PREFIXES = ("gpt-", "o1-", "o3-", "o4-")

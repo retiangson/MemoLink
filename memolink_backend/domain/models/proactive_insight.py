@@ -7,10 +7,10 @@ class ProactiveInsight(Base):
     Stores AI-generated proactive alerts surfaced from note content analysis.
 
     insight_type values:
-        missing_reminder  — note mentions a deadline/date but no reminder exists for it
-        incomplete_actions — note contains TODOs or action items that are untracked
-        unreviewed_upload  — recently uploaded file/recording with no follow-up activity
-        urgency_signal     — note uses urgent/time-critical language
+        missing_reminder  - note mentions a deadline/date but no reminder exists for it
+        incomplete_actions - note contains TODOs or action items that are untracked
+        unreviewed_upload  - recently uploaded file/recording with no follow-up activity
+        urgency_signal     - note uses urgent/time-critical language
 
     severity values: info | warning | urgent
     """

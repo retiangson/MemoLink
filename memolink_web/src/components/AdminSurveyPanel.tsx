@@ -23,7 +23,7 @@ export function AdminSurveyPanel() {
       <div className="flex items-center justify-between mb-4">
         <div>
           <h2 className="text-lg font-semibold text-white">Evaluation Survey</h2>
-          <p className="text-xs text-gray-500">Research data — stored separately from feedback / bug reports.</p>
+          <p className="text-xs text-gray-500">Research data - stored separately from feedback / bug reports.</p>
         </div>
         <div className="flex gap-1 bg-[#12121a] border border-[#2a2a38] rounded-xl p-1">
           {(["questions", "report"] as const).map(t => (

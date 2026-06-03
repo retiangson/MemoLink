@@ -11,11 +11,11 @@ class SystemLogService:
         self._repo = repo
 
     def _safe_create(self, level: str, source: str, message: str, details: Optional[dict], user_id: Optional[int]) -> Optional[SystemLog]:
-        """Write a log entry. Never raises — a logging failure must not crash the calling request."""
+        """Write a log entry. Never raises - a logging failure must not crash the calling request."""
         try:
             return self._repo.create(level, source, message, details, user_id)
         except Exception as exc:
-            _logger.warning("SystemLogService: failed to write %s log [%s] %s — %s", level, source, message, exc)
+            _logger.warning("SystemLogService: failed to write %s log [%s] %s - %s", level, source, message, exc)
             return None
 
     def info(self, source: str, message: str, details: Optional[dict] = None, user_id: Optional[int] = None) -> Optional[SystemLog]:

@@ -34,7 +34,7 @@ html, body {
   50% { opacity: 0; }
 }
 
-/* ── Custom scrollbars — thin, dark, indigo accent ─────────────────────── */
+/* ── Custom scrollbars - thin, dark, indigo accent ─────────────────────── */
 ::-webkit-scrollbar {
   width: 5px;
   height: 5px;

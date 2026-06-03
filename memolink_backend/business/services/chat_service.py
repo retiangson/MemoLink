@@ -14,7 +14,7 @@ from memolink_backend.core.config import settings
 
 logger = logging.getLogger(__name__)
 _HTML_TAG = re.compile(r"<[^>]+>")
-# Matches markdown images with base64 data URLs — e.g. ![...](data:image/png;base64,...)
+# Matches markdown images with base64 data URLs - e.g. ![...](data:image/png;base64,...)
 _BASE64_IMG_MD = re.compile(r'!\[([^\]]*)\]\(data:[^)]{20,}\)', re.IGNORECASE)
 # Matches HTML img tags whose src is a base64 data URL
 _BASE64_IMG_HTML = re.compile(r'<img\b[^>]*\bsrc=["\']data:[^"\']{20,}["\'][^>]*>', re.IGNORECASE)
@@ -75,6 +75,15 @@ def _get_client(model: str, user_keys: dict | None = None) -> OpenAI:
     return OpenAI(api_key=settings.openai_api_key)
 
 
+def _completion_kwargs(model: str) -> dict:
+    """Per-provider chat-completion options. Gemini 2.5 is a 'thinking' model whose
+    internal reasoning eats into the output budget — without a generous max_tokens
+    the visible reply gets truncated mid-sentence, so we reserve plenty of room."""
+    if _canonical_model(model) in _GEMINI_MODELS:
+        return {"max_tokens": 8192}
+    return {}
+
+
 # ── Confidence layer ──────────────────────────────────────────────────────────
 
 # ── Confidence layer ──────────────────────────────────────────────────────────
@@ -91,7 +100,7 @@ _CONFIDENCE_RE = re.compile(
 
 # Sent as a SEPARATE final system message so the model sees it clearly
 _CONFIDENCE_SYSTEM_MSG = (
-    "IMPORTANT — CONFIDENCE ASSESSMENT:\n"
+    "IMPORTANT - CONFIDENCE ASSESSMENT:\n"
     "At the very end of your response, after a blank line, you MUST append:\n"
     "<confidence level=\"LEVEL\">one sentence reason</confidence>\n\n"
     "Replace LEVEL with exactly one of: HIGH, MEDIUM, LOW, UNSUPPORTED\n"
@@ -100,7 +109,7 @@ _CONFIDENCE_SYSTEM_MSG = (
     "- LOW         : minimal note grounding; answer draws mainly on general knowledge\n"
     "- UNSUPPORTED : notes have no relevant content; answer is entirely general AI knowledge\n\n"
     "Example: <confidence level=\"HIGH\">The answer is fully supported by the Project Plan note.</confidence>\n"
-    "This tag is stripped before display — always include it."
+    "This tag is stripped before display - always include it."
 )
 
 _WEB_SEARCH_SYSTEM_MSG = (
@@ -136,23 +145,23 @@ def _pre_confidence(all_notes: list, top_notes: list) -> tuple[str, str]:
     Used as a guaranteed fallback when the LLM doesn't output a confidence tag."""
     total = len(all_notes)
     if total == 0:
-        return "UNSUPPORTED", "No notes exist in this workspace yet — answer is based on general knowledge."
+        return "UNSUPPORTED", "No notes exist in this workspace yet - answer is based on general knowledge."
     if total <= 20:
-        # Small workspace: all notes included — confidence depends on note count
+        # Small workspace: all notes included - confidence depends on note count
         if total <= 2:
-            return "LOW", f"Only {total} note(s) in workspace — limited context available."
+            return "LOW", f"Only {total} note(s) in workspace - limited context available."
         if total <= 5:
-            return "MEDIUM", f"{total} notes available — answer draws from your full workspace."
+            return "MEDIUM", f"{total} notes available - answer draws from your full workspace."
         return "HIGH", f"All {total} workspace notes included as context."
-    # Large workspace — confidence based on vector search results
+    # Large workspace - confidence based on vector search results
     found = len(top_notes)
     if found == 0:
-        return "UNSUPPORTED", "No relevant notes found for this question — answer is general knowledge."
+        return "UNSUPPORTED", "No relevant notes found for this question - answer is general knowledge."
     if found <= 2:
-        return "LOW", f"Only {found} relevant note(s) found — answer may lack full context."
+        return "LOW", f"Only {found} relevant note(s) found - answer may lack full context."
     if found <= 4:
-        return "MEDIUM", f"{found} relevant notes found — answer partially grounded in your notes."
-    return "HIGH", f"{found} relevant notes found — answer strongly grounded in your workspace."
+        return "MEDIUM", f"{found} relevant notes found - answer partially grounded in your notes."
+    return "HIGH", f"{found} relevant notes found - answer strongly grounded in your workspace."
 
 
 # ── Improve-note regex ─────────────────────────────────────────────────────────
@@ -180,6 +189,35 @@ def _extract_improve_note_name(text: str) -> str | None:
         if m:
             return m.group(1).strip().strip('"\'')
     return None
+
+
+# High-capability OpenAI models with a low tokens-per-minute (TPM) cap on lower
+# OpenAI tiers — a large RAG context can 429 ("Request too large") on these even
+# though it fits their 128K context window. We proactively re-route oversized
+# requests to Gemini (1M-token window + generous limits) before the call.
+_LOW_TPM_OPENAI_MODELS = {
+    "gpt-4o", "gpt-4o-2024-08-06", "gpt-4o-2024-05-13",
+    "gpt-4-turbo", "gpt-4-turbo-preview", "gpt-4", "chatgpt-4o-latest",
+}
+# ~30K TPM tier-1 cap, kept with margin. ≈ chars/4 tokens.
+_LARGE_REQUEST_TOKEN_LIMIT = 28000
+
+
+def _estimate_tokens(messages: list[dict]) -> int:
+    """Rough token estimate (~4 chars/token) for the assembled request."""
+    return sum(len(m.get("content") or "") for m in messages) // 4
+
+
+def _reroute_large_request(model: str, est_tokens: int, gemini_key: str, default_model: str):
+    """If a low-TPM OpenAI model would receive an oversized request, send it to
+    Gemini instead (or the default mini if no Gemini key). Returns
+    (model, routing_reason) — routing_reason is None when nothing changed."""
+    if model in _LOW_TPM_OPENAI_MODELS and est_tokens > _LARGE_REQUEST_TOKEN_LIMIT:
+        if gemini_key:
+            return "gemini-2.5-flash", "Large context → Gemini"
+        if not model.endswith("-mini"):
+            return default_model, "Large context → GPT-4o Mini"
+    return model, None
 
 
 def _build_fallback_chain(primary: str, user_keys: dict | None = None) -> list[str]:
@@ -280,7 +318,7 @@ def _generate_image(prompt: str) -> tuple[str, str, str]:
             logger.warning("Image generation failed with %s: %s", model, exc)
             raise
 
-    # DALL-E not available — fall back to Pollinations.ai (free, no API key)
+    # DALL-E not available - fall back to Pollinations.ai (free, no API key)
     logger.info("DALL-E unavailable; falling back to Pollinations.ai.")
     encoded = urllib.parse.quote(prompt)
     poll_url = (
@@ -338,18 +376,18 @@ _SYSTEM_PROMPT = (
     "TICKET CREATION RULE: When the user asks you to create, generate, or propose tickets, "
     "issues, tasks, or user stories from their notes, produce a comprehensive, well-structured "
     "ticket list. For EACH ticket include ALL of the following fields:\n"
-    "- **Title** — a clear, actionable title (verb + noun, e.g. 'Implement user registration endpoint')\n"
-    "- **Type** — Feature / Bug / Chore / Spike / Documentation\n"
-    "- **Priority** — Critical / High / Medium / Low (justify based on the notes)\n"
-    "- **Epic / Category** — the feature area it belongs to\n"
-    "- **Description** — 2–4 sentences explaining what needs to be done and why\n"
-    "- **Acceptance Criteria** — a numbered checklist of specific, testable conditions that "
+    "- **Title** - a clear, actionable title (verb + noun, e.g. 'Implement user registration endpoint')\n"
+    "- **Type** - Feature / Bug / Chore / Spike / Documentation\n"
+    "- **Priority** - Critical / High / Medium / Low (justify based on the notes)\n"
+    "- **Epic / Category** - the feature area it belongs to\n"
+    "- **Description** - 2–4 sentences explaining what needs to be done and why\n"
+    "- **Acceptance Criteria** - a numbered checklist of specific, testable conditions that "
     "define 'done' (minimum 3 criteria per ticket)\n"
-    "- **Technical Notes** — any implementation hints, constraints, or dependencies mentioned "
+    "- **Technical Notes** - any implementation hints, constraints, or dependencies mentioned "
     "in the notes (e.g. specific endpoints, models, libraries, or architecture requirements)\n"
-    "- **Dependencies** — list any other tickets this one depends on or blocks, if applicable\n"
+    "- **Dependencies** - list any other tickets this one depends on or blocks, if applicable\n"
     "Group tickets under clear ## Epic headings. "
-    "Extract as many tickets as the notes actually justify — do not artificially shorten the list. "
+    "Extract as many tickets as the notes actually justify - do not artificially shorten the list. "
     "Use the full content of the notes as your source; do not invent requirements not present."
 )
 
@@ -428,16 +466,16 @@ class ChatService(IChatService):
         top_notes_for_confidence: list = []
 
         if len(all_notes) <= 20:
-            # Small workspace — include every note in full (up to 1 500 chars each)
+            # Small workspace - include every note in full (up to 1 500 chars each)
             top_notes_for_confidence = list(all_notes)
             for n in all_notes:
                 sources.append(ChatAnswerSource(note_id=n.id, title=n.title, snippet=n.content[:200] + "..."))
                 plain = _strip_base64_images(_HTML_TAG.sub(" ", n.content)).strip()
                 rag_blocks.append(f"[NOTE {n.id}: {n.title or 'Untitled'}]\n{plain[:1500]}")
         else:
-            # Large workspace — note directory + vector-search for top relevant notes
+            # Large workspace - note directory + vector-search for top relevant notes
             note_dir = "\n".join(f"- [NOTE {n.id}] {n.title or 'Untitled'}" for n in all_notes)
-            rag_blocks.append(f"[NOTE DIRECTORY — {len(all_notes)} notes]\n{note_dir}")
+            rag_blocks.append(f"[NOTE DIRECTORY - {len(all_notes)} notes]\n{note_dir}")
 
             try:
                 query_vec = self.embedding.embed_text(user_text)
@@ -475,7 +513,7 @@ class ChatService(IChatService):
                         top_ids.add(nid)
                         sources.append(ChatAnswerSource(note_id=note.id, title=note.title, snippet=note.content[:200] + "..."))
                         plain = _strip_base64_images(_HTML_TAG.sub(" ", note.content)).strip()
-                        rag_blocks.append(f"[NOTE {note.id}: {note.title or 'Untitled'} — related via MemoGraph]\n{plain}")
+                        rag_blocks.append(f"[NOTE {note.id}: {note.title or 'Untitled'} - related via MemoGraph]\n{plain}")
                 except Exception:
                     pass  # graph enhancement is best-effort; never break chat
 
@@ -491,7 +529,7 @@ class ChatService(IChatService):
             else:
                 system_msgs.append({"role": "system", "content": _WEB_SEARCH_EMPTY_MSG})
 
-        # Confidence instruction as the LAST system message — model sees it most clearly here
+        # Confidence instruction as the LAST system message - model sees it most clearly here
         system_msgs.append({"role": "system", "content": _CONFIDENCE_SYSTEM_MSG})
 
         # Pre-compute a deterministic confidence fallback so the badge always shows
@@ -520,7 +558,7 @@ class ChatService(IChatService):
                 "Rules: use proper HTML tags (h2, h3 for headings, p for paragraphs, ul/ol/li for lists, "
                 "<strong> for key terms, <em> for emphasis, <table> for tabular data). "
                 "Do NOT change the meaning, remove content, or add new information. "
-                "Return ONLY the improved HTML — no markdown fences, no doctype, no html/body tags, no commentary."
+                "Return ONLY the improved HTML - no markdown fences, no doctype, no html/body tags, no commentary."
             )},
             {"role": "user", "content": f"Note title: {note.title}\n\nContent:\n{plain[:5000]}"},
         ]
@@ -532,6 +570,7 @@ class ChatService(IChatService):
             try:
                 completion = _get_client(attempt, user_keys).chat.completions.create(
                     model=attempt, messages=improve_messages,
+                    **_completion_kwargs(attempt),
                 )
                 improved_html = (completion.choices[0].message.content or "").strip()
                 break
@@ -539,7 +578,7 @@ class ChatService(IChatService):
                 continue
 
         if not improved_html:
-            msg = "⚠ Failed to improve the note — all AI models are currently unavailable."
+            msg = "⚠ Failed to improve the note - all AI models are currently unavailable."
             assistant_msg = self.repo_conv.add_message(conversation_id, "assistant", msg)
             yield f"data: {json.dumps({'t': msg})}\n\n"
             yield f"data: {json.dumps({'done': True, 'id': assistant_msg.id})}\n\n"
@@ -590,6 +629,12 @@ class ChatService(IChatService):
             assistant_msg = self.repo_conv.add_message(conversation_id, "assistant", answer, model=img_model)
             return ChatResponseDTO(answer=answer, sources=[], message_id=assistant_msg.id)
 
+        # Proactive size guard — re-route oversized requests off low-TPM OpenAI models.
+        _rm, _large_reason = _reroute_large_request(model, _estimate_tokens(messages), settings.gemini_api_key, settings.openai_chat_model)
+        if _large_reason:
+            model = _rm
+            routing_reason = _large_reason
+
         chain = _build_fallback_chain(model)
         used_model = model
         answer: Optional[str] = None
@@ -600,6 +645,7 @@ class ChatService(IChatService):
                 completion = _get_client(attempt, user_keys).chat.completions.create(
                     model=attempt,
                     messages=messages,
+                    **_completion_kwargs(attempt),
                 )
                 answer = completion.choices[0].message.content
                 used_model = attempt
@@ -610,12 +656,12 @@ class ChatService(IChatService):
                 last_error = str(e)
                 logger.warning("Model %s failed: %s", attempt, e)
                 if attempt != model:
-                    self._syslog("warning", f"Fallback {attempt} also failed — trying next", {"model": attempt, "error": last_error}, dto.user_id)
+                    self._syslog("warning", f"Fallback {attempt} also failed - trying next", {"model": attempt, "error": last_error}, dto.user_id)
                 else:
-                    self._syslog("warning", f"{model} failed — starting fallback chain {chain[1:]}", {"model": model, "error": last_error, "chain": chain[1:]}, dto.user_id)
+                    self._syslog("warning", f"{model} failed - starting fallback chain {chain[1:]}", {"model": model, "error": last_error, "chain": chain[1:]}, dto.user_id)
 
         if answer is None:
-            self._syslog("error", f"All models exhausted {chain} — returning error to user", {"chain": chain, "last_error": last_error}, dto.user_id)
+            self._syslog("error", f"All models exhausted {chain} - returning error to user", {"chain": chain, "last_error": last_error}, dto.user_id)
             answer = f"⚠ All available AI models are currently unavailable. Please try again later.\n\n*Last error: {last_error}*"
 
         clean_answer, conf_level, conf_reason = _parse_confidence(answer)
@@ -669,6 +715,16 @@ class ChatService(IChatService):
             yield f"data: {json.dumps({'done': True, 'id': assistant_msg.id, 'model': img_model})}\n\n"
             return
 
+        # Proactive size guard: a large RAG context can 429 on low-TPM OpenAI
+        # models before the fallback even runs — re-route to Gemini up front.
+        est_tokens = _estimate_tokens(messages)
+        _rm, _large_reason = _reroute_large_request(model, est_tokens, settings.gemini_api_key, settings.openai_chat_model)
+        if _large_reason:
+            self._syslog("info", f"Re-routed {model} → {_rm} ({est_tokens} est. tokens) to avoid TPM limit",
+                         {"from": model, "to": _rm, "est_tokens": est_tokens}, dto.user_id)
+            model = _rm
+            routing_reason = _large_reason
+
         chain = _build_fallback_chain(model)
         full_answer = ""
         used_model = model
@@ -685,6 +741,7 @@ class ChatService(IChatService):
                     model=attempt,
                     messages=messages,
                     stream=True,
+                    **_completion_kwargs(attempt),
                 )
                 if attempt != model:
                     self._syslog("warning", f"Fell back from {model} → {attempt} (stream)", {"original": model, "fallback": attempt}, dto.user_id)
@@ -704,12 +761,12 @@ class ChatService(IChatService):
                 last_error = str(e)
                 logger.warning("Model %s failed (stream): %s", attempt, e)
                 if attempt != model:
-                    self._syslog("warning", f"Fallback {attempt} also failed (stream) — trying next", {"model": attempt, "error": last_error}, dto.user_id)
+                    self._syslog("warning", f"Fallback {attempt} also failed (stream) - trying next", {"model": attempt, "error": last_error}, dto.user_id)
                 else:
-                    self._syslog("warning", f"{model} failed (stream) — starting fallback chain {chain[1:]}", {"model": model, "error": last_error, "chain": chain[1:]}, dto.user_id)
+                    self._syslog("warning", f"{model} failed (stream) - starting fallback chain {chain[1:]}", {"model": model, "error": last_error, "chain": chain[1:]}, dto.user_id)
 
         if not succeeded:
-            self._syslog("error", f"All models exhausted {chain} (stream) — returning error to user", {"chain": chain, "last_error": last_error}, dto.user_id)
+            self._syslog("error", f"All models exhausted {chain} (stream) - returning error to user", {"chain": chain, "last_error": last_error}, dto.user_id)
             full_answer = f"⚠ All available AI models are currently unavailable. Please try again later.\n\n*Last error: {last_error}*"
             yield f"data: {json.dumps({'t': full_answer})}\n\n"
 

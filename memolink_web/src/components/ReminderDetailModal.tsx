@@ -203,12 +203,12 @@ export function ReminderDetailModal({ item, onClose, onSave, onDelete, onToggleD
               <span>
                 {item.due_date ? formatDate(item.due_date) : "No date"}
                 {item.due_time ? ` at ${formatTime(item.due_time)}` : ""}
-                {isOverdue ? " — overdue" : isToday ? " — due today" : ""}
+                {isOverdue ? " - overdue" : isToday ? " - due today" : ""}
               </span>
             </div>
           )}
 
-          {/* Email reply — shown when reminder was created from an email */}
+          {/* Email reply - shown when reminder was created from an email */}
           {linkedEmail && (
             <div className="space-y-2">
               <div className="flex items-center gap-2 px-3 py-2 bg-[#12121a] border border-[#2a2a38] rounded-xl">

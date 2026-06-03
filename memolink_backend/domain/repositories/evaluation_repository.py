@@ -1,5 +1,5 @@
 """
-Evaluation analytics repository — all SQLAlchemy access for the evaluation_* tables.
+Evaluation analytics repository - all SQLAlchemy access for the evaluation_* tables.
 """
 from typing import Optional, List
 from sqlalchemy.orm import Session
@@ -141,7 +141,7 @@ class EvaluationRepository:
         return r
 
     def upsert_rating(self, session_id: int, message_id: Optional[int], rating_type: str, **kw) -> EvaluationUserRating:
-        """One rating per (session, message, type) — re-rating updates in place."""
+        """One rating per (session, message, type) - re-rating updates in place."""
         existing = None
         if message_id is not None:
             existing = (

@@ -1,11 +1,11 @@
 """
-EvaluationService — records quantitative analytics.
+EvaluationService - records quantitative analytics.
 
 Design rules (from the spec):
 - If evaluation_analytics_enabled is false, record nothing.
-- Recording must never break the main user action — every record_* method is
+- Recording must never break the main user action - every record_* method is
   wrapped in try/except and only logs a safe warning.
-- Only IDs, counts, timings, ratings, and short metadata are stored — never full
+- Only IDs, counts, timings, ratings, and short metadata are stored - never full
   prompts, answers, note content, files, or secrets.
 """
 import logging
@@ -189,8 +189,8 @@ class EvaluationService:
 
     def _get_or_create_session(self, user_id: int):
         """One persistent background session per user (admin-controlled, always-on
-        when the flag is set). It is never auto-ended — logging out only pauses
-        the frontend heartbeat — so the same row accumulates the user's lifetime
+        when the flag is set). It is never auto-ended - logging out only pauses
+        the frontend heartbeat - so the same row accumulates the user's lifetime
         ACTIVE time across logins. Reset only by an admin."""
         session = self._repo.active_session_for_user(user_id)
         if session:

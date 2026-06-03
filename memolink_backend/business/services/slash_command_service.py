@@ -52,7 +52,7 @@ def _parse(text: str) -> Optional[ParsedCommand]:
     if target_part.lower() == "all":
         return ParsedCommand(raw=text, command=command, target=None, is_all=True, instruction=instruction)
 
-    # Quoted target — unquote. Any text after the closing quote becomes the
+    # Quoted target - unquote. Any text after the closing quote becomes the
     # instruction, e.g.  /Discussion "My Note" how do we improve this?
     if target_part and target_part[0] in ('"', "'"):
         q = target_part[0]
@@ -251,7 +251,7 @@ class SlashCommandService:
             yield _sse({"note_updated": note.id})
             yield _sse({"t": f"**{note.title}** has been {verb}d and saved.\n\n"})
         else:
-            yield _sse({"t": f"Could not {verb} **{note.title}** — AI unavailable.\n\n"})
+            yield _sse({"t": f"Could not {verb} **{note.title}** - AI unavailable.\n\n"})
 
     def _cmd_improve(self, p: ParsedCommand, dto: SlashCommandRequestDTO, model: str) -> Iterator[str]:
         sys_prompt = (
@@ -338,7 +338,7 @@ class SlashCommandService:
         yield _sse({"cmd_running": "Generating summary…"})
         summary = self._ai(model, messages, dto.user_id)
         if not summary:
-            yield _sse({"t": "⚠ Failed to generate summary — AI unavailable."})
+            yield _sse({"t": "⚠ Failed to generate summary - AI unavailable."})
             return
 
         new_note = self.note_repo.create_note(dto.user_id, title, summary, "slash_command", dto.workspace_id)
@@ -376,7 +376,7 @@ class SlashCommandService:
             yield _sse({"note_updated": note.id})
             yield _sse({"t": f"**{note.title}** has been rewritten naturally and saved."})
         else:
-            yield _sse({"t": "Could not rewrite note — AI unavailable."})
+            yield _sse({"t": "Could not rewrite note - AI unavailable."})
 
     # ── /Update ───────────────────────────────────────────────────────────────
 
@@ -409,7 +409,7 @@ class SlashCommandService:
             yield _sse({"note_updated": note.id})
             yield _sse({"t": f"**{note.title}** has been updated and saved."})
         else:
-            yield _sse({"t": "Could not update note — AI unavailable."})
+            yield _sse({"t": "Could not update note - AI unavailable."})
 
     # ── /Add ──────────────────────────────────────────────────────────────────
 
@@ -442,7 +442,7 @@ class SlashCommandService:
             yield _sse({"note_updated": note.id})
             yield _sse({"t": f"Content added to **{note.title}** and saved."})
         else:
-            yield _sse({"t": "Could not add content — AI unavailable."})
+            yield _sse({"t": "Could not add content - AI unavailable."})
 
     # ── /Undo ─────────────────────────────────────────────────────────────────
 
@@ -561,7 +561,7 @@ Base questions ONLY on the provided notes. Do not invent facts not in the notes.
         messages = [{"role": "system", "content": sys_prompt}, {"role": "user", "content": context}]
         raw = self._ai(model, messages, dto.user_id)
         if not raw:
-            yield _sse({"t": "⚠ Failed to generate quiz — AI unavailable."})
+            yield _sse({"t": "⚠ Failed to generate quiz - AI unavailable."})
             return
 
         try:
@@ -606,7 +606,7 @@ Base questions ONLY on the provided notes. Do not invent facts not in the notes.
         if settings.deepseek_api_key:
             discussion_models.append(("DeepSeek", "deepseek-chat"))
 
-        # User's custom providers — add any not already in the list
+        # User's custom providers - add any not already in the list
         user_keys_named: dict[str, dict] = {}
         if dto.user_id and self._user_api_key_repo:
             try:
@@ -633,7 +633,7 @@ Base questions ONLY on the provided notes. Do not invent facts not in the notes.
 
         base_sys = (
             "You are {name}, collaborating with other AI models to reach ONE agreed answer to the user's request "
-            "about a note. Read the note and the discussion so far, then contribute concretely — build on or "
+            "about a note. Read the note and the discussion so far, then contribute concretely - build on or "
             "respectfully challenge the others' points and move the group toward consensus. Keep your contribution "
             "to 3-5 sentences. End your message with a tag on its own line: write [AGREE] if you fully support the "
             "current best approach with no further changes, or [REFINE] if you still want changes."
@@ -658,7 +658,7 @@ Base questions ONLY on the provided notes. Do not invent facts not in the notes.
             for name, disc_model in discussion_models:
                 yield _sse({"t": f"**{name}:** "})
                 user_msg = (
-                    f"Discussion so far:\n{transcript[-8000:] or '(no one has spoken yet — you are first)'}\n\n"
+                    f"Discussion so far:\n{transcript[-8000:] or '(no one has spoken yet - you are first)'}\n\n"
                     f"Contribute your view as {name} (round {round_num})."
                 )
                 try:
@@ -681,12 +681,12 @@ Base questions ONLY on the provided notes. Do not invent facts not in the notes.
             if round_agrees and all(round_agrees) and round_num >= min_rounds:
                 agreed = True
 
-        # Final conclusion — the agreed best approach
-        yield _sse({"t": "## Conclusion — Best Approach\n\n"})
+        # Final conclusion - the agreed best approach
+        yield _sse({"t": "## Conclusion - Best Approach\n\n"})
         if agreed:
             yield _sse({"t": f"*The models reached agreement after {round_num} round(s).*\n\n"})
         else:
-            yield _sse({"t": f"*No full consensus after {round_num} rounds — summarising the strongest points.*\n\n"})
+            yield _sse({"t": f"*No full consensus after {round_num} rounds - summarising the strongest points.*\n\n"})
         synth_model = discussion_models[0][1]
         synth_prompt = (
             f"User's request: {question}\n\nNote: {topic}\n\nFull discussion:\n{transcript[-12000:]}\n\n"

@@ -1,7 +1,7 @@
 """
 Evaluation Analytics models
 ===========================
-Quantitative research telemetry for capstone evaluation — kept entirely separate
+Quantitative research telemetry for capstone evaluation - kept entirely separate
 from `system_logs` (operational) and `feedback` (bug reports).
 
 Privacy: these tables store IDs, counts, timings, ratings, and short metadata

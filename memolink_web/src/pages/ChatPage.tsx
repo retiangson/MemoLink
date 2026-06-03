@@ -548,7 +548,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
         {/* ── Unified tab bar ───────────────────────────────────────────── */}
         <div className="flex bg-[#0a0a0f] border-b border-[#1e1e2a] shrink-0" style={{ minHeight: 40 }}>
 
-          {/* Scrollable tabs — hidden in split modes (each panel has its own tab bar) */}
+          {/* Scrollable tabs - hidden in split modes (each panel has its own tab bar) */}
           <div className="flex items-center overflow-x-auto flex-1">
 
             {/* Chat tabs */}
@@ -646,7 +646,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
             ))}
           </div>
 
-          {/* User info — outside overflow so the bell tooltip can extend below freely */}
+          {/* User info - outside overflow so the bell tooltip can extend below freely */}
           <div className="shrink-0 flex items-center gap-3 px-4 text-xs text-gray-500">
             {urgentCount > 0 && (
               <div className="relative group">
@@ -663,7 +663,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                     {urgentCount}
                   </span>
                 </button>
-                {/* Tooltip — renders below the bell, unclipped */}
+                {/* Tooltip - renders below the bell, unclipped */}
                 <div className="pointer-events-none absolute right-0 top-full mt-1 z-[9999] hidden group-hover:block w-56 rounded-xl bg-[#1e1e2a] border border-amber-500/30 shadow-xl p-2.5">
                   <p className="text-[10px] font-semibold text-amber-400 uppercase tracking-wider mb-1.5">Due today</p>
                   {todayItems.map((item) => (
@@ -754,7 +754,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                     </button>
                   )}
 
-                  {/* Admin Panel — only shown to admins */}
+                  {/* Admin Panel - only shown to admins */}
                   {user.is_admin && (
                     <button
                       onClick={() => { setUserMenuOpen(false); setShowAdmin(true); }}
@@ -1015,7 +1015,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                           <span key={i} className="w-[3px] bg-indigo-400 rounded-full animate-pulse" style={{height:`${8+i*3}px`,animationDelay:`${i*0.15}s`}} />
                         ))}
                       </span>
-                      Reading aloud — click to stop
+                      Reading aloud - click to stop
                     </button>
                   </div>
                 )}

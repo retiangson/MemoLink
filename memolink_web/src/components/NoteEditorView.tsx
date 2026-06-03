@@ -90,7 +90,7 @@ export function NoteEditorView({
       const { from } = editor.state.selection;
       const doc = editor.state.doc;
       // Snap to the start of the sentence the cursor sits in, so reading
-      // begins at that sentence — never mid-sentence, and not the whole paragraph.
+      // begins at that sentence - never mid-sentence, and not the whole paragraph.
       if (from <= 1) {
         fromPos = 0;
       } else {
@@ -111,7 +111,7 @@ export function NoteEditorView({
     speakStartDocPos.current = fromPos;
     speakDocTrimOffset.current = rawDocText.length - rawDocText.trimStart().length;
     speakDocText.current = trimmedDocText;
-    // Read only the body, starting from the cursor — never the title.
+    // Read only the body, starting from the cursor - never the title.
     speakDocSentenceOffset.current = 0;
     onPlay(trimmedDocText);
   }
@@ -218,7 +218,7 @@ export function NoteEditorView({
   return (
     <div className="flex-1 flex flex-col overflow-hidden w-full max-w-[740px] mx-auto">
 
-      {/* Floating TTS player — identical to the /read command player */}
+      {/* Floating TTS player - identical to the /read command player */}
       {ttsEnabled && ttsPlaying && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40">
           <TTSPlayerBar
@@ -421,7 +421,7 @@ export function NoteEditorView({
           Video
         </button>}
 
-        {/* TTS play — the floating player bar (same as /read) handles controls while playing */}
+        {/* TTS play - the floating player bar (same as /read) handles controls while playing */}
         {ttsEnabled && onPlay && (
           ttsPlaying ? (
             <span className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs text-indigo-400 bg-indigo-400/10 border border-indigo-400/20 shrink-0">

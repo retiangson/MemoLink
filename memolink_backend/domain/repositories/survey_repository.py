@@ -1,5 +1,5 @@
 """
-Survey repository — all SQLAlchemy queries for the evaluation survey.
+Survey repository - all SQLAlchemy queries for the evaluation survey.
 """
 from typing import Optional, List
 from sqlalchemy.orm import Session

@@ -183,7 +183,7 @@ export function uploadToS3(
     xhr.ontimeout = () => reject(new Error("S3 upload timed out"));
     xhr.timeout = 600000; // 10 min
     xhr.open("PUT", url);
-    // Content-Type is intentionally not set — the presigned URL no longer
+    // Content-Type is intentionally not set - the presigned URL no longer
     // includes ContentType as a signed condition, so S3 accepts any type.
     // Setting it here with an inconsistent value (browsers vary on audio/video
     // MIME types) would cause a 403 SignatureDoesNotMatch from S3.

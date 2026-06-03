@@ -62,7 +62,7 @@ export function Sidebar({
           <span className="font-semibold text-sm text-gray-100 shrink-0">MemoLink</span>
           {showEvalTimer && evalStatus && (
             <span
-              title={`Evaluation collection window — ${fmtClock(evalStatus.consumedSeconds)} of ${fmtClock(evalStatus.budgetSeconds)} used. Data stops recording when it ends.`}
+              title={`Evaluation collection window - ${fmtClock(evalStatus.consumedSeconds)} of ${fmtClock(evalStatus.budgetSeconds)} used. Data stops recording when it ends.`}
               className="flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-medium bg-cyan-500/10 text-cyan-300 border border-cyan-500/25 whitespace-nowrap"
             >
               <svg className="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

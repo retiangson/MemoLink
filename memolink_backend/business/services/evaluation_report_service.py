@@ -1,5 +1,5 @@
 """
-EvaluationReportService — admin-only aggregation, export, and report generation.
+EvaluationReportService - admin-only aggregation, export, and report generation.
 """
 import io
 import csv
@@ -63,7 +63,7 @@ class EvaluationReportService:
         else:
             coverage = None
 
-        # ratings by type — choice-based questions are tallied, not averaged
+        # ratings by type - choice-based questions are tallied, not averaged
         by_type: Dict[str, List[int]] = {}
         supported_by_notes: Dict[str, int] = {}
         trust_by_msg: Dict[int, int] = {}

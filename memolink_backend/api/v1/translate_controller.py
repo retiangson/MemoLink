@@ -17,7 +17,7 @@ GEMINI_MODEL = "gemini-2.5-flash-lite"  # lighter model, softer burst thresholds
 
 _MAORI_HINT = (
     "Te reo Māori is the indigenous language of New Zealand. "
-    "Always use correct macrons (tohutō): ā ē ī ō ū — never substitute a plain vowel. "
+    "Always use correct macrons (tohutō): ā ē ī ō ū - never substitute a plain vowel. "
     "Prefer natural, fluent Māori over literal word-for-word translation. "
     "Use common Māori loanwords where appropriate (e.g. kura for school, waka for vehicle, hōhonu for deep)."
 )
@@ -62,7 +62,7 @@ async def _gemini_translate(client: AsyncOpenAI, text: str, target_language: str
     system = (
         f"Translate the following text to {target_language}. "
         + (hint + " " if hint else "")
-        + ("Previous attempt had these issues — fix them: " + feedback + " " if feedback else "")
+        + ("Previous attempt had these issues - fix them: " + feedback + " " if feedback else "")
         + "Return only the translated text with no additional commentary."
     )
     resp = await client.chat.completions.create(
@@ -187,15 +187,15 @@ async def translate(
             model_used = GEMINI_MODEL
 
         except RateLimitError:
-            logger.warning("Gemini rate limit hit for language=%s — falling back to GPT", req.target_language)
-            c.logs().warning("translate", f"Gemini rate limit hit — falling back to {settings.openai_chat_model}", {"target_language": req.target_language, "fallback": settings.openai_chat_model}, user_id)
+            logger.warning("Gemini rate limit hit for language=%s - falling back to GPT", req.target_language)
+            c.logs().warning("translate", f"Gemini rate limit hit - falling back to {settings.openai_chat_model}", {"target_language": req.target_language, "fallback": settings.openai_chat_model}, user_id)
             translation = await _gpt_translate(gpt, req.text, req.target_language, hint)
             accuracy = await _score_gpt_translation(gpt, req.text, translation, req.target_language)
             model_used = settings.openai_chat_model
 
         except APIError as e:
-            logger.error("Gemini API error: %s — falling back to GPT", e)
-            c.logs().error("translate", f"Gemini API error — falling back to {settings.openai_chat_model}: {e}", {"target_language": req.target_language, "fallback": settings.openai_chat_model, "error": str(e)}, user_id)
+            logger.error("Gemini API error: %s - falling back to GPT", e)
+            c.logs().error("translate", f"Gemini API error - falling back to {settings.openai_chat_model}: {e}", {"target_language": req.target_language, "fallback": settings.openai_chat_model, "error": str(e)}, user_id)
             translation = await _gpt_translate(gpt, req.text, req.target_language, hint)
             accuracy = await _score_gpt_translation(gpt, req.text, translation, req.target_language)
             model_used = settings.openai_chat_model

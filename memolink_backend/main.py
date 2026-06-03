@@ -13,7 +13,7 @@ _logger = logging.getLogger(__name__)
 
 
 def _try_write_system_log(level: str, source: str, message: str, details: dict) -> None:
-    """Write to system_logs without ever raising — used inside exception handlers."""
+    """Write to system_logs without ever raising - used inside exception handlers."""
     try:
         from memolink_backend.core.db import get_db
         from memolink_backend.domain.repositories.system_log_repository import SystemLogRepository
@@ -299,7 +299,7 @@ if os.getenv("MEMOLINK_SKIP_DB_BOOTSTRAP") != "1":
         """))
         _conn.execute(text("INSERT INTO feature_flags (key, value) VALUES ('timeline_enabled', 'true') ON CONFLICT (key) DO NOTHING"))
         _conn.execute(text("INSERT INTO feature_flags (key, value) VALUES ('workflow_enabled', 'true') ON CONFLICT (key) DO NOTHING"))
-        # ── Evaluation Survey tables (research data — kept separate from feedback) ──
+        # ── Evaluation Survey tables (research data - kept separate from feedback) ──
         _conn.execute(text("""
             CREATE TABLE IF NOT EXISTS survey_questions (
                 id SERIAL PRIMARY KEY,
@@ -543,7 +543,7 @@ if os.getenv("MEMOLINK_SKIP_DB_BOOTSTRAP") != "1":
 app = FastAPI(
     title="MemoLink API",
     version="1.0.0",
-    description="Context-aware AI knowledge companion — RAG-powered note retrieval and chat.",
+    description="Context-aware AI knowledge companion - RAG-powered note retrieval and chat.",
     docs_url="/api/docs",
     openapi_url="/api/openapi.json",
     redoc_url="/api/redoc",
@@ -562,7 +562,7 @@ app = FastAPI(
 @app.exception_handler(StarletteHTTPException)
 async def http_exception_handler(request: Request, exc: StarletteHTTPException):
     """Handles all explicit raise HTTPException(...) calls throughout the app.
-    5xx errors are logged as ERROR; 4xx as WARNING (only unusual ones — skip
+    5xx errors are logged as ERROR; 4xx as WARNING (only unusual ones - skip
     routine 401/404 to avoid log noise)."""
     path = request.url.path
     method = request.method
@@ -590,7 +590,7 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException):
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    """Handles Pydantic validation failures (missing fields, wrong types) — FastAPI
+    """Handles Pydantic validation failures (missing fields, wrong types) - FastAPI
     returns 422 for these automatically. Logged as WARNING so bad client requests
     are visible without polluting the ERROR channel."""
     path = request.url.path
@@ -609,7 +609,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception):
-    """Catch-all for any exception not handled above — a true safety net.
+    """Catch-all for any exception not handled above - a true safety net.
     Logged as ERROR with a truncated traceback so it appears in system_logs
     and server output."""
     tb = traceback.format_exc()
@@ -635,14 +635,14 @@ def health():
         "status": "ok",
         "service": "MemoLink API",
         "version": "2.1.2",
-        # Temporary debug — shows whether S3 env vars are visible to the app
+        # Temporary debug - shows whether S3 env vars are visible to the app
         "s3_bucket_set": bool(settings.s3_upload_bucket),
         "s3_bucket_len": len(settings.s3_upload_bucket),
         "s3_env_raw": bool(os.environ.get("S3_UPLOAD_BUCKET")),
     }
 
 
-# Build allowed origins list — always wildcard, plus the explicit frontend
+# Build allowed origins list - always wildcard, plus the explicit frontend
 # URL from env so the correct origin appears in CORS responses when Lambda
 # or a CDN strips the wildcard header from error responses.
 _cors_origins: list[str] = ["*"]
@@ -658,7 +658,7 @@ app.add_middleware(
     allow_credentials=False,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     # Explicitly list headers so the preflight Access-Control-Allow-Headers
-    # response is concrete — required for requests with an Authorization header.
+    # response is concrete - required for requests with an Authorization header.
     allow_headers=["Authorization", "Content-Type", "Accept", "Origin",
                    "X-Requested-With", "X-Real-IP", "X-Forwarded-For"],
     expose_headers=["Content-Length", "Content-Range"],
@@ -692,7 +692,7 @@ app.include_router(workflow_controller.router, prefix="/api")
 app.include_router(survey_controller.router, prefix="/api")
 app.include_router(evaluation_controller.router, prefix="/api")
 
-# AWS Lambda handler — only active when running inside Lambda
+# AWS Lambda handler - only active when running inside Lambda
 if os.getenv("AWS_LAMBDA_FUNCTION_NAME"):
     from mangum import Mangum
     handler = Mangum(app, lifespan="off")

@@ -3,7 +3,7 @@ AutoPilot Model Routing Service
 ================================
 
 Analyses each chat prompt and automatically selects the best AI model for the task,
-balancing capability and cost — without requiring the user to think about model selection.
+balancing capability and cost - without requiring the user to think about model selection.
 
 ROUTING RULES (evaluated in priority order)
 -------------------------------------------
@@ -116,7 +116,7 @@ def route(
     """
     Returns (model_to_use, routing_reason).
     routing_reason is None when no routing was applied (default/fallthrough).
-    AutoPilot always evaluates — the on/off switch is the autopilot_enabled feature flag.
+    AutoPilot always evaluates - the on/off switch is the autopilot_enabled feature flag.
     """
     text_lower = prompt.lower()
     word_count = len(prompt.split())
@@ -143,8 +143,8 @@ def route(
 
     # ── Rule 5: Simple / Short Query ───────────────────────────────────────────
     if word_count <= _SIMPLE_WORD_THRESHOLD and not any(kw in text_lower for kw in _SIMPLE_EXCLUDE):
-        # Default model (gpt-4o-mini) is already optimal — signal this explicitly
+        # Default model (gpt-4o-mini) is already optimal - signal this explicitly
         return default_model, "Simple Query"
 
-    # ── No specific routing — use default ─────────────────────────────────────
+    # ── No specific routing - use default ─────────────────────────────────────
     return default_model, None

@@ -24,7 +24,7 @@ export function UploadNotes({ setNotes, workspaceId, onUploaded }: Props) {
     setStatus("Connecting…");
     setFailures([]);
 
-    // Pre-flight health check — distinguishes "backend unreachable" from
+    // Pre-flight health check - distinguishes "backend unreachable" from
     // "upload rejected". API_BASE includes /api so strip it to reach /health.
     try {
       const rootBase = API_BASE.replace(/\/api\/?$/, "");
@@ -100,7 +100,7 @@ export function UploadNotes({ setNotes, workspaceId, onUploaded }: Props) {
           } else if (httpStatus) {
             setStatus(`Upload failed (HTTP ${httpStatus}): ${detail}`);
           } else if (e?.message?.toLowerCase().includes("network")) {
-            setStatus("Upload failed: Network Error — the connection was interrupted. Check your connection and try again.");
+            setStatus("Upload failed: Network Error - the connection was interrupted. Check your connection and try again.");
           } else {
             setStatus(`Upload failed: ${detail}`);
           }
@@ -152,7 +152,7 @@ export function UploadNotes({ setNotes, workspaceId, onUploaded }: Props) {
       } else if (httpStatus) {
         setStatus(`Upload failed (HTTP ${httpStatus}): ${detail}`);
       } else if (e?.message?.toLowerCase().includes("network")) {
-        setStatus("Upload failed: Network Error — the connection was interrupted mid-upload. For large files, try a faster connection. If the problem persists, contact your admin to check server logs.");
+        setStatus("Upload failed: Network Error - the connection was interrupted mid-upload. For large files, try a faster connection. If the problem persists, contact your admin to check server logs.");
       } else {
         setStatus(`Upload failed: ${detail}`);
       }

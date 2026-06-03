@@ -127,7 +127,7 @@ export function FeedbackModal({ show, onClose }: FeedbackModalProps) {
               />
 
               {fbState === "error" && (
-                <p className="text-xs text-red-400">Failed to submit — please try again.</p>
+                <p className="text-xs text-red-400">Failed to submit - please try again.</p>
               )}
 
               <button

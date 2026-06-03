@@ -48,7 +48,7 @@ const CONTENT: Record<string, React.ReactNode> = {
           { label: "File & Video", desc: "Import PDFs, DOCX, PPTX, YouTube, and recordings" },
           { label: "AI Tools", desc: "Web search, agent mode, research, image generation" },
           { label: "Reminders", desc: "Auto-detected from notes or set manually" },
-          { label: "Slash Commands", desc: "14 commands — /Improve, /Quiz, /Discuss and more" },
+          { label: "Slash Commands", desc: "14 commands - /Improve, /Quiz, /Discuss and more" },
           { label: "Gmail Email", desc: "Connect Gmail, auto-sync important emails to notes and reminders, reply in-app" },
           { label: "AI Memory Graph", desc: "Visual force-directed graph of entities extracted from notes with cross-note links" },
           { label: "Proactive Insights", desc: "AI scans notes to surface missed deadlines, action items, and urgency signals" },
@@ -144,7 +144,7 @@ const CONTENT: Record<string, React.ReactNode> = {
         <ul className="space-y-2">
           {[
             "Paste a YouTube URL - the transcript is extracted via YouTube Caption API and saved as a note.",
-            "Upload a video or audio file (MP4, M4A, WebM, MOV, MP3, WAV - max 200 MB) — files ≤25 MB use Whisper, larger files use Deepgram Nova-2.",
+            "Upload a video or audio file (MP4, M4A, WebM, MOV, MP3, WAV - max 200 MB) - files ≤25 MB use Whisper, larger files use Deepgram Nova-2.",
             "Upload a Zoom recording or lecture capture; the transcript is saved as a searchable note.",
           ].map((item, i) => (
             <li key={i} className="flex gap-2"><span className="text-indigo-500 shrink-0 mt-0.5">•</span><span>{item}</span></li>
@@ -197,7 +197,7 @@ const CONTENT: Record<string, React.ReactNode> = {
           "A pulsing amber bell in the top bar means you have reminders due today.",
           "Browser notifications are sent when a reminder fires (grant permission when prompted).",
           "Reminders are scoped to the active workspace, keeping study and work tasks separate.",
-          "Connect Gmail in Settings → Email to sync important emails. A \"Sync from Email\" button appears in the Reminders panel — email-sourced reminders are global and appear across all workspaces.",
+          "Connect Gmail in Settings → Email to sync important emails. A \"Sync from Email\" button appears in the Reminders panel - email-sourced reminders are global and appear across all workspaces.",
           "Click an email-sourced reminder to see the original email and reply to it directly from MemoLink without leaving the app.",
         ].map((item, i) => (
           <li key={i} className="flex gap-2"><span className="text-indigo-500 shrink-0 mt-0.5">•</span><span>{item}</span></li>
@@ -208,7 +208,7 @@ const CONTENT: Record<string, React.ReactNode> = {
 
   models: (
     <div className="space-y-4 text-sm text-gray-400 leading-relaxed">
-      <p>Open <span className="text-white">Settings → AI Model</span> to choose your chat model. Every reply shows a "replied by" badge and the model is saved in conversation history. Add custom providers in <span className="text-white">Settings → API Keys</span> — they appear here too.</p>
+      <p>Open <span className="text-white">Settings → AI Model</span> to choose your chat model. Every reply shows a "replied by" badge and the model is saved in conversation history. Add custom providers in <span className="text-white">Settings → API Keys</span> - they appear here too.</p>
       <div className="space-y-3">
         {[
           {
@@ -242,7 +242,7 @@ const CONTENT: Record<string, React.ReactNode> = {
   noteai: (
     <div className="space-y-4 text-sm text-gray-400 leading-relaxed">
       <p>
-        Ask the AI to <span className="text-white font-medium">automatically improve and save</span> any note just by mentioning its name in chat. The AI reformats the content with proper headings, paragraphs, lists, and bold terms — then saves it directly. No copy-paste needed.
+        Ask the AI to <span className="text-white font-medium">automatically improve and save</span> any note just by mentioning its name in chat. The AI reformats the content with proper headings, paragraphs, lists, and bold terms - then saves it directly. No copy-paste needed.
       </p>
 
       {/* How it works */}
@@ -253,7 +253,7 @@ const CONTENT: Record<string, React.ReactNode> = {
             "If the note is open in an editor tab, it closes automatically first",
             "A spinning indicator shows while the AI is working",
             "The improved content is saved directly to the database",
-            "An \"Open Note\" button appears — click it to see the result",
+            "An \"Open Note\" button appears - click it to see the result",
           ].map((s, i) => (
             <li key={i} className="flex gap-2 text-[12px]"><span className="text-indigo-500 shrink-0 font-bold">{i + 1}.</span><span>{s}</span></li>
           ))}
@@ -263,7 +263,7 @@ const CONTENT: Record<string, React.ReactNode> = {
       {/* All trigger phrases */}
       <div>
         <p className="text-xs font-semibold text-indigo-300 uppercase tracking-wider mb-2">All supported phrases</p>
-        <p className="text-[11px] text-gray-500 mb-2">Replace <code className="bg-[#12121a] px-1 rounded text-indigo-300">Note Name</code> with any part of your note's title — exact match, partial, or filename with extension.</p>
+        <p className="text-[11px] text-gray-500 mb-2">Replace <code className="bg-[#12121a] px-1 rounded text-indigo-300">Note Name</code> with any part of your note's title - exact match, partial, or filename with extension.</p>
         <div className="space-y-1">
           {[
             ["improve",  "improve my note Note Name"],
@@ -324,8 +324,8 @@ const CONTENT: Record<string, React.ReactNode> = {
         <p className="text-xs font-semibold text-amber-400 mb-1.5">Tips</p>
         <ul className="space-y-1">
           {[
-            "You don't need the full note title — a partial match works (e.g. \"Recording\" matches \"Recording (7).m4a\").",
-            "Works with any file type — audio transcriptions, PDFs, DOCX imports, or hand-written notes.",
+            "You don't need the full note title - a partial match works (e.g. \"Recording\" matches \"Recording (7).m4a\").",
+            "Works with any file type - audio transcriptions, PDFs, DOCX imports, or hand-written notes.",
             "The original content is replaced immediately. If you want to keep the old version, duplicate the note first.",
           ].map((t, i) => (
             <li key={i} className="flex gap-2 text-[11px] text-gray-400"><span className="text-amber-500 shrink-0 mt-0.5">•</span><span>{t}</span></li>
@@ -364,9 +364,9 @@ const CONTENT: Record<string, React.ReactNode> = {
           color: "indigo",
           cmds: [
             { cmd: "/Improve", args: "All | \"Note Name\"", desc: "Improve grammar, clarity, structure, and Markdown. Does not add new information." },
-            { cmd: "/Enhance", args: "All | \"Note Name\"", desc: "Expand and enrich — adds helpful context and examples while preserving all original content." },
+            { cmd: "/Enhance", args: "All | \"Note Name\"", desc: "Expand and enrich - adds helpful context and examples while preserving all original content." },
             { cmd: "/Natural", args: "\"Note Name\"", desc: "Rewrite the note in a natural, readable style. Also available as /Humanize." },
-            { cmd: "/Update", args: "\"Note Name\" : instruction", desc: "Merge an instruction into the note — AI decides the best section to update." },
+            { cmd: "/Update", args: "\"Note Name\" : instruction", desc: "Merge an instruction into the note - AI decides the best section to update." },
             { cmd: "/Add", args: "\"Note Name\" : content", desc: "Append or insert new content into the most appropriate section." },
             { cmd: "/Undo", args: "\"Note Name\"", desc: "Restore the immediately previous version of a note. One level only." },
           ],
@@ -383,15 +383,15 @@ const CONTENT: Record<string, React.ReactNode> = {
           color: "violet",
           cmds: [
             { cmd: "/Quiz", args: "All | \"Note Name\" : count", desc: "Generate an interactive quiz from the note. Supports radio and checkbox questions. Save results to Notes after submission." },
-            { cmd: "/Discussion", args: "\"Note Name\" your question", desc: "Iterative multi-model debate driven by your question — e.g. /Discussion \"Chat Snippet\" how do we improve this? GPT, Gemini, DeepSeek, plus any custom providers each contribute in turn, seeing the running discussion and building on or challenging each other. They loop round-by-round (up to 4) until they all agree, then a final \"Best Approach\" conclusion answers your question. Omit the question to default to improving the note; use All to discuss every note." },
-            { cmd: "/Read", args: "\"Note Name\"", desc: "Display a note's content inline in the chat, open it in the editor, and read it aloud. Reading starts from the body (the title is never read) — place your cursor anywhere first to begin from that point. A TTS player bar appears with play/pause, stop, ◀◀ / ▶▶ sentence navigation, and speed controls (0.75× – 2×), and the sentence being spoken is highlighted in the editor." },
+            { cmd: "/Discussion", args: "\"Note Name\" your question", desc: "Iterative multi-model debate driven by your question - e.g. /Discussion \"Chat Snippet\" how do we improve this? GPT, Gemini, DeepSeek, plus any custom providers each contribute in turn, seeing the running discussion and building on or challenging each other. They loop round-by-round (up to 4) until they all agree, then a final \"Best Approach\" conclusion answers your question. Omit the question to default to improving the note; use All to discuss every note." },
+            { cmd: "/Read", args: "\"Note Name\"", desc: "Display a note's content inline in the chat, open it in the editor, and read it aloud. Reading starts from the body (the title is never read) - place your cursor anywhere first to begin from that point. A TTS player bar appears with play/pause, stop, ◀◀ / ▶▶ sentence navigation, and speed controls (0.75× – 2×), and the sentence being spoken is highlighted in the editor." },
           ],
         },
         {
           group: "Productivity",
           color: "amber",
           cmds: [
-            { cmd: "/Reminder", args: "title : YYYY-MM-DD HH:MM", desc: "Create a reminder in the active workspace. A format hint popup shows example dates — the note picker does not appear for this command." },
+            { cmd: "/Reminder", args: "title : YYYY-MM-DD HH:MM", desc: "Create a reminder in the active workspace. A format hint popup shows example dates - the note picker does not appear for this command." },
             { cmd: "/Feedback", args: "title : message", desc: "Submit a suggestion. A format hint popup shows examples instead of the note picker." },
             { cmd: "/ReportBug", args: "title : description", desc: "Report a bug. A format hint popup shows examples instead of the note picker." },
           ],
@@ -417,7 +417,7 @@ const CONTENT: Record<string, React.ReactNode> = {
 
       <div className="bg-[#12121a] border border-[#2a2a38] rounded-xl p-3 space-y-2">
         <p className="text-xs font-semibold text-indigo-300 uppercase tracking-wider">Note picker vs Format hint</p>
-        <p className="text-[11px] text-gray-400">Commands that need a note name (/Improve, /Enhance, /Quiz, /Read, etc.) open a note picker after Tab — showing all workspace notes with arrow-key navigation. Commands that take free text (/Feedback, /ReportBug, /Reminder) show a format hint popup with the expected syntax and examples instead.</p>
+        <p className="text-[11px] text-gray-400">Commands that need a note name (/Improve, /Enhance, /Quiz, /Read, etc.) open a note picker after Tab - showing all workspace notes with arrow-key navigation. Commands that take free text (/Feedback, /ReportBug, /Reminder) show a format hint popup with the expected syntax and examples instead.</p>
       </div>
 
       <div className="bg-[#12121a] border border-[#2a2a38] rounded-xl p-3 space-y-2">
@@ -426,15 +426,15 @@ const CONTENT: Record<string, React.ReactNode> = {
       </div>
 
       <div className="bg-amber-500/5 border border-amber-500/20 rounded-xl p-3">
-        <p className="text-xs font-semibold text-amber-400 mb-1.5">Undo — how it works</p>
-        <p className="text-[11px] text-gray-400">Before any command modifies a note (/Improve, /Enhance, /Natural, /Humanize, /Update, /Add), the current version is saved as an undo snapshot. Use <code className="bg-[#12121a] px-1 rounded text-indigo-300">/Undo "Note Name"</code> to restore it. Only one level is supported — a second modification overwrites the snapshot.</p>
+        <p className="text-xs font-semibold text-amber-400 mb-1.5">Undo - how it works</p>
+        <p className="text-[11px] text-gray-400">Before any command modifies a note (/Improve, /Enhance, /Natural, /Humanize, /Update, /Add), the current version is saved as an undo snapshot. Use <code className="bg-[#12121a] px-1 rounded text-indigo-300">/Undo "Note Name"</code> to restore it. Only one level is supported - a second modification overwrites the snapshot.</p>
       </div>
     </div>
   ),
 
   apikeys: (
     <div className="space-y-4 text-sm text-gray-400 leading-relaxed">
-      <p>Add your own API keys in <span className="text-white">Settings → API Keys</span>. When set, your key takes priority over the shared server key for all requests. Your custom providers also appear as extra participants in <code className="bg-[#12121a] px-1 rounded text-indigo-300">/Discussion</code> — each sharing their own perspective alongside GPT, Gemini, and DeepSeek.</p>
+      <p>Add your own API keys in <span className="text-white">Settings → API Keys</span>. When set, your key takes priority over the shared server key for all requests. Your custom providers also appear as extra participants in <code className="bg-[#12121a] px-1 rounded text-indigo-300">/Discussion</code> - each sharing their own perspective alongside GPT, Gemini, and DeepSeek.</p>
 
       <div className="space-y-3">
         {[
@@ -451,12 +451,12 @@ const CONTENT: Record<string, React.ReactNode> = {
       </div>
 
       <p className="text-xs font-semibold text-indigo-300 uppercase tracking-wider mt-2">Adding a Custom Provider</p>
-      <p>You can add <span className="text-white">any OpenAI-compatible API</span> — Groq, Mistral, Together AI, Ollama, Perplexity, and more.</p>
+      <p>You can add <span className="text-white">any OpenAI-compatible API</span> - Groq, Mistral, Together AI, Ollama, Perplexity, and more.</p>
       <div className="bg-[#12121a] border border-[#2a2a38] rounded-xl p-3 space-y-2">
         {[
-          ["Provider Name", "A label you choose — e.g. \"Groq\" or \"My Ollama\""],
-          ["Model ID", "The model to send requests to — e.g. llama3-8b-8192"],
-          ["Base URL", "The OpenAI-compatible endpoint — e.g. https://api.groq.com/openai/v1"],
+          ["Provider Name", "A label you choose - e.g. \"Groq\" or \"My Ollama\""],
+          ["Model ID", "The model to send requests to - e.g. llama3-8b-8192"],
+          ["Base URL", "The OpenAI-compatible endpoint - e.g. https://api.groq.com/openai/v1"],
           ["API Key", "Your key for that provider"],
         ].map(([field, desc]) => (
           <div key={field} className="flex gap-2 text-[11px]">
@@ -468,7 +468,7 @@ const CONTENT: Record<string, React.ReactNode> = {
 
       <div className="space-y-1.5 text-[11px] text-gray-500">
         <p>Once added, your custom provider appears in <span className="text-gray-300">Settings → AI Model</span> under <em>Your Custom Providers</em> and can be selected like any built-in model.</p>
-        <p>Keys are encrypted at rest (Fernet symmetric encryption). The raw key is never returned by the API — only whether a key is set.</p>
+        <p>Keys are encrypted at rest (Fernet symmetric encryption). The raw key is never returned by the API - only whether a key is set.</p>
         <p>Remove a provider at any time; requests fall back to the server's shared key immediately.</p>
       </div>
     </div>
@@ -476,17 +476,17 @@ const CONTENT: Record<string, React.ReactNode> = {
 
   email: (
     <div className="space-y-4 text-sm text-gray-400 leading-relaxed">
-      <p>Connect your Gmail account to automatically sync important emails, turn them into notes and reminders, and reply directly from MemoLink — without switching apps.</p>
+      <p>Connect your Gmail account to automatically sync important emails, turn them into notes and reminders, and reply directly from MemoLink - without switching apps.</p>
 
       <div className="space-y-3">
         {[
           {
             title: "Connect Gmail",
-            desc: "Go to Settings → Email → Connect Gmail. MemoLink uses Google OAuth 2.0 — it never stores your password. You can disconnect at any time from the same settings tab.",
+            desc: "Go to Settings → Email → Connect Gmail. MemoLink uses Google OAuth 2.0 - it never stores your password. You can disconnect at any time from the same settings tab.",
           },
           {
             title: "Auto-Sync on Email Tab Open",
-            desc: "Every time you open Settings → Email, MemoLink fetches new unread and important emails, scores their importance with AI (1–5), and saves those scoring ≥ 3. Only new emails are fetched — already-synced ones are skipped.",
+            desc: "Every time you open Settings → Email, MemoLink fetches new unread and important emails, scores their importance with AI (1–5), and saves those scoring ≥ 3. Only new emails are fetched - already-synced ones are skipped.",
           },
           {
             title: "Sync from Email button",
@@ -494,19 +494,19 @@ const CONTENT: Record<string, React.ReactNode> = {
           },
           {
             title: "Email Digest Note",
-            desc: "Important emails are appended to a global note called \"Email Digest\". This note is created automatically on first sync and updated on each subsequent sync — only new emails are added, never duplicated. It appears in every workspace.",
+            desc: "Important emails are appended to a global note called \"Email Digest\". This note is created automatically on first sync and updated on each subsequent sync - only new emails are added, never duplicated. It appears in every workspace.",
           },
           {
             title: "Importance Badges",
-            desc: "🔴 Urgent (score ≥ 4.5)  ·  🟠 Important (score ≥ 3.5)  ·  🔵 Notable (score = 3). Emails scoring below 3 are filtered out entirely — newsletters and promotions are excluded from the sync query.",
+            desc: "🔴 Urgent (score ≥ 4.5)  ·  🟠 Important (score ≥ 3.5)  ·  🔵 Notable (score = 3). Emails scoring below 3 are filtered out entirely - newsletters and promotions are excluded from the sync query.",
           },
           {
             title: "Email-sourced Reminders",
-            desc: "When AI detects a deadline in an email, a reminder is automatically created and linked back to that email. These reminders are global — they appear in all workspaces, not just the active one. Click any email-sourced reminder to see the original email.",
+            desc: "When AI detects a deadline in an email, a reminder is automatically created and linked back to that email. These reminders are global - they appear in all workspaces, not just the active one. Click any email-sourced reminder to see the original email.",
           },
           {
             title: "In-App Email Reply",
-            desc: "Open a reminder that originated from an email, or open the email detail in Settings → Email — a collapsible reply panel appears. Choose a tone (Formal / Friendly / Brief), optionally click \"Suggest Reply\" to get 3 AI-drafted options, edit if needed, then click \"Send Reply\". The reply threads correctly in Gmail.",
+            desc: "Open a reminder that originated from an email, or open the email detail in Settings → Email - a collapsible reply panel appears. Choose a tone (Formal / Friendly / Brief), optionally click \"Suggest Reply\" to get 3 AI-drafted options, edit if needed, then click \"Send Reply\". The reply threads correctly in Gmail.",
           },
           {
             title: "Save as Note / Add Reminder manually",
@@ -522,20 +522,20 @@ const CONTENT: Record<string, React.ReactNode> = {
 
       <div className="bg-amber-500/5 border border-amber-500/20 rounded-xl p-3">
         <p className="text-xs font-semibold text-amber-400 mb-1.5">Privacy note</p>
-        <p className="text-[11px] text-gray-400">OAuth tokens are encrypted at rest using Fernet symmetric encryption. Email bodies are fetched on demand — only subject, sender, and snippet are stored in the database after scoring. Your Gmail password is never seen or stored by MemoLink.</p>
+        <p className="text-[11px] text-gray-400">OAuth tokens are encrypted at rest using Fernet symmetric encryption. Email bodies are fetched on demand - only subject, sender, and snippet are stored in the database after scoring. Your Gmail password is never seen or stored by MemoLink.</p>
       </div>
     </div>
   ),
 
   memograph: (
     <div className="space-y-4 text-sm text-gray-400 leading-relaxed">
-      <p>The <span className="text-white font-medium">AI Memory Graph</span> visualises how your knowledge is connected — entities extracted from notes are drawn as colour-coded nodes, and shared entities between notes are linked with edges.</p>
+      <p>The <span className="text-white font-medium">AI Memory Graph</span> visualises how your knowledge is connected - entities extracted from notes are drawn as colour-coded nodes, and shared entities between notes are linked with edges.</p>
       <div className="space-y-3">
         {[
           { title: "Opening MemoGraph", desc: "Click the graph icon (⬡) in the top toolbar. MemoLink builds or re-uses the graph for your current workspace. Click \"Rebuild\" to re-scan all notes." },
           { title: "Node types", desc: "note (indigo) · reminder (amber) · person (green) · topic (cyan) · project (orange) · deadline (red) · decision (yellow) · action item (pink) · question (purple) · theme (teal). Each type can be toggled with the filter chips at the top." },
-          { title: "Pan & Zoom", desc: "Drag on empty canvas to pan. Scroll to zoom in/out. Click \"Fit\" to auto-scale so all nodes are visible. Drag a node to pin it — it will stay fixed until you drag it again." },
-          { title: "Graph-Enhanced RAG", desc: "The graph isn't just visual — it improves AI answers. When you chat, MemoLink traverses the graph from the top vector-search hits to find related notes you might not have mentioned. This expands the context beyond simple similarity." },
+          { title: "Pan & Zoom", desc: "Drag on empty canvas to pan. Scroll to zoom in/out. Click \"Fit\" to auto-scale so all nodes are visible. Drag a node to pin it - it will stay fixed until you drag it again." },
+          { title: "Graph-Enhanced RAG", desc: "The graph isn't just visual - it improves AI answers. When you chat, MemoLink traverses the graph from the top vector-search hits to find related notes you might not have mentioned. This expands the context beyond simple similarity." },
           { title: "How entities are extracted", desc: "GPT processes your notes in batches of 5. It identifies people, topics, projects, deadlines, decisions, action items, questions, and themes. Notes that share an entity are automatically linked with a \"related_to\" edge." },
         ].map((t) => (
           <div key={t.title}>
@@ -549,12 +549,12 @@ const CONTENT: Record<string, React.ReactNode> = {
 
   proactive: (
     <div className="space-y-4 text-sm text-gray-400 leading-relaxed">
-      <p><span className="text-white font-medium">Proactive Insights</span> scans your notes and surfaces things you might have missed — deadlines without reminders, incomplete action items, and urgent signals buried in your notes.</p>
+      <p><span className="text-white font-medium">Proactive Insights</span> scans your notes and surfaces things you might have missed - deadlines without reminders, incomplete action items, and urgent signals buried in your notes.</p>
       <div className="space-y-3">
         {[
           { title: "How to use it", desc: "Open the Reminders panel (bell icon) and expand the \"AI Insights\" section. Click \"Scan Notes\" to trigger a fresh analysis of all your notes in the current workspace." },
-          { title: "Insight types", desc: "🔴 Urgency Signal — something needs immediate attention. 🟠 Missing Reminder — a deadline mentioned in a note has no reminder. 🔵 Incomplete Actions — action items detected in a note with no follow-up." },
-          { title: "Unreviewed uploads", desc: "Files uploaded to the workspace in the last 14 days that haven't been reviewed are automatically flagged — no AI call needed for this check." },
+          { title: "Insight types", desc: "🔴 Urgency Signal - something needs immediate attention. 🟠 Missing Reminder - a deadline mentioned in a note has no reminder. 🔵 Incomplete Actions - action items detected in a note with no follow-up." },
+          { title: "Unreviewed uploads", desc: "Files uploaded to the workspace in the last 14 days that haven't been reviewed are automatically flagged - no AI call needed for this check." },
           { title: "Dismissing insights", desc: "Click the × on any insight card to dismiss it. Dismissed insights are not re-shown on the next scan." },
           { title: "Open Note link", desc: "Each insight card has an \"Open Note\" link that takes you directly to the source note so you can act on it immediately." },
         ].map((t) => (
@@ -569,12 +569,12 @@ const CONTENT: Record<string, React.ReactNode> = {
 
   confidence: (
     <div className="space-y-4 text-sm text-gray-400 leading-relaxed">
-      <p>Every AI response carries a <span className="text-white font-medium">confidence badge</span> inline with the model attribution — so you always know how well-grounded the answer is in your notes.</p>
+      <p>Every AI response carries a <span className="text-white font-medium">confidence badge</span> inline with the model attribution - so you always know how well-grounded the answer is in your notes.</p>
       <div className="space-y-2">
         {[
           { level: "HIGH", color: "text-emerald-400", desc: "The AI found strong, relevant evidence in your notes and is confident in the answer." },
           { level: "MEDIUM", color: "text-amber-400", desc: "Some relevant notes were found but the evidence is partial or indirect." },
-          { level: "LOW", color: "text-orange-400", desc: "Very little relevant context was found — treat the answer with caution." },
+          { level: "LOW", color: "text-orange-400", desc: "Very little relevant context was found - treat the answer with caution." },
           { level: "UNSUPPORTED", color: "text-red-400", desc: "No notes in this workspace cover the topic. The AI answered from general knowledge only." },
         ].map(({ level, color, desc }) => (
           <div key={level} className="bg-[#12121a] border border-[#2a2a38] rounded-xl px-3 py-2.5">
@@ -583,13 +583,13 @@ const CONTENT: Record<string, React.ReactNode> = {
           </div>
         ))}
       </div>
-      <p className="text-[11px] text-gray-600">Hover over the badge to see the AI's reasoning. The badge is always shown — even if the model doesn't self-assess, a server-side fallback computes a level based on how many relevant notes were retrieved.</p>
+      <p className="text-[11px] text-gray-600">Hover over the badge to see the AI's reasoning. The badge is always shown - even if the model doesn't self-assess, a server-side fallback computes a level based on how many relevant notes were retrieved.</p>
     </div>
   ),
 
   autopilot: (
     <div className="space-y-4 text-sm text-gray-400 leading-relaxed">
-      <p><span className="text-white font-medium">AutoPilot</span> automatically picks the best AI model for each message based on what you're asking — no manual switching needed.</p>
+      <p><span className="text-white font-medium">AutoPilot</span> automatically picks the best AI model for each message based on what you're asking - no manual switching needed.</p>
       <div className="space-y-2">
         {[
           { intent: "Translation", model: "Gemini 2.5 Flash", signal: "Any translation-related phrase (\"translate to French\", \"in Spanish\", etc.)", color: "text-blue-400" },
@@ -619,11 +619,11 @@ const CONTENT: Record<string, React.ReactNode> = {
         {[
           {
             title: "Generate / Regenerate",
-            desc: "Click Generate Timeline to run the analysis (one GPT call). Results are cached — switching to the Timeline tab later is instant. Click Regenerate any time to refresh after editing the note.",
+            desc: "Click Generate Timeline to run the analysis (one GPT call). Results are cached - switching to the Timeline tab later is instant. Click Regenerate any time to refresh after editing the note.",
           },
           {
             title: "Chapters",
-            desc: "Major topic sections with timestamps — e.g. 00:03:12 Assessment requirement explained. Timestamps are estimated from word position at 130 wpm (average lecture speaking rate), accurate to ±30–90 seconds.",
+            desc: "Major topic sections with timestamps - e.g. 00:03:12 Assessment requirement explained. Timestamps are estimated from word position at 130 wpm (average lecture speaking rate), accurate to ±30–90 seconds.",
           },
           {
             title: "Action Items",
@@ -635,7 +635,7 @@ const CONTENT: Record<string, React.ReactNode> = {
           },
           {
             title: "Jump → to section",
-            desc: "Every chapter, action item, and moment has a Jump → button. Clicking it switches to the Editor tab, finds the exact phrase in the transcript, highlights it, and scrolls to it — no manual searching through thousands of words.",
+            desc: "Every chapter, action item, and moment has a Jump → button. Clicking it switches to the Editor tab, finds the exact phrase in the transcript, highlights it, and scrolls to it - no manual searching through thousands of words.",
           },
         ].map((t) => (
           <div key={t.title}>
@@ -662,16 +662,16 @@ const CONTENT: Record<string, React.ReactNode> = {
 
   study: (
     <div className="space-y-4 text-sm text-gray-400 leading-relaxed">
-      <p>Open <span className="text-white font-medium">AI Study Mode</span> from the user menu (top-right). It turns the notes in your active workspace into active-recall study tools — all generated on demand from your own content.</p>
+      <p>Open <span className="text-white font-medium">AI Study Mode</span> from the user menu (top-right). It turns the notes in your active workspace into active-recall study tools - all generated on demand from your own content.</p>
 
       <div className="space-y-3">
         {[
           { icon: "🃏", title: "Flashcards", desc: "Generate question/answer cards from a single note or the whole workspace. Flip each card to reveal the answer and step through them for spaced review." },
-          { icon: "❓", title: "Quiz", desc: "Build an interactive quiz (single- and multiple-choice) from any note or all notes — the same engine as the /Quiz slash command. Submit to see your score, the correct answers, and explanations, then save the result as a note." },
+          { icon: "❓", title: "Quiz", desc: "Build an interactive quiz (single- and multiple-choice) from any note or all notes - the same engine as the /Quiz slash command. Submit to see your score, the correct answers, and explanations, then save the result as a note." },
           { icon: "📋", title: "Exam Review", desc: "Pick one or more notes to get a reviewer: key concepts, definitions, important facts, likely exam questions, and the topics to focus on most." },
-          { icon: "📅", title: "Study Plan", desc: "Describe your goal and time frame (e.g. \"before my MSE907 presentation\") and get a day-by-day plan — each day lists focus topics, tasks, and which notes to revise." },
+          { icon: "📅", title: "Study Plan", desc: "Describe your goal and time frame (e.g. \"before my MSE907 presentation\") and get a day-by-day plan - each day lists focus topics, tasks, and which notes to revise." },
           { icon: "🔍", title: "Weak Topics", desc: "AI scans the questions you keep asking across your chats and notes, identifies recurring weak spots, and explains each one simply with a study tip." },
-          { icon: "📝", title: "Summary", desc: "Summarise any note at three levels — short, medium, or detailed — with optional bullet points. Great for a quick refresher or a condensed revision sheet." },
+          { icon: "📝", title: "Summary", desc: "Summarise any note at three levels - short, medium, or detailed - with optional bullet points. Great for a quick refresher or a condensed revision sheet." },
         ].map((t) => (
           <div key={t.title} className="bg-[#12121a] border border-[#2a2a38] rounded-xl px-3 py-2.5">
             <p className="text-xs font-semibold text-indigo-300 mb-0.5">{t.icon} {t.title}</p>
@@ -686,13 +686,13 @@ const CONTENT: Record<string, React.ReactNode> = {
 
   workflow: (
     <div className="space-y-4 text-sm text-gray-400 leading-relaxed">
-      <p><span className="text-white font-medium">Smart Actions</span> let the AI offer to <em>do</em> things for you — not just answer. After a normal chat reply, MemoLink quietly analyses the exchange and, when something useful is possible, shows action buttons right below the message. Nothing happens until you approve.</p>
+      <p><span className="text-white font-medium">Smart Actions</span> let the AI offer to <em>do</em> things for you - not just answer. After a normal chat reply, MemoLink quietly analyses the exchange and, when something useful is possible, shows action buttons right below the message. Nothing happens until you approve.</p>
 
       <div className="bg-[#12121a] border border-[#2a2a38] rounded-xl p-3 space-y-1.5">
         <p className="text-xs font-semibold text-indigo-300 uppercase tracking-wider">How it works</p>
         <ol className="space-y-1">
           {[
-            "Chat normally — no toggle or mode to turn on.",
+            "Chat normally - no toggle or mode to turn on.",
             "When an action fits, a short question appears under the reply (e.g. \"Do you want me to search the web for this?\").",
             "Click Yes to run it, or No to dismiss. Your click is recorded as your message, and the result comes back as an assistant reply.",
             "Both are saved to the conversation, so the whole exchange is still there after a reload.",
@@ -743,26 +743,26 @@ const CONTENT: Record<string, React.ReactNode> = {
           "The default model set by the admin applies when model selection is disabled - check Settings to see what's available to you.",
           "Reminders → Suggest scans only the active workspace - switch workspaces to suggest from different note sets.",
           "Paste a YouTube video URL in the Upload Notes panel to instantly transcribe and import it.",
-          "Ask the AI to improve any note by name — e.g. \"improve my note Recording (7).m4a\". See the Note Improvement section for all supported phrases.",
-          "Type / in chat to access 14 slash commands — use ↑↓ arrows to navigate, Tab to complete. After a command, Tab opens a note picker with all your notes.",
+          "Ask the AI to improve any note by name - e.g. \"improve my note Recording (7).m4a\". See the Note Improvement section for all supported phrases.",
+          "Type / in chat to access 14 slash commands - use ↑↓ arrows to navigate, Tab to complete. After a command, Tab opens a note picker with all your notes.",
           "Add your own API key in Settings → API Keys to use your personal quota. You can also add any OpenAI-compatible provider (Groq, Mistral, Ollama) with a custom base URL.",
-          "Use /Read to hear a note read aloud. Playback starts from where your cursor is and skips the title — click into the paragraph you want to start from, then play. The sentence being spoken is highlighted live in the editor.",
-          "Open AI Study Mode from the top-right user menu for flashcards, quizzes, exam reviewers, study plans, weak-topic detection, and multi-level summaries — all built from your workspace notes.",
-          "Let Smart Actions help after a chat reply: when MemoLink can do something useful (save a note, set a reminder, search the web), it asks below the message — click Yes and it runs, with both your click and the result saved to the conversation.",
-          "Custom providers added in Settings → API Keys automatically join /Discussion as extra participants — each model gives its own perspective on the note.",
+          "Use /Read to hear a note read aloud. Playback starts from where your cursor is and skips the title - click into the paragraph you want to start from, then play. The sentence being spoken is highlighted live in the editor.",
+          "Open AI Study Mode from the top-right user menu for flashcards, quizzes, exam reviewers, study plans, weak-topic detection, and multi-level summaries - all built from your workspace notes.",
+          "Let Smart Actions help after a chat reply: when MemoLink can do something useful (save a note, set a reminder, search the web), it asks below the message - click Yes and it runs, with both your click and the result saved to the conversation.",
+          "Custom providers added in Settings → API Keys automatically join /Discussion as extra participants - each model gives its own perspective on the note.",
           "After a /Quiz submission, click \"Save Results to Notes\" to store questions, your answers, correct answers, and explanations as a searchable note.",
           "Connect Gmail in Settings → Email to automatically sync important emails to an \"Email Digest\" note and create deadline reminders. The \"Sync from Email\" button in the Reminders panel triggers a fresh sync at any time.",
-          "Email-sourced reminders are global — they appear in every workspace, not just the one that was active when they were created.",
-          "Reply to emails directly from a reminder detail or the email list in Settings → Email — MemoLink builds 3 AI-drafted options based on your notes, and sends the reply threaded correctly in Gmail.",
+          "Email-sourced reminders are global - they appear in every workspace, not just the one that was active when they were created.",
+          "Reply to emails directly from a reminder detail or the email list in Settings → Email - MemoLink builds 3 AI-drafted options based on your notes, and sends the reply threaded correctly in Gmail.",
           "Open the AI Memory Graph (⬡ icon in toolbar) to see how your notes are connected through shared entities. Rebuild the graph after adding new notes to update the relationships.",
-          "Graph-Enhanced RAG is automatic — when you chat, MemoLink traverses the knowledge graph to find related notes beyond the top vector search results, giving more complete answers.",
+          "Graph-Enhanced RAG is automatic - when you chat, MemoLink traverses the knowledge graph to find related notes beyond the top vector search results, giving more complete answers.",
           "Use the AI Insights scan (Reminders panel → AI Insights → Scan Notes) before important deadlines to catch anything you may have forgotten to set a reminder for.",
-          "The Answer Confidence badge tells you how grounded each AI reply is. UNSUPPORTED means the topic isn't in your notes — try uploading a relevant document first.",
-          "AutoPilot automatically routes coding questions to DeepSeek Coder — just mention any language name (Python, Go, Rust, SQL…) in your message.",
+          "The Answer Confidence badge tells you how grounded each AI reply is. UNSUPPORTED means the topic isn't in your notes - try uploading a relevant document first.",
+          "AutoPilot automatically routes coding questions to DeepSeek Coder - just mention any language name (Python, Go, Rust, SQL…) in your message.",
           "AutoPilot routes research and analysis questions to GPT-4o. For quick factual questions it stays on the default fast model. The violet ⚡ chip shows when a routing decision was made.",
-          "Open the Timeline tab on any lecture or meeting transcript note to get chapters, action items, and key moments with timestamps — no manual note-taking needed.",
-          "The Jump → button in the Timeline tab finds the exact phrase in the transcript and scrolls the editor to it — useful for long recordings where scrolling manually would take too long.",
-          "Timeline results are cached — clicking Regenerate re-runs the AI analysis after you've edited or improved the transcript note.",
+          "Open the Timeline tab on any lecture or meeting transcript note to get chapters, action items, and key moments with timestamps - no manual note-taking needed.",
+          "The Jump → button in the Timeline tab finds the exact phrase in the transcript and scrolls the editor to it - useful for long recordings where scrolling manually would take too long.",
+          "Timeline results are cached - clicking Regenerate re-runs the AI analysis after you've edited or improved the transcript note.",
         ].map((item, i) => (
           <li key={i} className="flex gap-2"><span className="text-indigo-500 shrink-0 mt-0.5">•</span><span>{item}</span></li>
         ))}
