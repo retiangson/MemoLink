@@ -36,6 +36,7 @@ import { fetchAdminFeedback } from "../api/adminApi";
 import { getEmailStatus, autoProcessEmails } from "../api/emailApi";
 import { AdminPage } from "./AdminPage";
 import { suggestActions, type WorkflowAction } from "../api/workflowApi";
+import { OnboardingTour } from "../components/OnboardingTour";
 
 type WorkspaceHook = ReturnType<typeof useWorkspace>;
 type LayoutMode = "stacked" | "columns" | "rows";
@@ -80,6 +81,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
   const [emailConnected, setEmailConnected] = useState(false);
   const [isSyncingEmail, setIsSyncingEmail] = useState(false);
   const [emailSyncResult, setEmailSyncResult] = useState<string | null>(null);
+  const [showTour, setShowTour] = useState(() => !localStorage.getItem("memolink_walkthrough_done"));
 
   // Tab drag-and-drop
   const dragSrcRef = useRef<{ type: "chat" | "note"; index: number } | null>(null);
@@ -546,7 +548,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
       <div className="flex-1 flex flex-col h-full overflow-hidden">
 
         {/* ── Unified tab bar ───────────────────────────────────────────── */}
-        <div className="flex bg-[#0a0a0f] border-b border-[#1e1e2a] shrink-0" style={{ minHeight: 40 }}>
+        <div id="tour-tab-bar" className="flex bg-[#0a0a0f] border-b border-[#1e1e2a] shrink-0" style={{ minHeight: 40 }}>
 
           {/* Scrollable tabs - hidden in split modes (each panel has its own tab bar) */}
           <div className="flex items-center overflow-x-auto flex-1">
@@ -681,6 +683,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
             {/* User avatar + dropdown */}
             <div className="relative">
               <button
+                id="tour-user-menu"
                 onClick={(e) => { e.stopPropagation(); setUserMenuOpen((v) => !v); }}
                 className="relative flex items-center justify-center w-7 h-7 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white text-[11px] font-bold transition"
                 title={user.email}
@@ -757,6 +760,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                   {/* Admin Panel - only shown to admins */}
                   {user.is_admin && (
                     <button
+                      id="tour-admin-menu"
                       onClick={() => { setUserMenuOpen(false); setShowAdmin(true); }}
                       className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-indigo-400 hover:bg-indigo-500/10 hover:text-indigo-300 transition"
                     >
@@ -1180,7 +1184,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
         />
       )}
 
-      <SettingsModal show={showSettings} user={user} onClose={() => setShowSettings(false)} selectedModel={selectedModel} onModelChange={handleModelChange} modelSelectionEnabled={flags.model_selection_enabled} customApiKeysEnabled={flags.custom_api_keys_enabled} ttsEnabled={flags.tts_enabled} emailEnabled={flags.email_enabled} workflowEnabled={flags.workflow_enabled} />
+      <SettingsModal show={showSettings} user={user} onClose={() => setShowSettings(false)} selectedModel={selectedModel} onModelChange={handleModelChange} modelSelectionEnabled={flags.model_selection_enabled} customApiKeysEnabled={flags.custom_api_keys_enabled} ttsEnabled={flags.tts_enabled} emailEnabled={flags.email_enabled} workflowEnabled={flags.workflow_enabled} onReplayTour={() => { localStorage.removeItem("memolink_walkthrough_done"); setShowTour(true); setShowSettings(false); }} />
       <HelpModal show={showHelp} onClose={() => setShowHelp(false)} />
       <FeedbackModal show={showFeedback} onClose={() => setShowFeedback(false)} />
       <MemoGraphModal
@@ -1217,7 +1221,19 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
         />
       )}
 
-      {showAdmin && <AdminPage onClose={() => { setShowAdmin(false); refreshFeedbackCount(); }} currentUserId={user.id} />}
+      {showAdmin && <AdminPage onClose={() => { setShowAdmin(false); refreshFeedbackCount(); }} currentUserId={user.id} onResetWalkthrough={() => { localStorage.removeItem("memolink_walkthrough_done"); setShowTour(true); setShowAdmin(false); }} />}
+
+      <OnboardingTour
+        run={showTour}
+        isAdmin={user.is_admin ?? false}
+        onOpenUserMenu={() => setUserMenuOpen(true)}
+        onCloseUserMenu={() => setUserMenuOpen(false)}
+        onFinish={() => {
+          localStorage.setItem("memolink_walkthrough_done", "1");
+          setShowTour(false);
+          setUserMenuOpen(false);
+        }}
+      />
     </div>
   );
 }

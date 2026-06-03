@@ -125,7 +125,7 @@ export function ChatInput({
   ];
 
   return (
-    <footer className="px-4 pb-4 pt-2">
+    <footer id="tour-chat-input" className="px-4 pb-4 pt-2">
       {showLangPicker && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setShowLangPicker(false)} />
