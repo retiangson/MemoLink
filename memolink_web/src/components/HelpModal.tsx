@@ -29,6 +29,8 @@ const NAV: Section[] = [
   { id: "confidence", label: "Answer Confidence",  icon: <path d="M5.072.56C6.157.265 7.31 0 8 0s1.843.265 2.928.56c1.11.3 2.229.655 2.887.87a1.54 1.54 0 0 1 1.044 1.262c.596 4.477-.787 7.795-2.465 9.99a11.8 11.8 0 0 1-2.517 2.453 7 7 0 0 1-1.048.625c-.28.132-.581.24-.829.24s-.548-.108-.829-.24a7 7 0 0 1-1.048-.625 11.8 11.8 0 0 1-2.517-2.453C1.928 10.487.545 7.169 1.141 2.692A1.54 1.54 0 0 1 2.185 1.43 63 63 0 0 1 5.072.56"/> },
   { id: "autopilot",  label: "AutoPilot Routing",  icon: <path d="M11.251.068a.5.5 0 0 1 .227.58L9.677 6.5H13a.5.5 0 0 1 .364.843l-8 8.5a.5.5 0 0 1-.842-.49L6.323 9.5H3a.5.5 0 0 1-.364-.843l8-8.5a.5.5 0 0 1 .615-.09z"/> },
   { id: "timeline",   label: "Lecture Timeline",   icon: <><path d="M8 3.5a.5.5 0 0 0-1 0V9a.5.5 0 0 0 .252.434l3.5 2a.5.5 0 0 0 .496-.868L8 8.71z"/><path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16m7-8A7 7 0 1 1 1 8a7 7 0 0 1 14 0"/></> },
+  { id: "study",      label: "AI Study Mode",      icon: <path d="M8.211 2.047a.5.5 0 0 0-.422 0l-7.5 3.5a.5.5 0 0 0 .025.917l7.5 3a.5.5 0 0 0 .372 0L14 7.14V13a1 1 0 0 0-1 1v2h3v-2a1 1 0 0 0-1-1V6.739l.686-.275a.5.5 0 0 0 .025-.917zM8 8.46 1.758 5.965 8 3.052l6.242 2.913z"/> },
+  { id: "workflow",   label: "Smart Actions",      icon: <path d="M9.405 1.05c-.413-1.4-2.397-1.4-2.81 0l-.1.34a1.46 1.46 0 0 1-2.105.872l-.31-.17c-1.283-.698-2.686.705-1.987 1.987l.169.311c.446.82.023 1.841-.872 2.105l-.34.1c-1.4.413-1.4 2.397 0 2.81l.34.1a1.46 1.46 0 0 1 .872 2.105l-.17.31c-.698 1.283.705 2.686 1.987 1.987l.311-.169a1.46 1.46 0 0 1 2.105.872l.1.34c.413 1.4 2.397 1.4 2.81 0l.1-.34a1.46 1.46 0 0 1 2.105-.872l.31.17c1.283.698 2.686-.705 1.987-1.987l-.169-.311a1.46 1.46 0 0 1 .872-2.105l.34-.1c1.4-.413 1.4-2.397 0-2.81l-.34-.1a1.46 1.46 0 0 1-.872-2.105l.17-.31c.698-1.283-.705-2.686-1.987-1.987l-.311.169a1.46 1.46 0 0 1-2.105-.872zM8 10.93a2.929 2.929 0 1 1 0-5.86 2.929 2.929 0 0 1 0 5.858z"/> },
   { id: "tips",       label: "Tips & Shortcuts",  icon: <path d="M2 2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v13.5a.5.5 0 0 1-.777.416L8 13.101l-5.223 2.815A.5.5 0 0 1 2 15.5zm2-1a1 1 0 0 0-1 1v12.566l4.723-2.482a.5.5 0 0 1 .554 0L13 14.566V2a1 1 0 0 0-1-1z"/> },
 ];
 
@@ -53,6 +55,8 @@ const CONTENT: Record<string, React.ReactNode> = {
           { label: "Answer Confidence", desc: "HIGH / MEDIUM / LOW confidence badge on every AI response" },
           { label: "AutoPilot Routing", desc: "Automatically selects the best AI model based on your question's intent" },
           { label: "Lecture Timeline", desc: "Timestamped chapters, action items, and key moments for any transcript note" },
+          { label: "AI Study Mode", desc: "Flashcards, quizzes, exam reviewers, study plans, weak-topic detection, and summaries" },
+          { label: "Smart Actions", desc: "AI offers to save notes, set reminders, or search the web right below a chat reply" },
           { label: "Custom API Keys", desc: "Use your own OpenAI, Gemini, or any compatible key" },
         ].map((f) => (
           <div key={f.label} className="bg-[#12121a] border border-[#2a2a38] rounded-xl p-3">
@@ -379,8 +383,8 @@ const CONTENT: Record<string, React.ReactNode> = {
           color: "violet",
           cmds: [
             { cmd: "/Quiz", args: "All | \"Note Name\" : count", desc: "Generate an interactive quiz from the note. Supports radio and checkbox questions. Save results to Notes after submission." },
-            { cmd: "/Discussion", args: "All | \"Note Name\"", desc: "Multi-model discussion — GPT, Gemini, DeepSeek, plus any custom providers in Settings → API Keys all share perspectives, then a synthesis is generated." },
-            { cmd: "/Read", args: "\"Note Name\"", desc: "Display a note's content inline in the chat, open it in the editor, and read it aloud. A TTS player bar appears with play/pause, stop, ◀◀ / ▶▶ sentence navigation, and speed controls (0.75× – 2×)." },
+            { cmd: "/Discussion", args: "\"Note Name\" your question", desc: "Iterative multi-model debate driven by your question — e.g. /Discussion \"Chat Snippet\" how do we improve this? GPT, Gemini, DeepSeek, plus any custom providers each contribute in turn, seeing the running discussion and building on or challenging each other. They loop round-by-round (up to 4) until they all agree, then a final \"Best Approach\" conclusion answers your question. Omit the question to default to improving the note; use All to discuss every note." },
+            { cmd: "/Read", args: "\"Note Name\"", desc: "Display a note's content inline in the chat, open it in the editor, and read it aloud. Reading starts from the body (the title is never read) — place your cursor anywhere first to begin from that point. A TTS player bar appears with play/pause, stop, ◀◀ / ▶▶ sentence navigation, and speed controls (0.75× – 2×), and the sentence being spoken is highlighted in the editor." },
           ],
         },
         {
@@ -656,6 +660,76 @@ const CONTENT: Record<string, React.ReactNode> = {
     </div>
   ),
 
+  study: (
+    <div className="space-y-4 text-sm text-gray-400 leading-relaxed">
+      <p>Open <span className="text-white font-medium">AI Study Mode</span> from the user menu (top-right). It turns the notes in your active workspace into active-recall study tools — all generated on demand from your own content.</p>
+
+      <div className="space-y-3">
+        {[
+          { icon: "🃏", title: "Flashcards", desc: "Generate question/answer cards from a single note or the whole workspace. Flip each card to reveal the answer and step through them for spaced review." },
+          { icon: "❓", title: "Quiz", desc: "Build an interactive quiz (single- and multiple-choice) from any note or all notes — the same engine as the /Quiz slash command. Submit to see your score, the correct answers, and explanations, then save the result as a note." },
+          { icon: "📋", title: "Exam Review", desc: "Pick one or more notes to get a reviewer: key concepts, definitions, important facts, likely exam questions, and the topics to focus on most." },
+          { icon: "📅", title: "Study Plan", desc: "Describe your goal and time frame (e.g. \"before my MSE907 presentation\") and get a day-by-day plan — each day lists focus topics, tasks, and which notes to revise." },
+          { icon: "🔍", title: "Weak Topics", desc: "AI scans the questions you keep asking across your chats and notes, identifies recurring weak spots, and explains each one simply with a study tip." },
+          { icon: "📝", title: "Summary", desc: "Summarise any note at three levels — short, medium, or detailed — with optional bullet points. Great for a quick refresher or a condensed revision sheet." },
+        ].map((t) => (
+          <div key={t.title} className="bg-[#12121a] border border-[#2a2a38] rounded-xl px-3 py-2.5">
+            <p className="text-xs font-semibold text-indigo-300 mb-0.5">{t.icon} {t.title}</p>
+            <p className="text-[11px] text-gray-500">{t.desc}</p>
+          </div>
+        ))}
+      </div>
+
+      <p className="text-[11px] text-gray-600">Everything is scoped to the active workspace, so a quiz or plan only ever draws from that workspace's notes. Study Mode can be turned off by an admin via the <code className="bg-[#12121a] px-1 rounded text-indigo-300">study_mode</code> feature flag.</p>
+    </div>
+  ),
+
+  workflow: (
+    <div className="space-y-4 text-sm text-gray-400 leading-relaxed">
+      <p><span className="text-white font-medium">Smart Actions</span> let the AI offer to <em>do</em> things for you — not just answer. After a normal chat reply, MemoLink quietly analyses the exchange and, when something useful is possible, shows action buttons right below the message. Nothing happens until you approve.</p>
+
+      <div className="bg-[#12121a] border border-[#2a2a38] rounded-xl p-3 space-y-1.5">
+        <p className="text-xs font-semibold text-indigo-300 uppercase tracking-wider">How it works</p>
+        <ol className="space-y-1">
+          {[
+            "Chat normally — no toggle or mode to turn on.",
+            "When an action fits, a short question appears under the reply (e.g. \"Do you want me to search the web for this?\").",
+            "Click Yes to run it, or No to dismiss. Your click is recorded as your message, and the result comes back as an assistant reply.",
+            "Both are saved to the conversation, so the whole exchange is still there after a reload.",
+          ].map((s, i) => (
+            <li key={i} className="flex gap-2 text-[12px]"><span className="text-indigo-500 shrink-0 font-bold">{i + 1}.</span><span>{s}</span></li>
+          ))}
+        </ol>
+      </div>
+
+      <div>
+        <p className="text-xs font-semibold text-indigo-300 uppercase tracking-wider mb-2">Available actions</p>
+        <div className="space-y-1.5">
+          {[
+            ["⏰", "Create reminder", "Turn a mentioned deadline or task into a reminder in the current workspace."],
+            ["📝", "Create note", "Save the AI's response as a new note you can search later."],
+            ["📋", "Summarise workspace", "Produce a summary across the notes in the active workspace."],
+            ["🌐", "Search web", "Run a live web search when the answer needs information beyond your notes."],
+            ["🗂️", "Organise notes", "Suggest a structure / grouping for your existing notes."],
+            ["✏️", "Suggest title", "Propose a clearer title for the note being discussed."],
+            ["✅", "Extract tasks", "Pull actionable tasks out of the response or a note."],
+            ["📄", "Prepare report outline", "Draft a structured outline from your notes to start a report."],
+          ].map(([icon, name, desc]) => (
+            <div key={name} className="flex items-start gap-2 bg-[#12121a] border border-[#2a2a38] rounded-xl px-3 py-2">
+              <span className="shrink-0 text-sm leading-none mt-0.5">{icon}</span>
+              <div>
+                <p className="text-[12px] font-medium text-gray-300">{name}</p>
+                <p className="text-[11px] text-gray-500">{desc}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <p className="text-[11px] text-gray-600">Turn suggestions on or off any time in <span className="text-gray-300">Settings → Workflow</span>. Admins can disable the whole feature via the <code className="bg-[#12121a] px-1 rounded text-indigo-300">workflow</code> feature flag. After an action runs, the affected panel (Notes or Reminders) refreshes automatically.</p>
+    </div>
+  ),
+
   tips: (
     <div className="space-y-3 text-sm text-gray-400 leading-relaxed">
       <ul className="space-y-2">
@@ -672,7 +746,9 @@ const CONTENT: Record<string, React.ReactNode> = {
           "Ask the AI to improve any note by name — e.g. \"improve my note Recording (7).m4a\". See the Note Improvement section for all supported phrases.",
           "Type / in chat to access 14 slash commands — use ↑↓ arrows to navigate, Tab to complete. After a command, Tab opens a note picker with all your notes.",
           "Add your own API key in Settings → API Keys to use your personal quota. You can also add any OpenAI-compatible provider (Groq, Mistral, Ollama) with a custom base URL.",
-          "Use /Read to hear a note read aloud. The TTS player bar lets you pause, skip by sentence, and adjust speed (0.75× – 2×). Works in any browser without extra setup.",
+          "Use /Read to hear a note read aloud. Playback starts from where your cursor is and skips the title — click into the paragraph you want to start from, then play. The sentence being spoken is highlighted live in the editor.",
+          "Open AI Study Mode from the top-right user menu for flashcards, quizzes, exam reviewers, study plans, weak-topic detection, and multi-level summaries — all built from your workspace notes.",
+          "Let Smart Actions help after a chat reply: when MemoLink can do something useful (save a note, set a reminder, search the web), it asks below the message — click Yes and it runs, with both your click and the result saved to the conversation.",
           "Custom providers added in Settings → API Keys automatically join /Discussion as extra participants — each model gives its own perspective on the note.",
           "After a /Quiz submission, click \"Save Results to Notes\" to store questions, your answers, correct answers, and explanations as a searchable note.",
           "Connect Gmail in Settings → Email to automatically sync important emails to an \"Email Digest\" note and create deadline reminders. The \"Sync from Email\" button in the Reminders panel triggers a fresh sync at any time.",

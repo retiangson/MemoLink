@@ -5,8 +5,9 @@ import {
   type FeedbackItem, type AdminUser, type FeatureFlags, type AccessLevel, type SystemLogItem,
 } from "../api/adminApi";
 import { MODELS } from "../constants/models";
+import { AdminSurveyPanel } from "../components/AdminSurveyPanel";
 
-type Tab = "feedback" | "features" | "users" | "logs";
+type Tab = "feedback" | "features" | "users" | "logs" | "survey";
 
 const _LEVEL_ORDER: Record<string, number> = { regular: 0, plus: 1, pro: 2 };
 
@@ -206,6 +207,7 @@ export function AdminPage({ onClose, currentUserId }: Props) {
             { key: "features", label: "Feature Flags", icon: <path d="M3 2a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v13h1.5a.5.5 0 0 1 0 1h-13a.5.5 0 0 1 0-1H3V2zm1 13h1.5v-2a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 .5.5v2H10V2H4v13z"/> },
             { key: "users", label: "Users", icon: <path d="M7 14s-1 0-1-1 1-4 5-4 5 3 5 4-1 1-1 1zm4-6a3 3 0 1 0 0-6 3 3 0 0 0 0 6m-5.784 6A2.24 2.24 0 0 1 5 13c0-1.355.68-2.75 1.936-3.72A6.3 6.3 0 0 0 5 9c-4 0-5 3-5 4s1 1 1 1zM4.5 8a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5"/> },
           { key: "logs", label: "System Logs", icon: <><path d="M5 0h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h2zm-1 1H3a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H6v2.5a.5.5 0 0 1-.5.5h-2A.5.5 0 0 1 3 4.5V1.5A.5.5 0 0 1 3.5 1H4z"/><path d="M4.5 12.5A.5.5 0 0 1 5 12h6a.5.5 0 0 1 0 1H5a.5.5 0 0 1-.5-.5zm0-2A.5.5 0 0 1 5 10h6a.5.5 0 0 1 0 1H5a.5.5 0 0 1-.5-.5zm0-2A.5.5 0 0 1 5 8h6a.5.5 0 0 1 0 1H5a.5.5 0 0 1-.5-.5z"/></> },
+            { key: "survey", label: "Evaluation Survey", icon: <><path d="M9.5 0a.5.5 0 0 1 .5.5.5.5 0 0 0 .5.5.5.5 0 0 1 .5.5V2a.5.5 0 0 1-.5.5h-5A.5.5 0 0 1 5 2v-.5a.5.5 0 0 1 .5-.5.5.5 0 0 0 .5-.5.5.5 0 0 1 .5-.5z"/><path d="M3 2.5a.5.5 0 0 1 .5-.5H4a.5.5 0 0 0 0-1h-.5A1.5 1.5 0 0 0 2 2.5v12A1.5 1.5 0 0 0 3.5 16h9a1.5 1.5 0 0 0 1.5-1.5v-12A1.5 1.5 0 0 0 12.5 1H12a.5.5 0 0 0 0 1h.5a.5.5 0 0 1 .5.5v12a.5.5 0 0 1-.5.5h-9a.5.5 0 0 1-.5-.5z"/></> },
           ] as { key: Tab; label: string; icon: React.ReactNode }[]).map(({ key, label, icon }) => (
             <button
               key={key}
@@ -231,6 +233,9 @@ export function AdminPage({ onClose, currentUserId }: Props) {
 
         {/* Main content */}
         <main className="flex-1 overflow-y-auto p-6">
+
+          {/* EVALUATION SURVEY TAB */}
+          {tab === "survey" && <AdminSurveyPanel />}
 
           {/* FEEDBACK TAB */}
           {tab === "feedback" && (
@@ -447,6 +452,7 @@ export function AdminPage({ onClose, currentUserId }: Props) {
                     { key: "study_mode_enabled", label: "Study Mode", desc: "Enable AI Study Mode — flashcards, exam review, study plans, weak topic detection, and summaries" },
                     { key: "timeline_enabled", label: "Meeting/Lecture Timeline", desc: "Show Timeline tab in note editor — chapters, action items, and important moments with timestamps" },
                     { key: "workflow_enabled", label: "Workflow Agent", desc: "Enable Workflow mode — AI proposes actions for user approval before executing" },
+                    { key: "evaluation_survey_enabled", label: "Evaluation Survey", desc: "Show \"Take Evaluation Survey\" in the profile menu — research data collection, separate from feedback" },
                   ] as { key: keyof FeatureFlags; label: string; desc: string }[]).map(({ key, label, desc }) => (
                     <div key={key} className="flex items-center justify-between px-4 py-3.5 bg-[#1a1a24] border border-[#2a2a38] rounded-xl">
                       <div>

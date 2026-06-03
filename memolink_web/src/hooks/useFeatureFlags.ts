@@ -22,6 +22,7 @@ const DEFAULT_FLAGS: FeatureFlags = {
   study_mode_enabled: true,
   timeline_enabled: true,
   workflow_enabled: true,
+  evaluation_survey_enabled: true,
   default_model: "gpt-4o-mini",
   default_language: "English",
   web_search_min_level: "regular",

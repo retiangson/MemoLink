@@ -19,6 +19,7 @@ import { SettingsModal } from "../components/SettingsModal";
 import { HelpModal } from "../components/HelpModal";
 import { MemoGraphModal } from "../components/MemoGraphModal";
 import { StudyModeModal } from "../components/StudyModeModal";
+import { SurveyModal } from "../components/SurveyModal";
 import { FeedbackModal } from "../components/FeedbackModal";
 import { TTSPlayerBar } from "../components/TTSPlayerBar";
 import { WorkspaceManagerModal } from "../components/WorkspaceManagerModal";
@@ -62,6 +63,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
   const [showHelp, setShowHelp] = useState(false);
   const [showMemoGraph, setShowMemoGraph] = useState(false);
   const [showStudyMode, setShowStudyMode] = useState(false);
+  const [showSurvey, setShowSurvey] = useState(false);
   const [workflowSuggestions, setWorkflowSuggestions] = useState<Record<number, WorkflowAction[]>>({});
   const prevStreamingRef = useRef(false);
   const [showWorkspaceManager, setShowWorkspaceManager] = useState(false);
@@ -768,6 +770,21 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                     Send Feedback
                   </button>
 
+                  {/* Take Evaluation Survey */}
+                  {flags.evaluation_survey_enabled && (
+                    <button
+                      onClick={() => { setUserMenuOpen(false); setShowSurvey(true); }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-violet-300 hover:bg-violet-500/10 hover:text-violet-200 transition"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 shrink-0" fill="currentColor" viewBox="0 0 16 16">
+                        <path d="M9.5 0a.5.5 0 0 1 .5.5.5.5 0 0 0 .5.5.5.5 0 0 1 .5.5V2a.5.5 0 0 1-.5.5h-5A.5.5 0 0 1 5 2v-.5a.5.5 0 0 1 .5-.5.5.5 0 0 0 .5-.5.5.5 0 0 1 .5-.5z"/>
+                        <path d="M3 2.5a.5.5 0 0 1 .5-.5H4a.5.5 0 0 0 0-1h-.5A1.5 1.5 0 0 0 2 2.5v12A1.5 1.5 0 0 0 3.5 16h9a1.5 1.5 0 0 0 1.5-1.5v-12A1.5 1.5 0 0 0 12.5 1H12a.5.5 0 0 0 0 1h.5a.5.5 0 0 1 .5.5v12a.5.5 0 0 1-.5.5h-9a.5.5 0 0 1-.5-.5z"/>
+                        <path d="M10.854 7.854a.5.5 0 0 0-.708-.708L7.5 9.793 6.354 8.646a.5.5 0 1 0-.708.708l1.5 1.5a.5.5 0 0 0 .708 0z"/>
+                      </svg>
+                      Take Evaluation Survey
+                    </button>
+                  )}
+
                   <div className="border-t border-[#2a2a38] my-1" />
 
                   {/* Sign Out */}
@@ -810,8 +827,16 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                 ttsPaused={chat.tts.paused}
                 onTtsStop={chat.tts.stop}
                 onTtsPauseResume={chat.tts.paused ? chat.tts.resume : chat.tts.pause}
+                onTtsBack={chat.tts.back}
+                onTtsForward={chat.tts.forward}
+                ttsRate={chat.tts.rate}
+                ttsVoices={chat.tts.voices}
+                ttsSelectedVoice={chat.tts.selectedVoice}
+                onTtsRateChange={chat.tts.setRate}
+                onTtsVoiceChange={chat.tts.setSelectedVoice}
                 ttsSentenceIdx={chat.tts.currentSentenceIdx}
                 ttsSentences={chat.tts.sentencesList}
+                ttsWord={chat.tts.currentWord}
                 ttsEnabled={flags.tts_enabled}
                 videoImportEnabled={flags.video_import_enabled}
                 timelineEnabled={flags.timeline_enabled}
@@ -1055,8 +1080,16 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                       ttsPaused={chat.tts.paused}
                       onTtsStop={chat.tts.stop}
                       onTtsPauseResume={chat.tts.paused ? chat.tts.resume : chat.tts.pause}
+                      onTtsBack={chat.tts.back}
+                      onTtsForward={chat.tts.forward}
+                      ttsRate={chat.tts.rate}
+                      ttsVoices={chat.tts.voices}
+                      ttsSelectedVoice={chat.tts.selectedVoice}
+                      onTtsRateChange={chat.tts.setRate}
+                      onTtsVoiceChange={chat.tts.setSelectedVoice}
                       ttsSentenceIdx={chat.tts.currentSentenceIdx}
                       ttsSentences={chat.tts.sentencesList}
+                      ttsWord={chat.tts.currentWord}
                       ttsEnabled={flags.tts_enabled}
                       videoImportEnabled={flags.video_import_enabled}
                       timelineEnabled={flags.timeline_enabled}
@@ -1149,6 +1182,12 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
         onClose={() => setShowStudyMode(false)}
         workspaceId={activeWorkspaceId}
         notes={notes.map(n => ({ id: n.id, title: n.title }))}
+      />
+
+      <SurveyModal
+        show={showSurvey}
+        onClose={() => setShowSurvey(false)}
+        workspaceId={activeWorkspaceId}
       />
 
       {showWorkspaceManager && (

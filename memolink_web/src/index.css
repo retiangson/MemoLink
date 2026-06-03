@@ -64,6 +64,8 @@ html, body {
 }
 
 .tts-highlight {
-  background: rgba(99, 102, 241, 0.35);
-  border-radius: 2px;
+  background: rgba(99, 102, 241, 0.45);
+  border-radius: 3px;
+  box-shadow: 0 0 0 1px rgba(129, 140, 248, 0.45);
+  transition: background 60ms linear;
 }

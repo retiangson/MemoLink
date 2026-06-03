@@ -102,6 +102,11 @@ class ServiceInstaller:
             note_repo=self._domain.get_note_repository(),
         )
 
+    def get_survey_service(self):
+        from memolink_backend.business.services.survey_service import SurveyService
+        from memolink_backend.domain.repositories.survey_repository import SurveyRepository
+        return SurveyService(repo=SurveyRepository(self._domain.get_db()))
+
     def get_study_service(self):
         from memolink_backend.business.services.study_service import StudyService
         return StudyService(

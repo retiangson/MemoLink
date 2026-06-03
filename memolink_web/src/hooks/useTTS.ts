@@ -15,6 +15,8 @@ export function useTTS() {
   const [selectedVoice, setSelectedVoiceState] = useState<SpeechSynthesisVoice | null>(null);
   const [currentSentenceIdx, setCurrentSentenceIdx] = useState(-1);
   const [sentencesList, setSentencesList] = useState<string[]>([]);
+  // Char range of the word currently being spoken, relative to the current sentence.
+  const [currentWord, setCurrentWord] = useState<{ start: number; end: number } | null>(null);
 
   const sentences = useRef<string[]>([]);
   const cursor = useRef(0);
@@ -66,15 +68,32 @@ export function useTTS() {
     u.rate = rateRef.current;
     if (voiceRef.current) u.voice = voiceRef.current;
     cursor.current = idx;
-    u.onstart = () => { setPlaying(true); setPaused(false); setCurrentSentenceIdx(idx); };
+    u.onstart = () => { setPlaying(true); setPaused(false); setCurrentSentenceIdx(idx); setCurrentWord(null); };
+    // Word-level highlight: fires at each word boundary with a char offset
+    // into the current sentence. charLength isn't reported by every browser,
+    // so fall back to scanning to the next whitespace.
+    u.onboundary = (e: SpeechSynthesisEvent) => {
+      if (e.name && e.name !== "word") return;
+      const sent = sentences.current[idx] ?? "";
+      const start = e.charIndex;
+      if (start == null || start < 0 || start >= sent.length) return;
+      let end = start + (e.charLength ?? 0);
+      if (!end || end <= start) {
+        const rest = sent.slice(start);
+        const ws = rest.search(/\s/);
+        end = start + (ws === -1 ? rest.length : ws);
+      }
+      setCurrentWord({ start, end });
+    };
     u.onend = () => {
+      setCurrentWord(null);
       if (cursor.current + 1 < sentences.current.length) {
         _speak(cursor.current + 1);
       } else {
-        setPlaying(false); setPaused(false);
+        setPlaying(false); setPaused(false); setCurrentSentenceIdx(-1);
       }
     };
-    u.onerror = () => { setPlaying(false); setPaused(false); };
+    u.onerror = () => { setPlaying(false); setPaused(false); setCurrentWord(null); };
     window.speechSynthesis.speak(u);
   }
 
@@ -92,6 +111,7 @@ export function useTTS() {
     sentences.current = []; cursor.current = 0;
     setPlaying(false); setPaused(false);
     setCurrentSentenceIdx(-1);
+    setCurrentWord(null);
   }
 
   function pause() { window.speechSynthesis.pause(); setPaused(true); }
@@ -113,6 +133,6 @@ export function useTTS() {
   return {
     playing, paused, rate, voices, selectedVoice,
     speak, stop, pause, resume, forward, back, setRate, setSelectedVoice,
-    currentSentenceIdx, sentencesList,
+    currentSentenceIdx, sentencesList, currentWord,
   };
 }
