@@ -73,6 +73,10 @@ class ServiceInstaller:
             embedding_service=self._domain.get_embedding_service(),
         )
 
+    def get_teams_service(self):
+        from memolink_backend.business.services.teams_service import TeamsService
+        return TeamsService(account_repo=self._domain.get_teams_account_repository())
+
     def get_proactive_insight_service(self):
         from memolink_backend.business.services.proactive_insight_service import ProactiveInsightService
         return ProactiveInsightService(

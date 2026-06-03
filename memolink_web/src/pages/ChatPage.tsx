@@ -146,10 +146,10 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
     }
   }
 
-  // Open Settings → Email tab after Gmail OAuth redirect
+  // Open Settings after OAuth redirects
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get("email_connected") === "1") {
+    if (params.get("email_connected") === "1" || params.get("teams_connected") === "1") {
       setShowSettings(true);
       window.history.replaceState({}, "", window.location.pathname);
     }
