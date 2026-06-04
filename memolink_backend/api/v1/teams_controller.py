@@ -74,6 +74,7 @@ def get_connect_url(user_id: int = Depends(get_current_user)):
         + f"&redirect_uri={quote(settings.teams_redirect_uri, safe='')}"
         + f"&scope={quote(SCOPES, safe='')}"
         + f"&response_mode=query"
+        + f"&prompt=consent"
         + f"&state={quote(state, safe='')}"
     )
     return {"url": url}

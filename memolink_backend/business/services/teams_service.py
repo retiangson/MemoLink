@@ -19,11 +19,6 @@ class TeamsService:
 
     # ── Token management ──────────────────────────────────────────────────────
 
-    def _is_jwt_like(self, token: str) -> bool:
-        # Graph delegated access tokens from this flow should be compact JWTs.
-        # A non-JWT token here has produced Graph's "No authorization information" 403.
-        return bool(token) and token.count(".") == 2
-
     async def _refresh_if_needed(self, user_id: int, force: bool = False) -> Optional[str]:
         data = self._repo.get_decrypted_tokens(user_id)
         if not data:
@@ -40,14 +35,6 @@ class TeamsService:
 
         expiry: Optional[datetime] = data["token_expiry"]
         now = datetime.now(tz=timezone.utc)
-        if not self._is_jwt_like(token):
-            force = True
-            self._syslog("warning", "Stored Teams access token is not JWT-shaped; forcing refresh", {
-                "user_id": user_id,
-                "token_length": len(token),
-                "token_prefix": token[:15] if token else "(empty)",
-            }, user_id)
-
         if not force and expiry and (expiry - now).total_seconds() > 120:
             return token.strip() if token else None
 
@@ -79,10 +66,18 @@ class TeamsService:
         access_token = token_data.get("access_token", "")
         refresh_token = token_data.get("refresh_token", refresh_token)
         expires_in = token_data.get("expires_in", 3600)
+        granted_scope = token_data.get("scope", "")
         expiry_dt = datetime.fromtimestamp(time.time() + expires_in, tz=timezone.utc)
         if not access_token:
             self._syslog("error", "Teams token refresh returned no access token", {"user_id": user_id}, user_id)
             return None
+        self._syslog("info", "Teams token refreshed", {
+            "user_id": user_id,
+            "token_length": len(access_token),
+            "token_prefix": access_token[:15],
+            "scope": granted_scope,
+            "expires_in": expires_in,
+        }, user_id)
 
         self._repo.upsert(
             user_id=user_id,
@@ -95,12 +90,7 @@ class TeamsService:
         )
         return access_token
 
-    async def _request_with_retry(self, method: str, user_id: int, path: str, *, params: dict = None, body: dict = None) -> Optional[httpx.Response]:
-        token = await self._refresh_if_needed(user_id)
-        if not token:
-            self._syslog("warning", f"{method} {path} - no token", {"user_id": user_id}, user_id)
-            return None
-
+    async def _graph_request(self, method: str, token: str, path: str, *, params: dict = None, body: dict = None) -> httpx.Response:
         async with httpx.AsyncClient() as client:
             kwargs = {
                 "headers": {"Authorization": f"Bearer {token.strip()}"},
@@ -110,8 +100,51 @@ class TeamsService:
             else:
                 kwargs["headers"]["Content-Type"] = "application/json"
                 kwargs["json"] = body or {}
+            return await client.request(method, f"{GRAPH_BASE}{path}", **kwargs)
 
-            resp = await client.request(method, f"{GRAPH_BASE}{path}", **kwargs)
+    async def _log_me_diagnostic(self, user_id: int, token: str, original_path: str) -> None:
+        try:
+            me_resp = await self._graph_request(
+                "GET",
+                token,
+                "/me",
+                params={"$select": "id,displayName,mail,userPrincipalName,userType"},
+            )
+            details = {
+                "user_id": user_id,
+                "original_path": original_path,
+                "me_status": me_resp.status_code,
+            }
+            if me_resp.status_code == 200:
+                me = me_resp.json()
+                details.update({
+                    "graph_user_id": me.get("id"),
+                    "display_name": me.get("displayName"),
+                    "email": me.get("mail") or me.get("userPrincipalName"),
+                    "user_type": me.get("userType"),
+                    "likely_cause": (
+                        "Graph token works for /me, but Teams chat API rejected it. "
+                        "Use a work/school Teams account and ensure delegated Chat.ReadWrite consent is granted."
+                    ),
+                })
+                self._syslog("warning", "Teams token works for /me but not Teams chats", details, user_id)
+            else:
+                details["me_response"] = me_resp.text[:500]
+                self._syslog("error", "Teams token also failed Graph /me", details, user_id)
+        except Exception as exc:
+            self._syslog("error", "Teams /me diagnostic failed", {
+                "user_id": user_id,
+                "original_path": original_path,
+                "error": str(exc),
+            }, user_id)
+
+    async def _request_with_retry(self, method: str, user_id: int, path: str, *, params: dict = None, body: dict = None) -> Optional[httpx.Response]:
+        token = await self._refresh_if_needed(user_id)
+        if not token:
+            self._syslog("warning", f"{method} {path} - no token", {"user_id": user_id}, user_id)
+            return None
+
+        resp = await self._graph_request(method, token, path, params=params, body=body)
 
         if resp.status_code not in (401, 403):
             return resp
@@ -125,16 +158,10 @@ class TeamsService:
         if not retry_token:
             return resp
 
-        async with httpx.AsyncClient() as client:
-            kwargs = {
-                "headers": {"Authorization": f"Bearer {retry_token.strip()}"},
-            }
-            if method == "GET":
-                kwargs["params"] = params or {}
-            else:
-                kwargs["headers"]["Content-Type"] = "application/json"
-                kwargs["json"] = body or {}
-            return await client.request(method, f"{GRAPH_BASE}{path}", **kwargs)
+        retry_resp = await self._graph_request(method, retry_token, path, params=params, body=body)
+        if retry_resp.status_code in (401, 403):
+            await self._log_me_diagnostic(user_id, retry_token, path)
+        return retry_resp
 
     def _syslog(self, level: str, message: str, details: dict = None, user_id: int = None):
         if not self._log:
