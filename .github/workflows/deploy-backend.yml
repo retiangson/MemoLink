@@ -94,6 +94,10 @@ jobs:
           GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
           GOOGLE_REDIRECT_URI: ${{ secrets.GOOGLE_REDIRECT_URI }}
           FERNET_KEY: ${{ secrets.FERNET_KEY }}
+          TEAMS_CLIENT_ID: ${{ secrets.TEAMS_CLIENT_ID }}
+          TEAMS_CLIENT_SECRET: ${{ secrets.TEAMS_CLIENT_SECRET }}
+          TEAMS_TENANT_ID: ${{ secrets.TEAMS_TENANT_ID }}
+          TEAMS_REDIRECT_URI: ${{ secrets.TEAMS_REDIRECT_URI }}
         run: |
           # Build Variables JSON via Python to safely handle special characters in secret values
           ENV_JSON=$(python3 -c "
@@ -121,6 +125,10 @@ jobs:
             'GOOGLE_CLIENT_SECRET': os.environ.get('GOOGLE_CLIENT_SECRET', ''),
             'GOOGLE_REDIRECT_URI': os.environ.get('GOOGLE_REDIRECT_URI', ''),
             'FERNET_KEY': os.environ.get('FERNET_KEY', ''),
+            'TEAMS_CLIENT_ID': os.environ.get('TEAMS_CLIENT_ID', ''),
+            'TEAMS_CLIENT_SECRET': os.environ.get('TEAMS_CLIENT_SECRET', ''),
+            'TEAMS_TENANT_ID': os.environ.get('TEAMS_TENANT_ID', ''),
+            'TEAMS_REDIRECT_URI': os.environ.get('TEAMS_REDIRECT_URI', ''),
             'MEMOLINK_SKIP_DB_BOOTSTRAP': '1',
           }
           print(json.dumps({'Variables': vars}))
