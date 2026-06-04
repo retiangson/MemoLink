@@ -79,7 +79,11 @@ class TeamsService:
                 headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
                 json=body,
             )
-        return resp.json() if resp.status_code in (200, 201) else None
+        if resp.status_code not in (200, 201):
+            import logging
+            logging.getLogger(__name__).warning("Teams POST %s → %s: %s", path, resp.status_code, resp.text[:300])
+            return None
+        return resp.json()
 
     # ── Public API ────────────────────────────────────────────────────────────
 
@@ -139,7 +143,7 @@ class TeamsService:
         return messages
 
     async def send_message(self, user_id: int, chat_id: str, text: str) -> bool:
-        result = await self._post(user_id, f"/me/chats/{chat_id}/messages", {
+        result = await self._post(user_id, f"/chats/{chat_id}/messages", {
             "body": {"content": text, "contentType": "text"}
         })
         return result is not None
