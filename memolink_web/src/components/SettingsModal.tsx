@@ -86,6 +86,7 @@ export function SettingsModal({
   const [teamsReply, setTeamsReply] = useState("");
   const [teamsSending, setTeamsSending] = useState(false);
   const [teamsSaveResult, setTeamsSaveResult] = useState<string | null>(null);
+  const [teamsError, setTeamsError] = useState<string | null>(null);
 
   // Email connection state
   const [emailStatus, setEmailStatus] = useState<EmailStatus>({ connected: false, email: null });
@@ -113,7 +114,14 @@ export function SettingsModal({
 
   async function loadTeamsChats() {
     setTeamsChatsLoading(true);
-    try { setTeamsChats(await listTeamsChats()); } catch { /* silently fail */ } finally { setTeamsChatsLoading(false); }
+    setTeamsError(null);
+    try {
+      setTeamsChats(await listTeamsChats());
+    } catch (err: any) {
+      const detail = err?.response?.data?.detail;
+      setTeamsError(detail?.message ?? "Could not load Teams chats.");
+      setTeamsChats([]);
+    } finally { setTeamsChatsLoading(false); }
   }
 
   async function handleTeamsConnect() {
@@ -130,6 +138,7 @@ export function SettingsModal({
       await disconnectTeams();
       setTeamsStatus({ connected: false });
       setTeamsChats([]);
+      setTeamsError(null);
       setSelectedChat(null);
       setTeamsMessages([]);
     } catch { /* silently fail */ } finally { setTeamsLoading(false); }
@@ -139,8 +148,14 @@ export function SettingsModal({
     setSelectedChat(chat);
     setTeamsMessages([]);
     setTeamsMessagesLoading(true);
+    setTeamsError(null);
     setTeamsSaveResult(null);
-    try { setTeamsMessages(await getTeamsMessages(chat.id, 20)); } catch { /* silently fail */ } finally { setTeamsMessagesLoading(false); }
+    try {
+      setTeamsMessages(await getTeamsMessages(chat.id, 20));
+    } catch (err: any) {
+      const detail = err?.response?.data?.detail;
+      setTeamsError(detail?.message ?? "Could not load Teams messages.");
+    } finally { setTeamsMessagesLoading(false); }
   }
 
   async function handleSendTeamsReply() {
@@ -944,6 +959,12 @@ export function SettingsModal({
                       </button>
                     </div>
 
+                    {teamsError && (
+                      <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs leading-relaxed text-amber-200">
+                        {teamsError}
+                      </div>
+                    )}
+
                     {selectedChat ? (
                       <div className="bg-[#12121a] border border-[#2a2a38] rounded-xl overflow-hidden">
                         <div className="flex items-center justify-between px-4 py-2.5 border-b border-[#2a2a38]">
@@ -990,7 +1011,7 @@ export function SettingsModal({
                           </button>
                         </div>
                         {teamsChats.length === 0 ? (
-                          <p className="text-xs text-gray-600">{teamsChatsLoading ? "Loading…" : "No chats found"}</p>
+                          <p className="text-xs text-gray-600">{teamsChatsLoading ? "Loading…" : teamsError ?? "No chats found"}</p>
                         ) : teamsChats.map((chat) => (
                           <button
                             key={chat.id}

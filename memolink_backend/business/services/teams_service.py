@@ -12,6 +12,14 @@ SOURCE = "teams"
 TEAMS_SCOPES = "User.Read Chat.ReadWrite ChatMessage.Send offline_access"
 
 
+class TeamsGraphError(Exception):
+    def __init__(self, status_code: int, code: str, detail: str):
+        self.status_code = status_code
+        self.code = code
+        self.detail = detail
+        super().__init__(detail)
+
+
 class TeamsService:
     def __init__(self, account_repo: TeamsAccountRepository, log_service=None):
         self._repo = account_repo
@@ -173,6 +181,16 @@ class TeamsService:
         if resp is None:
             return None
         if resp.status_code != 200:
+            if path.startswith("/me/chats") and resp.status_code == 403:
+                raise TeamsGraphError(
+                    403,
+                    "teams_chat_access_denied",
+                    (
+                        "Microsoft Graph accepted your sign-in, but rejected Teams chat access. "
+                        "Use a work or school Microsoft Teams account and approve delegated Chat.ReadWrite access. "
+                        "Personal Microsoft accounts such as Gmail-backed Microsoft accounts cannot list Teams chats through /me/chats."
+                    ),
+                )
             self._syslog("error", f"GET {path} failed", {
                 "status": resp.status_code,
                 "response": resp.text[:500],

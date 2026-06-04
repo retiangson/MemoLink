@@ -51,10 +51,18 @@ export function RightPanel({
   const [teamsReply, setTeamsReply] = useState("");
   const [teamsSending, setTeamsSending] = useState(false);
   const [teamsSaveResult, setTeamsSaveResult] = useState<string | null>(null);
+  const [teamsError, setTeamsError] = useState<string | null>(null);
 
   const loadTeamsChats = useCallback(async () => {
     setTeamsChatsLoading(true);
-    try { setTeamsChats(await listTeamsChats()); } catch { /* ignore */ } finally { setTeamsChatsLoading(false); }
+    setTeamsError(null);
+    try {
+      setTeamsChats(await listTeamsChats());
+    } catch (err: any) {
+      const detail = err?.response?.data?.detail;
+      setTeamsError(detail?.message ?? "Could not load Teams chats.");
+      setTeamsChats([]);
+    } finally { setTeamsChatsLoading(false); }
   }, []);
 
   useEffect(() => {
@@ -65,8 +73,14 @@ export function RightPanel({
     setSelectedChat(chat);
     setTeamsMessages([]);
     setTeamsSaveResult(null);
+    setTeamsError(null);
     setTeamsMsgLoading(true);
-    try { setTeamsMessages(await getTeamsMessages(chat.id, 20)); } catch { /* ignore */ } finally { setTeamsMsgLoading(false); }
+    try {
+      setTeamsMessages(await getTeamsMessages(chat.id, 20));
+    } catch (err: any) {
+      const detail = err?.response?.data?.detail;
+      setTeamsError(detail?.message ?? "Could not load Teams messages.");
+    } finally { setTeamsMsgLoading(false); }
   }
 
   async function handleSendReply() {
@@ -360,6 +374,12 @@ export function RightPanel({
 
           {showTeams && (
             <div className="px-3 pb-3 flex flex-col gap-2">
+              {teamsError && (
+                <div className="rounded-lg border border-amber-500/20 bg-amber-500/10 px-2.5 py-2 text-[11px] leading-relaxed text-amber-200">
+                  {teamsError}
+                </div>
+              )}
+
               {selectedChat ? (
                 <div className="bg-[#12121a] border border-[#2a2a38] rounded-xl overflow-hidden">
                   {/* Chat header */}
@@ -417,7 +437,7 @@ export function RightPanel({
                     )}
                   </button>
                   {teamsChats.length === 0 && !teamsChatsLoading && (
-                    <p className="text-[11px] text-gray-600 text-center pt-1">No chats found</p>
+                    <p className="text-[11px] text-gray-600 text-center pt-1">{teamsError ?? "No chats found"}</p>
                   )}
                   {teamsChats.map((chat) => (
                     <button

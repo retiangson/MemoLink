@@ -13,6 +13,7 @@ from memolink_backend.core.config import settings
 from memolink_backend.core.security import get_current_user
 from memolink_backend.contracts.note_dtos import NoteCreateDTO
 from memolink_backend.di.request_container import RequestContainer, get_request_container
+from memolink_backend.business.services.teams_service import TeamsGraphError
 
 router = APIRouter(prefix="/teams", tags=["teams"])
 
@@ -157,7 +158,10 @@ async def list_chats(
     user_id: int = Depends(get_current_user),
     c: RequestContainer = Depends(get_request_container),
 ):
-    chats = await c.teams().list_chats(user_id)
+    try:
+        chats = await c.teams().list_chats(user_id)
+    except TeamsGraphError as exc:
+        raise HTTPException(status_code=exc.status_code, detail={"code": exc.code, "message": exc.detail})
     return {"chats": chats}
 
 
@@ -168,7 +172,10 @@ async def get_messages(
     user_id: int = Depends(get_current_user),
     c: RequestContainer = Depends(get_request_container),
 ):
-    messages = await c.teams().get_messages(user_id, chat_id, limit=limit)
+    try:
+        messages = await c.teams().get_messages(user_id, chat_id, limit=limit)
+    except TeamsGraphError as exc:
+        raise HTTPException(status_code=exc.status_code, detail={"code": exc.code, "message": exc.detail})
     return {"messages": messages}
 
 
