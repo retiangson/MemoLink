@@ -51,24 +51,6 @@ def _verify_state(state: str) -> int:
         raise HTTPException(status_code=400, detail="Invalid or expired OAuth state")
 
 
-@router.get("/debug-messages/{chat_id}")
-async def debug_messages(
-    chat_id: str,
-    user_id: int = Depends(get_current_user),
-    c: RequestContainer = Depends(get_request_container),
-):
-    """Returns raw Graph API response for a chat's messages - for debugging only."""
-    svc = c.teams()
-    token = await svc._refresh_if_needed(user_id)
-    if not token:
-        return {"error": "no token"}
-    async with httpx.AsyncClient() as client:
-        resp = await client.get(
-            f"https://graph.microsoft.com/v1.0/me/chats/{chat_id}/messages?$top=5",
-            headers={"Authorization": f"Bearer {token}"},
-        )
-    return {"status": resp.status_code, "body": resp.json()}
-
 
 @router.get("/debug-config")
 def debug_config():

@@ -75,7 +75,10 @@ class ServiceInstaller:
 
     def get_teams_service(self):
         from memolink_backend.business.services.teams_service import TeamsService
-        return TeamsService(account_repo=self._domain.get_teams_account_repository())
+        return TeamsService(
+            account_repo=self._domain.get_teams_account_repository(),
+            log_service=self.get_system_log_service(),
+        )
 
     def get_proactive_insight_service(self):
         from memolink_backend.business.services.proactive_insight_service import ProactiveInsightService

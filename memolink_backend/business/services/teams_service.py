@@ -8,11 +8,13 @@ from memolink_backend.core.config import settings
 from memolink_backend.domain.repositories.teams_account_repository import TeamsAccountRepository
 
 GRAPH_BASE = "https://graph.microsoft.com/v1.0"
+SOURCE = "teams"
 
 
 class TeamsService:
-    def __init__(self, account_repo: TeamsAccountRepository):
+    def __init__(self, account_repo: TeamsAccountRepository, log_service=None):
         self._repo = account_repo
+        self._log = log_service
 
     # ── Token management ──────────────────────────────────────────────────────
 
@@ -57,12 +59,15 @@ class TeamsService:
         )
         return access_token
 
+    def _syslog(self, level: str, message: str, details: dict = None, user_id: int = None):
+        if not self._log:
+            return
+        getattr(self._log, level)(SOURCE, message, details, user_id)
+
     async def _get(self, user_id: int, path: str, params: dict = None) -> Optional[dict]:
-        import logging
-        log = logging.getLogger(__name__)
         token = await self._refresh_if_needed(user_id)
         if not token:
-            log.warning("Teams GET %s - no token for user %s", path, user_id)
+            self._syslog("warning", f"GET {path} - no token", {"user_id": user_id}, user_id)
             return None
         async with httpx.AsyncClient() as client:
             resp = await client.get(
@@ -71,15 +76,21 @@ class TeamsService:
                 params=params or {},
             )
         if resp.status_code != 200:
-            log.warning("Teams GET %s → %s: %s", path, resp.status_code, resp.text[:500])
+            self._syslog("error", f"GET {path} failed", {
+                "status": resp.status_code,
+                "response": resp.text[:500],
+                "user_id": user_id,
+            }, user_id)
             return None
         data = resp.json()
-        log.info("Teams GET %s → %s items", path, len(data.get("value", [])) if "value" in data else "ok")
+        count = len(data.get("value", [])) if "value" in data else "-"
+        self._syslog("info", f"GET {path} → {count} items", {"user_id": user_id}, user_id)
         return data
 
     async def _post(self, user_id: int, path: str, body: dict) -> Optional[dict]:
         token = await self._refresh_if_needed(user_id)
         if not token:
+            self._syslog("warning", f"POST {path} - no token", {"user_id": user_id}, user_id)
             return None
         async with httpx.AsyncClient() as client:
             resp = await client.post(
@@ -88,9 +99,13 @@ class TeamsService:
                 json=body,
             )
         if resp.status_code not in (200, 201):
-            import logging
-            logging.getLogger(__name__).warning("Teams POST %s → %s: %s", path, resp.status_code, resp.text[:300])
+            self._syslog("error", f"POST {path} failed", {
+                "status": resp.status_code,
+                "response": resp.text[:500],
+                "user_id": user_id,
+            }, user_id)
             return None
+        self._syslog("info", f"POST {path} → {resp.status_code}", {"user_id": user_id}, user_id)
         return resp.json()
 
     # ── Public API ────────────────────────────────────────────────────────────
