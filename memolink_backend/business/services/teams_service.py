@@ -9,6 +9,7 @@ from memolink_backend.domain.repositories.teams_account_repository import TeamsA
 
 GRAPH_BASE = "https://graph.microsoft.com/v1.0"
 SOURCE = "teams"
+TEAMS_SCOPES = "User.Read Chat.ReadWrite ChatMessage.Send offline_access"
 
 
 class TeamsService:
@@ -18,7 +19,12 @@ class TeamsService:
 
     # ── Token management ──────────────────────────────────────────────────────
 
-    async def _refresh_if_needed(self, user_id: int) -> Optional[str]:
+    def _is_jwt_like(self, token: str) -> bool:
+        # Graph delegated access tokens from this flow should be compact JWTs.
+        # A non-JWT token here has produced Graph's "No authorization information" 403.
+        return bool(token) and token.count(".") == 2
+
+    async def _refresh_if_needed(self, user_id: int, force: bool = False) -> Optional[str]:
         data = self._repo.get_decrypted_tokens(user_id)
         if not data:
             self._syslog("warning", "No Teams account found in DB", {"user_id": user_id}, user_id)
@@ -34,28 +40,49 @@ class TeamsService:
 
         expiry: Optional[datetime] = data["token_expiry"]
         now = datetime.now(tz=timezone.utc)
-        if expiry and (expiry - now).total_seconds() > 120:
+        if not self._is_jwt_like(token):
+            force = True
+            self._syslog("warning", "Stored Teams access token is not JWT-shaped; forcing refresh", {
+                "user_id": user_id,
+                "token_length": len(token),
+                "token_prefix": token[:15] if token else "(empty)",
+            }, user_id)
+
+        if not force and expiry and (expiry - now).total_seconds() > 120:
             return token.strip() if token else None
+
+        refresh_token = data.get("refresh_token", "")
+        if not refresh_token:
+            self._syslog("warning", "Teams refresh token missing", {"user_id": user_id}, user_id)
+            return None
 
         async with httpx.AsyncClient() as client:
             resp = await client.post(
                 f"https://login.microsoftonline.com/{settings.teams_tenant_id or 'common'}/oauth2/v2.0/token",
                 data={
                     "grant_type": "refresh_token",
-                    "refresh_token": data["refresh_token"],
+                    "refresh_token": refresh_token,
                     "client_id": settings.teams_client_id,
                     "client_secret": settings.teams_client_secret,
-                    "scope": "https://graph.microsoft.com/.default offline_access",
+                    "scope": TEAMS_SCOPES,
                 },
             )
         if resp.status_code != 200:
+            self._syslog("error", "Teams token refresh failed", {
+                "status": resp.status_code,
+                "response": resp.text[:500],
+                "user_id": user_id,
+            }, user_id)
             return None
 
         token_data = resp.json()
         access_token = token_data.get("access_token", "")
-        refresh_token = token_data.get("refresh_token", data["refresh_token"])
+        refresh_token = token_data.get("refresh_token", refresh_token)
         expires_in = token_data.get("expires_in", 3600)
         expiry_dt = datetime.fromtimestamp(time.time() + expires_in, tz=timezone.utc)
+        if not access_token:
+            self._syslog("error", "Teams token refresh returned no access token", {"user_id": user_id}, user_id)
+            return None
 
         self._repo.upsert(
             user_id=user_id,
@@ -68,28 +95,59 @@ class TeamsService:
         )
         return access_token
 
+    async def _request_with_retry(self, method: str, user_id: int, path: str, *, params: dict = None, body: dict = None) -> Optional[httpx.Response]:
+        token = await self._refresh_if_needed(user_id)
+        if not token:
+            self._syslog("warning", f"{method} {path} - no token", {"user_id": user_id}, user_id)
+            return None
+
+        async with httpx.AsyncClient() as client:
+            kwargs = {
+                "headers": {"Authorization": f"Bearer {token.strip()}"},
+            }
+            if method == "GET":
+                kwargs["params"] = params or {}
+            else:
+                kwargs["headers"]["Content-Type"] = "application/json"
+                kwargs["json"] = body or {}
+
+            resp = await client.request(method, f"{GRAPH_BASE}{path}", **kwargs)
+
+        if resp.status_code not in (401, 403):
+            return resp
+
+        self._syslog("warning", f"{method} {path} failed auth; refreshing and retrying once", {
+            "status": resp.status_code,
+            "response": resp.text[:500],
+            "user_id": user_id,
+        }, user_id)
+        retry_token = await self._refresh_if_needed(user_id, force=True)
+        if not retry_token:
+            return resp
+
+        async with httpx.AsyncClient() as client:
+            kwargs = {
+                "headers": {"Authorization": f"Bearer {retry_token.strip()}"},
+            }
+            if method == "GET":
+                kwargs["params"] = params or {}
+            else:
+                kwargs["headers"]["Content-Type"] = "application/json"
+                kwargs["json"] = body or {}
+            return await client.request(method, f"{GRAPH_BASE}{path}", **kwargs)
+
     def _syslog(self, level: str, message: str, details: dict = None, user_id: int = None):
         if not self._log:
             return
         getattr(self._log, level)(SOURCE, message, details, user_id)
 
     async def _get(self, user_id: int, path: str, params: dict = None) -> Optional[dict]:
-        token = await self._refresh_if_needed(user_id)
-        if not token:
-            self._syslog("warning", f"GET {path} - no token", {"user_id": user_id}, user_id)
+        resp = await self._request_with_retry("GET", user_id, path, params=params)
+        if resp is None:
             return None
-        token = token.strip()
-        async with httpx.AsyncClient() as client:
-            resp = await client.get(
-                f"{GRAPH_BASE}{path}",
-                headers={"Authorization": f"Bearer {token}"},
-                params=params or {},
-            )
         if resp.status_code != 200:
             self._syslog("error", f"GET {path} failed", {
                 "status": resp.status_code,
-                "token_length": len(token),
-                "token_prefix": token[:15],
                 "response": resp.text[:500],
                 "user_id": user_id,
             }, user_id)
@@ -100,16 +158,9 @@ class TeamsService:
         return data
 
     async def _post(self, user_id: int, path: str, body: dict) -> Optional[dict]:
-        token = await self._refresh_if_needed(user_id)
-        if not token:
-            self._syslog("warning", f"POST {path} - no token", {"user_id": user_id}, user_id)
+        resp = await self._request_with_retry("POST", user_id, path, body=body)
+        if resp is None:
             return None
-        async with httpx.AsyncClient() as client:
-            resp = await client.post(
-                f"{GRAPH_BASE}{path}",
-                headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
-                json=body,
-            )
         if resp.status_code not in (200, 201):
             self._syslog("error", f"POST {path} failed", {
                 "status": resp.status_code,

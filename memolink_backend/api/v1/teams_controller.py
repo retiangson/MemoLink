@@ -21,9 +21,9 @@ MS_TOKEN_URL = "https://login.microsoftonline.com/{tenant}/oauth2/v2.0/token"
 MS_GRAPH_ME  = "https://graph.microsoft.com/v1.0/me"
 
 SCOPES = " ".join([
-    "https://graph.microsoft.com/Chat.ReadWrite",
-    "https://graph.microsoft.com/ChannelMessage.ReadWrite",
-    "https://graph.microsoft.com/User.Read",
+    "User.Read",
+    "Chat.ReadWrite",
+    "ChatMessage.Send",
     "offline_access",
 ])
 
@@ -109,12 +109,17 @@ async def oauth_callback(
     expires_in = token_data.get("expires_in", 3600)
     expiry = datetime.fromtimestamp(time.time() + expires_in, tz=timezone.utc)
 
+    if not access_token or not refresh_token:
+        raise HTTPException(status_code=400, detail="Microsoft did not return Teams access and refresh tokens")
+
     async with httpx.AsyncClient() as client:
         me_resp = await client.get(
             MS_GRAPH_ME,
             headers={"Authorization": f"Bearer {access_token}"},
         )
-    me = me_resp.json() if me_resp.status_code == 200 else {}
+    if me_resp.status_code != 200:
+        raise HTTPException(status_code=400, detail="Teams OAuth token could not access Microsoft Graph /me")
+    me = me_resp.json()
 
     c.domain.get_teams_account_repository().upsert(
         user_id=user_id,
