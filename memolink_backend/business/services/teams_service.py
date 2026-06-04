@@ -35,7 +35,7 @@ class TeamsService:
         expiry: Optional[datetime] = data["token_expiry"]
         now = datetime.now(tz=timezone.utc)
         if expiry and (expiry - now).total_seconds() > 120:
-            return token if token else None
+            return token.strip() if token else None
 
         async with httpx.AsyncClient() as client:
             resp = await client.post(
@@ -78,6 +78,7 @@ class TeamsService:
         if not token:
             self._syslog("warning", f"GET {path} - no token", {"user_id": user_id}, user_id)
             return None
+        token = token.strip()
         async with httpx.AsyncClient() as client:
             resp = await client.get(
                 f"{GRAPH_BASE}{path}",
@@ -87,6 +88,8 @@ class TeamsService:
         if resp.status_code != 200:
             self._syslog("error", f"GET {path} failed", {
                 "status": resp.status_code,
+                "token_length": len(token),
+                "token_prefix": token[:15],
                 "response": resp.text[:500],
                 "user_id": user_id,
             }, user_id)
