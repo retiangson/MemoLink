@@ -21,12 +21,21 @@ class TeamsService:
     async def _refresh_if_needed(self, user_id: int) -> Optional[str]:
         data = self._repo.get_decrypted_tokens(user_id)
         if not data:
+            self._syslog("warning", "No Teams account found in DB", {"user_id": user_id}, user_id)
             return None
+
+        token = data.get("access_token", "")
+        self._syslog("info", "Token retrieved", {
+            "user_id": user_id,
+            "token_length": len(token),
+            "token_prefix": token[:20] if token else "(empty)",
+            "expiry": str(data.get("token_expiry")),
+        }, user_id)
 
         expiry: Optional[datetime] = data["token_expiry"]
         now = datetime.now(tz=timezone.utc)
         if expiry and (expiry - now).total_seconds() > 120:
-            return data["access_token"]
+            return token if token else None
 
         async with httpx.AsyncClient() as client:
             resp = await client.post(
