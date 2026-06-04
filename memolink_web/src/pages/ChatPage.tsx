@@ -34,6 +34,7 @@ import { useWorkspace } from "../hooks/useWorkspace";
 import { useFeatureFlags } from "../hooks/useFeatureFlags";
 import { fetchAdminFeedback } from "../api/adminApi";
 import { getEmailStatus, autoProcessEmails } from "../api/emailApi";
+import { getTeamsStatus } from "../api/teamsApi";
 import { AdminPage } from "./AdminPage";
 import { suggestActions, type WorkflowAction } from "../api/workflowApi";
 import { OnboardingTour } from "../components/OnboardingTour";
@@ -79,6 +80,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
   const evaluationActive = flags.evaluation_analytics_enabled && !evalStatus.exhausted;
   const [evalRatings, setEvalRatings] = useState<Record<string, Record<string, number | string>>>({});
   const [emailConnected, setEmailConnected] = useState(false);
+  const [teamsConnected, setTeamsConnected] = useState(false);
   const [isSyncingEmail, setIsSyncingEmail] = useState(false);
   const [emailSyncResult, setEmailSyncResult] = useState<string | null>(null);
   const [showTour, setShowTour] = useState(() => !localStorage.getItem("memolink_walkthrough_done"));
@@ -122,6 +124,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
 
   useEffect(() => {
     getEmailStatus().then(s => setEmailConnected(s.connected)).catch(() => {});
+    getTeamsStatus().then(s => setTeamsConnected(s.connected)).catch(() => {});
   }, []);
 
   async function handleSyncEmail() {
@@ -146,11 +149,12 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
     }
   }
 
-  // Open Settings → Email tab after Gmail OAuth redirect
+  // Open Settings after OAuth redirects
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get("email_connected") === "1") {
+    if (params.get("email_connected") === "1" || params.get("teams_connected") === "1") {
       setShowSettings(true);
+      if (params.get("teams_connected") === "1") setTeamsConnected(true);
       window.history.replaceState({}, "", window.location.pathname);
     }
   }, []);
@@ -1165,6 +1169,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
         notificationPermission={notifPermission}
         onRequestNotificationPermission={requestNotifPermission}
         emailConnected={emailConnected && flags.email_enabled}
+        teamsConnected={teamsConnected}
         isSyncingEmail={isSyncingEmail}
         onSyncEmail={handleSyncEmail}
         emailSyncResult={emailSyncResult}

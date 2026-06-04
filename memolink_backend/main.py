@@ -51,6 +51,7 @@ from memolink_backend.api.v1 import (
     user_settings_controller,
     slash_command_controller,
     email_controller,
+    teams_controller,
     memograph_controller,
     proactive_insight_controller,
     study_controller,
@@ -73,6 +74,7 @@ import memolink_backend.domain.models.translation_cache # noqa: F401
 import memolink_backend.domain.models.user_api_key      # noqa: F401
 import memolink_backend.domain.models.email_account     # noqa: F401
 import memolink_backend.domain.models.email_record      # noqa: F401
+import memolink_backend.domain.models.teams_account     # noqa: F401
 import memolink_backend.domain.models.graph_node        # noqa: F401
 import memolink_backend.domain.models.graph_edge        # noqa: F401
 import memolink_backend.domain.models.proactive_insight # noqa: F401
@@ -214,6 +216,20 @@ if os.getenv("MEMOLINK_SKIP_DB_BOOTSTRAP") != "1":
                 user_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
                 provider VARCHAR(50) NOT NULL DEFAULT 'google',
                 email_address VARCHAR(255) NOT NULL,
+                encrypted_access_token TEXT NOT NULL,
+                encrypted_refresh_token TEXT NOT NULL,
+                token_expiry TIMESTAMPTZ,
+                connected_at TIMESTAMPTZ DEFAULT now(),
+                updated_at TIMESTAMPTZ DEFAULT now()
+            )
+        """))
+        _conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS teams_accounts (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+                teams_user_id VARCHAR(255) NOT NULL DEFAULT '',
+                display_name VARCHAR(255) NOT NULL DEFAULT '',
+                email VARCHAR(255) NOT NULL DEFAULT '',
                 encrypted_access_token TEXT NOT NULL,
                 encrypted_refresh_token TEXT NOT NULL,
                 token_expiry TIMESTAMPTZ,
@@ -684,6 +700,7 @@ app.include_router(s3_upload_controller.router, prefix="/api")
 app.include_router(user_settings_controller.router, prefix="/api")
 app.include_router(slash_command_controller.router, prefix="/api")
 app.include_router(email_controller.router, prefix="/api")
+app.include_router(teams_controller.router, prefix="/api")
 app.include_router(memograph_controller.router, prefix="/api")
 app.include_router(proactive_insight_controller.router, prefix="/api")
 app.include_router(study_controller.router, prefix="/api")
