@@ -20,6 +20,7 @@ router = APIRouter(prefix="/teams", tags=["teams"])
 MS_AUTH_URL = "https://login.microsoftonline.com/{tenant}/oauth2/v2.0/authorize"
 MS_TOKEN_URL = "https://login.microsoftonline.com/{tenant}/oauth2/v2.0/token"
 MS_GRAPH_ME  = "https://graph.microsoft.com/v1.0/me"
+DEFAULT_TEAMS_TENANT = "organizations"
 
 SCOPES = " ".join([
     "User.Read",
@@ -57,7 +58,7 @@ def _verify_state(state: str) -> int:
 def debug_config():
     return {
         "teams_client_id": settings.teams_client_id[:8] + "..." if settings.teams_client_id else "(not set)",
-        "teams_tenant_id": settings.teams_tenant_id or "(not set - will use common)",
+        "teams_tenant_id": settings.teams_tenant_id or f"(not set - will use {DEFAULT_TEAMS_TENANT})",
         "teams_redirect_uri": settings.teams_redirect_uri,
     }
 
@@ -67,7 +68,7 @@ def get_connect_url(user_id: int = Depends(get_current_user)):
     if not settings.teams_client_id:
         raise HTTPException(status_code=503, detail="Teams OAuth is not configured on this server")
     state = _sign_state(user_id)
-    tenant = settings.teams_tenant_id or "common"
+    tenant = settings.teams_tenant_id or DEFAULT_TEAMS_TENANT
     url = (
         MS_AUTH_URL.format(tenant=tenant)
         + f"?client_id={quote(settings.teams_client_id)}"
@@ -88,7 +89,7 @@ async def oauth_callback(
     c: RequestContainer = Depends(get_request_container),
 ):
     user_id = _verify_state(state)
-    tenant = settings.teams_tenant_id or "common"
+    tenant = settings.teams_tenant_id or DEFAULT_TEAMS_TENANT
 
     async with httpx.AsyncClient() as client:
         token_resp = await client.post(

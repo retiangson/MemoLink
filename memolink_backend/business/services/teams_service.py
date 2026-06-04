@@ -10,6 +10,7 @@ from memolink_backend.domain.repositories.teams_account_repository import TeamsA
 GRAPH_BASE = "https://graph.microsoft.com/v1.0"
 SOURCE = "teams"
 TEAMS_SCOPES = "User.Read Chat.ReadWrite ChatMessage.Send offline_access"
+DEFAULT_TEAMS_TENANT = "organizations"
 
 
 class TeamsGraphError(Exception):
@@ -53,7 +54,7 @@ class TeamsService:
 
         async with httpx.AsyncClient() as client:
             resp = await client.post(
-                f"https://login.microsoftonline.com/{settings.teams_tenant_id or 'common'}/oauth2/v2.0/token",
+                f"https://login.microsoftonline.com/{settings.teams_tenant_id or DEFAULT_TEAMS_TENANT}/oauth2/v2.0/token",
                 data={
                     "grant_type": "refresh_token",
                     "refresh_token": refresh_token,
