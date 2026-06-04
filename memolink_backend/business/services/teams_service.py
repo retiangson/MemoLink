@@ -58,8 +58,11 @@ class TeamsService:
         return access_token
 
     async def _get(self, user_id: int, path: str, params: dict = None) -> Optional[dict]:
+        import logging
+        log = logging.getLogger(__name__)
         token = await self._refresh_if_needed(user_id)
         if not token:
+            log.warning("Teams GET %s - no token for user %s", path, user_id)
             return None
         async with httpx.AsyncClient() as client:
             resp = await client.get(
@@ -67,7 +70,12 @@ class TeamsService:
                 headers={"Authorization": f"Bearer {token}"},
                 params=params or {},
             )
-        return resp.json() if resp.status_code == 200 else None
+        if resp.status_code != 200:
+            log.warning("Teams GET %s → %s: %s", path, resp.status_code, resp.text[:500])
+            return None
+        data = resp.json()
+        log.info("Teams GET %s → %s items", path, len(data.get("value", [])) if "value" in data else "ok")
+        return data
 
     async def _post(self, user_id: int, path: str, body: dict) -> Optional[dict]:
         token = await self._refresh_if_needed(user_id)
