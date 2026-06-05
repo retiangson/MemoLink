@@ -368,7 +368,8 @@ class ChatService(IChatService):
         log_service=None,
         user_api_key_repo=None,
         graph_repo=None,
-        eval_service=None,  # accepted for backwards-compat with cached callers
+        eval_service=None,
+        email_record_repo=None,
     ):
         if conv_repo is not None and note_repo is not None:
             self.repo_conv: IConversationRepository = conv_repo
@@ -382,7 +383,8 @@ class ChatService(IChatService):
         self.embedding = embedding_service or EmbeddingService()
         self._log = log_service
         self._user_api_key_repo = user_api_key_repo
-        self._graph_repo = graph_repo  # optional; None = no graph enhancement
+        self._graph_repo = graph_repo
+        self._email_record_repo = email_record_repo
 
     def _syslog(self, level: str, message: str, details: dict, user_id: int | None = None):
         if self._log is None:
@@ -480,6 +482,37 @@ class ChatService(IChatService):
         system_msgs = [{"role": "system", "content": _SYSTEM_PROMPT}]
         if rag_blocks:
             system_msgs.append({"role": "system", "content": "--- USER NOTES CONTEXT ---\n" + "\n\n".join(rag_blocks)})
+
+        # Email RAG — search embedded emails if connected
+        if self._email_record_repo and user_text and dto.user_id:
+            try:
+                query_vec = self.embedding.embed_text(user_text)
+                email_hits = self._email_record_repo.search_by_vector(query_vec, user_id=dto.user_id, top_k=3)
+                if email_hits:
+                    email_blocks = []
+                    for em in email_hits:
+                        date_str = em.email_date.strftime("%d %b %Y %H:%M") if em.email_date else ""
+                        sender = f"{em.sender_name} <{em.sender_email}>" if em.sender_name else em.sender_email
+                        body = (em.body_text or em.snippet or "")[:1500]
+                        email_blocks.append(
+                            f"[EMAIL id={em.id}]\n"
+                            f"Subject: {em.subject}\n"
+                            f"From: {sender}\n"
+                            f"Date: {date_str}\n"
+                            f"Body:\n{body}"
+                        )
+                    system_msgs.append({
+                        "role": "system",
+                        "content": (
+                            "--- USER EMAIL CONTEXT ---\n"
+                            "The following emails from the user's connected Gmail account are relevant to this question. "
+                            "When referencing an email, mention its subject and sender. "
+                            "If the user asks to reply or take action, acknowledge what you found and let them know they can reply directly from MemoLink.\n\n"
+                            + "\n\n".join(email_blocks)
+                        ),
+                    })
+            except Exception:
+                pass
 
         if getattr(dto, "web_search", False) and user_text:
             web_block = brave_search(user_text, count=8)

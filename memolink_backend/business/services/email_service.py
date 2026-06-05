@@ -202,7 +202,7 @@ class EmailService:
         saved = 0
         for email, score in zip(parsed, scores):
             if score >= 3.0:
-                self.record_repo.create(
+                record = self.record_repo.create(
                     user_id=user_id,
                     gmail_message_id=email["mid"],
                     gmail_thread_id=email.get("thread_id"),
@@ -216,6 +216,14 @@ class EmailService:
                     email_date=email["email_date"],
                 )
                 saved += 1
+                # Embed for RAG search in chat
+                if self.embedding_service:
+                    try:
+                        embed_text = f"{email['subject']} {email['sender_email']} {email['snippet'] or ''} {email['body'][:1000]}"
+                        vec = self.embedding_service.embed_text(embed_text)
+                        self.record_repo.save_embedding(record.id, vec)
+                    except Exception:
+                        pass
 
         return {"synced": saved, "skipped": len(message_ids) - len(new_ids), "filtered": len(new_ids) - saved}
 

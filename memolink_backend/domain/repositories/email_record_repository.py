@@ -1,5 +1,6 @@
 from typing import Optional
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 from memolink_backend.domain.models.email_record import EmailRecord
 
 
@@ -68,3 +69,30 @@ class EmailRecordRepository:
         count = self.db.query(EmailRecord).filter(EmailRecord.user_id == user_id).delete()
         self.db.commit()
         return count
+
+    def save_embedding(self, email_record_id: int, vector: list[float]) -> None:
+        vector_str = "[" + ",".join(str(v) for v in vector) + "]"
+        self.db.execute(text("""
+            INSERT INTO email_embeddings (email_record_id, vector)
+            VALUES (:email_record_id, CAST(:vector AS vector))
+            ON CONFLICT (email_record_id)
+            DO UPDATE SET vector = EXCLUDED.vector
+        """), {"email_record_id": email_record_id, "vector": vector_str})
+        self.db.commit()
+
+    def search_by_vector(self, query_vector: list[float], user_id: int, top_k: int = 3) -> list[EmailRecord]:
+        embedding_str = "[" + ",".join(str(x) for x in query_vector) + "]"
+        rows = self.db.execute(text("""
+            SELECT r.id
+            FROM email_embeddings e
+            JOIN email_records r ON r.id = e.email_record_id
+            WHERE r.user_id = :user_id
+            ORDER BY e.vector <-> vector(:embedding)
+            LIMIT :top_k
+        """), {"embedding": embedding_str, "top_k": top_k, "user_id": user_id}).fetchall()
+        record_ids = [r[0] for r in rows]
+        if not record_ids:
+            return []
+        records = self.db.query(EmailRecord).filter(EmailRecord.id.in_(record_ids)).all()
+        record_map = {r.id: r for r in records}
+        return [record_map[rid] for rid in record_ids if rid in record_map]

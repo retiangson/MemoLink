@@ -72,6 +72,7 @@ import memolink_backend.domain.models.translation_cache # noqa: F401
 import memolink_backend.domain.models.user_api_key      # noqa: F401
 import memolink_backend.domain.models.email_account     # noqa: F401
 import memolink_backend.domain.models.email_record      # noqa: F401
+import memolink_backend.domain.models.email_embedding   # noqa: F401
 import memolink_backend.domain.models.graph_node        # noqa: F401
 import memolink_backend.domain.models.graph_edge        # noqa: F401
 import memolink_backend.domain.models.proactive_insight # noqa: F401
@@ -81,6 +82,13 @@ import memolink_backend.domain.models.survey              # noqa: F401
 if os.getenv("MEMOLINK_SKIP_DB_BOOTSTRAP") != "1":
     with engine.connect() as _conn:
         _conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
+        _conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS email_embeddings (
+                id SERIAL PRIMARY KEY,
+                email_record_id INTEGER NOT NULL UNIQUE REFERENCES email_records(id) ON DELETE CASCADE,
+                vector vector(1536)
+            )
+        """))
         # Add columns that may not exist yet on already-created tables
         _conn.execute(text("ALTER TABLE notes ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ"))
         _conn.execute(text("ALTER TABLE conversations ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ"))

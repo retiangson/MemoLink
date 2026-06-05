@@ -25,6 +25,7 @@ class ServiceInstaller:
             log_service=self.get_system_log_service(),
             user_api_key_repo=self._domain.get_user_api_key_repository(),
             graph_repo=GraphRepository(self._domain.get_db()),
+            email_record_repo=self._domain.get_email_record_repository(),
         )
 
     def get_note_service(self) -> INoteService:
