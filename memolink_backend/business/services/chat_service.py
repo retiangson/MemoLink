@@ -583,17 +583,23 @@ class ChatService(IChatService):
                         subject = topic.replace('"', "'").capitalize()
                         mid, tid = "", ""
 
-                    # Search notes for topic content to prefill body
+                    # Search notes for topic content to prefill body (simple keyword filter, no vector needed)
                     body_text = topic  # default: use the topic itself
                     if hasattr(self, "repo_notes") and self.repo_notes and dto.user_id:
                         try:
                             _stop_note = {"the", "a", "an", "of", "in", "on", "for", "and", "or",
                                           "details", "info", "information", "about", "detail"}
-                            _kw = " ".join(w for w in topic.split() if w.lower() not in _stop_note and len(w) > 2)
-                            if _kw:
-                                _notes = self.repo_notes.search_hybrid(dto.user_id, _kw, top_k=1)
-                                if _notes:
-                                    body_text = _notes[0].content[:2000]
+                            _kw_words = [w.lower() for w in topic.split() if w.lower() not in _stop_note and len(w) > 2]
+                            if _kw_words:
+                                all_notes = self.repo_notes.get_for_user(dto.user_id)
+                                best, best_score = None, 0
+                                for note in all_notes:
+                                    text_lower = ((note.title or "") + " " + note.content).lower()
+                                    score = sum(1 for w in _kw_words if w in text_lower)
+                                    if score > best_score:
+                                        best_score, best = score, note
+                                if best and best_score > 0:
+                                    body_text = best.content[:2000]
                         except Exception:
                             pass
 
