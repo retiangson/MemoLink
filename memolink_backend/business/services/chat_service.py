@@ -529,9 +529,10 @@ class ChatService(IChatService):
         if rag_blocks:
             system_msgs.append({"role": "system", "content": "--- USER NOTES CONTEXT ---\n" + "\n\n".join(rag_blocks)})
 
-        # Email reply — detect intent, build a draft for user confirmation (never send without approval)
+        # Email reply — detect intent, build draft tag directly (never let AI decide to send)
         _reply_keywords = {"reply", "respond", "send", "write back", "email back"}
         _asks_reply = any(kw in user_text.lower() for kw in _reply_keywords)
+        _email_draft_prefill: str | None = None
         if _asks_reply and self._email_service and dto.user_id:
             try:
                 import re as _re
@@ -547,20 +548,16 @@ class ChatService(IChatService):
                         sender_email = sender.split("<")[-1].strip(">").strip() if "<" in sender else sender
                         subj = em.get("subject", "")
                         reply_subj = subj if subj.lower().startswith("re:") else f"Re: {subj}"
-                        # Build a draft tag — frontend renders a confirmation card, never auto-sends
-                        import json as _json
-                        draft_attrs = (
-                            f'to="{sender_email}" '
-                            f'subject="{reply_subj.replace(chr(34), chr(39))}" '
-                            f'body="{reply_body.replace(chr(34), chr(39))}" '
-                            f'message_id="{em.get("id","")}" '
-                            f'thread_id="{em.get("thread_id","")}"'
+                        body_safe = reply_body.replace('"', "'")
+                        subj_safe = reply_subj.replace('"', "'")
+                        draft_tag = (
+                            f'<email_draft to="{sender_email}" subject="{subj_safe}" '
+                            f'body="{body_safe}" message_id="{em.get("id","")}" '
+                            f'thread_id="{em.get("thread_id","")}"></email_draft>'
                         )
-                        system_msgs.append({"role": "system", "content": (
-                            f"EMAIL DRAFT READY — output this tag EXACTLY as shown, then ask the user to review and confirm before sending:\n\n"
-                            f"<email_draft {draft_attrs}></email_draft>\n\n"
-                            f"Tell the user: 'Here's your draft reply — review it and click Send to deliver, or edit the message first.'"
-                        )})
+                        # Prefill forces this exact text as the START of the AI response —
+                        # AI cannot hallucinate "sent" because the draft card appears first
+                        _email_draft_prefill = f"Here's your draft reply — review it and click **Send** to deliver, or click **Edit** to change the message first.\n\n{draft_tag}"
             except Exception:
                 pass  # Fall through to normal email RAG
 
@@ -709,7 +706,7 @@ class ChatService(IChatService):
         # Pre-compute a deterministic confidence fallback so the badge always shows
         pre_conf_level, pre_conf_reason = _pre_confidence(all_notes, top_notes_for_confidence)
 
-        return conversation_id, system_msgs + message_history, sources, pre_conf_level, pre_conf_reason
+        return conversation_id, system_msgs + message_history, sources, pre_conf_level, pre_conf_reason, _email_draft_prefill
 
     def _handle_improve_note_stream(self, dto: ChatRequestDTO, note_name: str, conversation_id: int) -> Iterator[str]:
         workspace_id = getattr(dto, "workspace_id", None)
@@ -791,7 +788,12 @@ class ChatService(IChatService):
             openai_key=settings.openai_api_key,
         )
 
-        conversation_id, messages, sources, pre_conf_level, pre_conf_reason = self._build_chat_context(dto)
+        conversation_id, messages, sources, pre_conf_level, pre_conf_reason, email_draft_prefill = self._build_chat_context(dto)
+
+        # Email draft — return immediately without calling the LLM
+        if email_draft_prefill:
+            assistant_msg = self.repo_conv.add_message(conversation_id, "assistant", email_draft_prefill)
+            return ChatResponseDTO(answer=email_draft_prefill, sources=[], message_id=assistant_msg.id)
 
         if _is_image_request(user_text):
             prompt = _extract_image_prompt(user_text)
@@ -867,8 +869,16 @@ class ChatService(IChatService):
 
         t_total = time.perf_counter()
         t_ctx = time.perf_counter()
-        conversation_id, messages, sources, pre_conf_level, pre_conf_reason = self._build_chat_context(dto)
+        conversation_id, messages, sources, pre_conf_level, pre_conf_reason, email_draft_prefill = self._build_chat_context(dto)
         ctx_ms = int((time.perf_counter() - t_ctx) * 1000)
+
+        # Email draft — bypass LLM entirely; stream the pre-built draft card
+        if email_draft_prefill:
+            assistant_msg = self.repo_conv.add_message(conversation_id, "assistant", email_draft_prefill)
+            for chunk in email_draft_prefill:
+                yield f"data: {json.dumps({'chunk': chunk})}\n\n"
+            yield f"data: {json.dumps({'done': True, 'id': assistant_msg.id, 'model': 'memolink'})}\n\n"
+            return
 
         note_name = _extract_improve_note_name(user_text)
         if note_name:
