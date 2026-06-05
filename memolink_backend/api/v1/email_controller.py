@@ -3,6 +3,7 @@ import hmac
 import json
 import time
 from datetime import datetime, timezone
+from urllib.parse import quote
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -54,14 +55,14 @@ def _verify_state(state: str) -> int:
 
 @router.get("/connect-url")
 def get_connect_url(user_id: int = Depends(get_current_user)):
-    if not settings.google_client_id:
-        raise HTTPException(status_code=503, detail="Google OAuth is not configured on this server")
+    if not settings.google_client_id or not settings.google_redirect_uri:
+        raise HTTPException(status_code=503, detail="Google OAuth is not fully configured — GOOGLE_CLIENT_ID and GOOGLE_REDIRECT_URI must be set")
     state = _sign_state(user_id)
     params = (
-        f"?client_id={settings.google_client_id}"
-        f"&redirect_uri={settings.google_redirect_uri}"
+        f"?client_id={quote(settings.google_client_id, safe='')}"
+        f"&redirect_uri={quote(settings.google_redirect_uri, safe='')}"
         f"&response_type=code"
-        f"&scope={SCOPES.replace(' ', '%20')}"
+        f"&scope={quote(SCOPES, safe='')}"
         f"&access_type=offline"
         f"&prompt=consent"
         f"&state={state}"
