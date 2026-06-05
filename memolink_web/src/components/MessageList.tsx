@@ -90,7 +90,7 @@ export function MessageList({
               messageId={msg.id}
               evaluationActive={ratingReady}
               evalRating={evalRatings?.[String(msg.id)]}
-              onRetry={!isStreamingMsg && msg.role === "assistant" && onRetry ? () => onRetry(idx) : undefined}
+              onRetry={!isStreamingMsg && onRetry ? () => onRetry(idx) : undefined}
             />
           );
         })}

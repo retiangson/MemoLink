@@ -609,6 +609,13 @@ export default function ChatBubble({ role, content, model, streaming, onAdd, onD
       {isUser && (
         <div className="flex items-center gap-2 text-xs text-gray-500 opacity-60 hover:opacity-100 transition pr-3">
           {translationEnabled && translateButton}
+          {onRetry && (
+            <button onClick={onRetry} title="Resend" className="flex items-center gap-1 px-2 py-1 bg-[#2A2A2A]/60 backdrop-blur-sm rounded-md hover:text-indigo-300">
+              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+              </svg>
+            </button>
+          )}
           {onDelete && (
             <button onClick={onDelete} className="flex items-center gap-1 px-2 py-1 bg-[#2A2A2A]/60 backdrop-blur-sm rounded-md hover:text-red-300">
               <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

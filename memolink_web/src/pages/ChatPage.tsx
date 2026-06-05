@@ -953,14 +953,21 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                     evalRatings={evalRatings}
                     onRetry={(idx) => {
                       const msgs = convs.activeConversation?.messages ?? [];
-                      // Find the user message immediately before this assistant message
-                      let userMsg = "";
-                      for (let i = idx - 1; i >= 0; i--) {
-                        if (msgs[i].role === "user") { userMsg = msgs[i].content; break; }
-                      }
-                      if (userMsg && !chat.loading && !chat.streaming) {
-                        chat.setInput(userMsg);
+                      const msg = msgs[idx];
+                      if (!msg || chat.loading || chat.streaming) return;
+                      if (msg.role === "user") {
+                        // Resend this user message directly
+                        chat.setInput(msg.content);
                         setTimeout(() => chat.handleSend(), 0);
+                      } else {
+                        // Retry assistant — find the preceding user message
+                        for (let i = idx - 1; i >= 0; i--) {
+                          if (msgs[i].role === "user") {
+                            chat.setInput(msgs[i].content);
+                            setTimeout(() => chat.handleSend(), 0);
+                            break;
+                          }
+                        }
                       }
                     }}
                   />
@@ -1076,13 +1083,19 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                       evalRatings={evalRatings}
                       onRetry={(idx) => {
                         const msgs = convs.activeConversation?.messages ?? [];
-                        let userMsg = "";
-                        for (let i = idx - 1; i >= 0; i--) {
-                          if (msgs[i].role === "user") { userMsg = msgs[i].content; break; }
-                        }
-                        if (userMsg && !chat.loading && !chat.streaming) {
-                          chat.setInput(userMsg);
+                        const msg = msgs[idx];
+                        if (!msg || chat.loading || chat.streaming) return;
+                        if (msg.role === "user") {
+                          chat.setInput(msg.content);
                           setTimeout(() => chat.handleSend(), 0);
+                        } else {
+                          for (let i = idx - 1; i >= 0; i--) {
+                            if (msgs[i].role === "user") {
+                              chat.setInput(msgs[i].content);
+                              setTimeout(() => chat.handleSend(), 0);
+                              break;
+                            }
+                          }
                         }
                       }}
                     />
