@@ -575,16 +575,19 @@ class ChatService(IChatService):
                             _consumed |= _sent_words
 
                         # Build keyword portion — drop stop words and operator-consumed words
+                        # Strip punctuation first so quoted phrases don't leak into the query
+                        import re as _re
                         _stop = {"can", "you", "check", "my", "about", "the", "an", "a", "is", "in",
                                  "for", "and", "or", "with", "from", "me", "please", "i", "have", "any",
                                  "email", "gmail", "inbox", "mail", "show", "get", "find", "search",
                                  "tell", "what", "do", "did", "does", "are", "was", "were", "that",
                                  "new", "all", "some", "there", "see", "look"}
                         keywords = " ".join(
-                            w for w in user_text.split()
-                            if w.lower() not in _stop
-                            and w.lower() not in _consumed
-                            and len(w) > 2
+                            clean for w in user_text.split()
+                            if (clean := _re.sub(r"[^\w]", "", w)) and
+                               clean.lower() not in _stop and
+                               clean.lower() not in _consumed and
+                               len(clean) > 2
                         )
                         gm_query = " ".join(operators + ([keywords] if keywords.strip() else []))
                         if not gm_query.strip():
