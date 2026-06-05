@@ -530,8 +530,15 @@ class ChatService(IChatService):
             system_msgs.append({"role": "system", "content": "--- USER NOTES CONTEXT ---\n" + "\n\n".join(rag_blocks)})
 
         # Email compose/reply — detect intent and build draft tag (never let AI decide to send)
-        _compose_keywords = {"send email", "email to", "send to", "compose", "write email", "send a message"}
-        _reply_keywords = {"reply", "respond", "write back", "email back"}
+        _compose_keywords = {
+            "send email", "send an email", "email to", "send to", "compose", "write email",
+            "write an email", "send a message", "draft email", "draft an email",
+            "shoot an email", "shoot email", "message to", "send message",
+        }
+        _reply_keywords = {
+            "reply", "reply to", "respond", "respond to", "write back", "email back",
+            "get back to", "follow up", "follow-up", "reply again", "send a reply",
+        }
         _asks_compose = any(kw in user_text.lower() for kw in _compose_keywords)
         _asks_reply = any(kw in user_text.lower() for kw in _reply_keywords)
         _email_draft_prefill: str | None = None
@@ -540,16 +547,20 @@ class ChatService(IChatService):
                 import re as _re
                 # Recipient: after "to", "reply to", "email to", etc.
                 _to_match = _re.search(
-                    r"(?:reply to|respond to|send(?: an? email)? to|email to|email)\s+([^\s,]+)",
+                    r"(?:reply(?: again)? to|respond to|write back to|get back to|follow[- ]?up (?:with|to)|"
+                    r"send(?: an?)?(?: email)?(?: message)? to|email to|email|message to|shoot(?: an? email)? to)\s+([^\s,@]+(?:@[^\s,]+)?)",
                     user_text, _re.I
                 )
-                # Body hint: after "saying/say/about/regarding/on/regarding/with details"
+                # Body hint: after "saying/say/about/regarding/telling/letting know" — intentionally no bare "with"
                 _body_match = _re.search(
-                    r"(?:saying|just say|say|about|regarding|on|with details of|with details about|with info about)\s+(.+)$",
+                    r"(?:saying|just say|say|about|regarding|on the topic of|"
+                    r"with details (?:of|about|on)|with info (?:about|on)|"
+                    r"telling (?:them|him|her) about|letting (?:them|him|her) know about|"
+                    r"containing|with content|,)\s+(.+)$",
                     user_text, _re.I | _re.S
                 )
                 if _to_match and _body_match:
-                    recipient_hint = (_to_match.group(2) or _to_match.group(1) or "").strip().lower().rstrip(".,")
+                    recipient_hint = (_to_match.group(_to_match.lastindex) or "").strip().lower().rstrip(".,")
                     topic = _body_match.group(1).strip().strip('"\'')
                     is_reply = _asks_reply and not _asks_compose
 
