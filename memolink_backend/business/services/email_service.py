@@ -387,15 +387,129 @@ class EmailService:
         )
 
     def live_search_sync(self, user_id: int, query: str, top_k: int = 3) -> list[dict]:
-        """Synchronous Gmail search — always runs in a fresh thread to avoid event loop conflicts."""
-        import asyncio
-        import concurrent.futures
+        """Synchronous Gmail search using httpx.Client — safe to call from any thread or sync context."""
+        import httpx as _httpx
+
+        # Fetch token from DB (sync, same thread — no session conflict)
+        tokens = self.account_repo.get_decrypted_tokens(user_id)
+        if not tokens:
+            return []
+
+        access_token = tokens.get("access_token", "")
+        expiry = tokens.get("token_expiry")
+
+        # Refresh if expired
+        if expiry and expiry <= datetime.now(tz=timezone.utc):
+            try:
+                resp = _httpx.post(GOOGLE_TOKEN_URL, data={
+                    "client_id": settings.google_client_id,
+                    "client_secret": settings.google_client_secret,
+                    "refresh_token": tokens.get("refresh_token", ""),
+                    "grant_type": "refresh_token",
+                }, timeout=10.0)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    access_token = data["access_token"]
+                    try:
+                        new_expiry = datetime.fromtimestamp(
+                            time.time() + data.get("expires_in", 3600), tz=timezone.utc
+                        )
+                        self.account_repo.upsert(
+                            user_id=user_id,
+                            email_address=tokens.get("email", ""),
+                            access_token=access_token,
+                            refresh_token=tokens.get("refresh_token", ""),
+                            token_expiry=new_expiry,
+                        )
+                    except Exception:
+                        pass
+            except Exception:
+                return []
+
+        if not access_token:
+            return []
+
+        headers = {"Authorization": f"Bearer {access_token}"}
+        results: list[dict] = []
+
         try:
-            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:
-                future = ex.submit(asyncio.run, self.live_search(user_id, query, top_k))
-                return future.result(timeout=20)
+            with _httpx.Client(timeout=15.0) as client:
+                list_resp = client.get(
+                    f"{GMAIL_API}/messages",
+                    headers=headers,
+                    params={"maxResults": top_k * 2, "q": query},
+                )
+                if list_resp.status_code != 200:
+                    return []
+
+                message_ids = [m["id"] for m in list_resp.json().get("messages", [])][:top_k * 2]
+                if not message_ids:
+                    return []
+
+                for mid in message_ids:
+                    resp = client.get(
+                        f"{GMAIL_API}/messages/{mid}",
+                        headers=headers,
+                        params={"format": "full"},
+                    )
+                    if resp.status_code != 200:
+                        continue
+                    msg = resp.json()
+                    hdrs = msg.get("payload", {}).get("headers", [])
+                    subject = _get_header(hdrs, "Subject") or "(no subject)"
+                    from_raw = _get_header(hdrs, "From")
+                    sender_name, sender_email = parseaddr(from_raw)
+                    date_raw = _get_header(hdrs, "Date")
+                    try:
+                        email_date = parsedate_to_datetime(date_raw) if date_raw else None
+                    except Exception:
+                        email_date = None
+                    body = _extract_body(msg.get("payload", {}))[:3000]
+                    attachments = _extract_attachments(msg.get("payload", {}))
+
+                    # Save to email_records for future searches
+                    if not self.record_repo.exists(user_id, mid):
+                        try:
+                            record = self.record_repo.create(
+                                user_id=user_id,
+                                gmail_message_id=mid,
+                                gmail_thread_id=msg.get("threadId"),
+                                subject=subject,
+                                sender_name=sender_name or None,
+                                sender_email=sender_email,
+                                snippet=msg.get("snippet", ""),
+                                body_text=body,
+                                importance_score=3.0,
+                                is_read="UNREAD" not in msg.get("labelIds", []),
+                                email_date=email_date,
+                            )
+                            if self.embedding_service:
+                                try:
+                                    vec = self.embedding_service.embed_text(
+                                        f"{subject} {sender_email} {msg.get('snippet', '')} {body[:1000]}"
+                                    )
+                                    self.record_repo.save_embedding(record.id, vec)
+                                except Exception:
+                                    pass
+                        except Exception:
+                            pass
+
+                    results.append({
+                        "id": mid,
+                        "subject": subject,
+                        "sender": f"{sender_name} <{sender_email}>" if sender_name else sender_email,
+                        "date": email_date.strftime("%d %b %Y") if email_date else "",
+                        "body": body,
+                        "snippet": msg.get("snippet", ""),
+                        "thread_id": msg.get("threadId"),
+                        "attachments": attachments,
+                    })
+                    if len(results) >= top_k:
+                        break
         except Exception:
             return []
+
+        return results
 
     async def live_search(self, user_id: int, query: str, top_k: int = 3) -> list[dict]:
         """Search Gmail directly with a free-text query — no sync required.
