@@ -638,9 +638,9 @@ class ChatService(IChatService):
                 system_msgs.append({"role": "system", "content": (
                     "GMAIL SEARCH RESULTS — you MUST base your answer on these emails. "
                     "Do NOT say you cannot access email. "
-                    "For each email, list subject, sender, date. "
-                    "For attachments, render each download path as a markdown link: [filename](download_path). "
-                    "Tell the user they can click to download attachments, reply, or save to note in MemoLink.\n\n"
+                    "For each email list the subject, sender, and date. "
+                    "For attachments, copy the markdown links EXACTLY as they appear below — do not change or replace them. "
+                    "Tell the user they can click the attachment links to download files.\n\n"
                     "--- EMAILS FOUND ---\n"
                     + "\n\n".join(email_blocks)
                 )})
