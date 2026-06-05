@@ -11,8 +11,18 @@ interface EmailDraftCardProps {
 
 const sentKey = (messageId: string, threadId: string) => `memolink_draft_sent_${messageId || threadId}`;
 
+function stripHtml(html: string): string {
+  return html
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>|<\/li>|<\/h[1-6]>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, " ")
+    .replace(/\n{3,}/g, "\n\n").trim();
+}
+
 export function EmailDraftCard({ to, subject, body: initialBody, messageId, threadId }: EmailDraftCardProps) {
-  const [body, setBody] = useState(initialBody);
+  const [body, setBody] = useState(stripHtml(initialBody));
   const [editing, setEditing] = useState(false);
   const alreadySent = !!localStorage.getItem(sentKey(messageId, threadId));
   const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">(alreadySent ? "sent" : "idle");

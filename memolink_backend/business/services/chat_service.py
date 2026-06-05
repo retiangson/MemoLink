@@ -583,6 +583,14 @@ class ChatService(IChatService):
                         subject = topic.replace('"', "'").capitalize()
                         mid, tid = "", ""
 
+                    def _html_to_plain(html: str) -> str:
+                        import re as _r
+                        text = _r.sub(r"<br\s*/?>|</p>|</li>|</h[1-6]>", "\n", html, flags=_r.I)
+                        text = _r.sub(r"<[^>]+>", "", text)
+                        import html as _html_mod
+                        text = _html_mod.unescape(text)
+                        return _r.sub(r"\n{3,}", "\n\n", text).strip()
+
                     # Only use a note if its TITLE closely matches the topic (avoid picking wrong content)
                     body_text = f"Hi,\n\nI wanted to share some details about: {topic}.\n\nPlease let me know if you have any questions."
                     if hasattr(self, "repo_notes") and self.repo_notes and dto.user_id:
@@ -593,10 +601,9 @@ class ChatService(IChatService):
                             if _kw_words:
                                 all_notes = self.repo_notes.get_for_user(dto.user_id)
                                 for note in all_notes:
-                                    # Only use note if TITLE matches — never use random body content
                                     title_lower = (note.title or "").lower()
                                     if sum(1 for w in _kw_words if w in title_lower) >= max(1, len(_kw_words) // 2):
-                                        body_text = note.content[:1500]
+                                        body_text = _html_to_plain(note.content)[:1500]
                                         break
                         except Exception:
                             pass
