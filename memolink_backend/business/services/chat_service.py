@@ -529,35 +529,74 @@ class ChatService(IChatService):
         if rag_blocks:
             system_msgs.append({"role": "system", "content": "--- USER NOTES CONTEXT ---\n" + "\n\n".join(rag_blocks)})
 
-        # Email reply — detect intent, build draft tag directly (never let AI decide to send)
-        _reply_keywords = {"reply", "respond", "send", "write back", "email back"}
+        # Email compose/reply — detect intent and build draft tag (never let AI decide to send)
+        _compose_keywords = {"send email", "email to", "send to", "compose", "write email", "send a message"}
+        _reply_keywords = {"reply", "respond", "write back", "email back"}
+        _asks_compose = any(kw in user_text.lower() for kw in _compose_keywords)
         _asks_reply = any(kw in user_text.lower() for kw in _reply_keywords)
         _email_draft_prefill: str | None = None
-        if _asks_reply and self._email_service and dto.user_id:
+        if (_asks_compose or _asks_reply) and self._email_service and dto.user_id:
             try:
                 import re as _re
-                _to_match = _re.search(r"(?:reply to|respond to|email|send to)\s+([^\s,]+)", user_text, _re.I)
-                _body_match = _re.search(r"(?:saying|just say|say|,)\s+(.+)$", user_text, _re.I | _re.S)
+                # Recipient: after "to", "reply to", "email to", etc.
+                _to_match = _re.search(
+                    r"(?:reply to|respond to|send(?: an? email)? to|email to|email)\s+([^\s,]+)",
+                    user_text, _re.I
+                )
+                # Body hint: after "saying/say/about/regarding/on/regarding/with details"
+                _body_match = _re.search(
+                    r"(?:saying|just say|say|about|regarding|on|with details of|with details about|with info about)\s+(.+)$",
+                    user_text, _re.I | _re.S
+                )
                 if _to_match and _body_match:
-                    recipient_hint = _to_match.group(1).strip().lower().rstrip(".,")
-                    reply_body = _body_match.group(1).strip().strip('"\'')
-                    candidate = self._email_service.live_search_sync(dto.user_id, recipient_hint, top_k=1)
-                    if candidate:
-                        em = candidate[0]
-                        sender = em.get("sender", "")
-                        sender_email = sender.split("<")[-1].strip(">").strip() if "<" in sender else sender
-                        subj = em.get("subject", "")
-                        reply_subj = subj if subj.lower().startswith("re:") else f"Re: {subj}"
-                        body_safe = reply_body.replace('"', "'")
-                        subj_safe = reply_subj.replace('"', "'")
-                        draft_tag = (
-                            f'<email_draft to="{sender_email}" subject="{subj_safe}" '
-                            f'body="{body_safe}" message_id="{em.get("id","")}" '
-                            f'thread_id="{em.get("thread_id","")}"></email_draft>'
-                        )
-                        # Prefill forces this exact text as the START of the AI response —
-                        # AI cannot hallucinate "sent" because the draft card appears first
-                        _email_draft_prefill = f"Here's your draft reply — review it and click **Send** to deliver, or click **Edit** to change the message first.\n\n{draft_tag}"
+                    recipient_hint = (_to_match.group(2) or _to_match.group(1) or "").strip().lower().rstrip(".,")
+                    topic = _body_match.group(1).strip().strip('"\'')
+                    is_reply = _asks_reply and not _asks_compose
+
+                    if is_reply:
+                        # Search Gmail for a thread to reply to
+                        candidate = self._email_service.live_search_sync(dto.user_id, recipient_hint, top_k=1)
+                        if candidate:
+                            em = candidate[0]
+                            sender = em.get("sender", "")
+                            to_addr = sender.split("<")[-1].strip(">").strip() if "<" in sender else sender
+                            subj = em.get("subject", "")
+                            subject = subj if subj.lower().startswith("re:") else f"Re: {subj}"
+                            mid = em.get("id", "")
+                            tid = em.get("thread_id", "")
+                        else:
+                            to_addr, subject, mid, tid = recipient_hint, f"Re: {topic}", "", ""
+                    else:
+                        # New email — recipient is likely an email address or name
+                        to_addr = recipient_hint if "@" in recipient_hint else f"{recipient_hint}@gmail.com"
+                        subject = topic.replace('"', "'").capitalize()
+                        mid, tid = "", ""
+
+                    # Search notes for topic content to prefill body
+                    body_text = topic  # default: use the topic itself
+                    if hasattr(self, "repo_notes") and self.repo_notes and dto.user_id:
+                        try:
+                            _stop_note = {"the", "a", "an", "of", "in", "on", "for", "and", "or",
+                                          "details", "info", "information", "about", "detail"}
+                            _kw = " ".join(w for w in topic.split() if w.lower() not in _stop_note and len(w) > 2)
+                            if _kw:
+                                _notes = self.repo_notes.search_hybrid(dto.user_id, _kw, top_k=1)
+                                if _notes:
+                                    body_text = _notes[0].content[:2000]
+                        except Exception:
+                            pass
+
+                    body_safe = body_text.replace('"', "'").replace("\n", "\\n")
+                    subj_safe = subject.replace('"', "'")
+                    draft_tag = (
+                        f'<email_draft to="{to_addr}" subject="{subj_safe}" '
+                        f'body="{body_safe}" message_id="{mid}" thread_id="{tid}"></email_draft>'
+                    )
+                    action = "reply" if is_reply else "email"
+                    _email_draft_prefill = (
+                        f"Here's your draft {action} — review it and click **Send** to deliver, "
+                        f"or click **Edit** to adjust the message first.\n\n{draft_tag}"
+                    )
             except Exception:
                 pass  # Fall through to normal email RAG
 
