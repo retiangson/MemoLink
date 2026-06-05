@@ -65,8 +65,8 @@ def debug_config():
 
 @router.get("/connect-url")
 def get_connect_url(user_id: int = Depends(get_current_user)):
-    if not settings.teams_client_id:
-        raise HTTPException(status_code=503, detail="Teams OAuth is not configured on this server")
+    if not settings.teams_client_id or not settings.teams_redirect_uri:
+        raise HTTPException(status_code=503, detail="Teams OAuth is not fully configured — TEAMS_CLIENT_ID and TEAMS_REDIRECT_URI must be set")
     state = _sign_state(user_id)
     tenant = settings.teams_tenant_id or DEFAULT_TEAMS_TENANT
     url = (
