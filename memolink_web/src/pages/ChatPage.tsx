@@ -92,6 +92,15 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
   const dragSrcRef = useRef<{ type: "chat" | "note"; index: number } | null>(null);
   const [dragOverTab, setDragOverTab] = useState<{ type: "chat" | "note"; index: number } | null>(null);
 
+  // Long-press to edit tab title on mobile
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  function startLongPress(action: () => void) {
+    longPressTimer.current = setTimeout(() => { action(); longPressTimer.current = null; }, 500);
+  }
+  function cancelLongPress() {
+    if (longPressTimer.current) { clearTimeout(longPressTimer.current); longPressTimer.current = null; }
+  }
+
   // Per-workspace tab persistence
   const pendingChatRestoreRef = useRef<{ chatIds: number[]; activeChatId: number | null } | null>(null);
   const pendingNoteRestoreRef = useRef<{ wsId: number; noteIds: number[]; activeNoteId: number | null; activeTabType: "chat" | "note" } | null>(null);
@@ -575,6 +584,9 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                   onDragEnd={() => { dragSrcRef.current = null; setDragOverTab(null); }}
                   onClick={() => handleActivateChat(chat.id)}
                   onDoubleClick={(e) => { e.stopPropagation(); handleActivateChat(chat.id); setEditingChatTabId(chat.id); setEditingChatTitle(convLabel(chat)); }}
+                  onTouchStart={() => startLongPress(() => { handleActivateChat(chat.id); setEditingChatTabId(chat.id); setEditingChatTitle(convLabel(chat)); })}
+                  onTouchEnd={cancelLongPress}
+                  onTouchMove={cancelLongPress}
                   className={`flex items-center gap-1.5 px-3 h-10 text-xs cursor-grab active:cursor-grabbing border-b-2 transition shrink-0 select-none ${
                     isActive ? "border-indigo-500 text-white bg-[#0f0f13]" : "border-transparent text-gray-500 hover:text-gray-300 hover:bg-[#0f0f13]/60"
                   } ${isDragOver ? "border-l-2 border-l-indigo-400" : ""}`}
@@ -609,6 +621,9 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                   onDragEnd={() => { dragSrcRef.current = null; setDragOverTab(null); }}
                   onClick={() => { editor.setActiveIndex(i); setActiveTabType("note"); }}
                   onDoubleClick={(e) => { e.stopPropagation(); editor.setActiveIndex(i); setActiveTabType("note"); setEditingNoteTab(i); }}
+                  onTouchStart={() => startLongPress(() => { editor.setActiveIndex(i); setActiveTabType("note"); setEditingNoteTab(i); })}
+                  onTouchEnd={cancelLongPress}
+                  onTouchMove={cancelLongPress}
                   className={`flex items-center gap-1.5 px-3 h-10 text-xs cursor-grab active:cursor-grabbing border-b-2 transition shrink-0 select-none ${
                     isActive ? "border-indigo-500 text-white bg-[#0f0f13]" : "border-transparent text-gray-500 hover:text-gray-300 hover:bg-[#0f0f13]/60"
                   } ${isDragOver ? "border-l-2 border-l-indigo-400" : ""}`}
