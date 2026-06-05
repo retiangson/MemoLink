@@ -409,6 +409,7 @@ class ChatService(IChatService):
         graph_repo=None,
         eval_service=None,
         email_record_repo=None,
+        email_service=None,
     ):
         if conv_repo is not None and note_repo is not None:
             self.repo_conv: IConversationRepository = conv_repo
@@ -424,6 +425,7 @@ class ChatService(IChatService):
         self._user_api_key_repo = user_api_key_repo
         self._graph_repo = graph_repo
         self._email_record_repo = email_record_repo
+        self._email_service = email_service
         self._eval = eval_service
 
     def _syslog(self, level: str, message: str, details: dict, user_id: int | None = None):
@@ -523,61 +525,70 @@ class ChatService(IChatService):
         if rag_blocks:
             system_msgs.append({"role": "system", "content": "--- USER NOTES CONTEXT ---\n" + "\n\n".join(rag_blocks)})
 
-        # Email RAG — search synced emails when user asks about email
+        # Email RAG — live Gmail search when user asks about email
         _email_keywords = {"email", "gmail", "inbox", "message", "attachment", "mail", "sent", "received"}
         _asks_about_email = any(kw in user_text.lower() for kw in _email_keywords)
-        if self._email_record_repo and user_text and dto.user_id and _asks_about_email:
+        if _asks_about_email and dto.user_id and user_text:
+            email_blocks: list[str] = []
+            no_account = False
             try:
-                total_emails = self._email_record_repo.count_for_user(dto.user_id)
-
-                if total_emails == 0:
-                    system_msgs.append({"role": "system", "content": (
-                        "EMAIL CONTEXT: The user has asked about their email, but no emails have been synced to MemoLink yet. "
-                        "Tell the user to go to Settings → Email to connect their Gmail and click Sync. "
-                        "Do not say you cannot access email — MemoLink CAN search synced emails once they are connected."
-                    )})
-                else:
-                    # Try vector search first, fall back to keyword search
-                    email_hits = []
-                    try:
-                        query_vec = self.embedding.embed_text(user_text)
-                        email_hits = self._email_record_repo.search_by_vector(query_vec, user_id=dto.user_id, top_k=3)
-                    except Exception:
-                        pass
-
-                    if not email_hits:
-                        email_hits = self._email_record_repo.keyword_search(dto.user_id, user_text, top_k=3)
-
-                    if email_hits:
-                        email_blocks = []
-                        for em in email_hits:
-                            date_str = em.email_date.strftime("%d %b %Y") if em.email_date else "unknown date"
-                            sender = f"{em.sender_name} <{em.sender_email}>" if em.sender_name else em.sender_email
-                            body = (em.body_text or em.snippet or "")[:1500]
-                            email_blocks.append(
-                                f"[EMAIL id={em.id}]\n"
-                                f"Subject: {em.subject}\n"
-                                f"From: {sender}\n"
-                                f"Date: {date_str}\n"
-                                f"Body:\n{body}"
-                            )
-                        system_msgs.append({"role": "system", "content": (
-                            "--- USER EMAIL CONTEXT ---\n"
-                            f"MemoLink found {len(email_hits)} synced email(s) relevant to this question "
-                            f"(searched from {total_emails} total synced emails). "
-                            "Reference the subject, sender and date when discussing them. "
-                            "The user can reply, save to note, or download attachments directly in MemoLink.\n\n"
-                            + "\n\n".join(email_blocks)
-                        )})
+                if self._email_service:
+                    # Build a clean Gmail search query from the user's message,
+                    # stripping common filler words so Gmail search gets signal
+                    _stop = {"can", "you", "check", "my", "about", "the", "an", "a", "is", "in",
+                             "for", "and", "or", "with", "from", "me", "please", "i", "have", "any"}
+                    gm_query = " ".join(
+                        w for w in user_text.split() if w.lower() not in _stop and len(w) > 2
+                    ) or user_text
+                    live = self._email_service.live_search_sync(dto.user_id, gm_query, top_k=3)
+                    for em in live:
+                        email_blocks.append(
+                            f"[EMAIL]\nSubject: {em['subject']}\nFrom: {em['sender']}\n"
+                            f"Date: {em['date']}\nBody:\n{em['body'][:1500]}"
+                        )
+                elif self._email_record_repo:
+                    # Fallback: search already-synced records
+                    total = self._email_record_repo.count_for_user(dto.user_id)
+                    if total == 0:
+                        no_account = True
                     else:
-                        system_msgs.append({"role": "system", "content": (
-                            f"EMAIL CONTEXT: The user has {total_emails} synced email(s) in MemoLink but none matched this query. "
-                            "This may be because the email is older than what was synced (MemoLink syncs recent important emails). "
-                            "Tell the user no matching email was found in their synced inbox, and suggest they check Gmail directly "
-                            "or sync more emails. Do not say MemoLink cannot access email — it can search what has been synced."
-                        )})
+                        hits = []
+                        try:
+                            q_vec = self.embedding.embed_text(user_text)
+                            hits = self._email_record_repo.search_by_vector(q_vec, user_id=dto.user_id, top_k=3)
+                        except Exception:
+                            pass
+                        if not hits:
+                            hits = self._email_record_repo.keyword_search(dto.user_id, user_text, top_k=3)
+                        for em in hits:
+                            date_str = em.email_date.strftime("%d %b %Y") if em.email_date else ""
+                            sender = f"{em.sender_name} <{em.sender_email}>" if em.sender_name else em.sender_email
+                            email_blocks.append(
+                                f"[EMAIL]\nSubject: {em.subject}\nFrom: {sender}\n"
+                                f"Date: {date_str}\nBody:\n{(em.body_text or em.snippet or '')[:1500]}"
+                            )
             except Exception:
                 pass
+
+            if email_blocks:
+                system_msgs.append({"role": "system", "content": (
+                    "--- USER EMAIL CONTEXT (live Gmail search) ---\n"
+                    "The following emails were retrieved directly from the user's Gmail account. "
+                    "Summarise what you found, mention subject, sender, and date. "
+                    "The user can reply or save to note directly from MemoLink.\n\n"
+                    + "\n\n".join(email_blocks)
+                )})
+            elif no_account:
+                system_msgs.append({"role": "system", "content": (
+                    "EMAIL CONTEXT: The user has not connected their Gmail to MemoLink. "
+                    "Tell them to go to Settings → Email to connect Gmail. "
+                    "Do NOT say you cannot access email — MemoLink can once Gmail is connected."
+                )})
+            else:
+                system_msgs.append({"role": "system", "content": (
+                    "EMAIL CONTEXT: Gmail was searched but no emails matched the user's query. "
+                    "Tell them no matching email was found and suggest they try different keywords."
+                )})
 
         if getattr(dto, "web_search", False) and user_text:
             web_block = brave_search(user_text, count=8)

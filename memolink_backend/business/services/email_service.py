@@ -366,6 +366,111 @@ class EmailService:
             f'<p>{body}</p>'
         )
 
+    def live_search_sync(self, user_id: int, query: str, top_k: int = 3) -> list[dict]:
+        """Synchronous Gmail search — safe to call from a sync context (e.g. a thread pool)."""
+        import asyncio
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                import concurrent.futures
+                with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:
+                    future = ex.submit(asyncio.run, self.live_search(user_id, query, top_k))
+                    return future.result(timeout=15)
+            else:
+                return loop.run_until_complete(self.live_search(user_id, query, top_k))
+        except Exception:
+            return []
+
+    async def live_search(self, user_id: int, query: str, top_k: int = 3) -> list[dict]:
+        """Search Gmail directly with a free-text query — no sync required.
+        Returns the top matching emails as plain dicts ready for chat context.
+        Also saves new results to email_records so they're available next time."""
+        try:
+            access_token = await _get_valid_token(self.account_repo, user_id)
+        except Exception:
+            return []
+
+        headers = {"Authorization": f"Bearer {access_token}"}
+
+        async with httpx.AsyncClient() as client:
+            list_resp = await client.get(
+                f"{GMAIL_API}/messages",
+                headers=headers,
+                params={"maxResults": top_k * 2, "q": query},
+            )
+        if list_resp.status_code != 200:
+            return []
+
+        message_ids = [m["id"] for m in list_resp.json().get("messages", [])][:top_k * 2]
+        if not message_ids:
+            return []
+
+        results = []
+        async with httpx.AsyncClient() as client:
+            for mid in message_ids:
+                resp = await client.get(
+                    f"{GMAIL_API}/messages/{mid}",
+                    headers=headers,
+                    params={"format": "full"},
+                )
+                if resp.status_code != 200:
+                    continue
+                msg = resp.json()
+                hdrs = msg.get("payload", {}).get("headers", [])
+                subject = _get_header(hdrs, "Subject") or "(no subject)"
+                from_raw = _get_header(hdrs, "From")
+                sender_name, sender_email = parseaddr(from_raw)
+                date_raw = _get_header(hdrs, "Date")
+                try:
+                    email_date = parsedate_to_datetime(date_raw) if date_raw else None
+                except Exception:
+                    email_date = None
+                snippet = msg.get("snippet", "")
+                body = _extract_body(msg.get("payload", {}))[:3000]
+                thread_id = msg.get("threadId")
+                is_read = "UNREAD" not in msg.get("labelIds", [])
+
+                # Save to email_records if not already there, so it's searchable later
+                if not self.record_repo.exists(user_id, mid):
+                    try:
+                        record = self.record_repo.create(
+                            user_id=user_id,
+                            gmail_message_id=mid,
+                            gmail_thread_id=thread_id,
+                            subject=subject,
+                            sender_name=sender_name or None,
+                            sender_email=sender_email,
+                            snippet=snippet,
+                            body_text=body,
+                            importance_score=3.0,
+                            is_read=is_read,
+                            email_date=email_date,
+                        )
+                        if self.embedding_service:
+                            try:
+                                vec = self.embedding_service.embed_text(
+                                    f"{subject} {sender_email} {snippet} {body[:1000]}"
+                                )
+                                self.record_repo.save_embedding(record.id, vec)
+                            except Exception:
+                                pass
+                    except Exception:
+                        pass
+
+                results.append({
+                    "id": mid,
+                    "subject": subject,
+                    "sender": f"{sender_name} <{sender_email}>" if sender_name else sender_email,
+                    "date": email_date.strftime("%d %b %Y") if email_date else "",
+                    "body": body,
+                    "snippet": snippet,
+                    "thread_id": thread_id,
+                })
+                if len(results) >= top_k:
+                    break
+
+        return results
+
     def backfill_embeddings(self, user_id: int) -> int:
         """Embed any existing email records that don't have a vector yet."""
         if not self.embedding_service:

@@ -26,6 +26,7 @@ class ServiceInstaller:
             user_api_key_repo=self._domain.get_user_api_key_repository(),
             graph_repo=GraphRepository(self._domain.get_db()),
             email_record_repo=self._domain.get_email_record_repository(),
+            email_service=self.get_email_service(),
             eval_service=self.get_evaluation_service(),
         )
 
