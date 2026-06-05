@@ -21,7 +21,7 @@ from fastapi.responses import PlainTextResponse
 from memolink_backend.core.security import get_current_user, get_current_admin
 from memolink_backend.di.request_container import get_request_container, RequestContainer
 from memolink_backend.contracts.survey_dtos import (
-    ActiveSurveyDTO, SurveySubmitRequest, SurveySubmitResponse,
+    ActiveSurveyDTO, SurveySubmitRequest, SurveySubmitResponse, MySurveyResponseDTO,
     SurveyQuestionDTO, QuestionUpsertRequest,
     SurveyReportDTO, SurveyResponsesDTO,
 )
@@ -39,6 +39,15 @@ def get_survey(
     return container.survey().get_active_survey()
 
 
+@router.get("/me", response_model=MySurveyResponseDTO)
+def get_my_survey_response(
+    user_id: int = Depends(get_current_user),
+    container: RequestContainer = Depends(get_request_container),
+):
+    """Return the current user's existing response (one per account) for editing."""
+    return container.survey().get_my_response(user_id)
+
+
 @router.post("/submit", response_model=SurveySubmitResponse)
 def submit_survey(
     body: SurveySubmitRequest,
@@ -46,7 +55,9 @@ def submit_survey(
     container: RequestContainer = Depends(get_request_container),
 ):
     try:
-        return container.survey().submit(user_id=user_id, req=body)
+        result = container.survey().submit(user_id=user_id, req=body)
+        container.evaluation().mark_task(user_id, "complete_survey", "Complete the qualitative survey", "survey")
+        return result
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 

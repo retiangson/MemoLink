@@ -71,7 +71,7 @@ class _HTMLSanitizer(HTMLParser):
         "td": {"colspan", "rowspan"},
         "th": {"colspan", "rowspan"},
     }
-    # Tags that are already block containers — don't wrap inside these
+    # Tags that are already block containers - don't wrap inside these
     _BLOCK_CONTAINERS = {
         "h1", "h2", "h3", "h4", "h5", "h6",
         "p", "li", "pre", "blockquote", "td", "th",
@@ -218,7 +218,7 @@ def extract_text_local(file_bytes: bytes, filename: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Rich HTML extraction — preserves headings, bold, italic, lists, tables
+# Rich HTML extraction - preserves headings, bold, italic, lists, tables
 # ---------------------------------------------------------------------------
 
 def _plain_to_html(text: str) -> str:
@@ -512,7 +512,7 @@ def transcribe_audio(file_bytes: bytes, filename: str, ext: str, language: str |
             return _transcribe_whisper(file_bytes, filename, language)
         except Exception as e:
             detail = getattr(e, "body", None) or ""
-            return f"[Transcription error] {e}{f' — detail: {detail}' if detail else ''}"
+            return f"[Transcription error] {e}{f' - detail: {detail}' if detail else ''}"
 
     # ≥ 5 MB: try Deepgram first
     if settings.deepgram_api_key:
@@ -527,6 +527,6 @@ def transcribe_audio(file_bytes: bytes, filename: str, ext: str, language: str |
             return _transcribe_whisper(file_bytes, filename, language)
         except Exception as e:
             detail = getattr(e, "body", None) or ""
-            return f"[Transcription error] {e}{f' — detail: {detail}' if detail else ''}"
+            return f"[Transcription error] {e}{f' - detail: {detail}' if detail else ''}"
 
     return "[Transcription skipped] File exceeds the 25 MB limit and Deepgram is not configured or failed."

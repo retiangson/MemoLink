@@ -13,7 +13,7 @@ _logger = logging.getLogger(__name__)
 
 
 def _try_write_system_log(level: str, source: str, message: str, details: dict) -> None:
-    """Write to system_logs without ever raising — used inside exception handlers."""
+    """Write to system_logs without ever raising - used inside exception handlers."""
     try:
         from memolink_backend.core.db import get_db
         from memolink_backend.domain.repositories.system_log_repository import SystemLogRepository
@@ -51,12 +51,14 @@ from memolink_backend.api.v1 import (
     user_settings_controller,
     slash_command_controller,
     email_controller,
+    teams_controller,
     memograph_controller,
     proactive_insight_controller,
     study_controller,
     timeline_controller,
     workflow_controller,
     survey_controller,
+    evaluation_controller,
 )
 
 # Register all models so SQLAlchemy sees them
@@ -73,11 +75,13 @@ import memolink_backend.domain.models.user_api_key      # noqa: F401
 import memolink_backend.domain.models.email_account     # noqa: F401
 import memolink_backend.domain.models.email_record      # noqa: F401
 import memolink_backend.domain.models.email_embedding   # noqa: F401
+import memolink_backend.domain.models.teams_account     # noqa: F401
 import memolink_backend.domain.models.graph_node        # noqa: F401
 import memolink_backend.domain.models.graph_edge        # noqa: F401
 import memolink_backend.domain.models.proactive_insight # noqa: F401
 import memolink_backend.domain.models.note_timeline      # noqa: F401
 import memolink_backend.domain.models.survey              # noqa: F401
+import memolink_backend.domain.models.evaluation          # noqa: F401
 
 if os.getenv("MEMOLINK_SKIP_DB_BOOTSTRAP") != "1":
     with engine.connect() as _conn:
@@ -227,6 +231,20 @@ if os.getenv("MEMOLINK_SKIP_DB_BOOTSTRAP") != "1":
                 updated_at TIMESTAMPTZ DEFAULT now()
             )
         """))
+        _conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS teams_accounts (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+                teams_user_id VARCHAR(255) NOT NULL DEFAULT '',
+                display_name VARCHAR(255) NOT NULL DEFAULT '',
+                email VARCHAR(255) NOT NULL DEFAULT '',
+                encrypted_access_token TEXT NOT NULL,
+                encrypted_refresh_token TEXT NOT NULL,
+                token_expiry TIMESTAMPTZ,
+                connected_at TIMESTAMPTZ DEFAULT now(),
+                updated_at TIMESTAMPTZ DEFAULT now()
+            )
+        """))
         # Slash command undo snapshot columns
         _conn.execute(text("ALTER TABLE notes ADD COLUMN IF NOT EXISTS undo_title TEXT"))
         _conn.execute(text("ALTER TABLE notes ADD COLUMN IF NOT EXISTS undo_content TEXT"))
@@ -305,7 +323,7 @@ if os.getenv("MEMOLINK_SKIP_DB_BOOTSTRAP") != "1":
         """))
         _conn.execute(text("INSERT INTO feature_flags (key, value) VALUES ('timeline_enabled', 'true') ON CONFLICT (key) DO NOTHING"))
         _conn.execute(text("INSERT INTO feature_flags (key, value) VALUES ('workflow_enabled', 'true') ON CONFLICT (key) DO NOTHING"))
-        # ── Evaluation Survey tables (research data — kept separate from feedback) ──
+        # ── Evaluation Survey tables (research data - kept separate from feedback) ──
         _conn.execute(text("""
             CREATE TABLE IF NOT EXISTS survey_questions (
                 id SERIAL PRIMARY KEY,
@@ -370,6 +388,172 @@ if os.getenv("MEMOLINK_SKIP_DB_BOOTSTRAP") != "1":
                         "req": _q.get("required", False),
                     },
                 )
+        # ── Evaluation Analytics tables (quantitative research telemetry) ──────────
+        _conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS evaluation_sessions (
+                id SERIAL PRIMARY KEY,
+                participant_code VARCHAR(50) NOT NULL,
+                user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                workspace_id INTEGER,
+                consent_confirmed BOOLEAN NOT NULL DEFAULT FALSE,
+                role VARCHAR(100),
+                ai_tool_usage_frequency VARCHAR(50),
+                device_type VARCHAR(50),
+                browser VARCHAR(100),
+                operating_system VARCHAR(100),
+                started_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                ended_at TIMESTAMPTZ,
+                total_time_seconds INTEGER,
+                completed BOOLEAN NOT NULL DEFAULT FALSE,
+                notes TEXT
+            )
+        """))
+        _conn.execute(text("CREATE INDEX IF NOT EXISTS ix_eval_sessions_participant ON evaluation_sessions(participant_code)"))
+        _conn.execute(text("ALTER TABLE evaluation_sessions ADD COLUMN IF NOT EXISTS budget_seconds INTEGER"))
+        _conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS evaluation_tasks (
+                id SERIAL PRIMARY KEY,
+                session_id INTEGER NOT NULL REFERENCES evaluation_sessions(id) ON DELETE CASCADE,
+                user_id INTEGER, workspace_id INTEGER,
+                task_key VARCHAR(100) NOT NULL,
+                task_name VARCHAR(255) NOT NULL,
+                feature_name VARCHAR(100),
+                started_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                completed_at TIMESTAMPTZ,
+                time_taken_ms INTEGER,
+                completed BOOLEAN NOT NULL DEFAULT FALSE,
+                success BOOLEAN,
+                error_count INTEGER NOT NULL DEFAULT 0,
+                retry_count INTEGER NOT NULL DEFAULT 0,
+                click_count INTEGER,
+                created_object_type VARCHAR(100),
+                created_object_id INTEGER,
+                notes TEXT
+            )
+        """))
+        _conn.execute(text("CREATE INDEX IF NOT EXISTS ix_eval_tasks_session ON evaluation_tasks(session_id)"))
+        _conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS evaluation_events (
+                id SERIAL PRIMARY KEY,
+                session_id INTEGER REFERENCES evaluation_sessions(id) ON DELETE SET NULL,
+                task_id INTEGER, user_id INTEGER, workspace_id INTEGER,
+                conversation_id INTEGER, message_id INTEGER, note_id INTEGER,
+                feature_name VARCHAR(100) NOT NULL,
+                operation_name VARCHAR(100) NOT NULL,
+                event_type VARCHAR(100) NOT NULL,
+                status VARCHAR(30) NOT NULL,
+                started_at TIMESTAMPTZ, ended_at TIMESTAMPTZ,
+                duration_ms INTEGER,
+                error_type VARCHAR(100), error_code VARCHAR(100), error_message_safe TEXT,
+                metadata JSONB,
+                created_at TIMESTAMPTZ DEFAULT now()
+            )
+        """))
+        _conn.execute(text("CREATE INDEX IF NOT EXISTS ix_eval_events_session ON evaluation_events(session_id)"))
+        _conn.execute(text("CREATE INDEX IF NOT EXISTS ix_eval_events_feature ON evaluation_events(feature_name)"))
+        _conn.execute(text("CREATE INDEX IF NOT EXISTS ix_eval_events_created ON evaluation_events(created_at)"))
+        _conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS evaluation_ai_metrics (
+                id SERIAL PRIMARY KEY,
+                session_id INTEGER REFERENCES evaluation_sessions(id) ON DELETE SET NULL,
+                task_id INTEGER, user_id INTEGER, workspace_id INTEGER,
+                conversation_id INTEGER, message_id INTEGER,
+                feature_name VARCHAR(100) NOT NULL,
+                prompt_length_chars INTEGER, prompt_length_words INTEGER,
+                answer_length_chars INTEGER, answer_length_words INTEGER,
+                selected_model VARCHAR(100), actual_model_used VARCHAR(100), provider VARCHAR(100),
+                autopilot_used BOOLEAN NOT NULL DEFAULT FALSE, autopilot_reason VARCHAR(255),
+                fallback_used BOOLEAN NOT NULL DEFAULT FALSE, fallback_attempt_count INTEGER NOT NULL DEFAULT 0,
+                failed_models JSONB,
+                web_search_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+                graph_rag_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+                top_k_requested INTEGER, retrieved_note_count INTEGER, citation_count INTEGER,
+                source_note_ids JSONB,
+                retrieval_min_score FLOAT, retrieval_max_score FLOAT, retrieval_avg_score FLOAT,
+                confidence_level VARCHAR(30), confidence_reason TEXT, confidence_method VARCHAR(50),
+                input_tokens INTEGER, output_tokens INTEGER, total_tokens INTEGER,
+                estimated_cost_usd NUMERIC(12,6),
+                first_token_latency_ms INTEGER, total_response_time_ms INTEGER, stream_duration_ms INTEGER,
+                embedding_time_ms INTEGER, retrieval_time_ms INTEGER, llm_time_ms INTEGER,
+                created_at TIMESTAMPTZ DEFAULT now()
+            )
+        """))
+        _conn.execute(text("CREATE INDEX IF NOT EXISTS ix_eval_ai_message ON evaluation_ai_metrics(message_id)"))
+        _conn.execute(text("CREATE INDEX IF NOT EXISTS ix_eval_ai_confidence ON evaluation_ai_metrics(confidence_level)"))
+        _conn.execute(text("CREATE INDEX IF NOT EXISTS ix_eval_ai_created ON evaluation_ai_metrics(created_at)"))
+        _conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS evaluation_user_ratings (
+                id SERIAL PRIMARY KEY,
+                session_id INTEGER REFERENCES evaluation_sessions(id) ON DELETE CASCADE,
+                task_id INTEGER, event_id INTEGER, ai_metric_id INTEGER, message_id INTEGER,
+                rating_type VARCHAR(100) NOT NULL,
+                rating_value INTEGER NOT NULL,
+                rating_scale_min INTEGER NOT NULL DEFAULT 1,
+                rating_scale_max INTEGER NOT NULL DEFAULT 5,
+                choice_value VARCHAR(100), comment TEXT,
+                created_at TIMESTAMPTZ DEFAULT now()
+            )
+        """))
+        _conn.execute(text("CREATE INDEX IF NOT EXISTS ix_eval_ratings_type ON evaluation_user_ratings(rating_type)"))
+        _conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS evaluation_translation_metrics (
+                id SERIAL PRIMARY KEY, session_id INTEGER, task_id INTEGER, user_id INTEGER, workspace_id INTEGER,
+                message_id INTEGER, source_language VARCHAR(100), target_language VARCHAR(100) NOT NULL,
+                model_used VARCHAR(100), accuracy_score INTEGER, refinement_rounds INTEGER NOT NULL DEFAULT 0,
+                cached BOOLEAN NOT NULL DEFAULT FALSE, force_retranslate BOOLEAN NOT NULL DEFAULT FALSE,
+                fallback_used BOOLEAN NOT NULL DEFAULT FALSE, translation_time_ms INTEGER,
+                source_text_length_chars INTEGER, translated_text_length_chars INTEGER,
+                user_quality_rating INTEGER, created_at TIMESTAMPTZ DEFAULT now()
+            )
+        """))
+        _conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS evaluation_transcription_metrics (
+                id SERIAL PRIMARY KEY, session_id INTEGER, task_id INTEGER, user_id INTEGER, workspace_id INTEGER,
+                note_id INTEGER, file_type VARCHAR(50), file_size_bytes BIGINT, file_size_mb FLOAT,
+                duration_seconds INTEGER, transcription_service_used VARCHAR(100),
+                fallback_used BOOLEAN NOT NULL DEFAULT FALSE, transcription_success BOOLEAN NOT NULL DEFAULT FALSE,
+                transcription_time_ms INTEGER, transcript_word_count INTEGER, note_created BOOLEAN NOT NULL DEFAULT FALSE,
+                error_type VARCHAR(100), user_transcript_accuracy_rating INTEGER, user_note_quality_rating INTEGER,
+                created_at TIMESTAMPTZ DEFAULT now()
+            )
+        """))
+        _conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS evaluation_reminder_metrics (
+                id SERIAL PRIMARY KEY, session_id INTEGER, task_id INTEGER, user_id INTEGER, workspace_id INTEGER,
+                source_note_id INTEGER, reminder_id INTEGER, proactive_insight_id INTEGER, detection_type VARCHAR(100),
+                generated_count INTEGER NOT NULL DEFAULT 0, accepted_count INTEGER NOT NULL DEFAULT 0,
+                dismissed_count INTEGER NOT NULL DEFAULT 0, completed_count INTEGER NOT NULL DEFAULT 0,
+                false_positive_marked BOOLEAN NOT NULL DEFAULT FALSE, missed_action_reported BOOLEAN NOT NULL DEFAULT FALSE,
+                usefulness_rating INTEGER, created_at TIMESTAMPTZ DEFAULT now()
+            )
+        """))
+        _conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS evaluation_quiz_metrics (
+                id SERIAL PRIMARY KEY, session_id INTEGER, task_id INTEGER, user_id INTEGER, workspace_id INTEGER,
+                note_id INTEGER, source_type VARCHAR(50), question_count INTEGER, single_choice_count INTEGER,
+                multi_choice_count INTEGER, correct_count INTEGER, incorrect_count INTEGER, score_percent FLOAT,
+                time_taken_ms INTEGER, attempt_number INTEGER NOT NULL DEFAULT 1,
+                saved_results_to_notes BOOLEAN NOT NULL DEFAULT FALSE, difficulty_rating INTEGER, usefulness_rating INTEGER,
+                created_at TIMESTAMPTZ DEFAULT now()
+            )
+        """))
+        _conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS evaluation_timeline_metrics (
+                id SERIAL PRIMARY KEY, session_id INTEGER, task_id INTEGER, user_id INTEGER, workspace_id INTEGER,
+                note_id INTEGER, transcript_word_count INTEGER, generation_time_ms INTEGER, chapter_count INTEGER,
+                action_item_count INTEGER, important_moment_count INTEGER, jump_clicked_count INTEGER NOT NULL DEFAULT 0,
+                jump_success_count INTEGER NOT NULL DEFAULT 0, usefulness_rating INTEGER, created_at TIMESTAMPTZ DEFAULT now()
+            )
+        """))
+        _conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS evaluation_feature_usage (
+                id SERIAL PRIMARY KEY, session_id INTEGER, user_id INTEGER, workspace_id INTEGER,
+                feature_name VARCHAR(100) NOT NULL, action_name VARCHAR(100) NOT NULL, count INTEGER NOT NULL DEFAULT 1,
+                first_used_at TIMESTAMPTZ DEFAULT now(), last_used_at TIMESTAMPTZ DEFAULT now()
+            )
+        """))
+        for _fk in ("evaluation_analytics_enabled", "evaluation_admin_export_enabled"):
+            _conn.execute(text("INSERT INTO feature_flags (key, value) VALUES (:k, 'true') ON CONFLICT (key) DO NOTHING"), {"k": _fk})
         # Auto-promote first user as admin if none exists
         _conn.execute(text("""
             UPDATE users SET is_admin = TRUE
@@ -383,7 +567,7 @@ if os.getenv("MEMOLINK_SKIP_DB_BOOTSTRAP") != "1":
 app = FastAPI(
     title="MemoLink API",
     version="1.0.0",
-    description="Context-aware AI knowledge companion — RAG-powered note retrieval and chat.",
+    description="Context-aware AI knowledge companion - RAG-powered note retrieval and chat.",
     docs_url="/api/docs",
     openapi_url="/api/openapi.json",
     redoc_url="/api/redoc",
@@ -402,7 +586,7 @@ app = FastAPI(
 @app.exception_handler(StarletteHTTPException)
 async def http_exception_handler(request: Request, exc: StarletteHTTPException):
     """Handles all explicit raise HTTPException(...) calls throughout the app.
-    5xx errors are logged as ERROR; 4xx as WARNING (only unusual ones — skip
+    5xx errors are logged as ERROR; 4xx as WARNING (only unusual ones - skip
     routine 401/404 to avoid log noise)."""
     path = request.url.path
     method = request.method
@@ -430,7 +614,7 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException):
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    """Handles Pydantic validation failures (missing fields, wrong types) — FastAPI
+    """Handles Pydantic validation failures (missing fields, wrong types) - FastAPI
     returns 422 for these automatically. Logged as WARNING so bad client requests
     are visible without polluting the ERROR channel."""
     path = request.url.path
@@ -449,7 +633,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception):
-    """Catch-all for any exception not handled above — a true safety net.
+    """Catch-all for any exception not handled above - a true safety net.
     Logged as ERROR with a truncated traceback so it appears in system_logs
     and server output."""
     tb = traceback.format_exc()
@@ -475,14 +659,14 @@ def health():
         "status": "ok",
         "service": "MemoLink API",
         "version": "2.1.2",
-        # Temporary debug — shows whether S3 env vars are visible to the app
+        # Temporary debug - shows whether S3 env vars are visible to the app
         "s3_bucket_set": bool(settings.s3_upload_bucket),
         "s3_bucket_len": len(settings.s3_upload_bucket),
         "s3_env_raw": bool(os.environ.get("S3_UPLOAD_BUCKET")),
     }
 
 
-# Build allowed origins list — always wildcard, plus the explicit frontend
+# Build allowed origins list - always wildcard, plus the explicit frontend
 # URL from env so the correct origin appears in CORS responses when Lambda
 # or a CDN strips the wildcard header from error responses.
 _cors_origins: list[str] = ["*"]
@@ -498,7 +682,7 @@ app.add_middleware(
     allow_credentials=False,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     # Explicitly list headers so the preflight Access-Control-Allow-Headers
-    # response is concrete — required for requests with an Authorization header.
+    # response is concrete - required for requests with an Authorization header.
     allow_headers=["Authorization", "Content-Type", "Accept", "Origin",
                    "X-Requested-With", "X-Real-IP", "X-Forwarded-For"],
     expose_headers=["Content-Length", "Content-Range"],
@@ -524,14 +708,16 @@ app.include_router(s3_upload_controller.router, prefix="/api")
 app.include_router(user_settings_controller.router, prefix="/api")
 app.include_router(slash_command_controller.router, prefix="/api")
 app.include_router(email_controller.router, prefix="/api")
+app.include_router(teams_controller.router, prefix="/api")
 app.include_router(memograph_controller.router, prefix="/api")
 app.include_router(proactive_insight_controller.router, prefix="/api")
 app.include_router(study_controller.router, prefix="/api")
 app.include_router(timeline_controller.router, prefix="/api")
 app.include_router(workflow_controller.router, prefix="/api")
 app.include_router(survey_controller.router, prefix="/api")
+app.include_router(evaluation_controller.router, prefix="/api")
 
-# AWS Lambda handler — only active when running inside Lambda
+# AWS Lambda handler - only active when running inside Lambda
 if os.getenv("AWS_LAMBDA_FUNCTION_NAME"):
     from mangum import Mangum
     handler = Mangum(app, lifespan="off")

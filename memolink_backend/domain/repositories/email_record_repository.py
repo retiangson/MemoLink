@@ -80,6 +80,18 @@ class EmailRecordRepository:
         """), {"email_record_id": email_record_id, "vector": vector_str})
         self.db.commit()
 
+    def list_without_embeddings(self, user_id: int) -> list[EmailRecord]:
+        """Return email records that have no embedding yet (for backfill)."""
+        rows = self.db.execute(text("""
+            SELECT r.id FROM email_records r
+            LEFT JOIN email_embeddings e ON e.email_record_id = r.id
+            WHERE r.user_id = :user_id AND e.id IS NULL
+        """), {"user_id": user_id}).fetchall()
+        ids = [r[0] for r in rows]
+        if not ids:
+            return []
+        return self.db.query(EmailRecord).filter(EmailRecord.id.in_(ids)).all()
+
     def search_by_vector(self, query_vector: list[float], user_id: int, top_k: int = 3) -> list[EmailRecord]:
         embedding_str = "[" + ",".join(str(x) for x in query_vector) + "]"
         rows = self.db.execute(text("""

@@ -222,7 +222,7 @@ async def send_reply(
         raise HTTPException(status_code=400, detail="Reply body cannot be empty")
     sent = await c.email().send_reply(user_id, email_id, reply_body)
     if not sent:
-        raise HTTPException(status_code=400, detail="Failed to send reply — check Gmail connection")
+        raise HTTPException(status_code=400, detail="Failed to send reply - check Gmail connection")
     return {"ok": True}
 
 

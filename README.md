@@ -2,33 +2,33 @@
 
 **Context-Aware AI Companion for Knowledge Capture, Retrieval, and Task Support**
 
-> Capstone Project 2026 — Design and Evaluation of a Context-Aware AI Companion for Knowledge Capture, Contextual Retrieval, and Task Support in Study and Work Settings.
+> Capstone Project 2026 - Design and Evaluation of a Context-Aware AI Companion for Knowledge Capture, Contextual Retrieval, and Task Support in Study and Work Settings.
 
 ---
 
 ## What is MemoLink?
 
-MemoLink lets you capture notes and documents, then ask an AI questions grounded entirely in your personal knowledge base. Every answer cites the source notes that informed it — no hallucinated context, traceable responses.
+MemoLink lets you capture notes and documents, then ask an AI questions grounded entirely in your personal knowledge base. Every answer cites the source notes that informed it - no hallucinated context, traceable responses.
 
 **Core features:**
 - Upload notes and documents (txt, PDF, DOCX, PPTX) with rich formatting preserved
-- Ask AI questions via RAG — answers cite your notes as sources
+- Ask AI questions via RAG - answers cite your notes as sources
 - Multi-turn conversations with persistent history
 - Save AI responses back as notes
 - Attach files directly in chat
 - Markdown + LaTeX rendering in the editor and chat
 - AI image generation via DALL-E 3 (`/image <prompt>` or natural language triggers) with fallback chain
-- Multi-model chat — choose between GPT-4o, GPT-4o Mini, GPT-4 Turbo, GPT-3.5 Turbo, Gemini 2.0 Flash, Gemini 2.0 Flash Lite, Gemini 1.5 Flash 8B, or Gemini 1.5 Pro
+- Multi-model chat - choose between GPT-4o, GPT-4o Mini, GPT-4 Turbo, GPT-3.5 Turbo, Gemini 2.0 Flash, Gemini 2.0 Flash Lite, Gemini 1.5 Flash 8B, or Gemini 1.5 Pro
 - Model attribution on every chat message and translation bubble
 - Translation quality loop with accuracy scoring (Gemini 2.0 Flash Lite + back-translation refinement)
-- Web search integration — toggle Brave Search context per message
-- Agent mode — agentic tool-use chat via `POST /api/chat/agent/stream`
+- Web search integration - toggle Brave Search context per message
+- Agent mode - agentic tool-use chat via `POST /api/chat/agent/stream`
 - Forgot password / reset password via signed JWT email link
 - Image insertion in the note editor (upload, drag-drop, clipboard paste)
 - Rich file format preservation for bulk upload (headings, bold, lists, tables, embedded images)
-- Admin panel — manage users, feature flags, and feedback reports (admin-only)
-- Feature flags system — admins toggle feature availability and set defaults app-wide
-- Bug reporting and suggestions — users submit reports via Help modal; admins manage status
+- Admin panel - manage users, feature flags, and feedback reports (admin-only)
+- Feature flags system - admins toggle feature availability and set defaults app-wide
+- Bug reporting and suggestions - users submit reports via Help modal; admins manage status
 
 ---
 
@@ -69,14 +69,14 @@ MemoLink/
 | Backend framework | FastAPI + Uvicorn |
 | ORM | SQLAlchemy 2.0 |
 | Database | PostgreSQL (Supabase) + pgvector |
-| AI — Chat | OpenAI GPT-4o-mini (default); GPT-4o, GPT-4 Turbo, GPT-3.5 Turbo also selectable |
-| AI — Multi-Model | Gemini 2.0 Flash, Gemini 2.0 Flash Lite, Gemini 1.5 Flash 8B, Gemini 1.5 Pro (via OpenAI-compatible endpoint) |
-| AI — Image Generation | gpt-image-2 → gpt-image-1 → DALL-E 3 → DALL-E 2 → Pollinations.ai (fallback chain) |
-| AI — Embeddings | text-embedding-3-small (1 536 dims) |
-| AI — Translation | Gemini 2.0 Flash Lite with quality-loop refinement |
+| AI - Chat | OpenAI GPT-4o-mini (default); GPT-4o, GPT-4 Turbo, GPT-3.5 Turbo also selectable |
+| AI - Multi-Model | Gemini 2.0 Flash, Gemini 2.0 Flash Lite, Gemini 1.5 Flash 8B, Gemini 1.5 Pro (via OpenAI-compatible endpoint) |
+| AI - Image Generation | gpt-image-2 → gpt-image-1 → DALL-E 3 → DALL-E 2 → Pollinations.ai (fallback chain) |
+| AI - Embeddings | text-embedding-3-small (1 536 dims) |
+| AI - Translation | Gemini 2.0 Flash Lite with quality-loop refinement |
 | Web Search | Brave Search API |
 | Password hashing | passlib bcrypt |
-| Email (SMTP) | Optional — feedback notifications + password reset |
+| Email (SMTP) | Optional - feedback notifications + password reset |
 | Frontend | React 18 + TypeScript + Vite |
 | Styling | Tailwind CSS v4 |
 | Note Editor | Tiptap (with image extension) |
@@ -92,7 +92,7 @@ MemoLink follows **Clean Architecture** with **Domain-Driven Design** and a **De
 Request → Controller (api/) → Service (business/) → Repository (domain/) → PostgreSQL
 ```
 
-- Controllers are thin — they only call services via `RequestContainer`.
+- Controllers are thin - they only call services via `RequestContainer`.
 - Services contain application logic, depend on repository *interfaces*.
 - Repositories contain all SQL/ORM queries.
 - DTOs (`contracts/`) are separate from ORM models.
@@ -122,7 +122,7 @@ The Settings modal lets each user select their preferred chat model at any time:
 | OpenAI | GPT-4o Mini (default), GPT-4o, GPT-4 Turbo, GPT-3.5 Turbo |
 | Google Gemini | Gemini 2.0 Flash, Gemini 2.0 Flash Lite, Gemini 1.5 Flash 8B, Gemini 1.5 Pro |
 
-Gemini models are accessed via an OpenAI-compatible endpoint using `GEMINI_API_KEY`. When Gemini hits a rate limit during chat, the system silently falls back to GPT and logs a warning — the user sees no error. Every chat message displays a "replied by [Model Name]" attribution badge.
+Gemini models are accessed via an OpenAI-compatible endpoint using `GEMINI_API_KEY`. When Gemini hits a rate limit during chat, the system silently falls back to GPT and logs a warning - the user sees no error. Every chat message displays a "replied by [Model Name]" attribution badge.
 
 ---
 
@@ -137,7 +137,7 @@ The stream yields:
 1. An initial "🎨 Generating your image…" status token (animated spinner shown in the UI)
 2. The rendered image embedded in Markdown as a base64 data URL, followed by the model's revised prompt
 
-Images are stored as base64 data URLs directly in `messages.content` — no file storage needed, no expiry. Base64 images are stripped from RAG context and conversation history before sending to OpenAI to avoid token overflow. The SSE `done` event carries the `model` field so attribution reflects the actual model used. No new endpoint is required — handled inside the existing `POST /api/chat/stream` and `POST /api/chat`.
+Images are stored as base64 data URLs directly in `messages.content` - no file storage needed, no expiry. Base64 images are stripped from RAG context and conversation history before sending to OpenAI to avoid token overflow. The SSE `done` event carries the `model` field so attribution reflects the actual model used. No new endpoint is required - handled inside the existing `POST /api/chat/stream` and `POST /api/chat`.
 
 ---
 
@@ -158,7 +158,7 @@ pip install -r requirements.txt
 
 # 3. Configure environment
 cp .env.example .env
-# Edit .env — set DATABASE_URL, OPENAI_API_KEY, and optional keys below
+# Edit .env - set DATABASE_URL, OPENAI_API_KEY, and optional keys below
 
 # 4. Run
 python -m uvicorn memolink_backend.main:app --reload
@@ -186,7 +186,7 @@ npm install
 
 # 2. Configure
 cp .env.example .env
-# Edit .env — set VITE_API_BASE_URL=http://localhost:8000/api
+# Edit .env - set VITE_API_BASE_URL=http://localhost:8000/api
 
 # 3. Run dev server
 npm run dev
@@ -199,11 +199,11 @@ npm run build
 
 ## Admin System & Feature Flags
 
-The first registered user is automatically promoted to admin on startup. Admins access the **Admin Panel** — a full-screen overlay in the user menu — with three tabs:
+The first registered user is automatically promoted to admin on startup. Admins access the **Admin Panel** - a full-screen overlay in the user menu - with three tabs:
 
-- **Feedback** — view, filter by type/status, and update bug reports and suggestions submitted by users
-- **Feature Flags** — toggle individual features on/off (web search, agent mode, model selection, image generation, translation, file upload) and set defaults (`default_model`, `default_language`)
-- **Users** — list all users, promote or demote admin status
+- **Feedback** - view, filter by type/status, and update bug reports and suggestions submitted by users
+- **Feature Flags** - toggle individual features on/off (web search, agent mode, model selection, image generation, translation, file upload) and set defaults (`default_model`, `default_language`)
+- **Users** - list all users, promote or demote admin status
 
 JWT tokens include an `is_admin` claim. Admin-only endpoints use the `get_current_admin` dependency and return 403 if the caller is not an admin.
 
@@ -256,12 +256,12 @@ MemoLink requires PostgreSQL with the **pgvector** extension. Supabase provides 
 
 ## Documentation
 
-Open any of the standalone HTML files in a browser — no server needed:
+Open any of the standalone HTML files in a browser - no server needed:
 
-- [`Overview.html`](Overview.html) — Project overview and architecture
-- [`Requirements Analysis.html`](Requirements%20Analysis.html) — FR, NFR, use cases, user stories
-- [`Database Design.html`](Database%20Design.html) — ERD, table schemas, indexes
-- [`API Endpoint Design.html`](API%20Endpoint%20Design.html) — All endpoints with request/response schemas
+- [`Overview.html`](Overview.html) - Project overview and architecture
+- [`Requirements Analysis.html`](Requirements%20Analysis.html) - FR, NFR, use cases, user stories
+- [`Database Design.html`](Database%20Design.html) - ERD, table schemas, indexes
+- [`API Endpoint Design.html`](API%20Endpoint%20Design.html) - All endpoints with request/response schemas
 
 ---
 
@@ -286,11 +286,11 @@ Open any of the standalone HTML files in a browser — no server needed:
 - Never commit API keys, passwords, or tokens
 - All passwords are bcrypt-hashed before storage
 - Password reset tokens are signed JWTs with a 1-hour expiry and a `purpose:"reset"` claim
-- User data is scoped by `user_id` — users cannot access each other's notes
-- Admin endpoints use `get_current_admin` dependency — non-admins receive 403
+- User data is scoped by `user_id` - users cannot access each other's notes
+- Admin endpoints use `get_current_admin` dependency - non-admins receive 403
 - JWT tokens include an `is_admin` claim verified on every admin request
 - The first registered user is automatically promoted to admin at startup
 
 ---
 
-*MemoLink Capstone Project — 2026*
+*MemoLink Capstone Project - 2026*

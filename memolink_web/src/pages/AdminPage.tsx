@@ -6,8 +6,15 @@ import {
 } from "../api/adminApi";
 import { MODELS } from "../constants/models";
 import { AdminSurveyPanel } from "../components/AdminSurveyPanel";
+import { AdminEvaluationPanel } from "../components/AdminEvaluationPanel";
+import { getEvaluationParticipants, setUserBudget, resetEvaluationBudget, type ParticipantBudget } from "../api/evaluationApi";
 
-type Tab = "feedback" | "features" | "users" | "logs" | "survey";
+function fmtMMSS(s: number): string {
+  const m = Math.floor(s / 60), sec = s % 60;
+  return `${m}:${String(sec).padStart(2, "0")}`;
+}
+
+type Tab = "feedback" | "features" | "users" | "logs" | "survey" | "evaluation";
 
 const _LEVEL_ORDER: Record<string, number> = { regular: 0, plus: 1, pro: 2 };
 
@@ -37,9 +44,10 @@ type FbStatus = "all" | "open" | "read" | "resolved";
 interface Props {
   onClose: () => void;
   currentUserId: number;
+  onResetWalkthrough?: () => void;
 }
 
-export function AdminPage({ onClose, currentUserId }: Props) {
+export function AdminPage({ onClose, currentUserId, onResetWalkthrough }: Props) {
   const [tab, setTab] = useState<Tab>("feedback");
 
   // Feedback state
@@ -53,6 +61,9 @@ export function AdminPage({ onClose, currentUserId }: Props) {
   // Users state
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [usersLoading, setUsersLoading] = useState(false);
+  const [evalParts, setEvalParts] = useState<Record<number, ParticipantBudget>>({});
+  const [evalDefaultMins, setEvalDefaultMins] = useState(30);
+  const [budgetInput, setBudgetInput] = useState<Record<number, string>>({});
   const [levelChanging, setLevelChanging] = useState<Record<number, boolean>>({});
 
   // Logs state
@@ -118,6 +129,35 @@ export function AdminPage({ onClose, currentUserId }: Props) {
     try { setUsers(await fetchAdminUsers()); }
     catch { /* ignore */ }
     finally { setUsersLoading(false); }
+    loadEvalParticipants();
+  }
+
+  async function loadEvalParticipants() {
+    try {
+      const list = await getEvaluationParticipants();
+      const map: Record<number, ParticipantBudget> = {};
+      list.participants.forEach((p) => { map[p.user_id] = p; });
+      setEvalParts(map);
+      setEvalDefaultMins(list.default_budget_minutes);
+    } catch { /* analytics may be unavailable */ }
+  }
+
+  async function applyUserBudget(userId: number) {
+    const raw = (budgetInput[userId] ?? "").trim();
+    const mins = raw === "" ? null : Math.max(1, parseInt(raw, 10) || 0);
+    try { await setUserBudget(userId, mins); await loadEvalParticipants(); }
+    catch { alert("Could not set budget."); }
+  }
+
+  async function resetUserBudget(userId: number) {
+    try { await resetEvaluationBudget(userId, false); await loadEvalParticipants(); }
+    catch { alert("Reset failed."); }
+  }
+
+  async function clearUserData(userId: number, email: string) {
+    if (!confirm(`Permanently DELETE all evaluation data contributed by ${email} (metrics, ratings, tasks, timings) and restart their window?\n\nThis cannot be undone.`)) return;
+    try { await resetEvaluationBudget(userId, true); await loadEvalParticipants(); }
+    catch { alert("Clear failed."); }
   }
 
   async function loadFlags() {
@@ -208,6 +248,7 @@ export function AdminPage({ onClose, currentUserId }: Props) {
             { key: "users", label: "Users", icon: <path d="M7 14s-1 0-1-1 1-4 5-4 5 3 5 4-1 1-1 1zm4-6a3 3 0 1 0 0-6 3 3 0 0 0 0 6m-5.784 6A2.24 2.24 0 0 1 5 13c0-1.355.68-2.75 1.936-3.72A6.3 6.3 0 0 0 5 9c-4 0-5 3-5 4s1 1 1 1zM4.5 8a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5"/> },
           { key: "logs", label: "System Logs", icon: <><path d="M5 0h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h2zm-1 1H3a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H6v2.5a.5.5 0 0 1-.5.5h-2A.5.5 0 0 1 3 4.5V1.5A.5.5 0 0 1 3.5 1H4z"/><path d="M4.5 12.5A.5.5 0 0 1 5 12h6a.5.5 0 0 1 0 1H5a.5.5 0 0 1-.5-.5zm0-2A.5.5 0 0 1 5 10h6a.5.5 0 0 1 0 1H5a.5.5 0 0 1-.5-.5zm0-2A.5.5 0 0 1 5 8h6a.5.5 0 0 1 0 1H5a.5.5 0 0 1-.5-.5z"/></> },
             { key: "survey", label: "Evaluation Survey", icon: <><path d="M9.5 0a.5.5 0 0 1 .5.5.5.5 0 0 0 .5.5.5.5 0 0 1 .5.5V2a.5.5 0 0 1-.5.5h-5A.5.5 0 0 1 5 2v-.5a.5.5 0 0 1 .5-.5.5.5 0 0 0 .5-.5.5.5 0 0 1 .5-.5z"/><path d="M3 2.5a.5.5 0 0 1 .5-.5H4a.5.5 0 0 0 0-1h-.5A1.5 1.5 0 0 0 2 2.5v12A1.5 1.5 0 0 0 3.5 16h9a1.5 1.5 0 0 0 1.5-1.5v-12A1.5 1.5 0 0 0 12.5 1H12a.5.5 0 0 0 0 1h.5a.5.5 0 0 1 .5.5v12a.5.5 0 0 1-.5.5h-9a.5.5 0 0 1-.5-.5z"/></> },
+            { key: "evaluation", label: "Evaluation Analytics", icon: <path d="M0 0h1v15h15v1H0zm14.817 3.113a.5.5 0 0 1 .07.704l-4.5 5.5a.5.5 0 0 1-.74.037L7.06 6.767l-3.656 5.027a.5.5 0 0 1-.808-.588l4-5.5a.5.5 0 0 1 .758-.06l2.609 2.61 4.15-5.073a.5.5 0 0 1 .704-.07"/> },
           ] as { key: Tab; label: string; icon: React.ReactNode }[]).map(({ key, label, icon }) => (
             <button
               key={key}
@@ -236,6 +277,9 @@ export function AdminPage({ onClose, currentUserId }: Props) {
 
           {/* EVALUATION SURVEY TAB */}
           {tab === "survey" && <AdminSurveyPanel />}
+
+          {/* EVALUATION ANALYTICS TAB */}
+          {tab === "evaluation" && <AdminEvaluationPanel />}
 
           {/* FEEDBACK TAB */}
           {tab === "feedback" && (
@@ -449,10 +493,12 @@ export function AdminPage({ onClose, currentUserId }: Props) {
                     { key: "proactive_insights_enabled", label: "Proactive Insights", desc: "Enable AI scanning of notes for missed deadlines, action items, and urgency signals" },
                     { key: "confidence_enabled", label: "Answer Confidence", desc: "Show HIGH / MEDIUM / LOW confidence badge on each AI response" },
                     { key: "autopilot_enabled", label: "AutoPilot Routing", desc: "Automatically select the best AI model based on the user's intent" },
-                    { key: "study_mode_enabled", label: "Study Mode", desc: "Enable AI Study Mode — flashcards, exam review, study plans, weak topic detection, and summaries" },
-                    { key: "timeline_enabled", label: "Meeting/Lecture Timeline", desc: "Show Timeline tab in note editor — chapters, action items, and important moments with timestamps" },
-                    { key: "workflow_enabled", label: "Workflow Agent", desc: "Enable Workflow mode — AI proposes actions for user approval before executing" },
-                    { key: "evaluation_survey_enabled", label: "Evaluation Survey", desc: "Show \"Take Evaluation Survey\" in the profile menu — research data collection, separate from feedback" },
+                    { key: "study_mode_enabled", label: "Study Mode", desc: "Enable AI Study Mode - flashcards, exam review, study plans, weak topic detection, and summaries" },
+                    { key: "timeline_enabled", label: "Meeting/Lecture Timeline", desc: "Show Timeline tab in note editor - chapters, action items, and important moments with timestamps" },
+                    { key: "workflow_enabled", label: "Workflow Agent", desc: "Enable Workflow mode - AI proposes actions for user approval before executing" },
+                    { key: "evaluation_survey_enabled", label: "Evaluation Survey", desc: "Show \"Take Evaluation Survey\" in the profile menu - research data collection, separate from feedback" },
+                    { key: "evaluation_analytics_enabled", label: "Evaluation Analytics", desc: "Collect quantitative evaluation telemetry (session/task timings, AI metrics, ratings). Disabling stops all collection" },
+                    { key: "evaluation_admin_export_enabled", label: "Evaluation Export", desc: "Allow admins to export evaluation analytics as CSV/JSON" },
                   ] as { key: keyof FeatureFlags; label: string; desc: string }[]).map(({ key, label, desc }) => (
                     <div key={key} className="flex items-center justify-between px-4 py-3.5 bg-[#1a1a24] border border-[#2a2a38] rounded-xl">
                       <div>
@@ -507,7 +553,7 @@ export function AdminPage({ onClose, currentUserId }: Props) {
                   </div>
                 </div>
 
-                {/* Access Level Requirements — tabbed */}
+                {/* Access Level Requirements - tabbed */}
                 <div className="mt-8">
                   <h3 className="text-sm font-semibold text-gray-200 mb-1">Access Level Requirements</h3>
                   <p className="text-xs text-gray-500 mb-4">Configure which features each tier can access. Pro always inherits everything enabled for Plus and Regular.</p>
@@ -581,16 +627,32 @@ export function AdminPage({ onClose, currentUserId }: Props) {
           {/* USERS TAB */}
           {tab === "users" && (
             <div>
-              <div className="mb-4">
-                <h2 className="text-lg font-semibold text-white">Users</h2>
-                <p className="text-xs text-gray-500 mt-0.5">{users.length} registered user{users.length !== 1 ? "s" : ""}</p>
+              <div className="mb-4 flex items-start justify-between gap-4">
+                <div>
+                  <h2 className="text-lg font-semibold text-white">Users</h2>
+                  <p className="text-xs text-gray-500 mt-0.5">{users.length} registered user{users.length !== 1 ? "s" : ""}</p>
+                </div>
+                {onResetWalkthrough && (
+                  <button
+                    onClick={() => { onResetWalkthrough(); onClose(); }}
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs bg-indigo-600/20 text-indigo-400 hover:bg-indigo-600/30 border border-indigo-500/20 transition shrink-0"
+                    title="Clears your walkthrough flag and replays the tour"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 16 16">
+                      <path d="M11.534 7h3.932a.25.25 0 0 1 .192.41l-1.966 2.36a.25.25 0 0 1-.384 0l-1.966-2.36a.25.25 0 0 1 .192-.41m-11 2h3.932a.25.25 0 0 0 .192-.41L2.692 6.23a.25.25 0 0 0-.384 0L.342 8.59A.25.25 0 0 0 .534 9"/>
+                      <path fillRule="evenodd" d="M8 3c-1.552 0-2.94.707-3.857 1.818a.5.5 0 1 1-.771-.636A6.002 6.002 0 0 1 13.917 7H12.9A5 5 0 0 0 8 3M3.1 9a5.002 5.002 0 0 0 8.757 2.182.5.5 0 1 1 .771.636A6.002 6.002 0 0 1 2.083 9z"/>
+                    </svg>
+                    Reset Walkthrough (Me)
+                  </button>
+                )}
               </div>
               {usersLoading ? (
                 <div className="flex items-center justify-center py-12 text-gray-600 text-sm">Loading…</div>
               ) : (
                 <div className="space-y-2">
                   {users.map((u) => (
-                    <div key={u.id} className="flex items-center gap-4 px-4 py-3 bg-[#1a1a24] border border-[#2a2a38] rounded-xl">
+                    <div key={u.id} className="px-4 py-3 bg-[#1a1a24] border border-[#2a2a38] rounded-xl">
+                      <div className="flex items-center gap-4">
                       <div className="w-8 h-8 rounded-full bg-indigo-600/30 flex items-center justify-center text-indigo-300 text-xs font-bold shrink-0">
                         {u.email.slice(0, 2).toUpperCase()}
                       </div>
@@ -643,6 +705,44 @@ export function AdminPage({ onClose, currentUserId }: Props) {
                           <span className="text-[10px] text-gray-600">You</span>
                         )}
                       </div>
+                      </div>
+
+                      {/* Evaluation collection window (per-user) */}
+                      {(() => {
+                        const p = evalParts[u.id];
+                        const pct = p ? Math.min(100, Math.round((p.consumed_seconds / Math.max(1, p.budget_seconds)) * 100)) : 0;
+                        return (
+                          <div className="mt-2.5 pt-2.5 border-t border-[#2a2a38] flex items-center gap-3 flex-wrap">
+                            <span className="text-[10px] uppercase tracking-wider text-cyan-400/70 shrink-0">Evaluation</span>
+                            {p ? (
+                              <>
+                                <span className="text-[11px] text-gray-400">
+                                  Consumed <span className="text-gray-200 font-mono">{fmtMMSS(p.consumed_seconds)}</span> / {fmtMMSS(p.budget_seconds)}
+                                  {p.exhausted && <span className="ml-1.5 text-amber-400">· window ended</span>}
+                                </span>
+                                <div className="w-24 h-1.5 bg-[#12121a] rounded overflow-hidden">
+                                  <div className={`h-full ${p.exhausted ? "bg-amber-500" : "bg-cyan-500/70"}`} style={{ width: `${pct}%` }} />
+                                </div>
+                              </>
+                            ) : (
+                              <span className="text-[11px] text-gray-600">No data yet · default {evalDefaultMins} min</span>
+                            )}
+                            <div className="flex items-center gap-1 ml-auto shrink-0">
+                              <input
+                                type="number" min={1}
+                                value={budgetInput[u.id] ?? ""}
+                                onChange={(e) => setBudgetInput((b) => ({ ...b, [u.id]: e.target.value }))}
+                                placeholder={String(p?.budget_seconds ? Math.round(p.budget_seconds / 60) : evalDefaultMins)}
+                                className="w-14 bg-[#12121a] border border-[#2a2a38] rounded-lg px-2 py-1 text-[11px] text-gray-200 focus:outline-none focus:border-cyan-500/50"
+                              />
+                              <span className="text-[10px] text-gray-600">min</span>
+                              <button onClick={() => applyUserBudget(u.id)} className="px-2 py-1 text-[11px] rounded-lg text-cyan-300 border border-cyan-500/30 hover:bg-cyan-500/10 transition">Set</button>
+                              <button onClick={() => resetUserBudget(u.id)} title="Reset the timer only - keeps collected data" className="px-2 py-1 text-[11px] rounded-lg text-amber-300 border border-amber-500/30 hover:bg-amber-500/10 transition">Reset</button>
+                              <button onClick={() => clearUserData(u.id, u.email)} title="Delete all this participant's evaluation data and restart" className="px-2 py-1 text-[11px] rounded-lg text-red-400 border border-red-500/30 hover:bg-red-500/10 transition">Clear data</button>
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </div>
                   ))}
                 </div>

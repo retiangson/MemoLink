@@ -1,9 +1,11 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import type { SuggestionItem } from "../hooks/useSuggestions";
 import { ReminderDetailModal } from "./ReminderDetailModal";
 import { AddReminderModal } from "./AddReminderModal";
 import { buildGoogleCalendarUrl } from "../utils/reminderUtils";
 import { InsightsPanel } from "./InsightsPanel";
+import { listTeamsChats, getTeamsMessages, sendTeamsMessage, chatToNote } from "../api/teamsApi";
+import type { TeamsChat, TeamsMessage } from "../api/teamsApi";
 
 interface RightPanelProps {
   open: boolean;
@@ -22,6 +24,7 @@ interface RightPanelProps {
   isSyncingEmail?: boolean;
   onSyncEmail?: () => void;
   emailSyncResult?: string | null;
+  teamsConnected?: boolean;
   insightsEnabled?: boolean;
   workspaceId?: number | null;
   onOpenNote?: (noteId: number) => void;
@@ -32,12 +35,72 @@ export function RightPanel({
   onAddManual, onToggleDone, onUpdate, onRemove, onClearDone,
   onGenerate, notificationPermission, onRequestNotificationPermission,
   emailConnected, isSyncingEmail, onSyncEmail, emailSyncResult,
+  teamsConnected,
   insightsEnabled, workspaceId, onOpenNote,
 }: RightPanelProps) {
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState<SuggestionItem | null>(null);
   const [showNoteReminders, setShowNoteReminders] = useState(true);
   const [showEmailReminders, setShowEmailReminders] = useState(true);
+  const [showTeams, setShowTeams] = useState(true);
+  const [teamsChats, setTeamsChats] = useState<TeamsChat[]>([]);
+  const [teamsChatsLoading, setTeamsChatsLoading] = useState(false);
+  const [selectedChat, setSelectedChat] = useState<TeamsChat | null>(null);
+  const [teamsMessages, setTeamsMessages] = useState<TeamsMessage[]>([]);
+  const [teamsMsgLoading, setTeamsMsgLoading] = useState(false);
+  const [teamsReply, setTeamsReply] = useState("");
+  const [teamsSending, setTeamsSending] = useState(false);
+  const [teamsSaveResult, setTeamsSaveResult] = useState<string | null>(null);
+  const [teamsError, setTeamsError] = useState<string | null>(null);
+
+  const loadTeamsChats = useCallback(async () => {
+    setTeamsChatsLoading(true);
+    setTeamsError(null);
+    try {
+      setTeamsChats(await listTeamsChats());
+    } catch (err: any) {
+      const detail = err?.response?.data?.detail;
+      setTeamsError(detail?.message ?? "Could not load Teams chats.");
+      setTeamsChats([]);
+    } finally { setTeamsChatsLoading(false); }
+  }, []);
+
+  useEffect(() => {
+    if (open && teamsConnected) loadTeamsChats();
+  }, [open, teamsConnected]);
+
+  async function handleOpenChat(chat: TeamsChat) {
+    setSelectedChat(chat);
+    setTeamsMessages([]);
+    setTeamsSaveResult(null);
+    setTeamsError(null);
+    setTeamsMsgLoading(true);
+    try {
+      setTeamsMessages(await getTeamsMessages(chat.id, 20));
+    } catch (err: any) {
+      const detail = err?.response?.data?.detail;
+      setTeamsError(detail?.message ?? "Could not load Teams messages.");
+    } finally { setTeamsMsgLoading(false); }
+  }
+
+  async function handleSendReply() {
+    if (!selectedChat || !teamsReply.trim()) return;
+    setTeamsSending(true);
+    try {
+      await sendTeamsMessage(selectedChat.id, teamsReply.trim());
+      setTeamsReply("");
+      setTeamsMessages(await getTeamsMessages(selectedChat.id, 20));
+    } catch { /* ignore */ } finally { setTeamsSending(false); }
+  }
+
+  async function handleSaveToNote() {
+    if (!selectedChat) return;
+    setTeamsSaveResult(null);
+    try {
+      const res = await chatToNote(selectedChat.id, selectedChat.topic, workspaceId);
+      setTeamsSaveResult(`✓ Saved: "${res.title}"`);
+    } catch { setTeamsSaveResult("Failed to save."); }
+  }
 
   if (!open) return null;
 
@@ -127,7 +190,7 @@ export function RightPanel({
   };
 
   return (
-    <div className="w-72 h-full flex flex-col bg-[#0f0f13] border-l border-[#1e1e2a] shrink-0">
+    <div id="tour-right-panel" className="w-72 h-full flex flex-col bg-[#0f0f13] border-l border-[#1e1e2a] shrink-0">
 
       {/* Header */}
       <div className="h-10 flex items-center justify-between px-4 border-b border-[#1e1e2a] shrink-0 bg-[#0a0a0f]">
@@ -152,7 +215,7 @@ export function RightPanel({
             onClick={notificationPermission === "granted" ? undefined : onRequestNotificationPermission}
             title={
               notificationPermission === "granted" ? "Browser alerts enabled" :
-              notificationPermission === "denied" ? "Notifications blocked — enable in browser settings" :
+              notificationPermission === "denied" ? "Notifications blocked - enable in browser settings" :
               "Enable browser alerts for due reminders"
             }
             className={`w-6 h-6 flex items-center justify-center rounded-md transition ${
@@ -178,7 +241,7 @@ export function RightPanel({
         </div>
       </div>
 
-      {/* Scrollable body — everything between header and footer scrolls together */}
+      {/* Scrollable body - everything between header and footer scrolls together */}
       <div className="flex-1 overflow-y-auto flex flex-col min-h-0">
 
       {/* ── Section 1: Notes ── */}
@@ -286,7 +349,116 @@ export function RightPanel({
         </div>
       )}
 
-      {/* ── Section 3: AI Insights ── */}
+      {/* ── Section 3: Teams ── */}
+      {teamsConnected && (
+        <div className="border-b border-[#1e1e2a]">
+          <button
+            onClick={() => setShowTeams((v) => !v)}
+            className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-[#1a1a24] transition text-left"
+          >
+            <div className="flex items-center gap-2">
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 text-violet-400 shrink-0" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M19.5 5.25a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0M14.25 10.5a2.25 2.25 0 1 0 0-4.5 2.25 2.25 0 0 0 0 4.5M5.25 7.5a2.25 2.25 0 1 0 4.5 0 2.25 2.25 0 0 0-4.5 0m2.25 3a3.75 3.75 0 0 0-3.75 3.75v.75h7.5v-.75A3.75 3.75 0 0 0 7.5 10.5m6.75 1.5a5.26 5.26 0 0 1 1.575.243A3.74 3.74 0 0 1 17.25 15v.75H21V15a3.75 3.75 0 0 0-6.75-2.25z"/>
+              </svg>
+              <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Teams</span>
+              {teamsChats.length > 0 && (
+                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-violet-500/20 text-violet-400">
+                  {teamsChats.length}
+                </span>
+              )}
+            </div>
+            <svg xmlns="http://www.w3.org/2000/svg" className={`w-3 h-3 text-gray-600 transition-transform ${showTeams ? "" : "-rotate-90"}`} fill="currentColor" viewBox="0 0 16 16">
+              <path d="M7.247 11.14 2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z"/>
+            </svg>
+          </button>
+
+          {showTeams && (
+            <div className="px-3 pb-3 flex flex-col gap-2">
+              {teamsError && (
+                <div className="rounded-lg border border-amber-500/20 bg-amber-500/10 px-2.5 py-2 text-[11px] leading-relaxed text-amber-200">
+                  {teamsError}
+                </div>
+              )}
+
+              {selectedChat ? (
+                <div className="bg-[#12121a] border border-[#2a2a38] rounded-xl overflow-hidden">
+                  {/* Chat header */}
+                  <div className="flex items-center justify-between px-3 py-2 border-b border-[#2a2a38]">
+                    <button onClick={() => { setSelectedChat(null); setTeamsSaveResult(null); }} className="text-[11px] text-gray-500 hover:text-gray-300 transition">← Back</button>
+                    <span className="text-[11px] text-gray-300 font-medium truncate max-w-[110px]">{selectedChat.topic}</span>
+                    <button onClick={handleSaveToNote} className="text-[11px] text-indigo-400 hover:text-indigo-300 transition">Save</button>
+                  </div>
+                  {teamsSaveResult && (
+                    <p className={`mx-3 mt-1.5 text-[10px] px-2 py-1 rounded-md ${teamsSaveResult.startsWith("✓") ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-400"}`}>{teamsSaveResult}</p>
+                  )}
+                  {/* Messages */}
+                  <div className="px-3 py-2 max-h-40 overflow-y-auto space-y-2">
+                    {teamsMsgLoading ? (
+                      <p className="text-[11px] text-gray-600">Loading…</p>
+                    ) : teamsMessages.length === 0 ? (
+                      <p className="text-[11px] text-gray-600">No messages</p>
+                    ) : teamsMessages.map((m) => (
+                      <div key={m.id}>
+                        <p className="text-[10px] text-violet-400 font-medium">{m.from}</p>
+                        <p className="text-[11px] text-gray-300 leading-snug">{m.content}</p>
+                      </div>
+                    ))}
+                  </div>
+                  {/* Reply */}
+                  <div className="px-3 pb-2.5 flex gap-1.5">
+                    <input
+                      type="text"
+                      value={teamsReply}
+                      onChange={(e) => setTeamsReply(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter") handleSendReply(); }}
+                      placeholder="Reply…"
+                      className="flex-1 bg-[#0f0f13] border border-[#2a2a38] rounded-lg px-2 py-1 text-[11px] text-gray-200 outline-none focus:border-violet-500/50"
+                    />
+                    <button
+                      onClick={handleSendReply}
+                      disabled={teamsSending || !teamsReply.trim()}
+                      className="px-2.5 py-1 text-[11px] bg-violet-600/20 border border-violet-500/30 text-violet-300 rounded-lg hover:bg-violet-600/30 disabled:opacity-40 transition"
+                    >
+                      {teamsSending ? "…" : "Send"}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <button
+                    onClick={loadTeamsChats}
+                    disabled={teamsChatsLoading}
+                    className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-violet-600/10 hover:bg-violet-600/20 border border-violet-500/20 text-violet-300 rounded-lg text-xs transition disabled:opacity-40"
+                  >
+                    {teamsChatsLoading ? (
+                      <><svg className="w-3 h-3 animate-spin shrink-0" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>Loading…</>
+                    ) : (
+                      <>↻ Refresh Chats</>
+                    )}
+                  </button>
+                  {teamsChats.length === 0 && !teamsChatsLoading && (
+                    <p className="text-[11px] text-gray-600 text-center pt-1">{teamsError ?? "No chats found"}</p>
+                  )}
+                  {teamsChats.map((chat) => (
+                    <button
+                      key={chat.id}
+                      onClick={() => handleOpenChat(chat)}
+                      className="w-full text-left px-2.5 py-2 bg-[#1a1a24] border border-[#2a2a38] rounded-xl hover:border-violet-500/30 transition"
+                    >
+                      <p className="text-[11px] text-gray-200 font-medium truncate">{chat.topic}</p>
+                      {chat.lastMessagePreview && (
+                        <p className="text-[10px] text-gray-600 truncate mt-0.5">{chat.lastMessagePreview}</p>
+                      )}
+                    </button>
+                  ))}
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Section 4: AI Insights ── */}
       {insightsEnabled && (
         <InsightsPanel
           workspaceId={workspaceId ?? null}
@@ -296,7 +468,7 @@ export function RightPanel({
 
       </div>{/* end scrollable body */}
 
-      {/* Footer: clear done — pinned at bottom */}
+      {/* Footer: clear done - pinned at bottom */}
       {doneCount > 0 && (
         <div className="px-3 py-2 border-t border-[#1e1e2a] shrink-0">
           <button
@@ -316,7 +488,7 @@ export function RightPanel({
         />
       )}
 
-      {/* Detail modal — keep up-to-date version of item from list */}
+      {/* Detail modal - keep up-to-date version of item from list */}
       <ReminderDetailModal
         item={selectedItem ? (items.find((i) => i.id === selectedItem.id) ?? selectedItem) : null}
         onClose={() => setSelectedItem(null)}

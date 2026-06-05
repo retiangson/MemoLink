@@ -1,12 +1,12 @@
 """
-Workflow Agent Service — Human-Approval Agent
+Workflow Agent Service - Human-Approval Agent
 =============================================
 
 A two-phase agent that proposes actions before executing them.
 
 PHASE 1  plan()
 ---------------------------------------------------------------------------
-1. Silently searches the user's notes (read-only — no approval needed).
+1. Silently searches the user's notes (read-only - no approval needed).
 2. Sends the prompt + found notes to GPT-4o-mini with a structured prompt
    that lists all 8 available action types and asks for a JSON plan.
 3. Stores the plan as a conversation message with the __WORKFLOW_PLAN__
@@ -26,15 +26,15 @@ Executes each in order, streaming progress events:
 
 ACTION TYPES
 ---------------------------------------------------------------------------
-  create_reminder       — creates a Reminder row
-  create_note           — creates a Note row + embedding
-  summarise_workspace   — GPT summarises all notes, creates a summary note
-  search_web            — Brave Search (read-only, but user still sees it)
-  organise_notes        — GPT proposes category tags for each note, creates
+  create_reminder       - creates a Reminder row
+  create_note           - creates a Note row + embedding
+  summarise_workspace   - GPT summarises all notes, creates a summary note
+  search_web            - Brave Search (read-only, but user still sees it)
+  organise_notes        - GPT proposes category tags for each note, creates
                           an organisation note with the mapping
-  suggest_title         — improves the title of a named note via GPT
-  extract_tasks         — extracts all action-item lines, creates a Tasks note
-  prepare_report_outline — GPT writes a structured outline, creates a note
+  suggest_title         - improves the title of a named note via GPT
+  extract_tasks         - extracts all action-item lines, creates a Tasks note
+  prepare_report_outline - GPT writes a structured outline, creates a note
 """
 
 from __future__ import annotations
@@ -71,7 +71,7 @@ _ACTION_ICONS = {
 }
 
 _PLAN_SYSTEM = """You are MemoLink Workflow Agent. Analyse the user's request and the notes context provided,
-then return a JSON action plan. Do NOT execute anything — only propose.
+then return a JSON action plan. Do NOT execute anything - only propose.
 
 Available action types and their required params:
   create_reminder       params: title (str), due_date (YYYY-MM-DD, optional), due_time (HH:MM, optional), description (optional)
@@ -80,7 +80,7 @@ Available action types and their required params:
   search_web            params: query (str)
   organise_notes        params: (none required)
   suggest_title         params: note_id (int), current_title (str)
-  extract_tasks         params: (none required — scans all context notes)
+  extract_tasks         params: (none required - scans all context notes)
   prepare_report_outline params: topic (str), sections (list[str], optional)
 
 Return ONLY valid JSON:
@@ -215,7 +215,7 @@ class WorkflowService:
         # Save user message
         self._convs.add_message(conversation_id, "user", prompt)
 
-        # Silently read notes for context (no approval needed — read-only)
+        # Silently read notes for context (no approval needed - read-only)
         context_notes = self._read_notes(prompt, user_id, workspace_id)
 
         # Ask GPT to generate a plan
@@ -345,7 +345,7 @@ class WorkflowService:
                 due_time=p.get("due_time"),
             )
             self._db.add(r); self._db.commit()
-            due = f" — due {p['due_date']}" if p.get("due_date") else ""
+            due = f" - due {p['due_date']}" if p.get("due_date") else ""
             return f"Reminder '{p.get('title', 'Reminder')}'{due} created"
 
         if action.type == "create_note":

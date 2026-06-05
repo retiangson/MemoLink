@@ -104,7 +104,7 @@ export function useNoteEditor() {
     );
   }
 
-  // Sync any open tab that matches this note id — called after a direct DB save
+  // Sync any open tab that matches this note id - called after a direct DB save
   function syncNoteById(id: number, fresh: NoteEditState) {
     setOpenNotes((prev) =>
       prev.map((t) =>

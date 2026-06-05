@@ -38,7 +38,7 @@ class UserApiKeyRepository:
         return result
 
     def get_all_decrypted_with_names(self, user_id: int) -> dict[str, dict]:
-        """Return {model_id: {key, base_url, name}} — includes user-defined provider name for labelling."""
+        """Return {model_id: {key, base_url, name}} - includes user-defined provider name for labelling."""
         rows = self.db.query(UserApiKey).filter(UserApiKey.user_id == user_id).all()
         result: dict[str, dict] = {}
         for row in rows:

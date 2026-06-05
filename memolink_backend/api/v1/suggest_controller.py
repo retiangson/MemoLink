@@ -55,7 +55,7 @@ def _normalize_time(val: str) -> Optional[str]:
         elif ampm == "AM" and h == 12:
             h = 0
         return f"{h:02d}:00"
-    # H:MM without AM/PM — treat as 24-hour
+    # H:MM without AM/PM - treat as 24-hour
     m = re.match(r"^(\d{1,2}):(\d{2})$", val)
     if m:
         return f"{int(m.group(1)):02d}:{m.group(2)}"
@@ -112,7 +112,7 @@ async def suggest(
                     "You are a helpful productivity assistant. "
                     "Extract actionable reminders and tasks from the note. "
                     "Include: meetings, appointments, deadlines, and concrete tasks with a named subject (e.g. 'Update RA document', 'Fix DB issue'). "
-                    "SKIP only truly generic filler like 'review your notes' or 'consider improving' — anything with a specific subject or action is worth keeping. "
+                    "SKIP only truly generic filler like 'review your notes' or 'consider improving' - anything with a specific subject or action is worth keeping. "
                     f"Resolve relative dates ('today' = {today_str}, 'tomorrow' = {tomorrow_str}). "
                     "IMPORTANT: Always convert dates to YYYY-MM-DD format (e.g. DD-MM-YYYY '15-05-2026' → '2026-05-15'). "
                     "IMPORTANT: Always convert times to 24-hour HH:MM format (e.g. '11PM' → '23:00', '2:30 PM' → '14:30', '9 AM' → '09:00'). "

@@ -6,6 +6,7 @@ import { MODELS } from "../constants/models";
 import { QuizRenderer } from "./QuizRenderer";
 import { WorkflowApprovalCard } from "./WorkflowApprovalCard";
 import { WorkflowActionBar } from "./WorkflowActionBar";
+import { EvaluationRatingBar } from "./EvaluationRatingBar";
 import type { Message } from "../types";
 import "highlight.js/styles/github-dark.css";
 import "../styles/markdown.css";
@@ -138,6 +139,9 @@ interface Props {
   workflowActions?: { id: string; type: string; label: string; preview: string; params: Record<string, unknown> }[];
   onWorkflowActionDone?: (type: string) => void;
   onWorkflowConversationMessages?: (messages: Message[]) => void;
+  messageId?: number;
+  evaluationActive?: boolean;
+  evalRating?: Record<string, number | string>;
 }
 
 const TRANSLATE_LANGUAGES = [
@@ -186,7 +190,7 @@ function ImageGeneratingSpinner() {
   );
 }
 
-export default function ChatBubble({ role, content, model, streaming, onAdd, onDelete, onApplyEdit, onOpenNote, onSaveNote, hasOpenNote, translationEnabled = true, modelAttributionEnabled = true, confidence, confidenceReason, confidenceEnabled = true, routingReason, autopilotEnabled = true, workflowContext, workflowActions, onWorkflowActionDone, onWorkflowConversationMessages }: Props) {
+export default function ChatBubble({ role, content, model, streaming, onAdd, onDelete, onApplyEdit, onOpenNote, onSaveNote, hasOpenNote, translationEnabled = true, modelAttributionEnabled = true, confidence, confidenceReason, confidenceEnabled = true, routingReason, autopilotEnabled = true, workflowContext, workflowActions, onWorkflowActionDone, onWorkflowConversationMessages, messageId, evaluationActive, evalRating }: Props) {
   const isUser = role === "user";
   const [copied, setCopied] = useState(false);
   const [showLangPicker, setShowLangPicker] = useState(false);
@@ -410,7 +414,7 @@ export default function ChatBubble({ role, content, model, streaming, onAdd, onD
         {post && <div className="mt-3"><ContentWithNoteLinks content={post} onOpenNote={onOpenNote} /></div>}
       </div>
 
-      {/* Loading bubble — shown while waiting for first translation */}
+      {/* Loading bubble - shown while waiting for first translation */}
       {isTranslating && !translation && (
         <div className={`max-w-[740px] px-5 py-4 rounded-2xl backdrop-blur-sm shadow-sm flex items-center gap-3
           ${isUser ? "bg-[#2F2F3F]/80 text-gray-400" : "text-gray-400"}`}>
@@ -475,7 +479,7 @@ export default function ChatBubble({ role, content, model, streaming, onAdd, onD
         </div>
       )}
 
-      {/* Action bar — always at the bottom of whatever is last */}
+      {/* Action bar - always at the bottom of whatever is last */}
       {!isUser && (
         <div className="flex flex-col gap-0.5 pl-3">
         <div className="flex items-center gap-2 text-xs text-gray-500 opacity-60 hover:opacity-100 transition">
@@ -547,7 +551,7 @@ export default function ChatBubble({ role, content, model, streaming, onAdd, onD
             })()}
           </div>
         )}
-        {/* Workflow action buttons — appear below AI message when suggestions are ready */}
+        {/* Workflow action buttons - appear below AI message when suggestions are ready */}
         {!streaming && workflowActions && workflowActions.length > 0 && workflowContext && (
           <WorkflowActionBar
             actions={workflowActions}
@@ -557,6 +561,10 @@ export default function ChatBubble({ role, content, model, streaming, onAdd, onD
             onActionDone={onWorkflowActionDone}
             onConversationMessages={onWorkflowConversationMessages}
           />
+        )}
+        {/* Evaluation rating bar - shown when admin has evaluation analytics on */}
+        {!streaming && role === "assistant" && evaluationActive && messageId != null && (
+          <EvaluationRatingBar messageId={messageId} initial={evalRating} />
         )}
         </div>
       )}

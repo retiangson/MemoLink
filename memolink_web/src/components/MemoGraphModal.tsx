@@ -1,5 +1,5 @@
 /**
- * MemoGraphModal — Interactive AI Knowledge Graph Viewer
+ * MemoGraphModal - Interactive AI Knowledge Graph Viewer
  *
  * Renders a full-screen, physics-based force-directed graph that shows how
  * notes, people, topics, projects, decisions, and other entities extracted
@@ -10,19 +10,19 @@
  * Uses an HTML <canvas> element drawn with the 2D Canvas API.
  * d3-force drives the physics simulation (charge repulsion + link attraction +
  * collision avoidance + center gravity). On each simulation tick the canvas is
- * redrawn via requestAnimationFrame — nodes as circles with glow effects,
+ * redrawn via requestAnimationFrame - nodes as circles with glow effects,
  * edges as lines with relationship labels, dashed indigo lines for note↔note
  * "related_to" connections.
  *
  * INTERACTION
  * -----------
- * Drag node   — click + drag a node circle to reposition it; node is pinned
+ * Drag node   - click + drag a node circle to reposition it; node is pinned
  *               (fx/fy set) while dragging, released on mouseup.
- * Pan canvas  — click + drag empty space to translate the viewport.
- * Zoom        — scroll wheel zooms toward the cursor position (non-passive
+ * Pan canvas  - click + drag empty space to translate the viewport.
+ * Zoom        - scroll wheel zooms toward the cursor position (non-passive
  *               native event listener so preventDefault() works).
- * Fit button  — auto-scales the viewport so all nodes are visible.
- * Click note  — clicking a note node opens it in the editor and closes the modal.
+ * Fit button  - auto-scales the viewport so all nodes are visible.
+ * Click note  - clicking a note node opens it in the editor and closes the modal.
  *
  * TRANSFORM SYSTEM
  * ----------------
@@ -199,7 +199,7 @@ export function MemoGraphModal({
       ctx.stroke();
       ctx.setLineDash([]);
 
-      // Edge label (relationship) at midpoint — only for non-related_to edges
+      // Edge label (relationship) at midpoint - only for non-related_to edges
       if (!isRelated) {
         const mx = (s.x + t.x) / 2;
         const my = (s.y + t.y) / 2;
@@ -339,7 +339,7 @@ export function MemoGraphModal({
       setBuildResult(result);
       await loadGraph();
     } catch {
-      setError("Build failed — check your OpenAI key");
+      setError("Build failed - check your OpenAI key");
     } finally {
       setBuilding(false);
     }
@@ -423,7 +423,7 @@ export function MemoGraphModal({
     return () => window.removeEventListener("mouseup", globalUp);
   }, []);
 
-  // Non-passive wheel listener — attached once per mount so it is never torn down
+  // Non-passive wheel listener - attached once per mount so it is never torn down
   // mid-session. Uses drawRef so it always calls the current draw version.
   useEffect(() => {
     const canvas = canvasRef.current;

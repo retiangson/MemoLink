@@ -23,6 +23,8 @@ const DEFAULT_FLAGS: FeatureFlags = {
   timeline_enabled: true,
   workflow_enabled: true,
   evaluation_survey_enabled: true,
+  evaluation_analytics_enabled: true,
+  evaluation_admin_export_enabled: true,
   default_model: "gpt-4o-mini",
   default_language: "English",
   web_search_min_level: "regular",

@@ -5,6 +5,7 @@ from typing import Optional
 from memolink_backend.core.security import get_current_user
 from memolink_backend.core.db import get_db
 from memolink_backend.domain.models.reminder import Reminder
+from memolink_backend.di.request_container import get_request_container, RequestContainer
 
 router = APIRouter(prefix="/reminders", tags=["reminders"])
 
@@ -52,6 +53,7 @@ def create_reminder(
     req: CreateReminderRequest,
     user_id: int = Depends(get_current_user),
     db: Session = Depends(get_db),
+    container: RequestContainer = Depends(get_request_container),
 ):
     reminder = Reminder(
         user_id=user_id,
@@ -66,6 +68,8 @@ def create_reminder(
     db.add(reminder)
     db.commit()
     db.refresh(reminder)
+    container.evaluation().mark_task(user_id, "create_reminder", "Generate / create a reminder",
+                                     "reminder", "reminder", reminder.id)
     return _serialize(reminder)
 
 

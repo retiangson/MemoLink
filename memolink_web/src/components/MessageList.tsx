@@ -37,13 +37,15 @@ interface MessageListProps {
   workflowSuggestions?: Record<number, { id: string; type: string; label: string; preview: string; params: Record<string, unknown> }[]>;
   onWorkflowActionDone?: (type: string) => void;
   onWorkflowConversationMessages?: (messages: Message[]) => void;
+  evaluationActive?: boolean;
+  evalRatings?: Record<string, Record<string, number | string>>;
 }
 
 export function MessageList({
   messages, loading, streaming, activeConversation,
   messagesContainerRef, bottomRef,
   onLoadOlder, onAddToNotes, onDeleteMessage, onDropFiles,
-  onApplyNoteEdit, onOpenNote, onSaveNote, hasOpenNote, translationEnabled = true, modelAttributionEnabled = true, confidenceEnabled = true, autopilotEnabled = true, workflowContext, workflowSuggestions, onWorkflowActionDone, onWorkflowConversationMessages,
+  onApplyNoteEdit, onOpenNote, onSaveNote, hasOpenNote, translationEnabled = true, modelAttributionEnabled = true, confidenceEnabled = true, autopilotEnabled = true, workflowContext, workflowSuggestions, onWorkflowActionDone, onWorkflowConversationMessages, evaluationActive = false, evalRatings,
 }: MessageListProps) {
   return (
     <div
@@ -55,7 +57,11 @@ export function MessageList({
     >
       <div className="max-w-[740px] mx-auto flex flex-col gap-4">
         {messages.map((msg, idx) => {
-          const isStreamingMsg = streaming && idx === messages.length - 1 && msg.role === "assistant";
+          const isLast = idx === messages.length - 1;
+          const isStreamingMsg = streaming && isLast && msg.role === "assistant";
+          // Only offer the evaluation rating once the AI has fully finished this
+          // reply — never while it's still thinking (loading) or streaming.
+          const ratingReady = evaluationActive && !(isLast && (loading || streaming));
           return (
             <ChatBubble
               key={msg.id}
@@ -80,6 +86,9 @@ export function MessageList({
               workflowActions={workflowSuggestions?.[msg.id]}
               onWorkflowActionDone={onWorkflowActionDone}
               onWorkflowConversationMessages={onWorkflowConversationMessages}
+              messageId={msg.id}
+              evaluationActive={ratingReady}
+              evalRating={evalRatings?.[String(msg.id)]}
             />
           );
         })}

@@ -42,3 +42,8 @@ class ApiRequestContainer:
 
     def logs(self):
         return SystemLogService(repo=SystemLogRepository(self._db))
+
+    def evaluation(self):
+        from memolink_backend.business.services.evaluation_service import EvaluationService
+        from memolink_backend.domain.repositories.evaluation_repository import EvaluationRepository
+        return EvaluationService(repo=EvaluationRepository(self._db))

@@ -3,8 +3,8 @@ Workflow Agent DTOs
 ===================
 Contracts for the two-phase Workflow Agent with Human Approval.
 
-Phase 1 — Plan:   POST /api/workflow/plan
-Phase 2 — Execute: POST /api/workflow/execute  (SSE stream)
+Phase 1 - Plan:   POST /api/workflow/plan
+Phase 2 - Execute: POST /api/workflow/execute  (SSE stream)
 """
 
 from typing import List, Optional, Any, Dict
@@ -21,7 +21,7 @@ class WorkflowPlanRequest(BaseModel):
 
 
 class WorkflowAction(BaseModel):
-    id: str                     # e.g. "a1", "a2" — stable client-side identifier
+    id: str                     # e.g. "a1", "a2" - stable client-side identifier
     type: str                   # one of the 8 action types
     label: str                  # human-readable: "Create reminder: Submit report"
     preview: str                # short outcome preview: "⏰ due 2026-06-06"

@@ -26,6 +26,7 @@ class ServiceInstaller:
             user_api_key_repo=self._domain.get_user_api_key_repository(),
             graph_repo=GraphRepository(self._domain.get_db()),
             email_record_repo=self._domain.get_email_record_repository(),
+            eval_service=self.get_evaluation_service(),
         )
 
     def get_note_service(self) -> INoteService:
@@ -73,6 +74,13 @@ class ServiceInstaller:
             embedding_service=self._domain.get_embedding_service(),
         )
 
+    def get_teams_service(self):
+        from memolink_backend.business.services.teams_service import TeamsService
+        return TeamsService(
+            account_repo=self._domain.get_teams_account_repository(),
+            log_service=self.get_system_log_service(),
+        )
+
     def get_proactive_insight_service(self):
         from memolink_backend.business.services.proactive_insight_service import ProactiveInsightService
         return ProactiveInsightService(
@@ -102,6 +110,16 @@ class ServiceInstaller:
             timeline_repo=TimelineRepository(self._domain.get_db()),
             note_repo=self._domain.get_note_repository(),
         )
+
+    def get_evaluation_service(self):
+        from memolink_backend.business.services.evaluation_service import EvaluationService
+        from memolink_backend.domain.repositories.evaluation_repository import EvaluationRepository
+        return EvaluationService(repo=EvaluationRepository(self._domain.get_db()))
+
+    def get_evaluation_report_service(self):
+        from memolink_backend.business.services.evaluation_report_service import EvaluationReportService
+        from memolink_backend.domain.repositories.evaluation_repository import EvaluationRepository
+        return EvaluationReportService(repo=EvaluationRepository(self._domain.get_db()))
 
     def get_survey_service(self):
         from memolink_backend.business.services.survey_service import SurveyService

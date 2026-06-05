@@ -77,7 +77,7 @@ export function EmailReplyPanel({ emailRecordId, senderName, senderEmail, subjec
         {/* Suggestions picker */}
         {suggestions.length > 0 && (
           <div className="space-y-1.5">
-            <p className="text-[10px] text-gray-500 uppercase tracking-wider">Suggestions — click to use</p>
+            <p className="text-[10px] text-gray-500 uppercase tracking-wider">Suggestions - click to use</p>
             {suggestions.map((s, i) => (
               <button
                 key={i}

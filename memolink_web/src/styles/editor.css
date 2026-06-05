@@ -1,4 +1,4 @@
-/* TipTap rich editor — document style */
+/* TipTap rich editor - document style */
 @import url('https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@400;500;600;700&display=swap');
 
 .tiptap-content {
@@ -28,7 +28,7 @@
   font-style: italic;
 }
 
-/* Headings — Word-style hierarchy */
+/* Headings - Word-style hierarchy */
 .tiptap-content h1 {
   font-family: 'Inter', 'Segoe UI', sans-serif;
   font-size: 2rem;
@@ -156,7 +156,7 @@
 /* Highlight */
 .tiptap-content mark { background-color: #7c6b1a; color: #ffe98a; border-radius: 3px; padding: 1px 4px; }
 
-/* Tables — Word-style */
+/* Tables - Word-style */
 .tiptap-content table {
   width: 100%;
   border-collapse: collapse;

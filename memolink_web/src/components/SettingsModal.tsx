@@ -4,6 +4,8 @@ import { getProviders, addProvider, updateProvider, deleteProvider } from "../ap
 import type { CustomProvider } from "../api/settingsApi";
 import { getEmailStatus, getEmailConnectUrl, disconnectEmail, autoProcessEmails, listEmails, deleteEmail, emailToNote, emailToReminder } from "../api/emailApi";
 import type { EmailStatus, EmailRecord, AutoProcessResult } from "../api/emailApi";
+import { getTeamsStatus, getTeamsConnectUrl, disconnectTeams, listTeamsChats, getTeamsMessages, sendTeamsMessage, chatToNote } from "../api/teamsApi";
+import type { TeamsStatus, TeamsChat, TeamsMessage } from "../api/teamsApi";
 import { EmailReplyPanel } from "./EmailReplyPanel";
 import { MODELS } from "../constants/models";
 import type { User } from "../utils/auth";
@@ -18,10 +20,12 @@ interface SettingsModalProps {
   customApiKeysEnabled?: boolean;
   ttsEnabled?: boolean;
   emailEnabled?: boolean;
+  teamsEnabled?: boolean;
   workflowEnabled?: boolean;
+  onReplayTour?: () => void;
 }
 
-type Tab = "profile" | "security" | "ai" | "keys" | "tts" | "email" | "workflow";
+type Tab = "profile" | "security" | "ai" | "keys" | "tts" | "email" | "teams" | "workflow";
 
 const BLANK_FORM = { name: "", key: "", model: "", base_url: "" };
 
@@ -35,7 +39,9 @@ export function SettingsModal({
   customApiKeysEnabled = true,
   ttsEnabled = true,
   emailEnabled = true,
+  teamsEnabled = true,
   workflowEnabled = true,
+  onReplayTour,
 }: SettingsModalProps) {
   const [tab, setTab] = useState<Tab>("profile");
 
@@ -69,6 +75,19 @@ export function SettingsModal({
     localStorage.setItem("memolink_workflow_suggestions", String(val));
   }
 
+  // Teams connection state
+  const [teamsStatus, setTeamsStatus] = useState<TeamsStatus>({ connected: false });
+  const [teamsLoading, setTeamsLoading] = useState(false);
+  const [teamsChats, setTeamsChats] = useState<TeamsChat[]>([]);
+  const [teamsChatsLoading, setTeamsChatsLoading] = useState(false);
+  const [selectedChat, setSelectedChat] = useState<TeamsChat | null>(null);
+  const [teamsMessages, setTeamsMessages] = useState<TeamsMessage[]>([]);
+  const [teamsMessagesLoading, setTeamsMessagesLoading] = useState(false);
+  const [teamsReply, setTeamsReply] = useState("");
+  const [teamsSending, setTeamsSending] = useState(false);
+  const [teamsSaveResult, setTeamsSaveResult] = useState<string | null>(null);
+  const [teamsError, setTeamsError] = useState<string | null>(null);
+
   // Email connection state
   const [emailStatus, setEmailStatus] = useState<EmailStatus>({ connected: false, email: null });
   const [emailLoading, setEmailLoading] = useState(false);
@@ -82,8 +101,81 @@ export function SettingsModal({
   const [actionResult, setActionResult] = useState<string | null>(null);
 
   useEffect(() => {
-    if (show) { loadProviders(); loadEmailStatus(); }
+    if (show) { loadProviders(); loadEmailStatus(); loadTeamsStatus(); }
   }, [show]);
+
+  async function loadTeamsStatus() {
+    try {
+      const s = await getTeamsStatus();
+      setTeamsStatus(s);
+      if (s.connected) loadTeamsChats();
+    } catch { /* silently fail */ }
+  }
+
+  async function loadTeamsChats() {
+    setTeamsChatsLoading(true);
+    setTeamsError(null);
+    try {
+      setTeamsChats(await listTeamsChats());
+    } catch (err: any) {
+      const detail = err?.response?.data?.detail;
+      setTeamsError(detail?.message ?? "Could not load Teams chats.");
+      setTeamsChats([]);
+    } finally { setTeamsChatsLoading(false); }
+  }
+
+  async function handleTeamsConnect() {
+    setTeamsLoading(true);
+    try {
+      const url = await getTeamsConnectUrl();
+      window.location.href = url;
+    } catch { setTeamsLoading(false); }
+  }
+
+  async function handleTeamsDisconnect() {
+    setTeamsLoading(true);
+    try {
+      await disconnectTeams();
+      setTeamsStatus({ connected: false });
+      setTeamsChats([]);
+      setTeamsError(null);
+      setSelectedChat(null);
+      setTeamsMessages([]);
+    } catch { /* silently fail */ } finally { setTeamsLoading(false); }
+  }
+
+  async function handleOpenChat(chat: TeamsChat) {
+    setSelectedChat(chat);
+    setTeamsMessages([]);
+    setTeamsMessagesLoading(true);
+    setTeamsError(null);
+    setTeamsSaveResult(null);
+    try {
+      setTeamsMessages(await getTeamsMessages(chat.id, 20));
+    } catch (err: any) {
+      const detail = err?.response?.data?.detail;
+      setTeamsError(detail?.message ?? "Could not load Teams messages.");
+    } finally { setTeamsMessagesLoading(false); }
+  }
+
+  async function handleSendTeamsReply() {
+    if (!selectedChat || !teamsReply.trim()) return;
+    setTeamsSending(true);
+    try {
+      await sendTeamsMessage(selectedChat.id, teamsReply.trim());
+      setTeamsReply("");
+      setTeamsMessages(await getTeamsMessages(selectedChat.id, 20));
+    } catch { /* silently fail */ } finally { setTeamsSending(false); }
+  }
+
+  async function handleChatToNote() {
+    if (!selectedChat) return;
+    setTeamsSaveResult(null);
+    try {
+      const res = await chatToNote(selectedChat.id, selectedChat.topic);
+      setTeamsSaveResult(`✓ Saved as note: "${res.title}"`);
+    } catch { setTeamsSaveResult("Failed to save note."); }
+  }
 
   async function loadEmailStatus() {
     try {
@@ -128,7 +220,7 @@ export function SettingsModal({
     setActionLoading("reminder"); setActionResult(null);
     try {
       const res = await emailToReminder(id);
-      const due = res.due_date ? ` — due ${res.due_date}${res.due_time ? " " + res.due_time : ""}` : "";
+      const due = res.due_date ? ` - due ${res.due_date}${res.due_time ? " " + res.due_time : ""}` : "";
       setActionResult(`✓ Reminder added: "${res.text}"${due}`);
     } catch { setActionResult("Failed to add reminder."); }
     finally { setActionLoading(null); }
@@ -155,7 +247,7 @@ export function SettingsModal({
     }
   }
 
-  // TTS settings — local voice list + saved preferences
+  // TTS settings - local voice list + saved preferences
   const [ttsVoices, setTtsVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [ttsVoiceName, setTtsVoiceNameState] = useState<string>(() => localStorage.getItem("memolink_tts_voice") ?? "");
   const [ttsRate, setTtsRateState] = useState<number>(() => parseFloat(localStorage.getItem("memolink_tts_rate") ?? "1.0"));
@@ -298,6 +390,7 @@ export function SettingsModal({
     ...(customApiKeysEnabled ? [{ id: "keys" as Tab, label: "API Keys" }] : []),
     ...(ttsEnabled ? [{ id: "tts" as Tab, label: "Text-to-Speech" }] : []),
     ...(emailEnabled ? [{ id: "email" as Tab, label: "Email" }] : []),
+    ...(teamsEnabled ? [{ id: "teams" as Tab, label: "Teams" }] : []),
     ...(workflowEnabled ? [{ id: "workflow" as Tab, label: "Workflow" }] : []),
   ];
 
@@ -361,6 +454,22 @@ export function SettingsModal({
                   <div className="bg-[#12121a] border border-[#2a2a38] rounded-xl px-3 py-2.5 text-sm text-gray-300">{user.email}</div>
                   <p className="text-xs text-gray-600 mt-1.5">Email cannot be changed.</p>
                 </div>
+                {onReplayTour && (
+                  <div className="pt-2 border-t border-[#2a2a38]">
+                    <label className="block text-xs text-gray-500 mb-2 uppercase tracking-wider">Onboarding</label>
+                    <button
+                      type="button"
+                      onClick={onReplayTour}
+                      className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm bg-indigo-600/20 text-indigo-400 hover:bg-indigo-600/30 border border-indigo-500/20 transition"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="currentColor" viewBox="0 0 16 16">
+                        <path d="M11.534 7h3.932a.25.25 0 0 1 .192.41l-1.966 2.36a.25.25 0 0 1-.384 0l-1.966-2.36a.25.25 0 0 1 .192-.41m-11 2h3.932a.25.25 0 0 0 .192-.41L2.692 6.23a.25.25 0 0 0-.384 0L.342 8.59A.25.25 0 0 0 .534 9"/>
+                        <path fillRule="evenodd" d="M8 3c-1.552 0-2.94.707-3.857 1.818a.5.5 0 1 1-.771-.636A6.002 6.002 0 0 1 13.917 7H12.9A5 5 0 0 0 8 3M3.1 9a5.002 5.002 0 0 0 8.757 2.182.5.5 0 1 1 .771.636A6.002 6.002 0 0 1 2.083 9z"/>
+                      </svg>
+                      Replay app tour
+                    </button>
+                  </div>
+                )}
               </div>
             )}
 
@@ -583,7 +692,7 @@ export function SettingsModal({
             {/* ── Text-to-Speech ── */}
             {tab === "tts" && (
               <div className="space-y-5">
-                <p className="text-sm text-gray-400">Configure the voice used when reading notes and chat messages aloud. Changes apply to the next reading. Uses your browser's built-in speech engine — <span className="text-gray-300">no API key or internet connection required</span>.</p>
+                <p className="text-sm text-gray-400">Configure the voice used when reading notes and chat messages aloud. Changes apply to the next reading. Uses your browser's built-in speech engine - <span className="text-gray-300">no API key or internet connection required</span>.</p>
 
                 {/* Speed */}
                 <div>
@@ -832,13 +941,113 @@ export function SettingsModal({
               </div>
             )}
 
+            {/* ── Teams ── */}
+            {tab === "teams" && (
+              <div className="space-y-4">
+                {teamsStatus.connected ? (
+                  <>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-green-400 shrink-0" />
+                        <div>
+                          <p className="text-xs text-gray-300">{teamsStatus.display_name}</p>
+                          <p className="text-[11px] text-gray-500">{teamsStatus.email}</p>
+                        </div>
+                      </div>
+                      <button onClick={handleTeamsDisconnect} disabled={teamsLoading} className={btnDanger}>
+                        {teamsLoading ? "Disconnecting…" : "Disconnect"}
+                      </button>
+                    </div>
+
+                    {teamsError && (
+                      <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs leading-relaxed text-amber-200">
+                        {teamsError}
+                      </div>
+                    )}
+
+                    {selectedChat ? (
+                      <div className="bg-[#12121a] border border-[#2a2a38] rounded-xl overflow-hidden">
+                        <div className="flex items-center justify-between px-4 py-2.5 border-b border-[#2a2a38]">
+                          <button onClick={() => { setSelectedChat(null); setTeamsSaveResult(null); }} className="text-xs text-gray-500 hover:text-gray-300 transition">← Back</button>
+                          <span className="text-xs text-gray-300 font-medium truncate max-w-[180px]">{selectedChat.topic}</span>
+                          <button onClick={handleChatToNote} className="text-xs text-indigo-400 hover:text-indigo-300 transition">Save to note</button>
+                        </div>
+                        {teamsSaveResult && (
+                          <p className={`mx-4 mt-2 text-xs px-3 py-1.5 rounded-lg ${teamsSaveResult.startsWith("✓") ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-400"}`}>{teamsSaveResult}</p>
+                        )}
+                        <div className="px-4 py-3 max-h-52 overflow-y-auto space-y-2">
+                          {teamsMessagesLoading ? (
+                            <p className="text-xs text-gray-600">Loading messages…</p>
+                          ) : teamsMessages.length === 0 ? (
+                            <p className="text-xs text-gray-600">No messages</p>
+                          ) : teamsMessages.map((m) => (
+                            <div key={m.id} className="space-y-0.5">
+                              <p className="text-[11px] text-indigo-400 font-medium">{m.from}</p>
+                              <p className="text-xs text-gray-300 leading-snug">{m.content}</p>
+                              <p className="text-[10px] text-gray-600">{new Date(m.createdDateTime).toLocaleString()}</p>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="px-4 pb-3 flex gap-2">
+                          <input
+                            type="text"
+                            value={teamsReply}
+                            onChange={(e) => setTeamsReply(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSendTeamsReply(); } }}
+                            placeholder="Reply…"
+                            className="flex-1 bg-[#0f0f13] border border-[#2a2a38] rounded-lg px-3 py-1.5 text-xs text-gray-200 outline-none focus:border-indigo-500"
+                          />
+                          <button onClick={handleSendTeamsReply} disabled={teamsSending || !teamsReply.trim()} className={btnPrimary}>
+                            {teamsSending ? "…" : "Send"}
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">Recent Chats</p>
+                          <button onClick={loadTeamsChats} disabled={teamsChatsLoading} className="text-xs text-indigo-400 hover:text-indigo-300">
+                            {teamsChatsLoading ? "Loading…" : "↻ Refresh"}
+                          </button>
+                        </div>
+                        {teamsChats.length === 0 ? (
+                          <p className="text-xs text-gray-600">{teamsChatsLoading ? "Loading…" : teamsError ?? "No chats found"}</p>
+                        ) : teamsChats.map((chat) => (
+                          <button
+                            key={chat.id}
+                            onClick={() => handleOpenChat(chat)}
+                            className="w-full text-left px-3 py-2.5 bg-[#12121a] border border-[#2a2a38] rounded-xl hover:border-indigo-500/30 transition"
+                          >
+                            <p className="text-xs text-gray-200 font-medium truncate">{chat.topic}</p>
+                            {chat.lastMessagePreview && (
+                              <p className="text-[11px] text-gray-500 truncate mt-0.5">{chat.lastMessagePreview}</p>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="space-y-3">
+                    <p className="text-xs text-gray-400 leading-relaxed">
+                      Connect your Microsoft Teams account to read chats, reply, and save conversations as notes.
+                    </p>
+                    <button onClick={handleTeamsConnect} disabled={teamsLoading} className={btnPrimary}>
+                      {teamsLoading ? "Redirecting…" : "Connect Microsoft Teams"}
+                    </button>
+                    <p className="text-[11px] text-gray-600">You'll be redirected to Microsoft to authorise access. MemoLink never stores your password.</p>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* ── Workflow ── */}
             {tab === "workflow" && (
               <div className="space-y-5">
                 <div>
                   <h3 className="text-sm font-semibold text-white mb-1">Workflow Action Suggestions</h3>
                   <p className="text-xs text-gray-500 leading-relaxed">
-                    When enabled, MemoLink automatically analyses each AI response and shows quick action buttons — like Save as Note or Add Reminder — directly below relevant messages. Nothing executes without you clicking.
+                    When enabled, MemoLink automatically analyses each AI response and shows quick action buttons - like Save as Note or Add Reminder - directly below relevant messages. Nothing executes without you clicking.
                   </p>
                 </div>
 
@@ -881,7 +1090,7 @@ export function SettingsModal({
 
                 <div className="bg-indigo-500/5 border border-indigo-500/15 rounded-xl px-4 py-3">
                   <p className="text-xs text-gray-500 leading-relaxed">
-                    Suggestions appear only when the AI response is actionable — short replies and simple questions will not show any buttons. Actions execute only when you click them.
+                    Suggestions appear only when the AI response is actionable - short replies and simple questions will not show any buttons. Actions execute only when you click them.
                   </p>
                 </div>
               </div>

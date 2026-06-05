@@ -23,7 +23,7 @@ export function useTTS() {
   const rateRef = useRef<number>(parseFloat(localStorage.getItem(LS_RATE) ?? "1.0"));
   const voiceRef = useRef<SpeechSynthesisVoice | null>(null);
 
-  // Load voices and restore saved voice — async in some browsers
+  // Load voices and restore saved voice - async in some browsers
   useEffect(() => {
     function load() {
       const v = window.speechSynthesis?.getVoices() ?? [];

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>MemoLink — API Endpoint Design</title>
+  <title>MemoLink - API Endpoint Design</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -162,7 +162,7 @@
 <div class="page-header">
   <div class="section-label">Documentation</div>
   <h1>API Endpoint Design</h1>
-  <p>All REST endpoints for MemoLink's FastAPI backend — base URL <code>/api/v1</code>. Docs auto-generated at <code>/api/docs</code>.</p>
+  <p>All REST endpoints for MemoLink's FastAPI backend - base URL <code>/api/v1</code>. Docs auto-generated at <code>/api/docs</code>.</p>
 </div>
 
 <div class="container">
@@ -187,9 +187,9 @@
         <tr><td><span class="method m-post">POST</span></td><td><code>/notes/update</code></td><td>Update note title / content</td><td>Notes</td></tr>
         <tr><td><span class="method m-post">POST</span></td><td><code>/notes/delete</code></td><td>Delete a note</td><td>Notes</td></tr>
         <tr><td><span class="method m-post">POST</span></td><td><code>/notes/search</code></td><td>Vector similarity search over notes</td><td>Notes</td></tr>
-        <tr><td><span class="method m-post">POST</span></td><td><code>/notes/bulk</code></td><td>Bulk upload files — rich format preserved (DOCX/PDF/PPTX with images)</td><td>Notes</td></tr>
-        <tr><td><span class="method m-post">POST</span></td><td><code>/chat</code></td><td>Submit a prompt — returns AI answer + citations (supports <code>model</code>, <code>web_search</code>)</td><td>Chat</td></tr>
-        <tr><td><span class="method m-post">POST</span></td><td><code>/chat/stream</code></td><td>Streaming AI response via SSE — supports model selection, web search, image generation</td><td>Chat</td></tr>
+        <tr><td><span class="method m-post">POST</span></td><td><code>/notes/bulk</code></td><td>Bulk upload files - rich format preserved (DOCX/PDF/PPTX with images)</td><td>Notes</td></tr>
+        <tr><td><span class="method m-post">POST</span></td><td><code>/chat</code></td><td>Submit a prompt - returns AI answer + citations (supports <code>model</code>, <code>web_search</code>)</td><td>Chat</td></tr>
+        <tr><td><span class="method m-post">POST</span></td><td><code>/chat/stream</code></td><td>Streaming AI response via SSE - supports model selection, web search, image generation</td><td>Chat</td></tr>
         <tr><td><span class="method m-post">POST</span></td><td><code>/chat/upload</code></td><td>Upload files + prompt in one request</td><td>Chat</td></tr>
         <tr><td><span class="method m-post">POST</span></td><td><code>/chat/agent/stream</code></td><td>Agentic chat with tool-call SSE events</td><td>Chat</td></tr>
         <tr><td><span class="method m-post">POST</span></td><td><code>/suggest</code></td><td>Generate AI reminder suggestions from notes</td><td>Suggest</td></tr>
@@ -198,7 +198,7 @@
         <tr><td><span class="method m-patch">PATCH</span></td><td><code>/reminders/{id}</code></td><td>Update a reminder (partial)</td><td>Reminders</td></tr>
         <tr><td><span class="method m-delete">DELETE</span></td><td><code>/reminders/{id}</code></td><td>Delete a reminder</td><td>Reminders</td></tr>
         <tr><td><span class="method m-post">POST</span></td><td><code>/transcribe</code></td><td>Transcribe audio/video file via Whisper</td><td>Transcribe</td></tr>
-        <tr><td><span class="method m-post">POST</span></td><td><code>/translate</code></td><td>Translate text — Gemini quality loop, returns accuracy score and model</td><td>Translate</td></tr>
+        <tr><td><span class="method m-post">POST</span></td><td><code>/translate</code></td><td>Translate text - Gemini quality loop, returns accuracy score and model</td><td>Translate</td></tr>
         <tr><td><span class="method m-post">POST</span></td><td><code>/video/import</code></td><td>Import YouTube video captions by URL</td><td>Video</td></tr>
         <tr><td><span class="method m-post">POST</span></td><td><code>/video/upload</code></td><td>Upload audio/video file for Whisper transcription</td><td>Video</td></tr>
         <tr><td><span class="method m-post">POST</span></td><td><code>/conversation/list</code></td><td>List conversations for a user</td><td>Conversation</td></tr>
@@ -231,7 +231,7 @@
         <tr><td><span class="method m-post">POST</span></td><td><code>/settings/api-keys</code></td><td>Add a custom provider (name, model, base URL, encrypted key)</td><td>Settings</td></tr>
         <tr><td><span class="method m-put">PUT</span></td><td><code>/settings/api-keys/{id}</code></td><td>Update an existing custom provider by ID</td><td>Settings</td></tr>
         <tr><td><span class="method m-delete">DELETE</span></td><td><code>/settings/api-keys/{id}</code></td><td>Remove a custom provider by ID</td><td>Settings</td></tr>
-        <tr><td><span class="method m-post">POST</span></td><td><code>/commands/execute</code></td><td>Execute a slash command — streams SSE response (14 commands supported)</td><td>Commands</td></tr>
+        <tr><td><span class="method m-post">POST</span></td><td><code>/commands/execute</code></td><td>Execute a slash command - streams SSE response (14 commands supported)</td><td>Commands</td></tr>
       </tbody>
     </table>
   </section>
@@ -256,14 +256,14 @@
           <p class="ep-desc">Creates a new user. Returns 400 if the email is already registered. Password is hashed with bcrypt (passlib) before storage.</p>
           <div class="schema-row">
             <div class="schema-box">
-              <div class="schema-box-title">Request Body — RegisterDTO</div>
+              <div class="schema-box-title">Request Body - RegisterDTO</div>
               <pre>{
   <span class="json-key">"email"</span>:    <span class="json-str">"user@example.com"</span>,
   <span class="json-key">"password"</span>: <span class="json-str">"securepassword"</span>
 }</pre>
             </div>
             <div class="schema-box">
-              <div class="schema-box-title">Response 200 — UserResponse</div>
+              <div class="schema-box-title">Response 200 - UserResponse</div>
               <pre>{
   <span class="json-key">"id"</span>:    <span class="json-num">1</span>,
   <span class="json-key">"email"</span>: <span class="json-str">"user@example.com"</span>
@@ -292,14 +292,14 @@
           <p class="ep-desc">Verifies email + hashed password. Returns the user record whose <code>id</code> the client stores in localStorage key <code>memolink_user</code> for scoped requests. Returns 401 on invalid credentials.</p>
           <div class="schema-row">
             <div class="schema-box">
-              <div class="schema-box-title">Request Body — LoginDTO</div>
+              <div class="schema-box-title">Request Body - LoginDTO</div>
               <pre>{
   <span class="json-key">"email"</span>:    <span class="json-str">"user@example.com"</span>,
   <span class="json-key">"password"</span>: <span class="json-str">"securepassword"</span>
 }</pre>
             </div>
             <div class="schema-box">
-              <div class="schema-box-title">Response 200 — UserResponse</div>
+              <div class="schema-box-title">Response 200 - UserResponse</div>
               <pre>{
   <span class="json-key">"id"</span>:    <span class="json-num">1</span>,
   <span class="json-key">"email"</span>: <span class="json-str">"user@example.com"</span>
@@ -321,7 +321,7 @@
           <p class="ep-desc">Verifies the supplied <code>current_password</code> against the stored bcrypt hash before updating. The new password must be at least 8 characters. Returns 401 if <code>current_password</code> is wrong, 400 if the new password fails length validation.</p>
           <div class="schema-row">
             <div class="schema-box">
-              <div class="schema-box-title">Request Body — ChangePasswordDTO</div>
+              <div class="schema-box-title">Request Body - ChangePasswordDTO</div>
               <pre>{
   <span class="json-key">"user_id"</span>:         <span class="json-num">1</span>,
   <span class="json-key">"current_password"</span>: <span class="json-str">"oldpass123"</span>,
@@ -353,11 +353,11 @@
         </div>
         <div class="ep-body">
           <p class="ep-desc">
-            Accepts an email address and, if a matching account exists, generates a signed JWT reset token with a 1-hour expiry and a <code>purpose:"reset"</code> claim. The reset link (<code>FRONTEND_URL/login?reset_token=&lt;token&gt;</code>) is sent to the user's address via SMTP. If SMTP is not configured the link is printed to the server console. The endpoint <strong>always returns HTTP 200</strong> regardless of whether the email is registered — this prevents email enumeration attacks.
+            Accepts an email address and, if a matching account exists, generates a signed JWT reset token with a 1-hour expiry and a <code>purpose:"reset"</code> claim. The reset link (<code>FRONTEND_URL/login?reset_token=&lt;token&gt;</code>) is sent to the user's address via SMTP. If SMTP is not configured the link is printed to the server console. The endpoint <strong>always returns HTTP 200</strong> regardless of whether the email is registered - this prevents email enumeration attacks.
           </p>
           <div class="schema-row">
             <div class="schema-box">
-              <div class="schema-box-title">Request Body — ForgotPasswordDTO</div>
+              <div class="schema-box-title">Request Body - ForgotPasswordDTO</div>
               <pre>{
   <span class="json-key">"email"</span>: <span class="json-str">"user@example.com"</span>
 }</pre>
@@ -384,7 +384,7 @@
           <p class="ep-desc">Verifies the supplied JWT token (signature, expiry, and <code>purpose:"reset"</code> claim). On success, hashes the new password with bcrypt and persists it. Returns 400 if the token has expired, or 401 if the token is structurally invalid or the purpose claim does not match.</p>
           <div class="schema-row">
             <div class="schema-box">
-              <div class="schema-box-title">Request Body — ResetPasswordDTO</div>
+              <div class="schema-box-title">Request Body - ResetPasswordDTO</div>
               <pre>{
   <span class="json-key">"token"</span>:        <span class="json-str">"eyJhbGciOiJIUzI1NiIsInR5..."</span>,
   <span class="json-key">"new_password"</span>: <span class="json-str">"newSecurePass123"</span>
@@ -430,7 +430,7 @@
           <p class="ep-desc">Creates the note record and triggers embedding generation via the OpenAI embeddings API. HTML is stripped before embedding. The resulting vector is stored in the <code>embeddings</code> table.</p>
           <div class="schema-row">
             <div class="schema-box">
-              <div class="schema-box-title">Request Body — NoteCreateDTO</div>
+              <div class="schema-box-title">Request Body - NoteCreateDTO</div>
               <pre>{
   <span class="json-key">"user_id"</span>: <span class="json-num">1</span>,
   <span class="json-key">"title"</span>:   <span class="json-str">"Lecture 5 Summary"</span>,
@@ -439,7 +439,7 @@
 }</pre>
             </div>
             <div class="schema-box">
-              <div class="schema-box-title">Response 200 — NoteResponseDTO</div>
+              <div class="schema-box-title">Response 200 - NoteResponseDTO</div>
               <pre>{
   <span class="json-key">"id"</span>:      <span class="json-num">42</span>,
   <span class="json-key">"user_id"</span>: <span class="json-num">1</span>,
@@ -464,13 +464,13 @@
           <p class="ep-desc">Returns all non-deleted notes owned by the given <code>user_id</code>, ordered by creation date descending.</p>
           <div class="schema-row">
             <div class="schema-box">
-              <div class="schema-box-title">Request Body — NoteListDTO</div>
+              <div class="schema-box-title">Request Body - NoteListDTO</div>
               <pre>{
   <span class="json-key">"user_id"</span>: <span class="json-num">1</span>
 }</pre>
             </div>
             <div class="schema-box">
-              <div class="schema-box-title">Response 200 — NoteResponseDTO[]</div>
+              <div class="schema-box-title">Response 200 - NoteResponseDTO[]</div>
               <pre>[
   {
     <span class="json-key">"id"</span>:      <span class="json-num">42</span>,
@@ -497,11 +497,11 @@
           <p class="ep-desc">Returns the full note record for the given <code>note_id</code>, or <code>null</code> if not found.</p>
           <div class="schema-row">
             <div class="schema-box">
-              <div class="schema-box-title">Request Body — NoteGetDTO</div>
+              <div class="schema-box-title">Request Body - NoteGetDTO</div>
               <pre>{ <span class="json-key">"note_id"</span>: <span class="json-num">42</span> }</pre>
             </div>
             <div class="schema-box">
-              <div class="schema-box-title">Response 200 — NoteResponseDTO | null</div>
+              <div class="schema-box-title">Response 200 - NoteResponseDTO | null</div>
               <pre>{
   <span class="json-key">"id"</span>: <span class="json-num">42</span>,
   <span class="json-key">"user_id"</span>: <span class="json-num">1</span>,
@@ -523,10 +523,10 @@
           <span class="ep-toggle">&#x25BC;</span>
         </div>
         <div class="ep-body">
-          <p class="ep-desc">Partial update — only provided fields are changed. If <code>content</code> changes, the embedding is regenerated from the HTML-stripped plain text.</p>
+          <p class="ep-desc">Partial update - only provided fields are changed. If <code>content</code> changes, the embedding is regenerated from the HTML-stripped plain text.</p>
           <div class="schema-row">
             <div class="schema-box">
-              <div class="schema-box-title">Request Body — NoteUpdateDTO</div>
+              <div class="schema-box-title">Request Body - NoteUpdateDTO</div>
               <pre>{
   <span class="json-key">"note_id"</span>: <span class="json-num">42</span>,
   <span class="json-key">"title"</span>:   <span class="json-str">"Updated Title"</span>,
@@ -534,7 +534,7 @@
 }</pre>
             </div>
             <div class="schema-box">
-              <div class="schema-box-title">Response 200 — NoteResponseDTO | null</div>
+              <div class="schema-box-title">Response 200 - NoteResponseDTO | null</div>
               <pre><span class="json-type">Updated note or null if not found</span></pre>
             </div>
           </div>
@@ -552,7 +552,7 @@
         <div class="ep-body">
           <div class="schema-row">
             <div class="schema-box">
-              <div class="schema-box-title">Request Body — NoteDeleteDTO</div>
+              <div class="schema-box-title">Request Body - NoteDeleteDTO</div>
               <pre>{ <span class="json-key">"note_id"</span>: <span class="json-num">42</span> }</pre>
             </div>
             <div class="schema-box">
@@ -575,14 +575,14 @@
           <p class="ep-desc">Accepts a pre-computed embedding vector and returns the top-K most similar notes using pgvector cosine similarity. Typically called internally by ChatService.</p>
           <div class="schema-row">
             <div class="schema-box">
-              <div class="schema-box-title">Request Body — NoteSearchDTO</div>
+              <div class="schema-box-title">Request Body - NoteSearchDTO</div>
               <pre>{
   <span class="json-key">"vector"</span>: [<span class="json-num">0.0231</span>, <span class="json-num">-0.1142</span>, <span class="json-type">... 1536 dims</span>],
   <span class="json-key">"top_k"</span>: <span class="json-num">5</span>
 }</pre>
             </div>
             <div class="schema-box">
-              <div class="schema-box-title">Response 200 — NoteResponseDTO[]</div>
+              <div class="schema-box-title">Response 200 - NoteResponseDTO[]</div>
               <pre>[
   {
     <span class="json-key">"id"</span>:      <span class="json-num">42</span>,
@@ -601,7 +601,7 @@
         <div class="ep-header" onclick="toggle('ep-note-bulk')">
           <span class="method m-post">POST</span>
           <span class="ep-path">/api/v1/notes/bulk</span>
-          <span class="ep-summary">Bulk upload files — rich formatting preserved</span>
+          <span class="ep-summary">Bulk upload files - rich formatting preserved</span>
           <span class="ep-toggle">&#x25BC;</span>
         </div>
         <div class="ep-body">
@@ -609,11 +609,11 @@
             Accepts one or more file uploads (DOCX, PDF, PPTX, TXT) as <code>multipart/form-data</code> and creates one note per file.
             Uses <code>extract_formatted_html()</code> instead of plain text extraction to preserve rich document structure:
             <br/><br/>
-            <strong>DOCX</strong> — headings (H1–H4 from paragraph style names), bold/italic/underline inline runs, bullet and numbered lists, tables (with <code>&lt;th&gt;</code> header rows), embedded images as base64 <code>&lt;img&gt;</code> tags; paragraphs and tables interleaved in document order.
+            <strong>DOCX</strong> - headings (H1–H4 from paragraph style names), bold/italic/underline inline runs, bullet and numbered lists, tables (with <code>&lt;th&gt;</code> header rows), embedded images as base64 <code>&lt;img&gt;</code> tags; paragraphs and tables interleaved in document order.
             <br/>
-            <strong>PDF</strong> — word-level extraction via pdfplumber; headings inferred by font-size ratio (≥ 1.5× body → H1; ≥ 1.3× → H2; ≥ 1.15× or bold+short → H3); bold text detected by fontname.
+            <strong>PDF</strong> - word-level extraction via pdfplumber; headings inferred by font-size ratio (≥ 1.5× body → H1; ≥ 1.3× → H2; ≥ 1.15× or bold+short → H3); bold text detected by fontname.
             <br/>
-            <strong>PPTX</strong> — slide title → <code>&lt;h2&gt;</code>; content items → <code>&lt;ul&gt;</code> with indent levels; slide separator → <code>&lt;hr&gt;</code>; picture shapes extracted as base64 <code>&lt;img&gt;</code> tags.
+            <strong>PPTX</strong> - slide title → <code>&lt;h2&gt;</code>; content items → <code>&lt;ul&gt;</code> with indent levels; slide separator → <code>&lt;hr&gt;</code>; picture shapes extracted as base64 <code>&lt;img&gt;</code> tags.
             <br/><br/>
             Each created note is automatically embedded for RAG retrieval.
           </p>
@@ -626,7 +626,7 @@
 <span class="json-type">Accepted: .docx .pdf .pptx .txt</span></pre>
             </div>
             <div class="schema-box">
-              <div class="schema-box-title">Response 200 — NoteResponseDTO[]</div>
+              <div class="schema-box-title">Response 200 - NoteResponseDTO[]</div>
               <pre>[
   {
     <span class="json-key">"id"</span>:      <span class="json-num">60</span>,
@@ -656,24 +656,24 @@
         <div class="ep-header" onclick="toggle('ep-chat')">
           <span class="method m-post">POST</span>
           <span class="ep-path">/api/v1/chat</span>
-          <span class="ep-summary">Submit prompt — RAG answer + citations (JSON)</span>
+          <span class="ep-summary">Submit prompt - RAG answer + citations (JSON)</span>
           <span class="ep-toggle">&#x25BC;</span>
         </div>
         <div class="ep-body">
           <p class="ep-desc">
             Core RAG endpoint. Flow:
-            1 — Embed the prompt via OpenAI text-embedding-3-small.
-            2 — Retrieve top-K notes by cosine similarity (workspace-scoped).
-            3 — Optionally query Brave Search API and inject results as system context (when <code>web_search: true</code>).
-            4 — Detect image-generation intent and call DALL-E 3 if triggered.
-            5 — Call the selected model (GPT or Gemini) for the answer.
-            6 — Return answer + source citations + model used.
+            1 - Embed the prompt via OpenAI text-embedding-3-small.
+            2 - Retrieve top-K notes by cosine similarity (workspace-scoped).
+            3 - Optionally query Brave Search API and inject results as system context (when <code>web_search: true</code>).
+            4 - Detect image-generation intent and call DALL-E 3 if triggered.
+            5 - Call the selected model (GPT or Gemini) for the answer.
+            6 - Return answer + source citations + model used.
             Persists both the user message and the AI reply to the conversation.
             For real-time streaming use <code>/chat/stream</code> instead.
           </p>
           <div class="schema-row">
             <div class="schema-box">
-              <div class="schema-box-title">Request Body — ChatRequestDTO</div>
+              <div class="schema-box-title">Request Body - ChatRequestDTO</div>
               <pre>{
   <span class="json-key">"user_id"</span>:         <span class="json-num">1</span>,
   <span class="json-key">"conversation_id"</span>: <span class="json-num">7</span>,
@@ -684,7 +684,7 @@
 }</pre>
             </div>
             <div class="schema-box">
-              <div class="schema-box-title">Response 200 — ChatResponseDTO</div>
+              <div class="schema-box-title">Response 200 - ChatResponseDTO</div>
               <pre>{
   <span class="json-key">"answer"</span>: <span class="json-str">"RAG combines retrieval..."</span>,
   <span class="json-key">"sources"</span>: [
@@ -717,12 +717,12 @@
             The selected model is called with <code>stream=True</code>. Each token is forwarded immediately.
             Supports optional web search context injection (<code>web_search: true</code>) and multi-model selection via the <code>model</code> field.
             When an image-generation intent is detected, yields "🎨 Generating your image…" first, then the base64 image tag.
-            nginx must have <code>proxy_buffering off</code> and <code>X-Accel-Buffering: no</code> — both are set in <code>nginx.conf</code>.
+            nginx must have <code>proxy_buffering off</code> and <code>X-Accel-Buffering: no</code> - both are set in <code>nginx.conf</code>.
             The frontend displays a blinking cursor while streaming; the cursor disappears when <code>done</code> is received.
           </p>
           <div class="schema-row">
             <div class="schema-box">
-              <div class="schema-box-title">Request Body — ChatRequestDTO</div>
+              <div class="schema-box-title">Request Body - ChatRequestDTO</div>
               <pre>{
   <span class="json-key">"user_id"</span>:         <span class="json-num">1</span>,
   <span class="json-key">"conversation_id"</span>: <span class="json-num">7</span>,
@@ -767,7 +767,7 @@
 <span class="json-type">Accepted: .txt, .pdf, .docx</span></pre>
             </div>
             <div class="schema-box">
-              <div class="schema-box-title">Response 200 — ChatResponseDTO</div>
+              <div class="schema-box-title">Response 200 - ChatResponseDTO</div>
               <pre>{
   <span class="json-key">"answer"</span>: <span class="json-str">"Based on your document..."</span>,
   <span class="json-key">"sources"</span>: [...],
@@ -796,14 +796,14 @@
         <div class="ep-body">
           <p class="ep-desc">
             Agentic variant of the streaming chat endpoint. Bypasses the standard RAG pipeline and uses tool-use capabilities. The SSE stream emits three event types in sequence:
-            (1) <code>{"tool_call": "&lt;name&gt;", "label": "&lt;display text&gt;"}</code> — rendered as status chips while a tool is executing;
-            (2) <code>{"tool_result": "&lt;result&gt;", "ok": true}</code> — signals tool completion;
+            (1) <code>{"tool_call": "&lt;name&gt;", "label": "&lt;display text&gt;"}</code> - rendered as status chips while a tool is executing;
+            (2) <code>{"tool_result": "&lt;result&gt;", "ok": true}</code> - signals tool completion;
             (3) regular <code>{"t": "&lt;token&gt;"}</code> events for the final answer.
             The frontend "Agent" toggle switches <code>streamChat()</code> to <code>streamAgentChat()</code> which targets this endpoint.
           </p>
           <div class="schema-row">
             <div class="schema-box">
-              <div class="schema-box-title">Request Body — AgentChatDTO</div>
+              <div class="schema-box-title">Request Body - AgentChatDTO</div>
               <pre>{
   <span class="json-key">"conversation_id"</span>: <span class="json-num">7</span>,
   <span class="json-key">"prompt"</span>:          <span class="json-str">"Search and summarise the latest on RAG."</span>,
@@ -848,11 +848,11 @@
           <p class="ep-desc">
             Strips HTML from the user's notes (up to 15), concatenates them, and sends the result to GPT with a reminder-extraction prompt.
             GPT returns a JSON array of suggestions. Each suggestion is saved to the <code>reminders</code> table with <code>type="ai"</code>.
-            The endpoint only uses the user's own notes — no external context is injected.
+            The endpoint only uses the user's own notes - no external context is injected.
           </p>
           <div class="schema-row">
             <div class="schema-box">
-              <div class="schema-box-title">Request Body — SuggestDTO</div>
+              <div class="schema-box-title">Request Body - SuggestDTO</div>
               <pre>{
   <span class="json-key">"user_id"</span>: <span class="json-num">1</span>,
   <span class="json-key">"context"</span>: <span class="json-str">"study, work"</span>,
@@ -860,7 +860,7 @@
 }</pre>
             </div>
             <div class="schema-box">
-              <div class="schema-box-title">Response 200 — SuggestResponse</div>
+              <div class="schema-box-title">Response 200 - SuggestResponse</div>
               <pre>{
   <span class="json-key">"suggestions"</span>: [
     {
@@ -903,7 +903,7 @@
               <pre><span class="json-key">user_id</span> <span class="json-type">integer (required)</span></pre>
             </div>
             <div class="schema-box">
-              <div class="schema-box-title">Response 200 — Reminder[]</div>
+              <div class="schema-box-title">Response 200 - Reminder[]</div>
               <pre>[
   {
     <span class="json-key">"id"</span>:          <span class="json-num">1</span>,
@@ -934,7 +934,7 @@
           <p class="ep-desc">Creates a reminder with <code>type="manual"</code>. All fields except <code>user_id</code> and <code>text</code> are optional.</p>
           <div class="schema-row">
             <div class="schema-box">
-              <div class="schema-box-title">Request Body — ReminderCreateDTO</div>
+              <div class="schema-box-title">Request Body - ReminderCreateDTO</div>
               <pre>{
   <span class="json-key">"user_id"</span>:     <span class="json-num">1</span>,
   <span class="json-key">"text"</span>:        <span class="json-str">"Read chapter 4"</span>,
@@ -944,7 +944,7 @@
 }</pre>
             </div>
             <div class="schema-box">
-              <div class="schema-box-title">Response 200 — Reminder</div>
+              <div class="schema-box-title">Response 200 - Reminder</div>
               <pre>{
   <span class="json-key">"id"</span>:   <span class="json-num">2</span>,
   <span class="json-key">"type"</span>: <span class="json-str">"manual"</span>,
@@ -965,10 +965,10 @@
           <span class="ep-toggle">&#x25BC;</span>
         </div>
         <div class="ep-body">
-          <p class="ep-desc">Partial update — any combination of fields may be provided. Used by the reminder detail modal to edit title, description, date/time, and toggle the done flag.</p>
+          <p class="ep-desc">Partial update - any combination of fields may be provided. Used by the reminder detail modal to edit title, description, date/time, and toggle the done flag.</p>
           <div class="schema-row">
             <div class="schema-box">
-              <div class="schema-box-title">Request Body — ReminderUpdateDTO (all optional)</div>
+              <div class="schema-box-title">Request Body - ReminderUpdateDTO (all optional)</div>
               <pre>{
   <span class="json-key">"text"</span>:        <span class="json-str">"Read chapter 5"</span>,
   <span class="json-key">"description"</span>: <span class="json-str">"Updated context."</span>,
@@ -978,7 +978,7 @@
 }</pre>
             </div>
             <div class="schema-box">
-              <div class="schema-box-title">Response 200 — Reminder (updated)</div>
+              <div class="schema-box-title">Response 200 - Reminder (updated)</div>
               <pre><span class="json-type">Full updated reminder object</span></pre>
             </div>
           </div>
@@ -997,7 +997,7 @@
           <div class="schema-row">
             <div class="schema-box">
               <div class="schema-box-title">Path Param</div>
-              <pre><span class="json-key">id</span> <span class="json-type">integer — reminder ID</span></pre>
+              <pre><span class="json-key">id</span> <span class="json-type">integer - reminder ID</span></pre>
             </div>
             <div class="schema-box">
               <div class="schema-box-title">Response 200</div>
@@ -1026,7 +1026,7 @@
           <span class="ep-toggle">&#x25BC;</span>
         </div>
         <div class="ep-body">
-          <p class="ep-desc">Accepts a multipart <code>file</code> upload (MP4, M4A, WebM, MP3, WAV, MOV — maximum 200 MB). Files &lt;5 MB are transcribed via OpenAI Whisper; files ≥5 MB are routed to Deepgram Nova-2 (Whisper fallback up to 25 MB). Returns the plain-text transcript. Used internally by the note editor's Record button.</p>
+          <p class="ep-desc">Accepts a multipart <code>file</code> upload (MP4, M4A, WebM, MP3, WAV, MOV - maximum 200 MB). Files &lt;5 MB are transcribed via OpenAI Whisper; files ≥5 MB are routed to Deepgram Nova-2 (Whisper fallback up to 25 MB). Returns the plain-text transcript. Used internally by the note editor's Record button.</p>
           <div class="schema-row">
             <div class="schema-box">
               <div class="schema-box-title">Form Fields</div>
@@ -1068,17 +1068,17 @@
             (1) Gemini 2.0 Flash Lite performs the initial translation;
             (2) the result is back-translated to the source language;
             (3) GPT scores semantic similarity (0–100);
-            (4) if the score is below 85, the feedback is fed back to Gemini for a refined translation — this repeats for up to 3 rounds.
+            (4) if the score is below 85, the feedback is fed back to Gemini for a refined translation - this repeats for up to 3 rounds.
             A 1.2-second sleep is applied between API calls to avoid burst-rate detection.
             If Gemini hits a rate limit the entire pipeline falls back to GPT-4o-mini.
             For Māori translations a hint is injected specifying correct macron usage (ā ē ī ō ū) and natural fluency.
             The <code>accuracy</code> field in the response is the final similarity score; it is <code>null</code> when the fallback model is used without a scoring round.
-            Results are cached in the <code>translation_cache</code> table — repeated requests for the same text and language are served instantly with <code>"cached": true</code>.
+            Results are cached in the <code>translation_cache</code> table - repeated requests for the same text and language are served instantly with <code>"cached": true</code>.
             The optional <code>force</code> boolean field (default <code>false</code>) bypasses the cache: when <code>true</code>, the full LLM pipeline runs and the cache entry is updated with the fresh result.
           </p>
           <div class="schema-row">
             <div class="schema-box">
-              <div class="schema-box-title">Request Body — TranslateDTO</div>
+              <div class="schema-box-title">Request Body - TranslateDTO</div>
               <pre>{
   <span class="json-key">"text"</span>:            <span class="json-str">"Hola mundo"</span>,
   <span class="json-key">"target_language"</span>: <span class="json-str">"English"</span>,
@@ -1098,9 +1098,9 @@
           <div class="schema-row" style="margin-top:.8rem;">
             <div class="schema-box">
               <div class="schema-box-title">Accuracy colour-coding in UI</div>
-              <pre><span class="json-num">&ge; 85</span>  <span class="json-type">Green  — high confidence</span>
-<span class="json-num">&ge; 70</span>  <span class="json-type">Amber  — acceptable</span>
-<span class="json-num">&lt; 70</span>   <span class="json-type">Red    — low confidence</span>
+              <pre><span class="json-num">&ge; 85</span>  <span class="json-type">Green  - high confidence</span>
+<span class="json-num">&ge; 70</span>  <span class="json-type">Amber  - acceptable</span>
+<span class="json-num">&lt; 70</span>   <span class="json-type">Red    - low confidence</span>
 <span class="json-null">null</span>   <span class="json-type">No score (GPT fallback path)</span></pre>
             </div>
           </div>
@@ -1129,18 +1129,18 @@
         <div class="ep-body">
           <p class="ep-desc">
             Accepts a YouTube video URL. Uses <code>YouTubeTranscriptApi()</code> (instantiated object, not static call) to fetch the available captions.
-            Returns the title and HTML-formatted transcript. No ffmpeg or yt-dlp is required — only caption data is fetched.
+            Returns the title and HTML-formatted transcript. No ffmpeg or yt-dlp is required - only caption data is fetched.
             Returns <code>422 Unprocessable Entity</code> if the video has no captions available.
           </p>
           <div class="schema-row">
             <div class="schema-box">
-              <div class="schema-box-title">Request Body — VideoImportDTO</div>
+              <div class="schema-box-title">Request Body - VideoImportDTO</div>
               <pre>{
   <span class="json-key">"url"</span>: <span class="json-str">"https://www.youtube.com/watch?v=abc123"</span>
 }</pre>
             </div>
             <div class="schema-box">
-              <div class="schema-box-title">Response 200 — VideoImportResponse</div>
+              <div class="schema-box-title">Response 200 - VideoImportResponse</div>
               <pre>{
   <span class="json-key">"title"</span>:   <span class="json-str">"Intro to Machine Learning"</span>,
   <span class="json-key">"content"</span>: <span class="json-str">"&lt;p&gt;Welcome to this tutorial...&lt;/p&gt;"</span>,
@@ -1163,12 +1163,12 @@
         <div class="ep-header" onclick="toggle('ep-video-upload')">
           <span class="method m-post">POST</span>
           <span class="ep-path">/api/v1/video/upload</span>
-          <span class="ep-summary">Upload audio/video file — Whisper (&lt;5 MB) / Deepgram (≥5 MB)</span>
+          <span class="ep-summary">Upload audio/video file - Whisper (&lt;5 MB) / Deepgram (≥5 MB)</span>
           <span class="ep-toggle">&#x25BC;</span>
         </div>
         <div class="ep-body">
           <p class="ep-desc">
-            Accepts a multipart <code>file</code> upload (MP4, M4A, WebM, MP3, WAV, MOV — maximum 200 MB).
+            Accepts a multipart <code>file</code> upload (MP4, M4A, WebM, MP3, WAV, MOV - maximum 200 MB).
             Intended for Zoom, Teams, and Google Meet recordings.
             Files &lt;5 MB are transcribed via OpenAI Whisper; files ≥5 MB are routed to Deepgram Nova-2 (with Whisper as fallback up to 25 MB). The result is wrapped in HTML for direct insertion into the Tiptap note editor.
           </p>
@@ -1180,7 +1180,7 @@
 <span class="json-type">Max size: 200 MB</span></pre>
             </div>
             <div class="schema-box">
-              <div class="schema-box-title">Response 200 — VideoUploadResponse</div>
+              <div class="schema-box-title">Response 200 - VideoUploadResponse</div>
               <pre>{
   <span class="json-key">"title"</span>:   <span class="json-str">"recording.mp4"</span>,
   <span class="json-key">"content"</span>: <span class="json-str">"&lt;p&gt;The meeting started...&lt;/p&gt;"</span>,
@@ -1220,11 +1220,11 @@
         <div class="ep-body">
           <div class="schema-row">
             <div class="schema-box">
-              <div class="schema-box-title">Request Body — UserID</div>
+              <div class="schema-box-title">Request Body - UserID</div>
               <pre>{ <span class="json-key">"user_id"</span>: <span class="json-num">1</span> }</pre>
             </div>
             <div class="schema-box">
-              <div class="schema-box-title">Response 200 — Conversation[]</div>
+              <div class="schema-box-title">Response 200 - Conversation[]</div>
               <pre>[
   {
     <span class="json-key">"id"</span>:         <span class="json-num">7</span>,
@@ -1249,11 +1249,11 @@
         <div class="ep-body">
           <div class="schema-row">
             <div class="schema-box">
-              <div class="schema-box-title">Request Body — CreateConvDTO</div>
+              <div class="schema-box-title">Request Body - CreateConvDTO</div>
               <pre>{ <span class="json-key">"user_id"</span>: <span class="json-num">1</span> }</pre>
             </div>
             <div class="schema-box">
-              <div class="schema-box-title">Response 200 — Conversation</div>
+              <div class="schema-box-title">Response 200 - Conversation</div>
               <pre>{ <span class="json-key">"id"</span>: <span class="json-num">8</span>, <span class="json-key">"user_id"</span>: <span class="json-num">1</span>, <span class="json-key">"title"</span>: <span class="json-null">null</span>, ... }</pre>
             </div>
           </div>
@@ -1280,7 +1280,7 @@
 ?limit=<span class="json-num">10</span>&amp;before_id=<span class="json-num">103</span></pre>
             </div>
             <div class="schema-box">
-              <div class="schema-box-title">Response 200 — Message[]</div>
+              <div class="schema-box-title">Response 200 - Message[]</div>
               <pre>[
   {
     <span class="json-key">"id"</span>:         <span class="json-num">102</span>,
@@ -1311,7 +1311,7 @@
         <div class="ep-body">
           <div class="schema-row">
             <div class="schema-box">
-              <div class="schema-box-title">Request Body — RenameDTO</div>
+              <div class="schema-box-title">Request Body - RenameDTO</div>
               <pre>{
   <span class="json-key">"conversation_id"</span>: <span class="json-num">7</span>,
   <span class="json-key">"title"</span>: <span class="json-str">"RAG Study Session"</span>
@@ -1336,7 +1336,7 @@
         <div class="ep-body">
           <div class="schema-row">
             <div class="schema-box">
-              <div class="schema-box-title">Request Body — DeleteDTO</div>
+              <div class="schema-box-title">Request Body - DeleteDTO</div>
               <pre>{ <span class="json-key">"conversation_id"</span>: <span class="json-num">7</span> }</pre>
             </div>
             <div class="schema-box">
@@ -1358,7 +1358,7 @@
         <div class="ep-body">
           <div class="schema-row">
             <div class="schema-box">
-              <div class="schema-box-title">Request Body — DeleteMessageDTO</div>
+              <div class="schema-box-title">Request Body - DeleteMessageDTO</div>
               <pre>{ <span class="json-key">"message_id"</span>: <span class="json-num">102</span> }</pre>
             </div>
             <div class="schema-box">
@@ -1378,10 +1378,10 @@
           <span class="ep-toggle">&#x25BC;</span>
         </div>
         <div class="ep-body">
-          <p class="ep-desc">Creates a new note from the provided content — typically used to save a useful AI reply back into the user's knowledge base. Triggers embedding generation for the new note.</p>
+          <p class="ep-desc">Creates a new note from the provided content - typically used to save a useful AI reply back into the user's knowledge base. Triggers embedding generation for the new note.</p>
           <div class="schema-row">
             <div class="schema-box">
-              <div class="schema-box-title">Request Body — AddToNoteDTO</div>
+              <div class="schema-box-title">Request Body - AddToNoteDTO</div>
               <pre>{
   <span class="json-key">"user_id"</span>: <span class="json-num">1</span>,
   <span class="json-key">"content"</span>: <span class="json-str">"RAG combines retrieval..."</span>,
@@ -1389,7 +1389,7 @@
 }</pre>
             </div>
             <div class="schema-box">
-              <div class="schema-box-title">Response 200 — NoteResponseDTO</div>
+              <div class="schema-box-title">Response 200 - NoteResponseDTO</div>
               <pre>{
   <span class="json-key">"id"</span>:      <span class="json-num">55</span>,
   <span class="json-key">"user_id"</span>: <span class="json-num">1</span>,
@@ -1412,7 +1412,7 @@
   <section>
     <div class="section-label">Workspaces</div>
     <h2>Knowledge Workspace Endpoints</h2>
-    <p>All workspace operations require a <code>user_id</code> in the request body. The API enforces ownership — a user can only read or modify their own workspaces. Soft-deleted workspaces are excluded from all responses unless explicitly queried.</p>
+    <p>All workspace operations require a <code>user_id</code> in the request body. The API enforces ownership - a user can only read or modify their own workspaces. Soft-deleted workspaces are excluded from all responses unless explicitly queried.</p>
     <div class="ep-group">
 
       <!-- CREATE WORKSPACE -->
@@ -1427,7 +1427,7 @@
           <p class="ep-desc">Creates a workspace for the given user. Returns 400 if a workspace with the same name already exists for that user. The <code>type</code> field must be one of: <code>Academic</code>, <code>Professional</code>, <code>Personal</code>, <code>Project</code>, <code>Other</code>. If this is the user's first workspace, <code>is_default</code> is set to <code>true</code> automatically.</p>
           <div class="schema-row">
             <div class="schema-box">
-              <div class="schema-box-title">Request Body — WorkspaceCreateDTO</div>
+              <div class="schema-box-title">Request Body - WorkspaceCreateDTO</div>
               <pre>{
   <span class="json-key">"user_id"</span>:     <span class="json-num">1</span>,
   <span class="json-key">"name"</span>:        <span class="json-str">"Capstone Research"</span>,
@@ -1436,7 +1436,7 @@
 }</pre>
             </div>
             <div class="schema-box">
-              <div class="schema-box-title">Response 200 — WorkspaceResponseDTO</div>
+              <div class="schema-box-title">Response 200 - WorkspaceResponseDTO</div>
               <pre>{
   <span class="json-key">"id"</span>:              <span class="json-num">1</span>,
   <span class="json-key">"user_id"</span>:         <span class="json-num">1</span>,
@@ -1469,14 +1469,14 @@
           <span class="ep-toggle">&#x25BC;</span>
         </div>
         <div class="ep-body">
-          <p class="ep-desc">Returns all non-deleted workspaces owned by the given <code>user_id</code>, ordered by <code>last_accessed_at</code> descending (most recently used first). Each workspace includes an <code>alert_count</code> — the number of non-done reminders in that workspace — which drives the alert badge in the sidebar dropdown.</p>
+          <p class="ep-desc">Returns all non-deleted workspaces owned by the given <code>user_id</code>, ordered by <code>last_accessed_at</code> descending (most recently used first). Each workspace includes an <code>alert_count</code> - the number of non-done reminders in that workspace - which drives the alert badge in the sidebar dropdown.</p>
           <div class="schema-row">
             <div class="schema-box">
-              <div class="schema-box-title">Request Body — WorkspaceListDTO</div>
+              <div class="schema-box-title">Request Body - WorkspaceListDTO</div>
               <pre>{ <span class="json-key">"user_id"</span>: <span class="json-num">1</span> }</pre>
             </div>
             <div class="schema-box">
-              <div class="schema-box-title">Response 200 — WorkspaceResponseDTO[]</div>
+              <div class="schema-box-title">Response 200 - WorkspaceResponseDTO[]</div>
               <pre>[
   {
     <span class="json-key">"id"</span>:              <span class="json-num">1</span>,
@@ -1514,14 +1514,14 @@
           <p class="ep-desc">Returns the full workspace record for the given <code>workspace_id</code>. Returns 403 if the workspace does not belong to the requesting user. Returns 404 if not found or soft-deleted.</p>
           <div class="schema-row">
             <div class="schema-box">
-              <div class="schema-box-title">Request Body — WorkspaceGetDTO</div>
+              <div class="schema-box-title">Request Body - WorkspaceGetDTO</div>
               <pre>{
   <span class="json-key">"user_id"</span>:      <span class="json-num">1</span>,
   <span class="json-key">"workspace_id"</span>: <span class="json-num">1</span>
 }</pre>
             </div>
             <div class="schema-box">
-              <div class="schema-box-title">Response 200 — WorkspaceResponseDTO</div>
+              <div class="schema-box-title">Response 200 - WorkspaceResponseDTO</div>
               <pre><span class="json-type">Full workspace object (see /workspaces/list for shape)</span></pre>
             </div>
           </div>
@@ -1544,10 +1544,10 @@
           <span class="ep-toggle">&#x25BC;</span>
         </div>
         <div class="ep-body">
-          <p class="ep-desc">Partial update — any combination of <code>name</code>, <code>type</code>, and <code>description</code> may be provided. Rejects a name change if the new name is already taken by another workspace belonging to the same user. Updates <code>updated_at</code> automatically.</p>
+          <p class="ep-desc">Partial update - any combination of <code>name</code>, <code>type</code>, and <code>description</code> may be provided. Rejects a name change if the new name is already taken by another workspace belonging to the same user. Updates <code>updated_at</code> automatically.</p>
           <div class="schema-row">
             <div class="schema-box">
-              <div class="schema-box-title">Request Body — WorkspaceUpdateDTO</div>
+              <div class="schema-box-title">Request Body - WorkspaceUpdateDTO</div>
               <pre>{
   <span class="json-key">"user_id"</span>:      <span class="json-num">1</span>,
   <span class="json-key">"workspace_id"</span>: <span class="json-num">1</span>,
@@ -1557,7 +1557,7 @@
 }</pre>
             </div>
             <div class="schema-box">
-              <div class="schema-box-title">Response 200 — WorkspaceResponseDTO</div>
+              <div class="schema-box-title">Response 200 - WorkspaceResponseDTO</div>
               <pre><span class="json-type">Full updated workspace object</span></pre>
             </div>
           </div>
@@ -1581,10 +1581,10 @@
           <span class="ep-toggle">&#x25BC;</span>
         </div>
         <div class="ep-body">
-          <p class="ep-desc">Sets <code>deleted_at</code> on the workspace. Returns 409 if this is the user's only remaining non-deleted workspace — users must always have at least one. The frontend must switch the active workspace to another before calling this endpoint if the deleted workspace was the active one.</p>
+          <p class="ep-desc">Sets <code>deleted_at</code> on the workspace. Returns 409 if this is the user's only remaining non-deleted workspace - users must always have at least one. The frontend must switch the active workspace to another before calling this endpoint if the deleted workspace was the active one.</p>
           <div class="schema-row">
             <div class="schema-box">
-              <div class="schema-box-title">Request Body — WorkspaceDeleteDTO</div>
+              <div class="schema-box-title">Request Body - WorkspaceDeleteDTO</div>
               <pre>{
   <span class="json-key">"user_id"</span>:      <span class="json-num">1</span>,
   <span class="json-key">"workspace_id"</span>: <span class="json-num">2</span>
@@ -1618,14 +1618,14 @@
           <p class="ep-desc">Records the user's active workspace selection. Updates <code>last_accessed_at</code> on the workspace row. The frontend stores the returned <code>workspace_id</code> alongside the user object in <code>localStorage</code> key <code>memolink_user</code> so it persists across page refreshes. On next login the client calls <code>/workspaces/active</code> to restore it.</p>
           <div class="schema-row">
             <div class="schema-box">
-              <div class="schema-box-title">Request Body — SetActiveDTO</div>
+              <div class="schema-box-title">Request Body - SetActiveDTO</div>
               <pre>{
   <span class="json-key">"user_id"</span>:      <span class="json-num">1</span>,
   <span class="json-key">"workspace_id"</span>: <span class="json-num">1</span>
 }</pre>
             </div>
             <div class="schema-box">
-              <div class="schema-box-title">Response 200 — WorkspaceResponseDTO</div>
+              <div class="schema-box-title">Response 200 - WorkspaceResponseDTO</div>
               <pre><span class="json-type">Full workspace object with updated last_accessed_at</span></pre>
             </div>
           </div>
@@ -1644,11 +1644,11 @@
           <p class="ep-desc">Returns the workspace with the most recent <code>last_accessed_at</code> for the given user. Used on login to restore the user's last workspace selection. If no <code>last_accessed_at</code> is set on any workspace, falls back to the workspace where <code>is_default = true</code>.</p>
           <div class="schema-row">
             <div class="schema-box">
-              <div class="schema-box-title">Request Body — ActiveWorkspaceDTO</div>
+              <div class="schema-box-title">Request Body - ActiveWorkspaceDTO</div>
               <pre>{ <span class="json-key">"user_id"</span>: <span class="json-num">1</span> }</pre>
             </div>
             <div class="schema-box">
-              <div class="schema-box-title">Response 200 — WorkspaceResponseDTO</div>
+              <div class="schema-box-title">Response 200 - WorkspaceResponseDTO</div>
               <pre>{
   <span class="json-key">"id"</span>:              <span class="json-num">1</span>,
   <span class="json-key">"name"</span>:            <span class="json-str">"Capstone Research"</span>,
@@ -1700,7 +1700,7 @@
           <p class="ep-desc">Accepts a <code>type</code> (<code>"bug"</code> or <code>"suggestion"</code>) and a non-empty <code>message</code>. The authenticated user's ID and email are resolved from the JWT. The record is stored in the <code>feedback</code> table with <code>status="open"</code>. If SMTP is configured, an email notification is sent to the admin address.</p>
           <div class="schema-row">
             <div class="schema-box">
-              <div class="schema-box-title">Request Body — FeedbackCreateDTO</div>
+              <div class="schema-box-title">Request Body - FeedbackCreateDTO</div>
               <pre>{
   <span class="json-key">"type"</span>:    <span class="json-str">"bug"</span>,
   <span class="json-key">"message"</span>: <span class="json-str">"The translation button disappears on mobile viewport."</span>
@@ -1753,7 +1753,7 @@
               <pre><span class="json-type">Bearer token in Authorization header</span></pre>
             </div>
             <div class="schema-box">
-              <div class="schema-box-title">Response 200 — FeatureFlagsResponse</div>
+              <div class="schema-box-title">Response 200 - FeatureFlagsResponse</div>
               <pre>{
   <span class="json-key">"web_search_enabled"</span>:         <span class="json-str">"true"</span>,
   <span class="json-key">"agent_mode_enabled"</span>:         <span class="json-str">"true"</span>,
@@ -1789,14 +1789,14 @@
           <p class="ep-desc">Triggers the research pipeline for a user query. Before streaming begins the backend validates two conditions: (1) <code>research_mode_enabled</code> is not <code>"false"</code> and (2) the caller's JWT <code>access_level</code> meets or exceeds <code>research_mode_min_level</code>. Failure on either check returns HTTP 403. On success the endpoint streams a cited, multi-source answer via Server-Sent Events using the same SSE format as the main chat stream.</p>
           <div class="schema-row">
             <div class="schema-box">
-              <div class="schema-box-title">Request Body — ResearchStreamDTO</div>
+              <div class="schema-box-title">Request Body - ResearchStreamDTO</div>
               <pre>{
   <span class="json-key">"query"</span>:           <span class="json-str">"Latest findings on RAG evaluation"</span>,
   <span class="json-key">"conversation_id"</span>: <span class="json-num">42</span>
 }</pre>
             </div>
             <div class="schema-box">
-              <div class="schema-box-title">Response 200 — SSE Stream</div>
+              <div class="schema-box-title">Response 200 - SSE Stream</div>
               <pre><span class="json-type">text/event-stream</span>
 
 data: <span class="json-str">"RAG (Retrieval-Augmented Generation)"</span>
@@ -1843,7 +1843,7 @@ data: <span class="json-str">[DONE]</span></pre>
 <span class="json-key">status</span> <span class="json-type">string (optional, default "all")</span></pre>
             </div>
             <div class="schema-box">
-              <div class="schema-box-title">Response 200 — FeedbackEntry[]</div>
+              <div class="schema-box-title">Response 200 - FeedbackEntry[]</div>
               <pre>[
   {
     <span class="json-key">"id"</span>:         <span class="json-num">1</span>,
@@ -1879,14 +1879,14 @@ data: <span class="json-str">[DONE]</span></pre>
           <div class="schema-row">
             <div class="schema-box">
               <div class="schema-box-title">Path Param + Request Body</div>
-              <pre><span class="json-key">id</span> <span class="json-type">integer — feedback entry ID</span>
+              <pre><span class="json-key">id</span> <span class="json-type">integer - feedback entry ID</span>
 
 {
   <span class="json-key">"status"</span>: <span class="json-str">"resolved"</span>
 }</pre>
             </div>
             <div class="schema-box">
-              <div class="schema-box-title">Response 200 — FeedbackEntry (updated)</div>
+              <div class="schema-box-title">Response 200 - FeedbackEntry (updated)</div>
               <pre><span class="json-type">Full updated feedback object</span></pre>
             </div>
           </div>
@@ -1916,7 +1916,7 @@ data: <span class="json-str">[DONE]</span></pre>
               <pre><span class="json-type">Bearer token (admin) required</span></pre>
             </div>
             <div class="schema-box">
-              <div class="schema-box-title">Response 200 — AdminUserEntry[]</div>
+              <div class="schema-box-title">Response 200 - AdminUserEntry[]</div>
               <pre>[
   {
     <span class="json-key">"id"</span>:            <span class="json-num">1</span>,
@@ -1955,14 +1955,14 @@ data: <span class="json-str">[DONE]</span></pre>
           <div class="schema-row">
             <div class="schema-box">
               <div class="schema-box-title">Path Param + Request Body</div>
-              <pre><span class="json-key">id</span> <span class="json-type">integer — target user ID</span>
+              <pre><span class="json-key">id</span> <span class="json-type">integer - target user ID</span>
 
 {
   <span class="json-key">"is_admin"</span>: <span class="json-bool">true</span>
 }</pre>
             </div>
             <div class="schema-box">
-              <div class="schema-box-title">Response 200 — AdminUserEntry (updated)</div>
+              <div class="schema-box-title">Response 200 - AdminUserEntry (updated)</div>
               <pre>{
   <span class="json-key">"id"</span>:       <span class="json-num">2</span>,
   <span class="json-key">"email"</span>:    <span class="json-str">"user@example.com"</span>,
@@ -1989,11 +1989,11 @@ data: <span class="json-str">[DONE]</span></pre>
           <span class="ep-toggle">&#x25BC;</span>
         </div>
         <div class="ep-body">
-          <p class="ep-desc">Updates the <code>access_level</code> column of the target user. Accepted values are <code>"regular"</code>, <code>"plus"</code>, and <code>"pro"</code>. The change is persisted immediately but the user must re-login before their JWT reflects the new level — the old token remains valid with the old level until it expires. Returns 400 for an invalid level string, 404 if the user is not found.</p>
+          <p class="ep-desc">Updates the <code>access_level</code> column of the target user. Accepted values are <code>"regular"</code>, <code>"plus"</code>, and <code>"pro"</code>. The change is persisted immediately but the user must re-login before their JWT reflects the new level - the old token remains valid with the old level until it expires. Returns 400 for an invalid level string, 404 if the user is not found.</p>
           <div class="schema-row">
             <div class="schema-box">
               <div class="schema-box-title">Path Param + Request Body</div>
-              <pre><span class="json-key">id</span> <span class="json-type">integer — target user ID</span>
+              <pre><span class="json-key">id</span> <span class="json-type">integer - target user ID</span>
 
 {
   <span class="json-key">"level"</span>: <span class="json-str">"plus"</span>
@@ -2033,7 +2033,7 @@ data: <span class="json-str">[DONE]</span></pre>
               <pre><span class="json-type">Bearer token (admin) required</span></pre>
             </div>
             <div class="schema-box">
-              <div class="schema-box-title">Response 200 — FeatureFlagEntry[]</div>
+              <div class="schema-box-title">Response 200 - FeatureFlagEntry[]</div>
               <pre>[
   {
     <span class="json-key">"key"</span>:        <span class="json-str">"web_search_enabled"</span>,
@@ -2066,10 +2066,10 @@ data: <span class="json-str">[DONE]</span></pre>
           <span class="ep-toggle">&#x25BC;</span>
         </div>
         <div class="ep-body">
-          <p class="ep-desc">Accepts a partial or full map of flag key-value pairs. Each provided key is upserted into the <code>feature_flags</code> table and <code>updated_at</code> is refreshed. Unknown keys are rejected with 422. Changes take effect immediately for all new user sessions — no application restart required.</p>
+          <p class="ep-desc">Accepts a partial or full map of flag key-value pairs. Each provided key is upserted into the <code>feature_flags</code> table and <code>updated_at</code> is refreshed. Unknown keys are rejected with 422. Changes take effect immediately for all new user sessions - no application restart required.</p>
           <div class="schema-row">
             <div class="schema-box">
-              <div class="schema-box-title">Request Body — FeatureFlagsUpdateDTO</div>
+              <div class="schema-box-title">Request Body - FeatureFlagsUpdateDTO</div>
               <pre>{
   <span class="json-key">"web_search_enabled"</span>:      <span class="json-str">"false"</span>,
   <span class="json-key">"default_model"</span>:           <span class="json-str">"gpt-4o"</span>,
@@ -2077,7 +2077,7 @@ data: <span class="json-str">[DONE]</span></pre>
 }</pre>
             </div>
             <div class="schema-box">
-              <div class="schema-box-title">Response 200 — FeatureFlagEntry[] (all flags)</div>
+              <div class="schema-box-title">Response 200 - FeatureFlagEntry[] (all flags)</div>
               <pre><span class="json-type">Full updated list of all feature flag entries</span></pre>
             </div>
           </div>
@@ -2113,11 +2113,11 @@ data: <span class="json-str">[DONE]</span></pre>
         </div>
         <div class="ep-body">
           <p class="ep-desc">
-            Validates that the file size is ≤200 MB and that <code>S3_UPLOAD_BUCKET</code> is configured. Generates an S3 pre-signed PUT URL with a 1-hour TTL (3600 seconds) scoped to the authenticated user's folder. The client uploads file bytes directly to S3 using an HTTP <code>PUT</code> request to the returned URL — Lambda is never in the upload path so the 6 MB Lambda payload limit does not apply. Auth: Bearer token required.
+            Validates that the file size is ≤200 MB and that <code>S3_UPLOAD_BUCKET</code> is configured. Generates an S3 pre-signed PUT URL with a 1-hour TTL (3600 seconds) scoped to the authenticated user's folder. The client uploads file bytes directly to S3 using an HTTP <code>PUT</code> request to the returned URL - Lambda is never in the upload path so the 6 MB Lambda payload limit does not apply. Auth: Bearer token required.
           </p>
           <div class="schema-row">
             <div class="schema-box">
-              <div class="schema-box-title">Request Body — PresignDTO</div>
+              <div class="schema-box-title">Request Body - PresignDTO</div>
               <pre>{
   <span class="json-key">"filename"</span>:     <span class="json-str">"recording.mp4"</span>,
   <span class="json-key">"content_type"</span>: <span class="json-str">"video/mp4"</span>,
@@ -2125,7 +2125,7 @@ data: <span class="json-str">[DONE]</span></pre>
 }</pre>
             </div>
             <div class="schema-box">
-              <div class="schema-box-title">Response 200 — PresignResponse</div>
+              <div class="schema-box-title">Response 200 - PresignResponse</div>
               <pre>{
   <span class="json-key">"url"</span>:        <span class="json-str">"https://s3.amazonaws.com/..."</span>,
   <span class="json-key">"key"</span>:        <span class="json-str">"uploads/1/abc/recording.mp4"</span>,
@@ -2154,18 +2154,18 @@ data: <span class="json-str">[DONE]</span></pre>
         </div>
         <div class="ep-body">
           <p class="ep-desc">
-            Lambda downloads each S3 object by key, runs <code>extract_formatted_html</code> on the file bytes, creates a note per file, then deletes the S3 object. Each key is processed independently — one failure does not block the others. Supports all file types including audio/video (Whisper &lt;5 MB, Deepgram Nova-2 ≥5 MB with Whisper fallback up to 25 MB). Auth: Bearer token required.
+            Lambda downloads each S3 object by key, runs <code>extract_formatted_html</code> on the file bytes, creates a note per file, then deletes the S3 object. Each key is processed independently - one failure does not block the others. Supports all file types including audio/video (Whisper &lt;5 MB, Deepgram Nova-2 ≥5 MB with Whisper fallback up to 25 MB). Auth: Bearer token required.
           </p>
           <div class="schema-row">
             <div class="schema-box">
-              <div class="schema-box-title">Request Body — ProcessDTO</div>
+              <div class="schema-box-title">Request Body - ProcessDTO</div>
               <pre>{
   <span class="json-key">"keys"</span>:         [<span class="json-str">"uploads/1/abc/recording.mp4"</span>],
   <span class="json-key">"workspace_id"</span>: <span class="json-num">1</span>
 }</pre>
             </div>
             <div class="schema-box">
-              <div class="schema-box-title">Response 200 — ProcessResponse</div>
+              <div class="schema-box-title">Response 200 - ProcessResponse</div>
               <pre>{
   <span class="json-key">"notes"</span>: [
     {
@@ -2308,7 +2308,7 @@ data: <span class="json-str">[DONE]</span></pre>
         <div class="ep-header" onclick="toggle('ep-cmd-execute')">
           <span class="method m-post">POST</span>
           <span class="ep-path">/api/v1/commands/execute</span>
-          <span class="ep-summary">Execute a slash command — SSE stream</span>
+          <span class="ep-summary">Execute a slash command - SSE stream</span>
           <span class="ep-toggle">&#x25BC;</span>
         </div>
         <div class="ep-body">
@@ -2316,15 +2316,15 @@ data: <span class="json-str">[DONE]</span></pre>
             Parses and executes a slash command. The <code>command</code> field contains the full typed text (e.g. <code>/Improve "Assessment 2 Notes"</code>).
             The backend saves the command as a user message, executes the operation (AI call, DB update, reminder creation, etc.) and streams the result.<br/><br/>
             Special SSE events beyond standard <code>{"t":"token"}</code>:<br/>
-            <code>{"cmd_running":"message"}</code> — shown while the AI is processing (dual-ring spinner in UI)<br/>
-            <code>{"note_updated":id}</code> — triggers frontend to refresh the note in sidebar and editor<br/>
-            <code>{"quiz":{...}}</code> — renders an interactive quiz component in the chat bubble<br/>
-            <code>{"open_note":id}</code> — opens the note in the editor (used by /Read)<br/>
-            <code>{"speak":"plain text"}</code> — triggers browser text-to-speech via Web Speech API (used by /Read; Markdown symbols stripped server-side before sending)
+            <code>{"cmd_running":"message"}</code> - shown while the AI is processing (dual-ring spinner in UI)<br/>
+            <code>{"note_updated":id}</code> - triggers frontend to refresh the note in sidebar and editor<br/>
+            <code>{"quiz":{...}}</code> - renders an interactive quiz component in the chat bubble<br/>
+            <code>{"open_note":id}</code> - opens the note in the editor (used by /Read)<br/>
+            <code>{"speak":"plain text"}</code> - triggers browser text-to-speech via Web Speech API (used by /Read; Markdown symbols stripped server-side before sending)
           </p>
           <div class="schema-row">
             <div class="schema-box">
-              <div class="schema-box-title">Request Body — SlashCommandRequestDTO</div>
+              <div class="schema-box-title">Request Body - SlashCommandRequestDTO</div>
               <pre>{
   <span class="json-key">"command"</span>:         <span class="json-str">"/Improve \"Assessment 2 Notes\""</span>,
   <span class="json-key">"conversation_id"</span>: <span class="json-num">7</span>,

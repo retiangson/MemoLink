@@ -20,6 +20,8 @@ import { HelpModal } from "../components/HelpModal";
 import { MemoGraphModal } from "../components/MemoGraphModal";
 import { StudyModeModal } from "../components/StudyModeModal";
 import { SurveyModal } from "../components/SurveyModal";
+import { useEvaluationHeartbeat } from "../hooks/useEvaluationHeartbeat";
+import { getMyRatings } from "../api/evaluationApi";
 import { FeedbackModal } from "../components/FeedbackModal";
 import { TTSPlayerBar } from "../components/TTSPlayerBar";
 import { WorkspaceManagerModal } from "../components/WorkspaceManagerModal";
@@ -32,8 +34,10 @@ import { useWorkspace } from "../hooks/useWorkspace";
 import { useFeatureFlags } from "../hooks/useFeatureFlags";
 import { fetchAdminFeedback } from "../api/adminApi";
 import { getEmailStatus, autoProcessEmails } from "../api/emailApi";
+import { getTeamsStatus } from "../api/teamsApi";
 import { AdminPage } from "./AdminPage";
 import { suggestActions, type WorkflowAction } from "../api/workflowApi";
+import { OnboardingTour } from "../components/OnboardingTour";
 
 type WorkspaceHook = ReturnType<typeof useWorkspace>;
 type LayoutMode = "stacked" | "columns" | "rows";
@@ -72,9 +76,14 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
   const [openFeedbackCount, setOpenFeedbackCount] = useState(0);
   const [selectedModel, setSelectedModel] = useState<string>(getSavedModel);
   const { flags } = useFeatureFlags();
+  const evalStatus = useEvaluationHeartbeat(flags.evaluation_analytics_enabled);
+  const evaluationActive = flags.evaluation_analytics_enabled && !evalStatus.exhausted;
+  const [evalRatings, setEvalRatings] = useState<Record<string, Record<string, number | string>>>({});
   const [emailConnected, setEmailConnected] = useState(false);
+  const [teamsConnected, setTeamsConnected] = useState(false);
   const [isSyncingEmail, setIsSyncingEmail] = useState(false);
   const [emailSyncResult, setEmailSyncResult] = useState<string | null>(null);
+  const [showTour, setShowTour] = useState(() => !localStorage.getItem("memolink_walkthrough_done"));
 
   // Tab drag-and-drop
   const dragSrcRef = useRef<{ type: "chat" | "note"; index: number } | null>(null);
@@ -115,6 +124,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
 
   useEffect(() => {
     getEmailStatus().then(s => setEmailConnected(s.connected)).catch(() => {});
+    getTeamsStatus().then(s => setTeamsConnected(s.connected)).catch(() => {});
   }, []);
 
   async function handleSyncEmail() {
@@ -139,11 +149,12 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
     }
   }
 
-  // Open Settings → Email tab after Gmail OAuth redirect
+  // Open Settings after OAuth redirects
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get("email_connected") === "1") {
+    if (params.get("email_connected") === "1" || params.get("teams_connected") === "1") {
       setShowSettings(true);
+      if (params.get("teams_connected") === "1") setTeamsConnected(true);
       window.history.replaceState({}, "", window.location.pathname);
     }
   }, []);
@@ -158,6 +169,13 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
     editor.setNoteContentDraft((prev) => prev ? prev + `<p>${text}</p>` : `<p>${text}</p>`);
   });
   const convs = useConversations(activeWorkspaceId);
+
+  // Load the user's saved answer ratings so selections persist across reloads.
+  useEffect(() => {
+    if (!flags.evaluation_analytics_enabled) return;
+    getMyRatings().then(setEvalRatings).catch(() => {});
+  }, [flags.evaluation_analytics_enabled, convs.activeConversation?.id]);
+
   async function handleNoteUpdated(noteId: number) {
     try {
       const fresh = await getNote(noteId);
@@ -528,14 +546,15 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
           await workspaceHook.switchWorkspace(ws);
         }}
         onManageWorkspaces={() => setShowWorkspaceManager(true)}
+        evalStatus={evalStatus}
       />
 
       <div className="flex-1 flex flex-col h-full overflow-hidden">
 
         {/* ── Unified tab bar ───────────────────────────────────────────── */}
-        <div className="flex bg-[#0a0a0f] border-b border-[#1e1e2a] shrink-0" style={{ minHeight: 40 }}>
+        <div id="tour-tab-bar" className="flex bg-[#0a0a0f] border-b border-[#1e1e2a] shrink-0" style={{ minHeight: 40 }}>
 
-          {/* Scrollable tabs — hidden in split modes (each panel has its own tab bar) */}
+          {/* Scrollable tabs - hidden in split modes (each panel has its own tab bar) */}
           <div className="flex items-center overflow-x-auto flex-1">
 
             {/* Chat tabs */}
@@ -633,7 +652,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
             ))}
           </div>
 
-          {/* User info — outside overflow so the bell tooltip can extend below freely */}
+          {/* User info - outside overflow so the bell tooltip can extend below freely */}
           <div className="shrink-0 flex items-center gap-3 px-4 text-xs text-gray-500">
             {urgentCount > 0 && (
               <div className="relative group">
@@ -650,7 +669,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                     {urgentCount}
                   </span>
                 </button>
-                {/* Tooltip — renders below the bell, unclipped */}
+                {/* Tooltip - renders below the bell, unclipped */}
                 <div className="pointer-events-none absolute right-0 top-full mt-1 z-[9999] hidden group-hover:block w-56 rounded-xl bg-[#1e1e2a] border border-amber-500/30 shadow-xl p-2.5">
                   <p className="text-[10px] font-semibold text-amber-400 uppercase tracking-wider mb-1.5">Due today</p>
                   {todayItems.map((item) => (
@@ -668,6 +687,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
             {/* User avatar + dropdown */}
             <div className="relative">
               <button
+                id="tour-user-menu"
                 onClick={(e) => { e.stopPropagation(); setUserMenuOpen((v) => !v); }}
                 className="relative flex items-center justify-center w-7 h-7 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white text-[11px] font-bold transition"
                 title={user.email}
@@ -741,9 +761,10 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                     </button>
                   )}
 
-                  {/* Admin Panel — only shown to admins */}
+                  {/* Admin Panel - only shown to admins */}
                   {user.is_admin && (
                     <button
+                      id="tour-admin-menu"
                       onClick={() => { setUserMenuOpen(false); setShowAdmin(true); }}
                       className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-indigo-400 hover:bg-indigo-500/10 hover:text-indigo-300 transition"
                     >
@@ -756,6 +777,20 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                           {openFeedbackCount > 99 ? "99+" : openFeedbackCount}
                         </span>
                       )}
+                    </button>
+                  )}
+
+                  {/* Reset Walkthrough - admin only */}
+                  {user.is_admin && (
+                    <button
+                      onClick={() => { setUserMenuOpen(false); localStorage.removeItem("memolink_walkthrough_done"); setShowTour(true); }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-indigo-300 hover:bg-indigo-500/10 hover:text-indigo-200 transition"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-indigo-400 shrink-0" fill="currentColor" viewBox="0 0 16 16">
+                        <path d="M11.534 7h3.932a.25.25 0 0 1 .192.41l-1.966 2.36a.25.25 0 0 1-.384 0l-1.966-2.36a.25.25 0 0 1 .192-.41m-11 2h3.932a.25.25 0 0 0 .192-.41L2.692 6.23a.25.25 0 0 0-.384 0L.342 8.59A.25.25 0 0 0 .534 9"/>
+                        <path fillRule="evenodd" d="M8 3c-1.552 0-2.94.707-3.857 1.818a.5.5 0 1 1-.771-.636A6.002 6.002 0 0 1 13.917 7H12.9A5 5 0 0 0 8 3M3.1 9a5.002 5.002 0 0 0 8.757 2.182.5.5 0 1 1 .771.636A6.002 6.002 0 0 1 2.083 9z"/>
+                      </svg>
+                      Reset Walkthrough
                     </button>
                   )}
 
@@ -875,6 +910,8 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                       if (reminderActions.has(type)) suggestions.reload();
                     }}
                     onWorkflowConversationMessages={appendWorkflowMessages}
+                    evaluationActive={evaluationActive}
+                    evalRatings={evalRatings}
                   />
                 </div>
               </main>
@@ -984,6 +1021,8 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                         if (reminderActions.has(type)) suggestions.reload();
                       }}
                       onWorkflowConversationMessages={appendWorkflowMessages}
+                    evaluationActive={evaluationActive}
+                    evalRatings={evalRatings}
                     />
                   </div>
                 </main>
@@ -998,7 +1037,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                           <span key={i} className="w-[3px] bg-indigo-400 rounded-full animate-pulse" style={{height:`${8+i*3}px`,animationDelay:`${i*0.15}s`}} />
                         ))}
                       </span>
-                      Reading aloud — click to stop
+                      Reading aloud - click to stop
                     </button>
                   </div>
                 )}
@@ -1130,6 +1169,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
         notificationPermission={notifPermission}
         onRequestNotificationPermission={requestNotifPermission}
         emailConnected={emailConnected && flags.email_enabled}
+        teamsConnected={teamsConnected}
         isSyncingEmail={isSyncingEmail}
         onSyncEmail={handleSyncEmail}
         emailSyncResult={emailSyncResult}
@@ -1163,7 +1203,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
         />
       )}
 
-      <SettingsModal show={showSettings} user={user} onClose={() => setShowSettings(false)} selectedModel={selectedModel} onModelChange={handleModelChange} modelSelectionEnabled={flags.model_selection_enabled} customApiKeysEnabled={flags.custom_api_keys_enabled} ttsEnabled={flags.tts_enabled} emailEnabled={flags.email_enabled} workflowEnabled={flags.workflow_enabled} />
+      <SettingsModal show={showSettings} user={user} onClose={() => setShowSettings(false)} selectedModel={selectedModel} onModelChange={handleModelChange} modelSelectionEnabled={flags.model_selection_enabled} customApiKeysEnabled={flags.custom_api_keys_enabled} ttsEnabled={flags.tts_enabled} emailEnabled={flags.email_enabled} workflowEnabled={flags.workflow_enabled} onReplayTour={() => { localStorage.removeItem("memolink_walkthrough_done"); setShowTour(true); setShowSettings(false); }} />
       <HelpModal show={showHelp} onClose={() => setShowHelp(false)} />
       <FeedbackModal show={showFeedback} onClose={() => setShowFeedback(false)} />
       <MemoGraphModal
@@ -1200,7 +1240,19 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
         />
       )}
 
-      {showAdmin && <AdminPage onClose={() => { setShowAdmin(false); refreshFeedbackCount(); }} currentUserId={user.id} />}
+      {showAdmin && <AdminPage onClose={() => { setShowAdmin(false); refreshFeedbackCount(); }} currentUserId={user.id} onResetWalkthrough={() => { localStorage.removeItem("memolink_walkthrough_done"); setShowTour(true); setShowAdmin(false); }} />}
+
+      <OnboardingTour
+        run={showTour}
+        isAdmin={user.is_admin ?? false}
+        onOpenUserMenu={() => setUserMenuOpen(true)}
+        onCloseUserMenu={() => setUserMenuOpen(false)}
+        onFinish={() => {
+          localStorage.setItem("memolink_walkthrough_done", "1");
+          setShowTour(false);
+          setUserMenuOpen(false);
+        }}
+      />
     </div>
   );
 }

@@ -366,17 +366,36 @@ class EmailService:
             f'<p>{body}</p>'
         )
 
+    def backfill_embeddings(self, user_id: int) -> int:
+        """Embed any existing email records that don't have a vector yet."""
+        if not self.embedding_service:
+            return 0
+        unembedded = self.record_repo.list_without_embeddings(user_id)
+        count = 0
+        for r in unembedded:
+            try:
+                text = f"{r.subject} {r.sender_email} {r.snippet or ''} {(r.body_text or '')[:1000]}"
+                vec = self.embedding_service.embed_text(text)
+                self.record_repo.save_embedding(r.id, vec)
+                count += 1
+            except Exception:
+                pass
+        return count
+
     async def auto_process(self, user_id: int, db, workspace_id: int | None = None) -> dict:
-        workspace_id = None  # Email items are always global — visible across all workspaces
+        workspace_id = None  # Email items are always global - visible across all workspaces
         """Sync emails, append important ones to the Email Digest note, create reminders for deadlines."""
         from memolink_backend.domain.models.note import Note
         from memolink_backend.domain.models.reminder import Reminder
         from memolink_backend.contracts.note_dtos import NoteCreateDTO
 
-        # 1 — sync new emails from Gmail
+        # 1 - sync new emails from Gmail
         sync_result = await self.sync(user_id)
 
-        # 2 — only process records not yet appended to the digest note
+        # 1b - backfill embeddings for records saved before embedding was added
+        self.backfill_embeddings(user_id)
+
+        # 2 - only process records not yet appended to the digest note
         important = self.record_repo.list_unappended(user_id)
 
         notes_added = 0
@@ -405,7 +424,7 @@ class EmailService:
                 notes_added = len(important)
             else:
                 # Create fresh Email Digest note
-                header = '<h2>📧 Email Digest</h2><p><em>Important emails synced by MemoLink — updated automatically.</em></p>'
+                header = '<h2>📧 Email Digest</h2><p><em>Important emails synced by MemoLink - updated automatically.</em></p>'
                 content = header + "".join(self._format_email_block(r) for r in important)
                 note = Note(user_id=user_id, title="Email Digest", content=content, source="email", workspace_id=workspace_id)
                 db.add(note)

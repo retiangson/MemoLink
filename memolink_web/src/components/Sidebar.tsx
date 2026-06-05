@@ -3,6 +3,12 @@ import { UploadNotes } from "./UploadNotes";
 import { WorkspaceSelector } from "./WorkspaceSelector";
 import type { Conversation, Note, Workspace } from "../types";
 import { convLabel } from "../types";
+import type { EvalStatus } from "../hooks/useEvaluationHeartbeat";
+
+function fmtClock(s: number): string {
+  const m = Math.floor(s / 60), sec = Math.max(0, s % 60);
+  return `${m}:${String(sec).padStart(2, "0")}`;
+}
 
 interface SidebarProps {
   open: boolean;
@@ -27,6 +33,7 @@ interface SidebarProps {
   onSwitchWorkspace: (ws: Workspace) => void;
   onManageWorkspaces: () => void;
   onNotesUploaded?: (notes: any[]) => void;
+  evalStatus?: EvalStatus | null;
 }
 
 export function Sidebar({
@@ -37,25 +44,38 @@ export function Sidebar({
   onConversationClick, onNewChat, onConversationMenu,
   onOpenRecycleBin,
   workspaces, activeWorkspace, onSwitchWorkspace, onManageWorkspaces,
-  onNotesUploaded,
+  onNotesUploaded, evalStatus,
 }: SidebarProps) {
   if (!open) return null;
 
+  const showEvalTimer = !!evalStatus?.enabled && !!evalStatus?.loaded && !evalStatus?.exhausted;
+
   return (
-    <aside className="w-[300px] h-full bg-[#0f0f13] border-r border-[#1e1e2a] flex flex-col flex-shrink-0">
+    <aside id="tour-sidebar" className="w-[300px] h-full bg-[#0f0f13] border-r border-[#1e1e2a] flex flex-col flex-shrink-0">
       <div className="px-4 py-3 border-b border-[#1e1e2a] flex justify-between items-center">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 min-w-0">
           <img
             src="/memolink-icon.png"
             alt=""
-            className="h-7 w-7 rounded-md bg-white object-cover"
+            className="h-7 w-7 rounded-md bg-white object-cover shrink-0"
           />
-          <span className="font-semibold text-sm text-gray-100">MemoLink</span>
+          <span className="font-semibold text-sm text-gray-100 shrink-0">MemoLink</span>
+          {showEvalTimer && evalStatus && (
+            <span
+              title={`Evaluation collection window - ${fmtClock(evalStatus.consumedSeconds)} of ${fmtClock(evalStatus.budgetSeconds)} used. Data stops recording when it ends.`}
+              className="flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-medium bg-cyan-500/10 text-cyan-300 border border-cyan-500/25 whitespace-nowrap"
+            >
+              <svg className="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <circle cx="12" cy="12" r="9" /><path strokeLinecap="round" d="M12 7v5l3 2" />
+              </svg>
+              Eval {fmtClock(evalStatus.remainingSeconds)}
+            </span>
+          )}
         </div>
-        <button onClick={onClose} className="text-gray-500 hover:text-gray-300 text-sm">✕</button>
+        <button onClick={onClose} className="text-gray-500 hover:text-gray-300 text-sm shrink-0">✕</button>
       </div>
 
-      <div className="px-3 py-2.5 border-b border-[#1e1e2a]">
+      <div id="tour-workspace-selector" className="px-3 py-2.5 border-b border-[#1e1e2a]">
         <WorkspaceSelector
           workspaces={workspaces}
           activeWorkspace={activeWorkspace}
@@ -64,11 +84,11 @@ export function Sidebar({
         />
       </div>
 
-      <div className="px-3 py-3 border-b border-[#1e1e2a]">
+      <div id="tour-upload-notes" className="px-3 py-3 border-b border-[#1e1e2a]">
         <UploadNotes setNotes={setNotes} workspaceId={activeWorkspace?.id} onUploaded={onNotesUploaded} />
       </div>
 
-      <div className="border-b border-[#1e1e2a]">
+      <div id="tour-notes-section" className="border-b border-[#1e1e2a]">
         <button
           onClick={() => setShowNotes(!showNotes)}
           className="w-full px-4 py-2.5 flex justify-between items-center text-gray-400 text-xs font-semibold uppercase tracking-wider hover:text-gray-200 transition"
@@ -105,7 +125,7 @@ export function Sidebar({
         )}
       </div>
 
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div id="tour-chats-section" className="flex-1 flex flex-col overflow-hidden">
         <button
           onClick={() => setShowConversations(!showConversations)}
           className="w-full px-4 py-2.5 flex justify-between items-center text-gray-400 text-xs font-semibold uppercase tracking-wider hover:text-gray-200 transition border-b border-[#1e1e2a]"
@@ -143,7 +163,7 @@ export function Sidebar({
       </div>
 
       {/* Recycle Bin */}
-      <div className="shrink-0 border-t border-[#1e1e2a] p-3">
+      <div id="tour-recycle-bin" className="shrink-0 border-t border-[#1e1e2a] p-3">
         <button
           onClick={onOpenRecycleBin}
           className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-500 hover:text-gray-300 hover:bg-[#1e1e2a] rounded-lg transition"

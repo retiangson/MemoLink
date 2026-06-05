@@ -42,6 +42,8 @@ export type FeatureFlags = {
   timeline_enabled: boolean;
   workflow_enabled: boolean;
   evaluation_survey_enabled: boolean;
+  evaluation_analytics_enabled: boolean;
+  evaluation_admin_export_enabled: boolean;
   default_model: string;
   default_language: string;
   web_search_min_level: AccessLevel;
@@ -81,6 +83,8 @@ export function parseFlags(raw: Record<string, string>): FeatureFlags {
     timeline_enabled: raw.timeline_enabled !== "false",
     workflow_enabled: raw.workflow_enabled !== "false",
     evaluation_survey_enabled: raw.evaluation_survey_enabled !== "false",
+    evaluation_analytics_enabled: raw.evaluation_analytics_enabled !== "false",
+    evaluation_admin_export_enabled: raw.evaluation_admin_export_enabled !== "false",
     default_model: raw.default_model ?? "gpt-4o-mini",
     default_language: raw.default_language ?? "English",
     web_search_min_level: (raw.web_search_min_level ?? "regular") as AccessLevel,
@@ -148,6 +152,8 @@ export async function updateAdminFeatures(flags: FeatureFlags): Promise<FeatureF
     timeline_enabled: String(flags.timeline_enabled),
     workflow_enabled: String(flags.workflow_enabled),
     evaluation_survey_enabled: String(flags.evaluation_survey_enabled),
+    evaluation_analytics_enabled: String(flags.evaluation_analytics_enabled),
+    evaluation_admin_export_enabled: String(flags.evaluation_admin_export_enabled),
     default_model: flags.default_model,
     default_language: flags.default_language,
     web_search_min_level: flags.web_search_min_level,

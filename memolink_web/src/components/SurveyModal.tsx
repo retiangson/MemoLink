@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import {
-  getActiveSurvey, submitSurvey,
+  getActiveSurvey, submitSurvey, getMySurveyResponse,
   type ActiveSurvey, type SurveyQuestion, type SurveyAnswerInput,
 } from "../api/surveyApi";
 
@@ -24,14 +24,37 @@ export function SurveyModal({ show, onClose, workspaceId }: Props) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [participantCode, setParticipantCode] = useState("");
+  const [editing, setEditing] = useState(false);
 
   useEffect(() => {
     if (!show) return;
     setStep("consent"); setConsent(false); setAnswers({}); setOtherText({});
-    setError(null); setParticipantCode("");
+    setError(null); setParticipantCode(""); setEditing(false);
     setLoading(true);
-    getActiveSurvey()
-      .then(setSurvey)
+    Promise.all([getActiveSurvey(), getMySurveyResponse().catch(() => null)])
+      .then(([active, mine]) => {
+        setSurvey(active);
+        if (mine?.exists) {
+          // Pre-fill the user's previous answers for editing (one response per account)
+          const prefill: AnswerMap = { ...mine.answers };
+          const other: Record<string, string> = {};
+          for (const sec of active.sections) {
+            for (const q of sec.questions) {
+              const v = prefill[q.question_key];
+              if (q.answer_type === "single" && typeof v === "string" && v && !q.options.includes(v)) {
+                // a custom "Other" value was stored - restore it into the Other field
+                other[q.question_key] = v;
+                prefill[q.question_key] = "Other";
+              }
+            }
+          }
+          setAnswers(prefill);
+          setOtherText(other);
+          setEditing(true);
+          setConsent(true);
+          setParticipantCode(mine.participant_code ?? "");
+        }
+      })
       .catch(() => setError("Could not load the survey. Please try again."))
       .finally(() => setLoading(false));
   }, [show]);
@@ -124,6 +147,11 @@ export function SurveyModal({ show, onClose, workspaceId }: Props) {
 
           {!loading && step === "consent" && survey && (
             <div className="space-y-4">
+              {editing && (
+                <div className="bg-indigo-500/10 border border-indigo-500/25 rounded-xl px-4 py-2.5 text-[12px] text-indigo-200">
+                  You've already completed this survey{participantCode ? ` (${participantCode})` : ""}. Your previous answers are loaded - review and update them, then re-submit to save changes.
+                </div>
+              )}
               <p className="text-sm text-gray-400 leading-relaxed">{survey.intro}</p>
               <div className="bg-[#12121a] border border-[#2a2a38] rounded-xl p-4">
                 <p className="text-xs font-semibold text-indigo-300 uppercase tracking-wider mb-2">Before you start</p>
@@ -179,7 +207,7 @@ export function SurveyModal({ show, onClose, workspaceId }: Props) {
                 </svg>
               </div>
               <h3 className="text-lg font-semibold">Thank you!</h3>
-              <p className="text-sm text-gray-400 max-w-sm">Your responses were recorded for the MemoLink evaluation. Your participant code is:</p>
+              <p className="text-sm text-gray-400 max-w-sm">Your responses were {editing ? "updated" : "recorded"} for the MemoLink evaluation. You can return any time to edit them. Your participant code is:</p>
               <span className="px-3 py-1 rounded-lg bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 font-mono text-sm">{participantCode}</span>
             </div>
           )}
@@ -195,7 +223,7 @@ export function SurveyModal({ show, onClose, workspaceId }: Props) {
                 onClick={() => { setError(null); setStep("form"); }}
                 className="px-4 py-1.5 rounded-lg text-xs font-medium bg-indigo-600 hover:bg-indigo-500 text-white disabled:opacity-40 disabled:cursor-not-allowed transition"
               >
-                Start survey →
+                {editing ? "Review answers →" : "Start survey →"}
               </button>
             )}
             {step === "form" && (
@@ -206,7 +234,7 @@ export function SurveyModal({ show, onClose, workspaceId }: Props) {
                   onClick={handleSubmit}
                   className="px-4 py-1.5 rounded-lg text-xs font-medium bg-indigo-600 hover:bg-indigo-500 text-white disabled:opacity-40 transition"
                 >
-                  {submitting ? "Submitting…" : "Submit survey"}
+                  {submitting ? "Submitting…" : editing ? "Update survey" : "Submit survey"}
                 </button>
               </>
             )}

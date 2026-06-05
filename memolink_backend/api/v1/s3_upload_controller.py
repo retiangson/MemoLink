@@ -19,7 +19,7 @@ _200_MB = 200 * 1024 * 1024
 
 
 # ── boto3 client helper ────────────────────────────────────────────────────────
-# A new client is created on each call — Lambda may rotate credentials, so
+# A new client is created on each call - Lambda may rotate credentials, so
 # caching is intentionally avoided.
 
 def _s3():
@@ -83,7 +83,7 @@ def presign_upload(
     key = f"uploads/{current_user_id}/{uuid.uuid4().hex}/{body.filename}"
 
     try:
-        # ContentType is intentionally omitted from Params — including it makes
+        # ContentType is intentionally omitted from Params - including it makes
         # S3 require the exact same header in the PUT, which browsers report
         # inconsistently (especially for audio/video files). Without it S3
         # accepts any content type, which is fine for private upload buckets.
@@ -165,7 +165,7 @@ def process_from_s3(
                     try:
                         c.logs().info(
                             "s3.process",
-                            f"File '{filename}' exceeds 25 MB — falling back to Deepgram Nova-2",
+                            f"File '{filename}' exceeds 25 MB - falling back to Deepgram Nova-2",
                             {"filename": filename, "size_mb": size_mb, "fallback": "deepgram"},
                             current_user_id,
                         )
@@ -175,7 +175,7 @@ def process_from_s3(
                     try:
                         c.logs().warning(
                             "s3.process",
-                            f"File '{filename}' exceeds 25 MB Whisper limit — no Deepgram key, transcription will be skipped",
+                            f"File '{filename}' exceeds 25 MB Whisper limit - no Deepgram key, transcription will be skipped",
                             {"filename": filename, "size_mb": size_mb},
                             current_user_id,
                         )
@@ -190,7 +190,7 @@ def process_from_s3(
                 try:
                     c.logs().warning(
                         "s3.process",
-                        f"Transcription skipped for '{filename}' — file exceeds Whisper 25 MB limit",
+                        f"Transcription skipped for '{filename}' - file exceeds Whisper 25 MB limit",
                         {"filename": filename, "size_mb": size_mb},
                         current_user_id,
                     )
@@ -250,7 +250,7 @@ def process_from_s3(
                 pass
 
         finally:
-            # Always delete the S3 object — whether processing succeeded or failed
+            # Always delete the S3 object - whether processing succeeded or failed
             try:
                 s3.delete_object(Bucket=settings.s3_upload_bucket, Key=key)
             except Exception as del_exc:

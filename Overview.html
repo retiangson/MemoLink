@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>MemoLink — Project Overview</title>
+  <title>MemoLink - Project Overview</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -241,8 +241,8 @@
     </div>
     <p style="margin-top:1rem;">
       MemoLink is both a functional software product and an academic research artefact.
-      The system is evaluated against measurable criteria — retrieval relevance, answer
-      faithfulness, usability (SUS), and task completion time — to validate whether
+      The system is evaluated against measurable criteria - retrieval relevance, answer
+      faithfulness, usability (SUS), and task completion time - to validate whether
       AI-augmented note retrieval meaningfully reduces cognitive load.
     </p>
   </section>
@@ -280,7 +280,7 @@
       <div class="card">
         <div class="card-icon">&#x1F5C2;&#xFE0F;</div>
         <h3>Conversation History</h3>
-        <p>Persistent, paginated conversation threads — rename, soft-delete, or save AI replies back as notes.</p>
+        <p>Persistent, paginated conversation threads - rename, soft-delete, or save AI replies back as notes.</p>
       </div>
       <div class="card">
         <div class="card-icon">&#x1F4CE;</div>
@@ -300,27 +300,27 @@
       <div class="card">
         <div class="card-icon">&#x1F3A4;</div>
         <h3>Voice Input</h3>
-        <p>Mic button in ChatInput triggers the <code>useRecording</code> hook — speech is transcribed and inserted as the prompt without typing.</p>
+        <p>Mic button in ChatInput triggers the <code>useRecording</code> hook - speech is transcribed and inserted as the prompt without typing.</p>
       </div>
       <div class="card">
         <div class="card-icon">&#x23F0;</div>
         <h3>Reminders &amp; AI Suggestions</h3>
-        <p>Right-sidebar Reminders panel with AI-generated and manual reminders. AI suggestions are derived from the user's notes only — GPT returns title, description, due date, and due time.</p>
+        <p>Right-sidebar Reminders panel with AI-generated and manual reminders. AI suggestions are derived from the user's notes only - GPT returns title, description, due date, and due time.</p>
       </div>
       <div class="card">
         <div class="card-icon">&#x1F3AC;</div>
         <h3>Video Import</h3>
-        <p>YouTube URL tab fetches captions via <code>youtube-transcript-api</code>. Upload File tab accepts MP4/M4A/WebM/MP3/WAV/MOV up to 200 MB — files &lt;5 MB use OpenAI Whisper, files ≥5 MB are routed to Deepgram Nova-2 (with Whisper as fallback up to 25 MB).</p>
+        <p>YouTube URL tab fetches captions via <code>youtube-transcript-api</code>. Upload File tab accepts MP4/M4A/WebM/MP3/WAV/MOV up to 200 MB - files &lt;5 MB use OpenAI Whisper, files ≥5 MB are routed to Deepgram Nova-2 (with Whisper as fallback up to 25 MB).</p>
       </div>
       <div class="card">
         <div class="card-icon">&#x1F5C2;&#xFE0F;</div>
         <h3>Knowledge Workspaces</h3>
-        <p>Organise notes, conversations, reminders, and AI context into named, typed workspaces — Academic, Professional, Personal, Project, or Other. RAG retrieval is scoped to the active workspace. An alert badge flags workspaces with pending reminders. First-time users are onboarded with a guided workspace creation flow.</p>
+        <p>Organise notes, conversations, reminders, and AI context into named, typed workspaces - Academic, Professional, Personal, Project, or Other. RAG retrieval is scoped to the active workspace. An alert badge flags workspaces with pending reminders. First-time users are onboarded with a guided workspace creation flow.</p>
       </div>
       <div class="card">
         <div class="card-icon">&#x1F3A8;</div>
         <h3>AI Image Generation</h3>
-        <p>Type <code>/image &lt;prompt&gt;</code> or use natural language triggers ("draw me a …", "generate an image of …"). MemoLink calls DALL-E 3 and streams the image as a base64 data URL inside the chat — no expiry, no CDN dependency. Attribution shows "replied by DALL-E 3".</p>
+        <p>Type <code>/image &lt;prompt&gt;</code> or use natural language triggers ("draw me a …", "generate an image of …"). MemoLink calls DALL-E 3 and streams the image as a base64 data URL inside the chat - no expiry, no CDN dependency. Attribution shows "replied by DALL-E 3".</p>
       </div>
       <div class="card">
         <div class="card-icon">&#x1F310;</div>
@@ -330,7 +330,7 @@
       <div class="card">
         <div class="card-icon">&#x1F916;</div>
         <h3>Model Selection</h3>
-        <p>The Settings modal lets users choose their chat model across three providers — <strong>OpenAI</strong> (GPT-4o, GPT-4o Mini, GPT-4 Turbo, GPT-3.5 Turbo), <strong>Google Gemini</strong> (2.5 Flash, 2.5 Flash Lite, 2.5 Pro), and <strong>DeepSeek</strong> (DeepSeek V3, R1, Coder). Every AI reply shows a "replied by [Model]" attribution badge. If a model fails, the system automatically tries the next available model in the fallback chain: primary → GPT-4o-mini → Gemini 2.5 Flash → DeepSeek Chat. Stored model preferences using old Gemini 2.0 IDs are automatically migrated to their 2.5 equivalents.</p>
+        <p>The Settings modal lets users choose their chat model across three providers - <strong>OpenAI</strong> (GPT-4o, GPT-4o Mini, GPT-4 Turbo, GPT-3.5 Turbo), <strong>Google Gemini</strong> (2.5 Flash, 2.5 Flash Lite, 2.5 Pro), and <strong>DeepSeek</strong> (DeepSeek V3, R1, Coder). Every AI reply shows a "replied by [Model]" attribution badge. If a model fails, the system automatically tries the next available model in the fallback chain: primary → GPT-4o-mini → Gemini 2.5 Flash → DeepSeek Chat. Stored model preferences using old Gemini 2.0 IDs are automatically migrated to their 2.5 equivalents.</p>
       </div>
       <div class="card">
         <div class="card-icon">&#x1F50E;</div>
@@ -365,7 +365,7 @@
       <div class="card">
         <div class="card-icon">&#x1F3C5;</div>
         <h3>Access Levels</h3>
-        <p>Three user tiers — <strong>Regular</strong>, <strong>Plus</strong>, and <strong>Pro</strong> — gate access to premium features. Admins assign tiers per user via the Users tab. The tier is embedded in the JWT (<code>access_level</code> claim) and validated stateless on each API call. The <code>GET /api/features</code> endpoint automatically masks disabled features based on the caller's level. Research Mode, for example, can be set to require Plus or Pro.</p>
+        <p>Three user tiers - <strong>Regular</strong>, <strong>Plus</strong>, and <strong>Pro</strong> - gate access to premium features. Admins assign tiers per user via the Users tab. The tier is embedded in the JWT (<code>access_level</code> claim) and validated stateless on each API call. The <code>GET /api/features</code> endpoint automatically masks disabled features based on the caller's level. Research Mode, for example, can be set to require Plus or Pro.</p>
       </div>
       <div class="card">
         <div class="card-icon">&#x1F4DA;</div>
@@ -380,7 +380,7 @@
       <div class="card">
         <div class="card-icon">&#x1F4CB;</div>
         <h3>System Logs</h3>
-        <p>All major operations — auth, transcription, translation, uploads, chat fallbacks — write structured events to the <code>system_logs</code> table (INFO / WARNING / ERROR). The <code>SystemLogService</code> provides <code>.info()</code>, <code>.warning()</code>, and <code>.error()</code> methods. Admins view, filter, paginate, and clear logs from the fourth tab of the Admin Panel.</p>
+        <p>All major operations - auth, transcription, translation, uploads, chat fallbacks - write structured events to the <code>system_logs</code> table (INFO / WARNING / ERROR). The <code>SystemLogService</code> provides <code>.info()</code>, <code>.warning()</code>, and <code>.error()</code> methods. Admins view, filter, paginate, and clear logs from the fourth tab of the Admin Panel.</p>
       </div>
       <div class="card">
         <div class="card-icon">&#x1F399;&#xFE0F;</div>
@@ -415,62 +415,62 @@
       <div class="card">
         <div class="card-icon">&#x1F4DD;</div>
         <h3>Interactive Quiz</h3>
-        <p>The <code>/Quiz</code> command generates an interactive quiz from any note or all notes. Questions use radio buttons (single answer) or checkboxes (multiple answers). After submission the quiz shows score, correct answers, and per-question explanations. A <strong>Save Results to Notes</strong> button creates a formatted Markdown note with the full results — questions, answers, explanations, and topics to review.</p>
+        <p>The <code>/Quiz</code> command generates an interactive quiz from any note or all notes. Questions use radio buttons (single answer) or checkboxes (multiple answers). After submission the quiz shows score, correct answers, and per-question explanations. A <strong>Save Results to Notes</strong> button creates a formatted Markdown note with the full results - questions, answers, explanations, and topics to review.</p>
       </div>
       <div class="card">
         <div class="card-icon">&#x1F508;</div>
         <h3>Text-to-Speech (/Read)</h3>
-        <p>The <code>/Read</code> command opens a note in the editor, displays it in chat, and reads it aloud using the browser's built-in Web Speech API — no extra API key required. A TTS player bar appears above the chat input with: <strong>Play/Pause</strong>, <strong>Stop</strong>, <strong>◀◀ / ▶▶</strong> sentence navigation, and speed controls <strong>0.75× 1× 1.25× 1.5× 2×</strong>. Markdown symbols are stripped before speaking for natural delivery. Changing speed restarts the current sentence at the new rate.</p>
+        <p>The <code>/Read</code> command opens a note in the editor, displays it in chat, and reads it aloud using the browser's built-in Web Speech API - no extra API key required. A TTS player bar appears above the chat input with: <strong>Play/Pause</strong>, <strong>Stop</strong>, <strong>◀◀ / ▶▶</strong> sentence navigation, and speed controls <strong>0.75× 1× 1.25× 1.5× 2×</strong>. Markdown symbols are stripped before speaking for natural delivery. Changing speed restarts the current sentence at the new rate.</p>
       </div>
       <div class="card">
         <div class="card-icon">&#x1F4AC;</div>
         <h3>Multi-Model Discussion (/Discussion)</h3>
-        <p>The <code>/Discussion</code> command invites every configured AI model — GPT, Gemini, DeepSeek, and any custom providers the user has added in Settings → API Keys — to each share a 3-5 sentence perspective grounded in the note content. A synthesis is then generated combining all perspectives. The command uses the selected model first, then falls back through user custom keys → server providers → server default.</p>
+        <p>The <code>/Discussion</code> command invites every configured AI model - GPT, Gemini, DeepSeek, and any custom providers the user has added in Settings → API Keys - to each share a 3-5 sentence perspective grounded in the note content. A synthesis is then generated combining all perspectives. The command uses the selected model first, then falls back through user custom keys → server providers → server default.</p>
       </div>
       <div class="card">
         <div class="card-icon">&#x1F4E7;</div>
         <h3>Gmail Email Integration</h3>
-        <p>Connect Gmail via OAuth 2.0 in Settings → Email. MemoLink fetches unread and important emails, batch-scores importance with GPT (1–5), and saves those scoring ≥ 3. Auto-process appends new emails to a global <strong>Email Digest</strong> note and creates reminders for emails with detected deadlines — both are global (visible across all workspaces). A <strong>Sync from Email</strong> button in the Reminders panel triggers a fresh sync on demand. Email-sourced reminders link back to the original email. Reply to any email in-app: choose a tone (Formal / Friendly / Brief), generate 3 RAG-grounded AI draft suggestions, edit, and send — reply threads correctly in Gmail via <code>In-Reply-To</code> + <code>threadId</code>.</p>
+        <p>Connect Gmail via OAuth 2.0 in Settings → Email. MemoLink fetches unread and important emails, batch-scores importance with GPT (1–5), and saves those scoring ≥ 3. Auto-process appends new emails to a global <strong>Email Digest</strong> note and creates reminders for emails with detected deadlines - both are global (visible across all workspaces). A <strong>Sync from Email</strong> button in the Reminders panel triggers a fresh sync on demand. Email-sourced reminders link back to the original email. Reply to any email in-app: choose a tone (Formal / Friendly / Brief), generate 3 RAG-grounded AI draft suggestions, edit, and send - reply threads correctly in Gmail via <code>In-Reply-To</code> + <code>threadId</code>.</p>
       </div>
       <div class="card">
         <div class="card-icon">&#x1F9E0;</div>
         <h3>AI Memory Graph (MemoGraph)</h3>
-        <p>A full-screen force-directed graph that visualises how the AI perceives and connects knowledge across all notes. MemoGraph uses GPT to batch-extract entities — <strong>people, topics, projects, deadlines, decisions, action items, questions, and themes</strong> — then draws edges between entities and the notes that mention them. Notes sharing entities are automatically linked with <em>related_to</em> edges. The canvas supports pan, zoom, and a Fit button. Each node type has a distinct colour. Entity nodes are stored in <code>graph_nodes</code> and relationships in <code>graph_edges</code>. The graph data also powers <strong>Graph-Enhanced RAG</strong>: the retrieval pipeline traverses graph edges to find notes connected to the top-K vector hits, expanding context beyond cosine similarity alone.</p>
+        <p>A full-screen force-directed graph that visualises how the AI perceives and connects knowledge across all notes. MemoGraph uses GPT to batch-extract entities - <strong>people, topics, projects, deadlines, decisions, action items, questions, and themes</strong> - then draws edges between entities and the notes that mention them. Notes sharing entities are automatically linked with <em>related_to</em> edges. The canvas supports pan, zoom, and a Fit button. Each node type has a distinct colour. Entity nodes are stored in <code>graph_nodes</code> and relationships in <code>graph_edges</code>. The graph data also powers <strong>Graph-Enhanced RAG</strong>: the retrieval pipeline traverses graph edges to find notes connected to the top-K vector hits, expanding context beyond cosine similarity alone.</p>
       </div>
       <div class="card">
         <div class="card-icon">&#x1F4A1;</div>
         <h3>Proactive Reminder Intelligence</h3>
-        <p>An AI-powered scan that surfaces missed deadlines, incomplete action items, and urgency signals buried in the user's notes — without the user having to ask. Detection runs in two passes: a <strong>rule-based pass</strong> (filename regex flags recently uploaded unreviewed files) and a <strong>GPT batch pass</strong> (8 notes per call, each classified into <em>missing_reminder</em>, <em>incomplete_actions</em>, or <em>urgency_signal</em>). Insights appear in a collapsible <strong>AI Insights</strong> section in the Reminders panel, colour-coded by severity (red / amber / indigo). Each insight links directly to the source note. Dismissed insights are soft-deleted and not re-shown. Results are persisted in the <code>proactive_insights</code> table and refresh on each scan.</p>
+        <p>An AI-powered scan that surfaces missed deadlines, incomplete action items, and urgency signals buried in the user's notes - without the user having to ask. Detection runs in two passes: a <strong>rule-based pass</strong> (filename regex flags recently uploaded unreviewed files) and a <strong>GPT batch pass</strong> (8 notes per call, each classified into <em>missing_reminder</em>, <em>incomplete_actions</em>, or <em>urgency_signal</em>). Insights appear in a collapsible <strong>AI Insights</strong> section in the Reminders panel, colour-coded by severity (red / amber / indigo). Each insight links directly to the source note. Dismissed insights are soft-deleted and not re-shown. Results are persisted in the <code>proactive_insights</code> table and refresh on each scan.</p>
       </div>
       <div class="card">
         <div class="card-icon">&#x1F6E1;&#xFE0F;</div>
         <h3>Source-Grounded Answer Confidence</h3>
-        <p>Every AI response carries a <strong>HIGH / MEDIUM / LOW / UNSUPPORTED</strong> confidence badge inline with the model attribution. The system uses a two-layer approach: the LLM self-assesses by appending a <code>&lt;confidence&gt;</code> tag to its own reply (stripped before display), and a server-side pre-computed fallback guarantees a badge even if the model omits the tag. The fallback is deterministic — UNSUPPORTED when no notes exist, LOW/MEDIUM/HIGH based on how many top-K vector results were retrieved. Confidence and reasoning are persisted to the <code>messages</code> table (<code>confidence</code>, <code>confidence_reason</code> columns) so historical responses retain their badges. A hover tooltip shows the reasoning. The feature is toggled via the <code>confidence_enabled</code> feature flag.</p>
+        <p>Every AI response carries a <strong>HIGH / MEDIUM / LOW / UNSUPPORTED</strong> confidence badge inline with the model attribution. The system uses a two-layer approach: the LLM self-assesses by appending a <code>&lt;confidence&gt;</code> tag to its own reply (stripped before display), and a server-side pre-computed fallback guarantees a badge even if the model omits the tag. The fallback is deterministic - UNSUPPORTED when no notes exist, LOW/MEDIUM/HIGH based on how many top-K vector results were retrieved. Confidence and reasoning are persisted to the <code>messages</code> table (<code>confidence</code>, <code>confidence_reason</code> columns) so historical responses retain their badges. A hover tooltip shows the reasoning. The feature is toggled via the <code>confidence_enabled</code> feature flag.</p>
       </div>
       <div class="card">
         <div class="card-icon">&#x26A1;</div>
         <h3>AutoPilot Model Routing</h3>
-        <p>An intelligent, zero-latency routing layer that automatically selects the best AI model for each prompt — with no extra API calls. Rules are evaluated in priority order: <strong>Translation</strong> (language regex) → <strong>Code / Debug</strong> (any programming language name, or ≥2 code keywords) → <strong>Deep Research</strong> (analysis/research keywords) → <strong>Long Context</strong> (prompt &gt;250 words) → <strong>Simple Query</strong> (≤12 words, stays on default). Translation and Long Context route to <em>Gemini 2.5 Flash</em> (large context window); Code routes to <em>DeepSeek Coder</em>; Deep Research to <em>GPT-4o</em>. Rules skip gracefully if a model's API key is not configured. A violet <strong>⚡ AutoPilot · {Reason}</strong> chip appears inline with the model attribution, hidden for Simple Query. Controlled via the <code>autopilot_enabled</code> feature flag.</p>
+        <p>An intelligent, zero-latency routing layer that automatically selects the best AI model for each prompt - with no extra API calls. Rules are evaluated in priority order: <strong>Translation</strong> (language regex) → <strong>Code / Debug</strong> (any programming language name, or ≥2 code keywords) → <strong>Deep Research</strong> (analysis/research keywords) → <strong>Long Context</strong> (prompt &gt;250 words) → <strong>Simple Query</strong> (≤12 words, stays on default). Translation and Long Context route to <em>Gemini 2.5 Flash</em> (large context window); Code routes to <em>DeepSeek Coder</em>; Deep Research to <em>GPT-4o</em>. Rules skip gracefully if a model's API key is not configured. A violet <strong>⚡ AutoPilot · {Reason}</strong> chip appears inline with the model attribution, hidden for Simple Query. Controlled via the <code>autopilot_enabled</code> feature flag.</p>
       </div>
       <div class="card">
         <div class="card-icon">&#x23F1;&#xFE0F;</div>
         <h3>Meeting / Lecture Timeline</h3>
-        <p>A <strong>Timeline</strong> tab appears in the note editor for any note containing transcribed audio or video content. One GPT-4o-mini call analyses the transcript and returns: <strong>Chapters</strong> — major topic sections with timestamps (<code>00:03:12 Assessment requirement explained</code>); <strong>Action Items</strong> — tasks and follow-ups with the responsible person; <strong>Important Moments</strong> — key statements tagged as Decision ⚖️, Warning ⚠️, Key Point 💡, Deadline ⏰, or Question ❓. Timestamps are estimated from word position at 130 wpm (±30–90 s accuracy for lectures). Every entry has a <strong>Jump →</strong> button that uses TipTap's <code>doc.descendants()</code> to locate the exact phrase in the transcript and scrolls the editor to it. Results are cached in the <code>note_timelines</code> table; <strong>Regenerate</strong> overwrites the cache. Controlled via the <code>timeline_enabled</code> feature flag.</p>
+        <p>A <strong>Timeline</strong> tab appears in the note editor for any note containing transcribed audio or video content. One GPT-4o-mini call analyses the transcript and returns: <strong>Chapters</strong> - major topic sections with timestamps (<code>00:03:12 Assessment requirement explained</code>); <strong>Action Items</strong> - tasks and follow-ups with the responsible person; <strong>Important Moments</strong> - key statements tagged as Decision ⚖️, Warning ⚠️, Key Point 💡, Deadline ⏰, or Question ❓. Timestamps are estimated from word position at 130 wpm (±30–90 s accuracy for lectures). Every entry has a <strong>Jump →</strong> button that uses TipTap's <code>doc.descendants()</code> to locate the exact phrase in the transcript and scrolls the editor to it. Results are cached in the <code>note_timelines</code> table; <strong>Regenerate</strong> overwrites the cache. Controlled via the <code>timeline_enabled</code> feature flag.</p>
       </div>
       <div class="card">
         <div class="card-icon">&#x1F393;</div>
         <h3>AI Study Mode</h3>
-        <p>A full-screen study workspace opened from the user menu, with six tools built on demand from the active workspace's notes: <strong>Flashcards</strong> (flippable Q/A cards from a note or all notes), <strong>Quiz</strong> (interactive single/multi-choice with scoring, explanations, and save-to-note — the same engine as <code>/Quiz</code>), <strong>Exam Review</strong> (key concepts, definitions, important facts, likely questions, and focus topics across selected notes), <strong>Study Plan</strong> (a day-by-day plan from a goal and time frame, each day listing focus topics, tasks, and notes to revise), <strong>Weak Topics</strong> (detects recurring topics from your questions and explains each simply with a study tip), and <strong>Summary</strong> (short / medium / detailed levels with optional bullet points). All endpoints live under <code>business/services/study_service</code> and are gated by the <code>study_mode_enabled</code> feature flag.</p>
+        <p>A full-screen study workspace opened from the user menu, with six tools built on demand from the active workspace's notes: <strong>Flashcards</strong> (flippable Q/A cards from a note or all notes), <strong>Quiz</strong> (interactive single/multi-choice with scoring, explanations, and save-to-note - the same engine as <code>/Quiz</code>), <strong>Exam Review</strong> (key concepts, definitions, important facts, likely questions, and focus topics across selected notes), <strong>Study Plan</strong> (a day-by-day plan from a goal and time frame, each day listing focus topics, tasks, and notes to revise), <strong>Weak Topics</strong> (detects recurring topics from your questions and explains each simply with a study tip), and <strong>Summary</strong> (short / medium / detailed levels with optional bullet points). All endpoints live under <code>business/services/study_service</code> and are gated by the <code>study_mode_enabled</code> feature flag.</p>
       </div>
       <div class="card">
         <div class="card-icon">&#x2728;</div>
         <h3>Smart Actions (Workflow Agent)</h3>
-        <p>After a normal chat reply, MemoLink silently analyses the exchange (<code>POST /api/workflow/suggest</code>) and, when a useful follow-up is possible, renders conversational action buttons beneath the message — no mode or toggle required. Approving an action records the user's click as a chat message, executes it, and streams the result back as a saved assistant reply, so the full exchange survives a reload. Eight actions are supported: <strong>create reminder</strong>, <strong>create note</strong>, <strong>summarise workspace</strong>, <strong>search web</strong>, <strong>organise notes</strong>, <strong>suggest title</strong>, <strong>extract tasks</strong>, and <strong>prepare report outline</strong>. Non-OpenAI models fall back to GPT-4o-mini for the tool-calling step. Per-user suggestions toggle in <strong>Settings → Workflow</strong>; admin kill-switch via the <code>workflow_enabled</code> feature flag. After an action runs, the Notes or Reminders panel refreshes automatically.</p>
+        <p>After a normal chat reply, MemoLink silently analyses the exchange (<code>POST /api/workflow/suggest</code>) and, when a useful follow-up is possible, renders conversational action buttons beneath the message - no mode or toggle required. Approving an action records the user's click as a chat message, executes it, and streams the result back as a saved assistant reply, so the full exchange survives a reload. Eight actions are supported: <strong>create reminder</strong>, <strong>create note</strong>, <strong>summarise workspace</strong>, <strong>search web</strong>, <strong>organise notes</strong>, <strong>suggest title</strong>, <strong>extract tasks</strong>, and <strong>prepare report outline</strong>. Non-OpenAI models fall back to GPT-4o-mini for the tool-calling step. Per-user suggestions toggle in <strong>Settings → Workflow</strong>; admin kill-switch via the <code>workflow_enabled</code> feature flag. After an action runs, the Notes or Reminders panel refreshes automatically.</p>
       </div>
       <div class="card">
         <div class="card-icon">&#x1F50A;</div>
         <h3>Text-to-Speech Reading</h3>
-        <p>Any note can be read aloud via the <code>/Read</code> command or the play button in the note editor, using the browser's free Web Speech API (no API cost). Playback <strong>starts from the cursor position and skips the note title</strong>, so you can begin reading from any paragraph. The player bar offers play/pause, stop, ◀◀ / ▶▶ sentence navigation, and speed control (0.75×–2×), with the voice selectable in Settings. The sentence currently being spoken is highlighted live in the editor using non-destructive ProseMirror decorations — visual overlays that never modify the document. Gated by the <code>tts_enabled</code> feature flag.</p>
+        <p>Any note can be read aloud via the <code>/Read</code> command or the play button in the note editor, using the browser's free Web Speech API (no API cost). Playback <strong>starts from the cursor position and skips the note title</strong>, so you can begin reading from any paragraph. The player bar offers play/pause, stop, ◀◀ / ▶▶ sentence navigation, and speed control (0.75×–2×), with the voice selectable in Settings. The sentence currently being spoken is highlighted live in the editor using non-destructive ProseMirror decorations - visual overlays that never modify the document. Gated by the <code>tts_enabled</code> feature flag.</p>
       </div>
     </div>
   </section>
@@ -482,7 +482,7 @@
     <div class="section-label">Architecture</div>
     <h2>System Architecture</h2>
     <p>
-      MemoLink follows a strict three-layer Clean Architecture — API &rarr; Business &rarr; Domain —
+      MemoLink follows a strict three-layer Clean Architecture - API &rarr; Business &rarr; Domain -
       combined with Domain-Driven Design and a manual Dependency Injection container.
     </p>
 
@@ -499,13 +499,13 @@
         <tr>
           <td><strong>API</strong></td>
           <td><code>api/v1/</code></td>
-          <td>HTTP controllers — thin, no business logic</td>
+          <td>HTTP controllers - thin, no business logic</td>
           <td><span class="tag tag-py">FastAPI</span></td>
         </tr>
         <tr>
           <td><strong>Business</strong></td>
           <td><code>business/services/</code></td>
-          <td>Application logic — chat, notes, auth, conversations, reminders, video, workspaces, admin, feature flags, feedback, email, memograph, proactive insights, autopilot routing, lecture timeline, AI study mode, smart actions / workflow</td>
+          <td>Application logic - chat, notes, auth, conversations, reminders, video, workspaces, admin, feature flags, feedback, email, memograph, proactive insights, autopilot routing, lecture timeline, AI study mode, smart actions / workflow</td>
           <td><span class="tag tag-py">Python</span></td>
         </tr>
         <tr>
@@ -535,7 +535,7 @@
         <tr>
           <td><strong>Frontend</strong></td>
           <td><code>memolink_web/</code></td>
-          <td>SPA — chat UI, note editor, reminders panel, auth pages</td>
+          <td>SPA - chat UI, note editor, reminders panel, auth pages</td>
           <td><span class="tag tag-ts">React</span><span class="tag tag-ts">TypeScript</span></td>
         </tr>
         <tr>
@@ -595,13 +595,13 @@
         <tr>
           <td><strong>AutoPilot Routing</strong></td>
           <td><code>business/services/autopilot_service</code></td>
-          <td>Pure heuristic intent classification — Translation → Gemini 2.5 Flash, Code/Debug (any language name) → DeepSeek Coder, Deep Research → GPT-4o, Long Context → Gemini 2.5 Flash, Simple → default. Zero extra API calls; skips rules when API key absent; routing_reason returned in done SSE event</td>
+          <td>Pure heuristic intent classification - Translation → Gemini 2.5 Flash, Code/Debug (any language name) → DeepSeek Coder, Deep Research → GPT-4o, Long Context → Gemini 2.5 Flash, Simple → default. Zero extra API calls; skips rules when API key absent; routing_reason returned in done SSE event</td>
           <td><span class="tag tag-py">Python</span></td>
         </tr>
         <tr>
           <td><strong>AI Study Mode</strong></td>
           <td><code>business/services/study_service</code></td>
-          <td>Six on-demand generators over workspace notes — flashcards, quiz (single/multi-choice with scoring), exam review, day-by-day study plan, weak-topic detection from recurring questions, and multi-level summaries (short/medium/detailed); all scoped to the active workspace</td>
+          <td>Six on-demand generators over workspace notes - flashcards, quiz (single/multi-choice with scoring), exam review, day-by-day study plan, weak-topic detection from recurring questions, and multi-level summaries (short/medium/detailed); all scoped to the active workspace</td>
           <td><span class="tag tag-ai">OpenAI</span><span class="tag tag-db">pgvector</span></td>
         </tr>
         <tr>
@@ -700,70 +700,70 @@
     <div class="card-grid card-grid-2" style="margin-top:1.4rem;">
       <div class="card">
         <h3>Backend</h3>
-        <p><strong>FastAPI</strong> — async REST API + SSE streaming<br/>
-           <strong>SQLAlchemy</strong> — ORM &amp; session management<br/>
-           <strong>Pydantic v2</strong> — data validation &amp; DTOs<br/>
-           <strong>Uvicorn</strong> — ASGI server<br/>
-           <strong>python-jose</strong> — JWT utilities<br/>
-           <strong>python-multipart</strong> — file upload handling<br/>
-           <strong>passlib (bcrypt)</strong> — password hashing<br/>
-           <strong>cryptography (Fernet)</strong> — symmetric encryption for user API keys</p>
+        <p><strong>FastAPI</strong> - async REST API + SSE streaming<br/>
+           <strong>SQLAlchemy</strong> - ORM &amp; session management<br/>
+           <strong>Pydantic v2</strong> - data validation &amp; DTOs<br/>
+           <strong>Uvicorn</strong> - ASGI server<br/>
+           <strong>python-jose</strong> - JWT utilities<br/>
+           <strong>python-multipart</strong> - file upload handling<br/>
+           <strong>passlib (bcrypt)</strong> - password hashing<br/>
+           <strong>cryptography (Fernet)</strong> - symmetric encryption for user API keys</p>
       </div>
       <div class="card">
         <h3>Frontend</h3>
-        <p><strong>React 18</strong> — component-based SPA<br/>
-           <strong>TypeScript</strong> — type-safe development<br/>
-           <strong>Vite</strong> — fast bundler &amp; dev server<br/>
-           <strong>Tailwind CSS</strong> — utility-first styling<br/>
-           <strong>Tiptap</strong> — rich note editor<br/>
-           <strong>React Router</strong> — client-side routing<br/>
-           <strong>Axios</strong> — HTTP client</p>
+        <p><strong>React 18</strong> - component-based SPA<br/>
+           <strong>TypeScript</strong> - type-safe development<br/>
+           <strong>Vite</strong> - fast bundler &amp; dev server<br/>
+           <strong>Tailwind CSS</strong> - utility-first styling<br/>
+           <strong>Tiptap</strong> - rich note editor<br/>
+           <strong>React Router</strong> - client-side routing<br/>
+           <strong>Axios</strong> - HTTP client</p>
       </div>
       <div class="card">
         <h3>Database &amp; Search</h3>
-        <p><strong>PostgreSQL</strong> — primary relational database<br/>
-           <strong>Supabase</strong> — hosted Postgres + pgvector<br/>
-           <strong>pgvector</strong> — cosine similarity search<br/>
-           <strong>VectorType(1536)</strong> — custom SQLAlchemy column<br/>
-           <strong>reminders table</strong> — migrated at startup via ALTER TABLE IF NOT EXISTS<br/>
-           <strong>feature_flags table</strong> — feature toggles + *_min_level flags seeded on startup<br/>
-           <strong>feedback table</strong> — bug reports and suggestions with status lifecycle<br/>
-           <strong>users.is_admin</strong> — boolean column; first user auto-promoted<br/>
-           <strong>users.access_level</strong> — VARCHAR ('regular'|'plus'|'pro'); default 'regular'<br/>
-           <strong>system_logs table</strong> — structured event log for INFO/WARNING/ERROR events<br/>
-           <strong>translation_cache table</strong> — SHA-256-keyed translation result cache with hit_count<br/>
-           <strong>user_api_keys table</strong> — per-user encrypted API keys (provider + Fernet-encrypted key, unique per user+provider)<br/>
-           <strong>email_accounts table</strong> — one Gmail OAuth record per user; access + refresh tokens encrypted with Fernet<br/>
-           <strong>email_records table</strong> — synced email metadata (subject, sender, snippet, body, importance score, note_appended flag)<br/>
-           <strong>reminders.email_record_id</strong> — FK linking email-generated reminders back to their source email<br/>
-           <strong>graph_nodes table</strong> — one row per entity (user_id, workspace_id, node_type, label, source_id); unique constraint prevents duplicates<br/>
-           <strong>graph_edges table</strong> — directed relationships between graph nodes (source_node_id, target_node_id, relationship); CASCADE delete from nodes<br/>
-           <strong>proactive_insights table</strong> — AI-detected insight records (note_id, type, title, description, severity, dismissed flag, created_at)<br/>
-           <strong>messages.confidence</strong> — VARCHAR(20) column storing HIGH | MEDIUM | LOW | UNSUPPORTED per assistant message<br/>
-           <strong>messages.confidence_reason</strong> — TEXT column storing the LLM's or server-side fallback reasoning for the confidence level<br/>
-           <strong>note_timelines table</strong> — one cached timeline per note (UNIQUE note_id); summary TEXT, chapters/action_items/important_moments JSON, estimated_duration_seconds, word_count, generated_at</p>
+        <p><strong>PostgreSQL</strong> - primary relational database<br/>
+           <strong>Supabase</strong> - hosted Postgres + pgvector<br/>
+           <strong>pgvector</strong> - cosine similarity search<br/>
+           <strong>VectorType(1536)</strong> - custom SQLAlchemy column<br/>
+           <strong>reminders table</strong> - migrated at startup via ALTER TABLE IF NOT EXISTS<br/>
+           <strong>feature_flags table</strong> - feature toggles + *_min_level flags seeded on startup<br/>
+           <strong>feedback table</strong> - bug reports and suggestions with status lifecycle<br/>
+           <strong>users.is_admin</strong> - boolean column; first user auto-promoted<br/>
+           <strong>users.access_level</strong> - VARCHAR ('regular'|'plus'|'pro'); default 'regular'<br/>
+           <strong>system_logs table</strong> - structured event log for INFO/WARNING/ERROR events<br/>
+           <strong>translation_cache table</strong> - SHA-256-keyed translation result cache with hit_count<br/>
+           <strong>user_api_keys table</strong> - per-user encrypted API keys (provider + Fernet-encrypted key, unique per user+provider)<br/>
+           <strong>email_accounts table</strong> - one Gmail OAuth record per user; access + refresh tokens encrypted with Fernet<br/>
+           <strong>email_records table</strong> - synced email metadata (subject, sender, snippet, body, importance score, note_appended flag)<br/>
+           <strong>reminders.email_record_id</strong> - FK linking email-generated reminders back to their source email<br/>
+           <strong>graph_nodes table</strong> - one row per entity (user_id, workspace_id, node_type, label, source_id); unique constraint prevents duplicates<br/>
+           <strong>graph_edges table</strong> - directed relationships between graph nodes (source_node_id, target_node_id, relationship); CASCADE delete from nodes<br/>
+           <strong>proactive_insights table</strong> - AI-detected insight records (note_id, type, title, description, severity, dismissed flag, created_at)<br/>
+           <strong>messages.confidence</strong> - VARCHAR(20) column storing HIGH | MEDIUM | LOW | UNSUPPORTED per assistant message<br/>
+           <strong>messages.confidence_reason</strong> - TEXT column storing the LLM's or server-side fallback reasoning for the confidence level<br/>
+           <strong>note_timelines table</strong> - one cached timeline per note (UNIQUE note_id); summary TEXT, chapters/action_items/important_moments JSON, estimated_duration_seconds, word_count, generated_at</p>
       </div>
       <div class="card">
         <h3>AI &amp; Media</h3>
-        <p><strong>OpenAI GPT-4o / GPT-4o-mini</strong> — answer generation (streaming)<br/>
-           <strong>Gemini 2.5 Flash / Flash Lite / 2.5 Pro</strong> — alternative chat models &amp; translation<br/>
-           <strong>DeepSeek V3 / R1 / Coder</strong> — code-focused alternative chat models<br/>
-           <strong>DALL-E 3</strong> — AI image generation (1024&times;1024, base64)<br/>
-           <strong>text-embedding-3-small</strong> — vector embeddings<br/>
-           <strong>OpenAI Whisper</strong> — audio/video transcription (&lt;5 MB primary, up to 25 MB fallback)<br/>
-           <strong>Deepgram Nova-2</strong> — audio/video transcription (≥5 MB primary)<br/>
-           <strong>youtube-transcript-api</strong> — YouTube caption extraction<br/>
-           <strong>Brave Search API</strong> — optional per-message web context<br/>
-           <strong>RAG pattern</strong> — grounded retrieval<br/>
-           <strong>Top-K semantic search</strong> — relevant chunk selection</p>
+        <p><strong>OpenAI GPT-4o / GPT-4o-mini</strong> - answer generation (streaming)<br/>
+           <strong>Gemini 2.5 Flash / Flash Lite / 2.5 Pro</strong> - alternative chat models &amp; translation<br/>
+           <strong>DeepSeek V3 / R1 / Coder</strong> - code-focused alternative chat models<br/>
+           <strong>DALL-E 3</strong> - AI image generation (1024&times;1024, base64)<br/>
+           <strong>text-embedding-3-small</strong> - vector embeddings<br/>
+           <strong>OpenAI Whisper</strong> - audio/video transcription (&lt;5 MB primary, up to 25 MB fallback)<br/>
+           <strong>Deepgram Nova-2</strong> - audio/video transcription (≥5 MB primary)<br/>
+           <strong>youtube-transcript-api</strong> - YouTube caption extraction<br/>
+           <strong>Brave Search API</strong> - optional per-message web context<br/>
+           <strong>RAG pattern</strong> - grounded retrieval<br/>
+           <strong>Top-K semantic search</strong> - relevant chunk selection</p>
       </div>
       <div class="card">
         <h3>Deployment</h3>
-        <p><strong>Docker</strong> — Python 3.11-slim backend image<br/>
-           <strong>Docker</strong> — Node build + nginx frontend image<br/>
-           <strong>docker-compose.yml</strong> — single-command orchestration<br/>
-           <strong>nginx.conf</strong> — proxies /api/ to backend, disables buffering for SSE<br/>
-           <strong>AWS S3</strong> — temporary upload bucket for files &gt;5 MB; pre-signed PUT URLs bypass Lambda payload limit</p>
+        <p><strong>Docker</strong> - Python 3.11-slim backend image<br/>
+           <strong>Docker</strong> - Node build + nginx frontend image<br/>
+           <strong>docker-compose.yml</strong> - single-command orchestration<br/>
+           <strong>nginx.conf</strong> - proxies /api/ to backend, disables buffering for SSE<br/>
+           <strong>AWS S3</strong> - temporary upload bucket for files &gt;5 MB; pre-signed PUT URLs bypass Lambda payload limit</p>
       </div>
     </div>
   </section>
@@ -775,8 +775,8 @@
     <div class="section-label">Deployment</div>
     <h2>Docker Compose Deployment</h2>
     <p>
-      MemoLink ships with a complete Docker Compose configuration. The entire stack —
-      FastAPI backend, React/nginx frontend, and all configuration — is brought up with
+      MemoLink ships with a complete Docker Compose configuration. The entire stack -
+      FastAPI backend, React/nginx frontend, and all configuration - is brought up with
       a single command after copying the environment file.
     </p>
     <div class="deploy-box">
@@ -792,7 +792,7 @@ docker compose up --build   # builds and starts backend + frontend</pre>
         <code>X-Accel-Buffering: no</code> and <code>proxy_buffering off</code>
         so SSE tokens flow through without delay. The frontend is served as
         a static bundle on port 80. No ffmpeg or external media tools are required
-        in production — YouTube captions are fetched directly via HTTP and Whisper
+        in production - YouTube captions are fetched directly via HTTP and Whisper
         runs inside the backend container.
       </p>
     </div>
@@ -815,7 +815,7 @@ docker compose up --build   # builds and starts backend + frontend</pre>
       </div>
       <div class="card">
         <h3>Dependency Injection</h3>
-        <p><code>ServiceInstaller</code> binds interfaces to concrete implementations. Controllers resolve services through the container — not manually.</p>
+        <p><code>ServiceInstaller</code> binds interfaces to concrete implementations. Controllers resolve services through the container - not manually.</p>
       </div>
       <div class="card">
         <h3>Testability</h3>

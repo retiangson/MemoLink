@@ -19,7 +19,7 @@ import { marked } from "marked";
 import "../styles/editor.css";
 
 interface RichNoteEditorProps {
-  value: string;          // HTML (or legacy Markdown — auto-detected)
+  value: string;          // HTML (or legacy Markdown - auto-detected)
   onChange: (html: string) => void;
   noteKey: string | number;  // changes when a different note is opened
   disabled?: boolean;
@@ -54,13 +54,13 @@ async function toHtml(content: string): Promise<string> {
   const unwrapped = unwrapMarkdownFence(content);
   if (unwrapped !== content) return (await marked(unwrapped)) as string;
 
-  // Markdown takes priority — convert via marked even if mixed with some HTML
+  // Markdown takes priority - convert via marked even if mixed with some HTML
   if (looksLikeMarkdown(content)) return (await marked(content)) as string;
 
-  // Rich HTML from TipTap or sanitizer — use as-is
+  // Rich HTML from TipTap or sanitizer - use as-is
   if (isHtml(content) && hasRichHtmlStructure(content)) return content;
 
-  // Fallback — try marked
+  // Fallback - try marked
   return (await marked(content)) as string;
 }
 
