@@ -598,13 +598,16 @@ class ChatService(IChatService):
                             att_list = em.get("attachments", [])
                             att_str = ""
                             if att_list:
-                                att_str = "\nAttachments: " + ", ".join(
-                                    f"{a['filename']} ({round(a['size']/1024,1)} KB)" if a['size'] else a['filename']
-                                    for a in att_list
-                                )
+                                att_parts = []
+                                for a in att_list:
+                                    size_str = f" ({round(a['size']/1024,1)} KB)" if a.get('size') else ""
+                                    from urllib.parse import quote as _q
+                                    dl_url = f"/api/email/attachment/{em['id']}/{a['attachment_id']}?filename={_q(a['filename'], safe='')}"
+                                    att_parts.append(f"{a['filename']}{size_str} → download: {dl_url}")
+                                att_str = "\nAttachments:\n" + "\n".join(att_parts)
                             email_blocks.append(
                                 f"[EMAIL]\nSubject: {em['subject']}\nFrom: {em['sender']}\n"
-                                f"Date: {em['date']}{att_str}\nBody:\n{em['body'][:1500]}"
+                                f"Date: {em['date']}{att_str}\nBody:\n{em['body'][:1000]}"
                             )
                 elif self._email_record_repo:
                     # Fallback: search already-synced records
@@ -634,8 +637,9 @@ class ChatService(IChatService):
                 system_msgs.append({"role": "system", "content": (
                     "GMAIL SEARCH RESULTS — you MUST base your answer on these emails. "
                     "Do NOT say you cannot access email. "
-                    "Summarise what was found: subject, sender, date, and key content. "
-                    "Tell the user they can reply or save the email to a note directly in MemoLink.\n\n"
+                    "For each email, list subject, sender, date. "
+                    "For attachments, render each download path as a markdown link: [filename](download_path). "
+                    "Tell the user they can click to download attachments, reply, or save to note in MemoLink.\n\n"
                     "--- EMAILS FOUND ---\n"
                     + "\n\n".join(email_blocks)
                 )})

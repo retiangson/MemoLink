@@ -1,3 +1,4 @@
+import base64
 import hashlib
 import hmac
 import json
@@ -8,7 +9,7 @@ from urllib.parse import quote
 import httpx
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, Response
 
 from memolink_backend.core.config import settings
 from memolink_backend.core.security import get_current_user
@@ -278,3 +279,45 @@ def email_to_reminder(
         "due_date": reminder.due_date,
         "due_time": reminder.due_time,
     }
+
+
+@router.get("/attachment/{gmail_message_id}/{attachment_id}")
+async def download_attachment(
+    gmail_message_id: str,
+    attachment_id: str,
+    filename: str = Query("attachment"),
+    user_id: int = Depends(get_current_user),
+    c: RequestContainer = Depends(get_request_container),
+):
+    """Fetch a Gmail attachment and stream it to the browser as a download."""
+    account_repo = c.domain.get_email_account_repository()
+    tokens = account_repo.get_decrypted_tokens(user_id)
+    if not tokens:
+        raise HTTPException(status_code=403, detail="Gmail not connected")
+
+    access_token = tokens.get("access_token", "")
+    headers = {"Authorization": f"Bearer {access_token}"}
+
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            f"https://www.googleapis.com/gmail/v1/users/me/messages/{gmail_message_id}/attachments/{attachment_id}",
+            headers=headers,
+        )
+
+    if resp.status_code != 200:
+        raise HTTPException(status_code=502, detail="Failed to fetch attachment from Gmail")
+
+    data = resp.json().get("data", "")
+    file_bytes = base64.urlsafe_b64decode(data + "==")
+
+    # Guess content type from filename extension
+    import mimetypes
+    mime, _ = mimetypes.guess_type(filename)
+    content_type = mime or "application/octet-stream"
+
+    safe_filename = quote(filename)
+    return Response(
+        content=file_bytes,
+        media_type=content_type,
+        headers={"Content-Disposition": f'attachment; filename="{safe_filename}"'},
+    )

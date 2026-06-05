@@ -4,6 +4,7 @@ import hljs from "highlight.js";
 import "highlight.js/styles/github-dark.css";
 import katex from "katex";
 import "katex/dist/katex.min.css";
+import { API_BASE } from "../api/client";
 
 interface Props {
   children: string;
@@ -40,6 +41,22 @@ export default function MarkdownRenderer({ children, className }: Props) {
     const language = lang && hljs.getLanguage(lang) ? lang : "plaintext";
     const highlighted = hljs.highlight(code, { language }).value;
     return `<div class="code-block-wrapper"><button class="code-copy-btn" data-code="${encodeURIComponent(code)}">Copy</button><pre><code class="hljs ${language}">${highlighted}</code></pre></div>`;
+  };
+
+  // Rewrite /api/email/attachment/... links to include the full API base URL
+  // so downloads work when the API is on a different origin than the frontend
+  renderer.link = function (this: any, ...args: any[]) {
+    let href = "", title = "", text = "";
+    if (typeof args[0] === "object" && args[0] !== null && "href" in args[0]) {
+      href = args[0].href || ""; title = args[0].title || ""; text = args[0].text || "";
+    } else {
+      href = args[0] || ""; title = args[1] || ""; text = args[2] || "";
+    }
+    const fullHref = href.startsWith("/api/") ? `${API_BASE.replace(/\/api$/, "")}${href}` : href;
+    const isDownload = href.includes("/api/email/attachment/");
+    const titleAttr = title ? ` title="${title}"` : "";
+    const downloadAttr = isDownload ? ` download` : ` target="_blank" rel="noopener"`;
+    return `<a href="${fullHref}"${titleAttr}${downloadAttr}>${text}</a>`;
   };
 
   marked.setOptions({ renderer, gfm: true, breaks: true });
