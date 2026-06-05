@@ -603,11 +603,12 @@ class ChatService(IChatService):
                         except Exception:
                             pass
 
-                    body_safe = body_text.replace('"', "'").replace("\n", "\\n")
+                    import base64 as _b64
+                    body_b64 = _b64.b64encode(body_text[:2000].encode()).decode()
                     subj_safe = subject.replace('"', "'")
                     draft_tag = (
                         f'<email_draft to="{to_addr}" subject="{subj_safe}" '
-                        f'body="{body_safe}" message_id="{mid}" thread_id="{tid}"></email_draft>'
+                        f'body_b64="{body_b64}" message_id="{mid}" thread_id="{tid}"></email_draft>'
                     )
                     action = "reply" if is_reply else "email"
                     _email_draft_prefill = (

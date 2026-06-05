@@ -12,12 +12,17 @@ import type { Message } from "../types";
 import "highlight.js/styles/github-dark.css";
 import "../styles/markdown.css";
 
-/** Parse <email_draft to="..." subject="..." body="..." message_id="..." thread_id="..."> tags */
+/** Parse <email_draft to="..." subject="..." body_b64="..." message_id="..." thread_id="..."> tags.
+ *  Uses body_b64 (base64-encoded) to avoid issues with > < " in note content. */
 function parseEmailDrafts(content: string): { before: string; drafts: Array<{ to: string; subject: string; body: string; messageId: string; threadId: string }>; after: string } {
   const drafts: Array<{ to: string; subject: string; body: string; messageId: string; threadId: string }> = [];
-  const cleaned = content.replace(/<email_draft([^>]*)><\/email_draft>/g, (_, attrs) => {
+  // Match the tag using a regex that handles quoted attribute values containing any chars
+  const TAG_RE = /<email_draft((?:\s+\w+(?:_\w+)*="[^"]*")*)\s*><\/email_draft>/g;
+  const cleaned = content.replace(TAG_RE, (_, attrs) => {
     const get = (key: string) => { const m = attrs.match(new RegExp(`${key}="([^"]*)"`)); return m ? m[1] : ""; };
-    drafts.push({ to: get("to"), subject: get("subject"), body: get("body"), messageId: get("message_id"), threadId: get("thread_id") });
+    const bodyB64 = get("body_b64");
+    const body = bodyB64 ? atob(bodyB64) : get("body");
+    drafts.push({ to: get("to"), subject: get("subject"), body, messageId: get("message_id"), threadId: get("thread_id") });
     return "[[EMAIL_DRAFT_PLACEHOLDER]]";
   });
   const parts = cleaned.split("[[EMAIL_DRAFT_PLACEHOLDER]]");
