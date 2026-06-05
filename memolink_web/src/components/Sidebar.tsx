@@ -51,7 +51,10 @@ export function Sidebar({
   const showEvalTimer = !!evalStatus?.enabled && !!evalStatus?.loaded && !evalStatus?.exhausted;
 
   return (
-    <aside id="tour-sidebar" className="w-[300px] h-full bg-[#0f0f13] border-r border-[#1e1e2a] flex flex-col flex-shrink-0">
+    <>
+      {/* Mobile backdrop */}
+      <div className="fixed inset-0 bg-black/60 z-40 sm:hidden" onClick={onClose} />
+      <aside id="tour-sidebar" className="fixed inset-y-0 left-0 z-50 sm:relative sm:inset-auto w-[300px] h-full bg-[#0f0f13] border-r border-[#1e1e2a] flex flex-col flex-shrink-0">
       <div className="px-4 py-3 border-b border-[#1e1e2a] flex justify-between items-center">
         <div className="flex items-center gap-2 min-w-0">
           <img
@@ -175,5 +178,6 @@ export function Sidebar({
         </button>
       </div>
     </aside>
+    </>
   );
 }

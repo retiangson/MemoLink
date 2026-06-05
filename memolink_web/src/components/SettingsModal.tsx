@@ -402,7 +402,7 @@ export function SettingsModal({
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50" onClick={handleClose}>
       <div
-        className="bg-[#1a1a24] border border-[#2a2a38] rounded-2xl w-[700px] shadow-2xl text-white overflow-hidden"
+        className="bg-[#1a1a24] border border-[#2a2a38] rounded-2xl w-full max-w-[700px] mx-4 max-h-[90vh] overflow-y-auto shadow-2xl text-white"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}

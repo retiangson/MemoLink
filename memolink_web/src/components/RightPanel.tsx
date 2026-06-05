@@ -105,6 +105,7 @@ export function RightPanel({
   if (!open) return null;
 
   const _d = new Date();
+
   const today = `${_d.getFullYear()}-${String(_d.getMonth() + 1).padStart(2, "0")}-${String(_d.getDate()).padStart(2, "0")}`;
   const doneCount = items.filter((i) => i.done).length;
 
@@ -190,7 +191,10 @@ export function RightPanel({
   };
 
   return (
-    <div id="tour-right-panel" className="w-72 h-full flex flex-col bg-[#0f0f13] border-l border-[#1e1e2a] shrink-0">
+    <>
+      {/* Mobile backdrop */}
+      <div className="fixed inset-0 bg-black/60 z-40 sm:hidden" onClick={onClose} />
+      <div id="tour-right-panel" className="fixed inset-y-0 right-0 z-50 sm:relative sm:inset-auto w-72 h-full flex flex-col bg-[#0f0f13] border-l border-[#1e1e2a] shrink-0">
 
       {/* Header */}
       <div className="h-10 flex items-center justify-between px-4 border-b border-[#1e1e2a] shrink-0 bg-[#0a0a0f]">
@@ -497,5 +501,6 @@ export function RightPanel({
         onToggleDone={(id) => onToggleDone(id)}
       />
     </div>
+    </>
   );
 }

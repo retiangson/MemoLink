@@ -4,7 +4,7 @@ import type { Conversation, Message } from "../types";
 
 function ThinkingSpinner() {
   return (
-    <div className="flex items-center gap-3 px-5 py-4 max-w-[740px]">
+    <div className="flex items-center gap-3 px-5 py-4 max-w-full sm:max-w-[740px]">
       <div className="relative w-7 h-7 shrink-0">
         <div className="absolute inset-0 rounded-full border-[3px] border-indigo-500/20 border-t-indigo-400 animate-spin" />
         <div className="absolute inset-[4px] rounded-full border-2 border-purple-500/20 border-t-purple-400 animate-[spin_1.4s_linear_infinite_reverse]" />
@@ -55,7 +55,7 @@ export function MessageList({
       onDragOver={(e) => e.preventDefault()}
       onDrop={(e) => { e.preventDefault(); onDropFiles(Array.from(e.dataTransfer.files)); }}
     >
-      <div className="max-w-[740px] mx-auto flex flex-col gap-4">
+      <div className="max-w-full sm:max-w-[740px] mx-auto flex flex-col gap-4">
         {messages.map((msg, idx) => {
           const isLast = idx === messages.length - 1;
           const isStreamingMsg = streaming && isLast && msg.role === "assistant";

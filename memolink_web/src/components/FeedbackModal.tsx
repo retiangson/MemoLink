@@ -36,7 +36,7 @@ export function FeedbackModal({ show, onClose }: FeedbackModalProps) {
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50" onClick={handleClose}>
       <div
-        className="bg-[#1a1a24] border border-[#2a2a38] rounded-2xl w-[480px] shadow-2xl text-white overflow-hidden"
+        className="bg-[#1a1a24] border border-[#2a2a38] rounded-2xl w-full max-w-[480px] mx-4 shadow-2xl text-white overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
