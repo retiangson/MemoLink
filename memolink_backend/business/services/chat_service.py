@@ -531,6 +531,7 @@ class ChatService(IChatService):
         # Email RAG — live Gmail search when user asks about email
         _email_keywords = {"email", "gmail", "inbox", "message", "attachment", "mail", "sent", "received"}
         _asks_about_email = any(kw in user_text.lower() for kw in _email_keywords)
+        print(f"[EMAIL_RAG] asks={_asks_about_email} uid={dto.user_id} has_svc={self._email_service is not None}", flush=True)
         if _asks_about_email and dto.user_id and user_text:
             email_blocks: list[str] = []
             no_account = False
@@ -542,8 +543,9 @@ class ChatService(IChatService):
                         from memolink_backend.core.encryption import decrypt_text as _dt
                         tokens = self._email_service.account_repo.get_decrypted_tokens(dto.user_id)
                         has_account = tokens is not None
-                    except Exception:
-                        pass
+                        print(f"[EMAIL_RAG] tokens={'yes' if tokens else 'None'} has_account={has_account}", flush=True)
+                    except Exception as _e:
+                        print(f"[EMAIL_RAG] get_tokens raised: {_e}", flush=True)
 
                     if not has_account:
                         no_account = True
