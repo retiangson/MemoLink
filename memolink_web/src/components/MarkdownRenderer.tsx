@@ -52,7 +52,10 @@ export default function MarkdownRenderer({ children, className }: Props) {
     } else {
       href = args[0] || ""; title = args[1] || ""; text = args[2] || "";
     }
-    const fullHref = href.startsWith("/api/") ? `${API_BASE.replace(/\/api$/, "")}${href}` : href;
+    // Build absolute URL: API_BASE already ends with /api, so strip /api from the path prefix
+    const fullHref = href.startsWith("/api/")
+      ? `${API_BASE}${href.slice("/api".length)}`
+      : href;
     const isDownload = href.includes("/api/email/attachment/");
     const titleAttr = title ? ` title="${title}"` : "";
 
