@@ -548,17 +548,47 @@ class ChatService(IChatService):
                     if not has_account:
                         no_account = True
                     else:
-                        # Build a clean Gmail search query
+                        # Build a smart Gmail search query using Gmail operators where applicable
                         _stop = {"can", "you", "check", "my", "about", "the", "an", "a", "is", "in",
-                                 "for", "and", "or", "with", "from", "me", "please", "i", "have", "any"}
-                        gm_query = " ".join(
+                                 "for", "and", "or", "with", "from", "me", "please", "i", "have", "any",
+                                 "email", "gmail", "inbox", "mail", "show", "get", "find", "search",
+                                 "tell", "what", "do", "did", "does", "are", "was", "were", "that"}
+                        lower = user_text.lower()
+                        operators: list[str] = []
+
+                        # Attachment detection
+                        if any(w in lower for w in ("attachment", "attached", "file", "document", "pdf",
+                                                     "docx", "xlsx", "pptx", "zip", "image", "photo")):
+                            operators.append("has:attachment")
+
+                        # Unread detection
+                        if any(w in lower for w in ("unread", "new", "unseen")):
+                            operators.append("is:unread")
+
+                        # Sent detection
+                        if any(w in lower for w in ("sent", "i sent", "outbox")):
+                            operators.append("in:sent")
+
+                        # Strip operator keywords from the text query
+                        keywords = " ".join(
                             w for w in user_text.split() if w.lower() not in _stop and len(w) > 2
-                        ) or user_text
+                        )
+                        gm_query = " ".join(operators + ([keywords] if keywords.strip() else []))
+                        if not gm_query.strip():
+                            gm_query = user_text
+
                         live = self._email_service.live_search_sync(dto.user_id, gm_query, top_k=3)
                         for em in live:
+                            att_list = em.get("attachments", [])
+                            att_str = ""
+                            if att_list:
+                                att_str = "\nAttachments: " + ", ".join(
+                                    f"{a['filename']} ({round(a['size']/1024,1)} KB)" if a['size'] else a['filename']
+                                    for a in att_list
+                                )
                             email_blocks.append(
                                 f"[EMAIL]\nSubject: {em['subject']}\nFrom: {em['sender']}\n"
-                                f"Date: {em['date']}\nBody:\n{em['body'][:1500]}"
+                                f"Date: {em['date']}{att_str}\nBody:\n{em['body'][:1500]}"
                             )
                 elif self._email_record_repo:
                     # Fallback: search already-synced records

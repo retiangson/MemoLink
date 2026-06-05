@@ -51,6 +51,26 @@ def _extract_body(payload: dict) -> str:
     return ""
 
 
+def _extract_attachments(payload: dict) -> list[dict]:
+    """Return list of {filename, attachment_id, size} for all file parts."""
+    parts = payload.get("parts", [])
+    results = []
+    for part in parts:
+        filename = part.get("filename", "")
+        body = part.get("body", {})
+        attachment_id = body.get("attachmentId")
+        if filename and attachment_id:
+            results.append({
+                "filename": filename,
+                "attachment_id": attachment_id,
+                "size": body.get("size", 0),
+                "mime_type": part.get("mimeType", ""),
+            })
+        # Recurse into nested parts
+        results.extend(_extract_attachments(part))
+    return results
+
+
 def _get_header(headers: list, name: str) -> str:
     for h in headers:
         if h["name"].lower() == name.lower():
@@ -429,6 +449,7 @@ class EmailService:
                 body = _extract_body(msg.get("payload", {}))[:3000]
                 thread_id = msg.get("threadId")
                 is_read = "UNREAD" not in msg.get("labelIds", [])
+                attachments = _extract_attachments(msg.get("payload", {}))
 
                 # Save to email_records if not already there, so it's searchable later
                 if not self.record_repo.exists(user_id, mid):
@@ -465,6 +486,7 @@ class EmailService:
                     "body": body,
                     "snippet": snippet,
                     "thread_id": thread_id,
+                    "attachments": attachments,
                 })
                 if len(results) >= top_k:
                     break
