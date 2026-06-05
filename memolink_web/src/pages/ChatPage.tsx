@@ -50,7 +50,7 @@ function getSavedRatio(key: string): number {
 }
 
 export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: WorkspaceHook }) {
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth >= 640);
   const [layoutMode, setLayoutMode] = useState<LayoutMode>(getSavedLayout);
   const [colRatio, setColRatio] = useState(() => getSavedRatio("memolink_split_col"));
   const [rowRatio, setRowRatio] = useState(() => getSavedRatio("memolink_split_row"));
@@ -60,7 +60,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ id: number; content: string; index: number } | null>(null);
   const [activeTabType, setActiveTabType] = useState<"chat" | "note">("chat");
-  const [rightPanelOpen, setRightPanelOpen] = useState(true);
+  const [rightPanelOpen, setRightPanelOpen] = useState(() => window.innerWidth >= 640);
   const [recycleBinOpen, setRecycleBinOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -73,11 +73,14 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
   const [showWorkspaceManager, setShowWorkspaceManager] = useState(false);
   const [showAdmin, setShowAdmin] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
+  const [editingNoteTab, setEditingNoteTab] = useState<number | null>(null);
+  const [editingChatTabId, setEditingChatTabId] = useState<number | null>(null);
+  const [editingChatTitle, setEditingChatTitle] = useState("");
   const [openFeedbackCount, setOpenFeedbackCount] = useState(0);
   const [selectedModel, setSelectedModel] = useState<string>(getSavedModel);
   const { flags } = useFeatureFlags();
   const evalStatus = useEvaluationHeartbeat(flags.evaluation_analytics_enabled);
-  const evaluationActive = flags.evaluation_analytics_enabled && !evalStatus.exhausted;
+  const evaluationActive = flags.evaluation_analytics_enabled && evalStatus.loaded && !evalStatus.exhausted;
   const [evalRatings, setEvalRatings] = useState<Record<string, Record<string, number | string>>>({});
   const [emailConnected, setEmailConnected] = useState(false);
   const [teamsConnected, setTeamsConnected] = useState(false);
@@ -404,7 +407,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
   }
 
   if (!convs.activeConversation) return (
-    <div className="flex h-screen w-screen items-center justify-center bg-[#0f0f13] text-gray-400">
+    <div className="flex h-full w-full items-center justify-center bg-[#0f0f13] text-gray-400">
       Loading…
     </div>
   );
@@ -433,7 +436,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
   }
 
   return (
-    <div className="h-screen w-screen bg-[#16161d] text-gray-100 flex relative">
+    <div className="h-full w-full bg-[#16161d] text-gray-100 flex relative">
 
       {menuData && (
         <div className="absolute z-[9999]" style={{ top: menuData.top, left: menuData.left, width: 160 }}>
@@ -493,17 +496,18 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
         setShowConversations={setShowConversations}
         conversations={convs.conversations}
         activeConversation={convs.activeConversation}
-        onNoteClick={(note: Note) => handleOpenNote(note)}
-        onNewNote={() => handleOpenNote({ id: null, title: "", content: "" })}
+        onNoteClick={(note: Note) => { handleOpenNote(note); if (window.innerWidth < 640) setSidebarOpen(false); }}
+        onNewNote={() => { handleOpenNote({ id: null, title: "", content: "" }); if (window.innerWidth < 640) setSidebarOpen(false); }}
         onNoteMenu={(note: Note, rect: DOMRect) => setMenuData({ type: "note", item: note, top: rect.bottom + 4, left: rect.right - 160 })}
-        onConversationClick={(conv: Conversation) => { convs.handleSelectConversation(conv); setActiveTabType("chat"); }}
+        onConversationClick={(conv: Conversation) => { convs.handleSelectConversation(conv); setActiveTabType("chat"); if (window.innerWidth < 640) setSidebarOpen(false); }}
         onNewChat={() => {
           if (convs.activeConversation?.id === TEMP_ID && !convs.activeConversation.messages.length) {
-            setActiveTabType("chat"); chat.textareaRef.current?.focus(); return;
+            setActiveTabType("chat"); chat.textareaRef.current?.focus(); if (window.innerWidth < 640) setSidebarOpen(false); return;
           }
           convs.startNewChat();
           setActiveTabType("chat");
           setTimeout(() => chat.textareaRef.current?.focus(), 0);
+          if (window.innerWidth < 640) setSidebarOpen(false);
         }}
         onConversationMenu={(conv: Conversation, rect: DOMRect) => setMenuData({ type: "conversation", item: conv, top: rect.bottom + 4, left: rect.right - 160 })}
         onOpenRecycleBin={() => setRecycleBinOpen(true)}
@@ -570,6 +574,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                   onDrop={(e) => { e.preventDefault(); handleTabDrop("chat", i); setDragOverTab(null); }}
                   onDragEnd={() => { dragSrcRef.current = null; setDragOverTab(null); }}
                   onClick={() => handleActivateChat(chat.id)}
+                  onDoubleClick={(e) => { e.stopPropagation(); handleActivateChat(chat.id); setEditingChatTabId(chat.id); setEditingChatTitle(convLabel(chat)); }}
                   className={`flex items-center gap-1.5 px-3 h-10 text-xs cursor-grab active:cursor-grabbing border-b-2 transition shrink-0 select-none ${
                     isActive ? "border-indigo-500 text-white bg-[#0f0f13]" : "border-transparent text-gray-500 hover:text-gray-300 hover:bg-[#0f0f13]/60"
                   } ${isDragOver ? "border-l-2 border-l-indigo-400" : ""}`}
@@ -577,11 +582,15 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                   <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3 shrink-0 opacity-70" fill="currentColor" viewBox="0 0 16 16">
                     <path d="M2.678 11.894a1 1 0 0 1 .287.801 11 11 0 0 1-.398 2c1.395-.323 2.247-.697 2.634-.893a1 1 0 0 1 .71-.074A8 8 0 0 0 8 14c3.996 0 7-2.807 7-6s-3.004-6-7-6-7 2.808-7 6c0 1.468.617 2.83 1.678 3.894z"/>
                   </svg>
-                  <span className="max-w-[120px] truncate">{convLabel(chat)}</span>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); handleCloseChat(chat.id); }}
-                    className="text-gray-600 hover:text-gray-300 w-3.5 h-3.5 flex items-center justify-center rounded-sm hover:bg-[#2a2a38] transition leading-none"
-                  >×</button>
+                  {editingChatTabId === chat.id ? (
+                    <input autoFocus value={editingChatTitle} onChange={(e) => setEditingChatTitle(e.target.value)}
+                      onBlur={() => { convs.renameInline(chat, editingChatTitle); setEditingChatTabId(null); }}
+                      onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); convs.renameInline(chat, editingChatTitle); setEditingChatTabId(null); } if (e.key === "Escape") { e.preventDefault(); setEditingChatTabId(null); } }}
+                      onClick={(e) => e.stopPropagation()} className="max-w-[120px] bg-transparent border-b border-indigo-400 outline-none text-white text-xs" />
+                  ) : (
+                    <span className="max-w-[120px] truncate">{convLabel(chat)}</span>
+                  )}
+                  <button onClick={(e) => { e.stopPropagation(); handleCloseChat(chat.id); }} className="text-gray-600 hover:text-gray-300 w-3.5 h-3.5 flex items-center justify-center rounded-sm hover:bg-[#2a2a38] transition leading-none">×</button>
                 </div>
               );
             })}
@@ -599,6 +608,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                   onDrop={(e) => { e.preventDefault(); handleTabDrop("note", i); setDragOverTab(null); }}
                   onDragEnd={() => { dragSrcRef.current = null; setDragOverTab(null); }}
                   onClick={() => { editor.setActiveIndex(i); setActiveTabType("note"); }}
+                  onDoubleClick={(e) => { e.stopPropagation(); editor.setActiveIndex(i); setActiveTabType("note"); setEditingNoteTab(i); }}
                   className={`flex items-center gap-1.5 px-3 h-10 text-xs cursor-grab active:cursor-grabbing border-b-2 transition shrink-0 select-none ${
                     isActive ? "border-indigo-500 text-white bg-[#0f0f13]" : "border-transparent text-gray-500 hover:text-gray-300 hover:bg-[#0f0f13]/60"
                   } ${isDragOver ? "border-l-2 border-l-indigo-400" : ""}`}
@@ -606,11 +616,15 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                   <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3 shrink-0 opacity-70" fill="currentColor" viewBox="0 0 16 16">
                     <path d="M2 2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v13.5a.5.5 0 0 1-.777.416L8 13.101l-5.223 2.815A.5.5 0 0 1 2 15.5zm2-1a1 1 0 0 0-1 1v12.566l4.723-2.482a.5.5 0 0 1 .554 0L13 14.566V2a1 1 0 0 0-1-1z"/>
                   </svg>
-                  <span className="max-w-[120px] truncate">{note.titleDraft.trim() || "Untitled"}</span>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); editor.closeNote(i); }}
-                    className="text-gray-600 hover:text-gray-300 w-3.5 h-3.5 flex items-center justify-center rounded-sm hover:bg-[#2a2a38] transition leading-none"
-                  >×</button>
+                  {editingNoteTab === i ? (
+                    <input autoFocus value={note.titleDraft} onChange={(e) => editor.setNoteTitleDraft(e.target.value)}
+                      onBlur={() => setEditingNoteTab(null)}
+                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === "Escape") { e.preventDefault(); setEditingNoteTab(null); } }}
+                      onClick={(e) => e.stopPropagation()} className="max-w-[120px] bg-transparent border-b border-indigo-400 outline-none text-white text-xs" />
+                  ) : (
+                    <span className="max-w-[120px] truncate">{note.titleDraft.trim() || "Untitled"}</span>
+                  )}
+                  <button onClick={(e) => { e.stopPropagation(); editor.closeNote(i); }} className="text-gray-600 hover:text-gray-300 w-3.5 h-3.5 flex items-center justify-center rounded-sm hover:bg-[#2a2a38] transition leading-none">×</button>
                 </div>
               );
             })}
@@ -701,7 +715,9 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
               </button>
 
               {userMenuOpen && (
-                <div className="absolute right-0 top-full mt-2 z-[9999] w-52 rounded-xl bg-[#1e1e2a] border border-[#2a2a38] shadow-2xl py-1 overflow-hidden">
+                <>
+                  <div className="fixed inset-0 z-[9998] bg-black/50 sm:hidden" onClick={() => setUserMenuOpen(false)} />
+                  <div className="fixed inset-x-0 bottom-0 z-[9999] rounded-t-2xl max-h-[70vh] overflow-y-auto sm:absolute sm:inset-auto sm:right-0 sm:top-full sm:mt-2 sm:rounded-xl sm:w-52 sm:max-h-none bg-[#1e1e2a] border border-[#2a2a38] shadow-2xl py-1">
                   {/* Email header */}
                   <div className="px-3 py-2.5 border-b border-[#2a2a38]">
                     <p className="text-[11px] text-gray-500 truncate">{user.email}</p>
@@ -834,6 +850,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                     Sign Out
                   </button>
                 </div>
+                </>
               )}
             </div>
           </div>
