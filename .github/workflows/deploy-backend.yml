@@ -60,6 +60,11 @@ jobs:
           docker push $IMAGE_URI
           echo "image_uri=$IMAGE_URI" >> $GITHUB_OUTPUT
 
+      - name: Wait for any in-progress Lambda update to finish
+        run: |
+          aws lambda wait function-updated \
+            --function-name ${{ secrets.LAMBDA_FUNCTION_NAME }} || true
+
       - name: Update Lambda function image
         run: |
           aws lambda update-function-code \
