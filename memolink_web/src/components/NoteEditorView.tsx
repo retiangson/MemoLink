@@ -236,14 +236,6 @@ export function NoteEditorView({
         </div>
       )}
 
-      {/* Title */}
-      <input
-        value={noteTitleDraft}
-        onChange={(e) => setNoteTitleDraft(e.target.value)}
-        placeholder="Note title…"
-        className="w-full bg-transparent border-b border-[#1e1e2a] pb-2 mb-3 text-lg text-indigo-200 focus:outline-none focus:border-indigo-500 shrink-0"
-      />
-
       {/* Tabs */}
       <div className="flex items-center gap-1 mb-2 shrink-0">
         <button

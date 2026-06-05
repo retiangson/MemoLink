@@ -65,6 +65,14 @@ html, body {
   scrollbar-color: #2a2a38 transparent;
 }
 
+.scrollbar-none {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
 .tts-highlight {
   background: rgba(99, 102, 241, 0.45);
   border-radius: 3px;
