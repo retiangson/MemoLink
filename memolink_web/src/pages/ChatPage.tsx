@@ -404,7 +404,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
   }
 
   if (!convs.activeConversation) return (
-    <div className="flex h-screen w-screen items-center justify-center bg-[#0f0f13] text-gray-400">
+    <div className="flex h-full w-full items-center justify-center bg-[#0f0f13] text-gray-400">
       Loading…
     </div>
   );
@@ -433,7 +433,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
   }
 
   return (
-    <div className="h-screen w-screen bg-[#16161d] text-gray-100 flex relative">
+    <div className="h-full w-full bg-[#16161d] text-gray-100 flex relative">
 
       {menuData && (
         <div className="absolute z-[9999]" style={{ top: menuData.top, left: menuData.left, width: 160 }}>
