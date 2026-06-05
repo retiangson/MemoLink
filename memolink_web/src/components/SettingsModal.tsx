@@ -92,6 +92,7 @@ export function SettingsModal({
   const [emailStatus, setEmailStatus] = useState<EmailStatus>({ connected: false, email: null });
   const [emailLoading, setEmailLoading] = useState(false);
   const [emailConnecting, setEmailConnecting] = useState(false);
+  const [emailConnectError, setEmailConnectError] = useState<string | null>(null);
   const [emails, setEmails] = useState<EmailRecord[]>([]);
   const [emailsLoading, setEmailsLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -229,11 +230,14 @@ export function SettingsModal({
 
   async function handleConnectEmail() {
     setEmailConnecting(true);
+    setEmailConnectError(null);
     try {
       const url = await getEmailConnectUrl();
       window.location.href = url;
-    } catch {
+    } catch (err: any) {
       setEmailConnecting(false);
+      const detail = err?.response?.data?.detail ?? "Could not start Gmail connection. Check server configuration.";
+      setEmailConnectError(detail);
     }
   }
 
@@ -935,6 +939,11 @@ export function SettingsModal({
                       </svg>
                       {emailConnecting ? "Redirecting to Google…" : "Connect Gmail"}
                     </button>
+                    {emailConnectError && (
+                      <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-300 leading-relaxed">
+                        {emailConnectError}
+                      </div>
+                    )}
                     <p className="text-[11px] text-gray-600">You'll be redirected to Google to authorise access. MemoLink never stores your password.</p>
                   </div>
                 )}
