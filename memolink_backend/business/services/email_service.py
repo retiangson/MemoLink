@@ -389,14 +389,26 @@ class EmailService:
     def live_search_sync(self, user_id: int, query: str, top_k: int = 3) -> list[dict]:
         """Synchronous Gmail search using httpx.Client — safe to call from any thread or sync context."""
         import httpx as _httpx
+        import logging as _log
+        _logger = _log.getLogger(__name__)
 
-        # Fetch token from DB (sync, same thread — no session conflict)
-        tokens = self.account_repo.get_decrypted_tokens(user_id)
+        # Fetch token from DB
+        try:
+            tokens = self.account_repo.get_decrypted_tokens(user_id)
+        except Exception as exc:
+            _logger.warning(f"[live_search] user={user_id} get_decrypted_tokens raised: {exc}")
+            return []
+
         if not tokens:
+            _logger.warning(f"[live_search] user={user_id} no tokens in DB")
             return []
 
         access_token = tokens.get("access_token", "")
         expiry = tokens.get("token_expiry")
+        _logger.warning(
+            f"[live_search] user={user_id} q={query!r} "
+            f"token_len={len(access_token)} expired={bool(expiry and expiry <= datetime.now(tz=timezone.utc))}"
+        )
 
         # Refresh if expired
         if expiry and expiry <= datetime.now(tz=timezone.utc):
@@ -407,6 +419,7 @@ class EmailService:
                     "refresh_token": tokens.get("refresh_token", ""),
                     "grant_type": "refresh_token",
                 }, timeout=10.0)
+                _logger.warning(f"[live_search] refresh status={resp.status_code} body={resp.text[:200]}")
                 if resp.status_code == 200:
                     data = resp.json()
                     access_token = data["access_token"]
@@ -423,10 +436,14 @@ class EmailService:
                         )
                     except Exception:
                         pass
-            except Exception:
+                else:
+                    _logger.warning(f"[live_search] refresh failed — trying existing token anyway")
+            except Exception as exc:
+                _logger.warning(f"[live_search] refresh exception: {exc}")
                 return []
 
         if not access_token:
+            _logger.warning(f"[live_search] user={user_id} access_token empty after refresh attempt")
             return []
 
         headers = {"Authorization": f"Bearer {access_token}"}
@@ -438,6 +455,12 @@ class EmailService:
                     f"{GMAIL_API}/messages",
                     headers=headers,
                     params={"maxResults": top_k * 2, "q": query},
+                )
+                import logging as _log
+                _log.getLogger(__name__).warning(
+                    f"[live_search] user={user_id} q={query!r} "
+                    f"status={list_resp.status_code} "
+                    f"body={list_resp.text[:300]}"
                 )
                 if list_resp.status_code != 200:
                     return []
