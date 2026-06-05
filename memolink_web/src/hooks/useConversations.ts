@@ -126,6 +126,14 @@ export function useConversations(workspaceId?: number | null) {
     if (activeConversation?.id === conv.id) setActiveConversation(updated);
   }
 
+  async function renameInline(conv: { id: number; title: string | null }, title: string) {
+    if (!title.trim()) return;
+    await renameConversation(conv.id, title.trim());
+    setConversations((p) => p.map((c) => (c.id === conv.id ? { ...c, title: title.trim() } : c)));
+    setOpenChats((p) => p.map((c) => (c.id === conv.id ? { ...c, title: title.trim() } : c)));
+    if (activeConversation?.id === conv.id) setActiveConversation((prev) => prev ? { ...prev, title: title.trim() } : prev);
+  }
+
   async function handleDeleteConv(convId: number) {
     if (!confirm("Delete this conversation?")) return;
     await deleteConversation(convId);
@@ -150,6 +158,6 @@ export function useConversations(workspaceId?: number | null) {
     messagesCursor,
     messagesContainerRef, bottomRef,
     loadMessages, initConversations,
-    handleSelectConversation, handleRename, handleDeleteConv, startNewChat,
+    handleSelectConversation, handleRename, renameInline, handleDeleteConv, startNewChat,
   };
 }
