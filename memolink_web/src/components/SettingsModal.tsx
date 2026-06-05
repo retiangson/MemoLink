@@ -102,7 +102,11 @@ export function SettingsModal({
   const [actionResult, setActionResult] = useState<string | null>(null);
 
   useEffect(() => {
-    if (show) { loadProviders(); loadEmailStatus(); loadTeamsStatus(); }
+    if (show) {
+      loadProviders(); loadEmailStatus(); loadTeamsStatus();
+      const oauthErr = sessionStorage.getItem("email_oauth_error");
+      if (oauthErr) { setEmailConnectError(oauthErr); sessionStorage.removeItem("email_oauth_error"); }
+    }
   }, [show]);
 
   async function loadTeamsStatus() {

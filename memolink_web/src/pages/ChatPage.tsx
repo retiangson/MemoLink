@@ -169,6 +169,13 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
       if (params.get("teams_connected") === "1") setTeamsConnected(true);
       window.history.replaceState({}, "", window.location.pathname);
     }
+    const emailErr = params.get("email_error");
+    if (emailErr) {
+      setShowSettings(true);
+      window.history.replaceState({}, "", window.location.pathname);
+      // emailConnectError is shown in SettingsModal — pass via sessionStorage so it survives the redirect
+      sessionStorage.setItem("email_oauth_error", decodeURIComponent(emailErr));
+    }
   }, []);
 
   const activeWorkspaceId = workspaceHook.activeWorkspace?.id ?? null;

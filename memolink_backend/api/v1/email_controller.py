@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from urllib.parse import quote
 
 import httpx
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import RedirectResponse
 
@@ -72,10 +73,20 @@ def get_connect_url(user_id: int = Depends(get_current_user)):
 
 @router.get("/callback")
 async def oauth_callback(
-    code: str = Query(...),
-    state: str = Query(...),
+    code: Optional[str] = Query(None),
+    state: Optional[str] = Query(None),
+    error: Optional[str] = Query(None),
+    error_description: Optional[str] = Query(None),
     c: RequestContainer = Depends(get_request_container),
 ):
+    # Google redirected back with an error (e.g. redirect_uri_mismatch, access_denied)
+    if error:
+        frontend = settings.frontend_url.rstrip("/")
+        msg = error_description or error
+        return RedirectResponse(url=f"{frontend}?email_error={quote(msg, safe='')}")
+
+    if not code or not state:
+        raise HTTPException(status_code=400, detail="Missing code or state parameter from Google")
     user_id = _verify_state(state)
 
     async with httpx.AsyncClient() as client:
