@@ -333,6 +333,9 @@ def _generate_image(prompt: str) -> tuple[str, str, str]:
 _SYSTEM_PROMPT = (
     "You are MemoLink, a context-aware AI knowledge assistant and research companion. "
     "You have access to the user's personal notes and should use them as your primary source. "
+    "You also have access to the user's Gmail account — when email context appears below you MUST "
+    "use it to answer questions about emails. NEVER say you cannot access email — MemoLink has "
+    "native Gmail integration and can search, read, and display emails directly in the chat. "
     "Always be thorough, well-structured, and grounded in the actual content of the notes. "
     "Format every substantive response using rich markdown: "
     "## headings for major sections, ### for subsections, **bold** for key terms, "
@@ -533,19 +536,30 @@ class ChatService(IChatService):
             no_account = False
             try:
                 if self._email_service:
-                    # Build a clean Gmail search query from the user's message,
-                    # stripping common filler words so Gmail search gets signal
-                    _stop = {"can", "you", "check", "my", "about", "the", "an", "a", "is", "in",
-                             "for", "and", "or", "with", "from", "me", "please", "i", "have", "any"}
-                    gm_query = " ".join(
-                        w for w in user_text.split() if w.lower() not in _stop and len(w) > 2
-                    ) or user_text
-                    live = self._email_service.live_search_sync(dto.user_id, gm_query, top_k=3)
-                    for em in live:
-                        email_blocks.append(
-                            f"[EMAIL]\nSubject: {em['subject']}\nFrom: {em['sender']}\n"
-                            f"Date: {em['date']}\nBody:\n{em['body'][:1500]}"
-                        )
+                    # Check if email account is connected first
+                    has_account = False
+                    try:
+                        from memolink_backend.core.encryption import decrypt_text as _dt
+                        tokens = self._email_service.account_repo.get_decrypted_tokens(dto.user_id)
+                        has_account = tokens is not None
+                    except Exception:
+                        pass
+
+                    if not has_account:
+                        no_account = True
+                    else:
+                        # Build a clean Gmail search query
+                        _stop = {"can", "you", "check", "my", "about", "the", "an", "a", "is", "in",
+                                 "for", "and", "or", "with", "from", "me", "please", "i", "have", "any"}
+                        gm_query = " ".join(
+                            w for w in user_text.split() if w.lower() not in _stop and len(w) > 2
+                        ) or user_text
+                        live = self._email_service.live_search_sync(dto.user_id, gm_query, top_k=3)
+                        for em in live:
+                            email_blocks.append(
+                                f"[EMAIL]\nSubject: {em['subject']}\nFrom: {em['sender']}\n"
+                                f"Date: {em['date']}\nBody:\n{em['body'][:1500]}"
+                            )
                 elif self._email_record_repo:
                     # Fallback: search already-synced records
                     total = self._email_record_repo.count_for_user(dto.user_id)
@@ -572,22 +586,26 @@ class ChatService(IChatService):
 
             if email_blocks:
                 system_msgs.append({"role": "system", "content": (
-                    "--- USER EMAIL CONTEXT (live Gmail search) ---\n"
-                    "The following emails were retrieved directly from the user's Gmail account. "
-                    "Summarise what you found, mention subject, sender, and date. "
-                    "The user can reply or save to note directly from MemoLink.\n\n"
+                    "GMAIL SEARCH RESULTS — you MUST base your answer on these emails. "
+                    "Do NOT say you cannot access email. "
+                    "Summarise what was found: subject, sender, date, and key content. "
+                    "Tell the user they can reply or save the email to a note directly in MemoLink.\n\n"
+                    "--- EMAILS FOUND ---\n"
                     + "\n\n".join(email_blocks)
                 )})
             elif no_account:
                 system_msgs.append({"role": "system", "content": (
-                    "EMAIL CONTEXT: The user has not connected their Gmail to MemoLink. "
-                    "Tell them to go to Settings → Email to connect Gmail. "
-                    "Do NOT say you cannot access email — MemoLink can once Gmail is connected."
+                    "GMAIL NOT CONNECTED — MemoLink has Gmail integration but the user has not "
+                    "connected their account yet. Tell them: go to Settings → Email → Connect Gmail. "
+                    "Do NOT say you cannot access email as a general limitation — "
+                    "once connected, MemoLink searches Gmail in real time."
                 )})
             else:
                 system_msgs.append({"role": "system", "content": (
-                    "EMAIL CONTEXT: Gmail was searched but no emails matched the user's query. "
-                    "Tell them no matching email was found and suggest they try different keywords."
+                    "GMAIL SEARCHED — no emails matched the query. "
+                    "Tell the user: Gmail was searched but no matching email was found. "
+                    "Suggest trying different keywords or checking Gmail directly. "
+                    "Do NOT say you cannot access email — MemoLink did search Gmail, just found no results."
                 )})
 
         if getattr(dto, "web_search", False) and user_text:
