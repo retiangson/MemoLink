@@ -598,13 +598,14 @@ class ChatService(IChatService):
                             att_list = em.get("attachments", [])
                             att_str = ""
                             if att_list:
+                                from urllib.parse import quote as _q
                                 att_parts = []
                                 for a in att_list:
                                     size_str = f" ({round(a['size']/1024,1)} KB)" if a.get('size') else ""
-                                    from urllib.parse import quote as _q
                                     dl_url = f"/api/email/attachment/{em['id']}/{a['attachment_id']}?filename={_q(a['filename'], safe='')}"
-                                    att_parts.append(f"{a['filename']}{size_str} → download: {dl_url}")
-                                att_str = "\nAttachments:\n" + "\n".join(att_parts)
+                                    # Pre-formatted markdown link — AI must output it exactly as-is
+                                    att_parts.append(f"- [{a['filename']}{size_str}]({dl_url})")
+                                att_str = "\nAttachments (copy these markdown links exactly, do not change them):\n" + "\n".join(att_parts)
                             email_blocks.append(
                                 f"[EMAIL]\nSubject: {em['subject']}\nFrom: {em['sender']}\n"
                                 f"Date: {em['date']}{att_str}\nBody:\n{em['body'][:1000]}"

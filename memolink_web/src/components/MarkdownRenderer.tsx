@@ -76,5 +76,30 @@ export default function MarkdownRenderer({ children, className }: Props) {
     return () => buttons.forEach((btn) => btn.removeEventListener("click", handler));
   }, [html]);
 
+  // Intercept attachment download links — fetch with JWT then trigger download
+  useEffect(() => {
+    const links = document.querySelectorAll<HTMLAnchorElement>("a[href*='/api/email/attachment/']");
+    const handler = async (e: Event) => {
+      e.preventDefault();
+      const a = e.currentTarget as HTMLAnchorElement;
+      const href = a.getAttribute("href") || "";
+      const filename = new URL(href, window.location.origin).searchParams.get("filename") || "attachment";
+      try {
+        const { api } = await import("../api/client");
+        const res = await api.get(href.replace(/^https?:\/\/[^/]+/, ""), { responseType: "blob" });
+        const url = URL.createObjectURL(res.data);
+        const tmp = document.createElement("a");
+        tmp.href = url;
+        tmp.download = filename;
+        tmp.click();
+        setTimeout(() => URL.revokeObjectURL(url), 5000);
+      } catch {
+        window.open(href, "_blank");
+      }
+    };
+    links.forEach((l) => l.addEventListener("click", handler));
+    return () => links.forEach((l) => l.removeEventListener("click", handler));
+  }, [html]);
+
   return <div className={`markdown-body ${className || ""}`} dangerouslySetInnerHTML={{ __html: html }} />;
 }
