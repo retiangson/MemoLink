@@ -549,29 +549,40 @@ class ChatService(IChatService):
                         no_account = True
                     else:
                         # Build a smart Gmail search query using Gmail operators where applicable
-                        _stop = {"can", "you", "check", "my", "about", "the", "an", "a", "is", "in",
-                                 "for", "and", "or", "with", "from", "me", "please", "i", "have", "any",
-                                 "email", "gmail", "inbox", "mail", "show", "get", "find", "search",
-                                 "tell", "what", "do", "did", "does", "are", "was", "were", "that"}
                         lower = user_text.lower()
                         operators: list[str] = []
 
-                        # Attachment detection
-                        if any(w in lower for w in ("attachment", "attached", "file", "document", "pdf",
-                                                     "docx", "xlsx", "pptx", "zip", "image", "photo")):
+                        # Words consumed by operators — excluded from keyword query
+                        _consumed: set[str] = set()
+
+                        _att_words = {"attachment", "attached", "attachments", "file", "files",
+                                      "document", "documents", "pdf", "docx", "xlsx", "pptx",
+                                      "zip", "image", "photo", "photos"}
+                        if any(w in lower for w in _att_words):
                             operators.append("has:attachment")
+                            _consumed |= _att_words
 
-                        # Unread detection
-                        if any(w in lower for w in ("unread", "new", "unseen")):
+                        _unread_words = {"unread", "unseen"}
+                        if any(w in lower for w in _unread_words):
                             operators.append("is:unread")
+                            _consumed |= _unread_words
 
-                        # Sent detection
-                        if any(w in lower for w in ("sent", "i sent", "outbox")):
+                        _sent_words = {"sent", "outbox"}
+                        if any(w in lower for w in _sent_words):
                             operators.append("in:sent")
+                            _consumed |= _sent_words
 
-                        # Strip operator keywords from the text query
+                        # Build keyword portion — drop stop words and operator-consumed words
+                        _stop = {"can", "you", "check", "my", "about", "the", "an", "a", "is", "in",
+                                 "for", "and", "or", "with", "from", "me", "please", "i", "have", "any",
+                                 "email", "gmail", "inbox", "mail", "show", "get", "find", "search",
+                                 "tell", "what", "do", "did", "does", "are", "was", "were", "that",
+                                 "new", "all", "some", "there", "see", "look"}
                         keywords = " ".join(
-                            w for w in user_text.split() if w.lower() not in _stop and len(w) > 2
+                            w for w in user_text.split()
+                            if w.lower() not in _stop
+                            and w.lower() not in _consumed
+                            and len(w) > 2
                         )
                         gm_query = " ".join(operators + ([keywords] if keywords.strip() else []))
                         if not gm_query.strip():

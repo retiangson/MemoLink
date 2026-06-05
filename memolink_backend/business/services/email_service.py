@@ -387,17 +387,13 @@ class EmailService:
         )
 
     def live_search_sync(self, user_id: int, query: str, top_k: int = 3) -> list[dict]:
-        """Synchronous Gmail search — safe to call from a sync context (e.g. a thread pool)."""
+        """Synchronous Gmail search — always runs in a fresh thread to avoid event loop conflicts."""
         import asyncio
+        import concurrent.futures
         try:
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                import concurrent.futures
-                with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:
-                    future = ex.submit(asyncio.run, self.live_search(user_id, query, top_k))
-                    return future.result(timeout=15)
-            else:
-                return loop.run_until_complete(self.live_search(user_id, query, top_k))
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:
+                future = ex.submit(asyncio.run, self.live_search(user_id, query, top_k))
+                return future.result(timeout=20)
         except Exception:
             return []
 
