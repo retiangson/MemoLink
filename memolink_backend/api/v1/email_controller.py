@@ -288,18 +288,19 @@ async def download_attachment(
     attachment_id: str,
     filename: str = Query("attachment"),
     token: Optional[str] = Query(None),
-    user_id: Optional[int] = Depends(lambda: None),
     c: RequestContainer = Depends(get_request_container),
-    credentials: Optional[object] = Depends(HTTPBearer(auto_error=False)),
+    credentials=Depends(HTTPBearer(auto_error=False)),
 ):
-    # Accept auth via query param (for direct browser downloads) or header
+    """Fetch a Gmail attachment and stream it to the browser as a download.
+    Accepts JWT via ?token= query param (for direct browser links) or Authorization header.
+    """
     if token:
         resolved_uid = verify_token(token)
     elif credentials and hasattr(credentials, "credentials"):
-        resolved_uid = get_current_user(credentials)  # type: ignore
+        resolved_uid = verify_token(credentials.credentials)
     else:
         raise HTTPException(status_code=401, detail="Not authenticated")
-    """Fetch a Gmail attachment and stream it to the browser as a download."""
+
     account_repo = c.domain.get_email_account_repository()
     tokens = account_repo.get_decrypted_tokens(resolved_uid)
     if not tokens:
