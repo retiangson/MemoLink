@@ -583,8 +583,8 @@ class ChatService(IChatService):
                         subject = topic.replace('"', "'").capitalize()
                         mid, tid = "", ""
 
-                    # Search notes for topic content to prefill body (simple keyword filter, no vector needed)
-                    body_text = topic  # default: use the topic itself
+                    # Only use a note if its TITLE closely matches the topic (avoid picking wrong content)
+                    body_text = f"Hi,\n\nI wanted to share some details about: {topic}.\n\nPlease let me know if you have any questions."
                     if hasattr(self, "repo_notes") and self.repo_notes and dto.user_id:
                         try:
                             _stop_note = {"the", "a", "an", "of", "in", "on", "for", "and", "or",
@@ -592,14 +592,12 @@ class ChatService(IChatService):
                             _kw_words = [w.lower() for w in topic.split() if w.lower() not in _stop_note and len(w) > 2]
                             if _kw_words:
                                 all_notes = self.repo_notes.get_for_user(dto.user_id)
-                                best, best_score = None, 0
                                 for note in all_notes:
-                                    text_lower = ((note.title or "") + " " + note.content).lower()
-                                    score = sum(1 for w in _kw_words if w in text_lower)
-                                    if score > best_score:
-                                        best_score, best = score, note
-                                if best and best_score > 0:
-                                    body_text = best.content[:2000]
+                                    # Only use note if TITLE matches — never use random body content
+                                    title_lower = (note.title or "").lower()
+                                    if sum(1 for w in _kw_words if w in title_lower) >= max(1, len(_kw_words) // 2):
+                                        body_text = note.content[:1500]
+                                        break
                         except Exception:
                             pass
 
@@ -929,11 +927,10 @@ class ChatService(IChatService):
         conversation_id, messages, sources, pre_conf_level, pre_conf_reason, email_draft_prefill = self._build_chat_context(dto)
         ctx_ms = int((time.perf_counter() - t_ctx) * 1000)
 
-        # Email draft — bypass LLM entirely; stream the pre-built draft card
+        # Email draft — bypass LLM entirely; emit the full draft as a single replace event
         if email_draft_prefill:
             assistant_msg = self.repo_conv.add_message(conversation_id, "assistant", email_draft_prefill)
-            for chunk in email_draft_prefill:
-                yield f"data: {json.dumps({'chunk': chunk})}\n\n"
+            yield f"data: {json.dumps({'replace': email_draft_prefill})}\n\n"
             yield f"data: {json.dumps({'done': True, 'id': assistant_msg.id, 'model': 'memolink'})}\n\n"
             return
 
