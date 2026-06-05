@@ -335,7 +335,8 @@ _SYSTEM_PROMPT = (
     "You have access to the user's personal notes and should use them as your primary source. "
     "You also have access to the user's Gmail account — when email context appears below you MUST "
     "use it to answer questions about emails. NEVER say you cannot access email — MemoLink has "
-    "native Gmail integration and can search, read, and display emails directly in the chat. "
+    "native Gmail integration and can search, read, display emails, AND send replies directly in the chat. "
+    "When asked to reply to someone, MemoLink will send it and you will be told whether it succeeded. "
     "Always be thorough, well-structured, and grounded in the actual content of the notes. "
     "Format every substantive response using rich markdown: "
     "## headings for major sections, ### for subsections, **bold** for key terms, "
@@ -527,6 +528,70 @@ class ChatService(IChatService):
         system_msgs = [{"role": "system", "content": _SYSTEM_PROMPT}]
         if rag_blocks:
             system_msgs.append({"role": "system", "content": "--- USER NOTES CONTEXT ---\n" + "\n\n".join(rag_blocks)})
+
+        # Email reply — detect "reply to X saying/just Y" intent and send directly
+        _reply_keywords = {"reply", "respond", "send", "write back", "email back"}
+        _asks_reply = any(kw in user_text.lower() for kw in _reply_keywords)
+        if _asks_reply and self._email_service and dto.user_id:
+            try:
+                import re as _re
+                # Extract recipient hint (name or email after "reply to" / "send to")
+                _to_match = _re.search(r"(?:reply to|respond to|email|send to)\s+([^\s,]+)", user_text, _re.I)
+                # Extract body (text after "saying", "just say", "say", comma)
+                _body_match = _re.search(r"(?:saying|just say|say|,)\s+(.+)$", user_text, _re.I | _re.S)
+                if _to_match and _body_match:
+                    recipient_hint = _to_match.group(1).strip().lower().rstrip(".,")
+                    reply_body = _body_match.group(1).strip().strip('"\'')
+                    # Search Gmail for recent email from/to this person
+                    candidate = self._email_service.live_search_sync(
+                        dto.user_id, recipient_hint, top_k=1
+                    )
+                    if candidate:
+                        em = candidate[0]
+                        # Send reply via Gmail
+                        import asyncio, concurrent.futures
+                        async def _do_reply():
+                            from memolink_backend.business.services.email_service import _get_valid_token
+                            import httpx as _hx
+                            from email.mime.text import MIMEText
+                            import base64 as _b64
+                            token = await _get_valid_token(self._email_service.account_repo, dto.user_id)
+                            # Determine reply-to address
+                            sender_email = em.get("sender", "").split("<")[-1].strip(">").strip() if "<" in em.get("sender","") else em.get("sender","")
+                            msg = MIMEText(reply_body, "plain", "utf-8")
+                            msg["To"] = sender_email
+                            subj = em.get("subject","")
+                            msg["Subject"] = subj if subj.lower().startswith("re:") else f"Re: {subj}"
+                            msg["In-Reply-To"] = em["id"]
+                            msg["References"] = em["id"]
+                            raw = _b64.urlsafe_b64encode(msg.as_bytes()).decode()
+                            payload: dict = {"raw": raw}
+                            if em.get("thread_id"):
+                                payload["threadId"] = em["thread_id"]
+                            async with _hx.AsyncClient() as c:
+                                r = await c.post(
+                                    "https://www.googleapis.com/gmail/v1/users/me/messages/send",
+                                    headers={"Authorization": f"Bearer {token}"},
+                                    json=payload,
+                                )
+                            return r.status_code == 200
+                        def _run_reply():
+                            return asyncio.run(_do_reply())
+                        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:
+                            sent = ex.submit(_run_reply).result(timeout=15)
+                        if sent:
+                            system_msgs.append({"role": "system", "content": (
+                                f"EMAIL REPLY SENT: You successfully sent a reply to {em.get('sender','')} "
+                                f"on the email '{em.get('subject','')}' with the message: \"{reply_body}\". "
+                                f"Tell the user the reply was sent successfully."
+                            )})
+                        else:
+                            system_msgs.append({"role": "system", "content": (
+                                "EMAIL REPLY FAILED: The reply could not be sent via Gmail. "
+                                "Tell the user the reply failed and suggest trying from Settings → Email."
+                            )})
+            except Exception as _e:
+                pass  # Fall through to normal email RAG
 
         # Email RAG — live Gmail search when user asks about email
         _email_keywords = {"email", "gmail", "inbox", "message", "attachment", "mail", "sent", "received"}
