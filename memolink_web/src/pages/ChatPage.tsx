@@ -951,6 +951,18 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                     onWorkflowConversationMessages={appendWorkflowMessages}
                     evaluationActive={evaluationActive}
                     evalRatings={evalRatings}
+                    onRetry={(idx) => {
+                      const msgs = convs.activeConversation?.messages ?? [];
+                      // Find the user message immediately before this assistant message
+                      let userMsg = "";
+                      for (let i = idx - 1; i >= 0; i--) {
+                        if (msgs[i].role === "user") { userMsg = msgs[i].content; break; }
+                      }
+                      if (userMsg && !chat.loading && !chat.streaming) {
+                        chat.setInput(userMsg);
+                        setTimeout(() => chat.handleSend(), 0);
+                      }
+                    }}
                   />
                 </div>
               </main>
@@ -1060,8 +1072,19 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                         if (reminderActions.has(type)) suggestions.reload();
                       }}
                       onWorkflowConversationMessages={appendWorkflowMessages}
-                    evaluationActive={evaluationActive}
-                    evalRatings={evalRatings}
+                      evaluationActive={evaluationActive}
+                      evalRatings={evalRatings}
+                      onRetry={(idx) => {
+                        const msgs = convs.activeConversation?.messages ?? [];
+                        let userMsg = "";
+                        for (let i = idx - 1; i >= 0; i--) {
+                          if (msgs[i].role === "user") { userMsg = msgs[i].content; break; }
+                        }
+                        if (userMsg && !chat.loading && !chat.streaming) {
+                          chat.setInput(userMsg);
+                          setTimeout(() => chat.handleSend(), 0);
+                        }
+                      }}
                     />
                   </div>
                 </main>

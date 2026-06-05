@@ -39,13 +39,14 @@ interface MessageListProps {
   onWorkflowConversationMessages?: (messages: Message[]) => void;
   evaluationActive?: boolean;
   evalRatings?: Record<string, Record<string, number | string>>;
+  onRetry?: (index: number) => void;
 }
 
 export function MessageList({
   messages, loading, streaming, activeConversation,
   messagesContainerRef, bottomRef,
   onLoadOlder, onAddToNotes, onDeleteMessage, onDropFiles,
-  onApplyNoteEdit, onOpenNote, onSaveNote, hasOpenNote, translationEnabled = true, modelAttributionEnabled = true, confidenceEnabled = true, autopilotEnabled = true, workflowContext, workflowSuggestions, onWorkflowActionDone, onWorkflowConversationMessages, evaluationActive = false, evalRatings,
+  onApplyNoteEdit, onOpenNote, onSaveNote, hasOpenNote, translationEnabled = true, modelAttributionEnabled = true, confidenceEnabled = true, autopilotEnabled = true, workflowContext, workflowSuggestions, onWorkflowActionDone, onWorkflowConversationMessages, evaluationActive = false, evalRatings, onRetry,
 }: MessageListProps) {
   return (
     <div
@@ -89,6 +90,7 @@ export function MessageList({
               messageId={msg.id}
               evaluationActive={ratingReady}
               evalRating={evalRatings?.[String(msg.id)]}
+              onRetry={!isStreamingMsg && msg.role === "assistant" && onRetry ? () => onRetry(idx) : undefined}
             />
           );
         })}
