@@ -50,7 +50,7 @@ function getSavedRatio(key: string): number {
 }
 
 export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: WorkspaceHook }) {
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth >= 640);
   const [layoutMode, setLayoutMode] = useState<LayoutMode>(getSavedLayout);
   const [colRatio, setColRatio] = useState(() => getSavedRatio("memolink_split_col"));
   const [rowRatio, setRowRatio] = useState(() => getSavedRatio("memolink_split_row"));
@@ -60,7 +60,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ id: number; content: string; index: number } | null>(null);
   const [activeTabType, setActiveTabType] = useState<"chat" | "note">("chat");
-  const [rightPanelOpen, setRightPanelOpen] = useState(true);
+  const [rightPanelOpen, setRightPanelOpen] = useState(() => window.innerWidth >= 640);
   const [recycleBinOpen, setRecycleBinOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -493,17 +493,18 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
         setShowConversations={setShowConversations}
         conversations={convs.conversations}
         activeConversation={convs.activeConversation}
-        onNoteClick={(note: Note) => handleOpenNote(note)}
-        onNewNote={() => handleOpenNote({ id: null, title: "", content: "" })}
+        onNoteClick={(note: Note) => { handleOpenNote(note); if (window.innerWidth < 640) setSidebarOpen(false); }}
+        onNewNote={() => { handleOpenNote({ id: null, title: "", content: "" }); if (window.innerWidth < 640) setSidebarOpen(false); }}
         onNoteMenu={(note: Note, rect: DOMRect) => setMenuData({ type: "note", item: note, top: rect.bottom + 4, left: rect.right - 160 })}
-        onConversationClick={(conv: Conversation) => { convs.handleSelectConversation(conv); setActiveTabType("chat"); }}
+        onConversationClick={(conv: Conversation) => { convs.handleSelectConversation(conv); setActiveTabType("chat"); if (window.innerWidth < 640) setSidebarOpen(false); }}
         onNewChat={() => {
           if (convs.activeConversation?.id === TEMP_ID && !convs.activeConversation.messages.length) {
-            setActiveTabType("chat"); chat.textareaRef.current?.focus(); return;
+            setActiveTabType("chat"); chat.textareaRef.current?.focus(); if (window.innerWidth < 640) setSidebarOpen(false); return;
           }
           convs.startNewChat();
           setActiveTabType("chat");
           setTimeout(() => chat.textareaRef.current?.focus(), 0);
+          if (window.innerWidth < 640) setSidebarOpen(false);
         }}
         onConversationMenu={(conv: Conversation, rect: DOMRect) => setMenuData({ type: "conversation", item: conv, top: rect.bottom + 4, left: rect.right - 160 })}
         onOpenRecycleBin={() => setRecycleBinOpen(true)}
@@ -701,7 +702,10 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
               </button>
 
               {userMenuOpen && (
-                <div className="absolute right-0 top-full mt-2 z-[9999] w-52 rounded-xl bg-[#1e1e2a] border border-[#2a2a38] shadow-2xl py-1 overflow-hidden">
+                <>
+                  {/* Mobile backdrop */}
+                  <div className="fixed inset-0 z-[9998] bg-black/50 sm:hidden" onClick={() => setUserMenuOpen(false)} />
+                  <div className="fixed inset-x-0 bottom-0 z-[9999] rounded-t-2xl max-h-[70vh] overflow-y-auto sm:absolute sm:inset-auto sm:right-0 sm:top-full sm:mt-2 sm:rounded-xl sm:w-52 sm:max-h-none bg-[#1e1e2a] border border-[#2a2a38] shadow-2xl py-1">
                   {/* Email header */}
                   <div className="px-3 py-2.5 border-b border-[#2a2a38]">
                     <p className="text-[11px] text-gray-500 truncate">{user.email}</p>
@@ -834,6 +838,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                     Sign Out
                   </button>
                 </div>
+                </>
               )}
             </div>
           </div>

@@ -298,7 +298,7 @@ export default function ChatBubble({ role, content, model, streaming, onAdd, onD
     <div className={`w-full flex flex-col ${isUser ? "items-end" : "items-start"} my-[3px] gap-1`}>
       {/* Original message bubble */}
       <div
-        className={`max-w-[740px] px-5 py-4 rounded-2xl text-[16px] leading-relaxed backdrop-blur-sm shadow-sm
+        className={`max-w-full sm:max-w-[740px] px-5 py-4 rounded-2xl text-[16px] leading-relaxed backdrop-blur-sm shadow-sm
           ${isUser ? "bg-[#2F2F3F]/80 text-gray-100" : "text-white"}`}
       >
         {isWorkflowPlan && workflowPlanData && workflowContext ? (
@@ -416,7 +416,7 @@ export default function ChatBubble({ role, content, model, streaming, onAdd, onD
 
       {/* Loading bubble - shown while waiting for first translation */}
       {isTranslating && !translation && (
-        <div className={`max-w-[740px] px-5 py-4 rounded-2xl backdrop-blur-sm shadow-sm flex items-center gap-3
+        <div className={`max-w-full sm:max-w-[740px] px-5 py-4 rounded-2xl backdrop-blur-sm shadow-sm flex items-center gap-3
           ${isUser ? "bg-[#2F2F3F]/80 text-gray-400" : "text-gray-400"}`}>
           <svg className="w-4 h-4 animate-spin shrink-0 text-indigo-400" fill="none" viewBox="0 0 24 24">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
@@ -429,7 +429,7 @@ export default function ChatBubble({ role, content, model, streaming, onAdd, onD
       {/* Translation bubble */}
       {translation && (
         <div
-          className={`max-w-[740px] px-5 py-4 rounded-2xl text-[16px] leading-relaxed backdrop-blur-sm shadow-sm
+          className={`max-w-full sm:max-w-[740px] px-5 py-4 rounded-2xl text-[16px] leading-relaxed backdrop-blur-sm shadow-sm
             ${isUser ? "bg-[#2F2F3F]/80 text-gray-100" : "text-white"}`}
         >
           <div className="flex items-center justify-between mb-2.5">

@@ -146,7 +146,7 @@ export function ChatInput({
         </>
       )}
 
-      <div className="max-w-[740px] mx-auto relative">
+      <div className="max-w-full sm:max-w-[740px] mx-auto relative">
         {/* Stage 1: command name picker */}
         {SLASH_PICKER_VISIBLE && (
           <SlashCommandPicker

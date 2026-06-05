@@ -779,7 +779,7 @@ export function HelpModal({ show, onClose }: HelpModalProps) {
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50" onClick={onClose}>
       <div
-        className="bg-[#1a1a24] border border-[#2a2a38] rounded-2xl w-[700px] max-h-[82vh] flex flex-col shadow-2xl text-white overflow-hidden"
+        className="bg-[#1a1a24] border border-[#2a2a38] rounded-2xl w-full max-w-[700px] mx-4 max-h-[82vh] flex flex-col shadow-2xl text-white overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
