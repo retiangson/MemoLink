@@ -1112,6 +1112,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                         onDrop={(e) => { e.preventDefault(); handleTabDrop("note", i); setDragOverTab(null); }}
                         onDragEnd={() => { dragSrcRef.current = null; setDragOverTab(null); }}
                         onClick={() => { editor.setActiveIndex(i); setActiveTabType("note"); }}
+                        onDoubleClick={(e) => { e.stopPropagation(); editor.setActiveIndex(i); setActiveTabType("note"); setEditingNoteTab(i); }}
                         className={`flex items-center gap-1.5 px-3 h-9 text-xs cursor-grab active:cursor-grabbing border-b-2 transition shrink-0 select-none ${
                           isActive ? "border-indigo-500 text-white bg-[#0f0f13]" : "border-transparent text-gray-500 hover:text-gray-300"
                         } ${isDragOver ? "border-l-2 border-l-indigo-400" : ""}`}
@@ -1119,7 +1120,19 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                         <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3 shrink-0 opacity-70" fill="currentColor" viewBox="0 0 16 16">
                           <path d="M2 2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v13.5a.5.5 0 0 1-.777.416L8 13.101l-5.223 2.815A.5.5 0 0 1 2 15.5z"/>
                         </svg>
-                        <span className="max-w-[100px] truncate">{note.titleDraft.trim() || "Untitled"}</span>
+                        {editingNoteTab === i ? (
+                          <input
+                            autoFocus
+                            value={note.titleDraft}
+                            onChange={(e) => editor.setNoteTitleDraft(e.target.value)}
+                            onBlur={() => setEditingNoteTab(null)}
+                            onKeyDown={(e) => { if (e.key === "Enter" || e.key === "Escape") { e.preventDefault(); setEditingNoteTab(null); } }}
+                            onClick={(e) => e.stopPropagation()}
+                            className="max-w-[100px] bg-transparent border-b border-indigo-400 outline-none text-white text-xs"
+                          />
+                        ) : (
+                          <span className="max-w-[100px] truncate">{note.titleDraft.trim() || "Untitled"}</span>
+                        )}
                         <button onClick={(e) => { e.stopPropagation(); editor.closeNote(i); }} className="text-gray-600 hover:text-gray-300 w-3.5 h-3.5 flex items-center justify-center rounded-sm hover:bg-[#2a2a38] transition leading-none">×</button>
                       </div>
                     );

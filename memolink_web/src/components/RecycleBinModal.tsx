@@ -78,7 +78,7 @@ export function RecycleBinModal({ onClose, onNoteRestored, onConvRestored }: Rec
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="w-[520px] max-h-[80vh] flex flex-col bg-[#0f0f13] border border-[#2a2a38] rounded-2xl shadow-2xl overflow-hidden">
+      <div className="w-full max-w-[520px] mx-4 max-h-[80vh] flex flex-col bg-[#0f0f13] border border-[#2a2a38] rounded-2xl shadow-2xl overflow-hidden">
 
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-[#1e1e2a] shrink-0">

@@ -216,7 +216,7 @@ export function NoteEditorView({
   }
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden w-full max-w-[740px] mx-auto">
+    <div className="flex-1 flex flex-col overflow-hidden w-full max-w-full sm:max-w-[740px] mx-auto">
 
       {/* Floating TTS player — identical to the /read command player */}
       {ttsEnabled && ttsPlaying && (
