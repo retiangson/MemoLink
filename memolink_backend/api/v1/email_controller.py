@@ -282,6 +282,68 @@ def email_to_reminder(
     }
 
 
+@router.post("/send-draft")
+async def send_draft(
+    payload: dict,
+    user_id: int = Depends(get_current_user),
+    c: RequestContainer = Depends(get_request_container),
+):
+    """Send a confirmed email draft via Gmail. Called only after explicit user approval."""
+    from email.mime.text import MIMEText
+    import base64 as _b64
+
+    to = payload.get("to", "")
+    subject = payload.get("subject", "")
+    body = payload.get("body", "")
+    thread_id = payload.get("thread_id", "")
+    message_id = payload.get("message_id", "")
+
+    if not to or not body:
+        raise HTTPException(status_code=400, detail="to and body are required")
+
+    account_repo = c.domain.get_email_account_repository()
+    tokens = account_repo.get_decrypted_tokens(user_id)
+    if not tokens:
+        raise HTTPException(status_code=403, detail="Gmail not connected")
+
+    access_token = tokens.get("access_token", "")
+    expiry = tokens.get("token_expiry")
+    if expiry and datetime.now(tz=timezone.utc) >= expiry:
+        async with httpx.AsyncClient() as client:
+            ref = await client.post(GOOGLE_TOKEN_URL, data={
+                "client_id": settings.google_client_id,
+                "client_secret": settings.google_client_secret,
+                "refresh_token": tokens.get("refresh_token", ""),
+                "grant_type": "refresh_token",
+            })
+        if ref.status_code == 200:
+            access_token = ref.json().get("access_token", access_token)
+
+    msg = MIMEText(body, "plain", "utf-8")
+    msg["To"] = to
+    msg["Subject"] = subject
+    if message_id:
+        msg["In-Reply-To"] = message_id
+        msg["References"] = message_id
+
+    raw = _b64.urlsafe_b64encode(msg.as_bytes()).decode()
+    gmail_payload: dict = {"raw": raw}
+    if thread_id:
+        gmail_payload["threadId"] = thread_id
+
+    async with httpx.AsyncClient() as client:
+        resp = await client.post(
+            "https://www.googleapis.com/gmail/v1/users/me/messages/send",
+            headers={"Authorization": f"Bearer {access_token}"},
+            json=gmail_payload,
+        )
+
+    if resp.status_code not in (200, 201):
+        raise HTTPException(status_code=502, detail=f"Gmail send failed: {resp.text[:200]}")
+
+    return {"ok": True, "gmail_message_id": resp.json().get("id")}
+
+
 @router.get("/attachment/{gmail_message_id}/{attachment_id}")
 async def download_attachment(
     gmail_message_id: str,

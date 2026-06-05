@@ -529,68 +529,39 @@ class ChatService(IChatService):
         if rag_blocks:
             system_msgs.append({"role": "system", "content": "--- USER NOTES CONTEXT ---\n" + "\n\n".join(rag_blocks)})
 
-        # Email reply — detect "reply to X saying/just Y" intent and send directly
+        # Email reply — detect intent, build a draft for user confirmation (never send without approval)
         _reply_keywords = {"reply", "respond", "send", "write back", "email back"}
         _asks_reply = any(kw in user_text.lower() for kw in _reply_keywords)
         if _asks_reply and self._email_service and dto.user_id:
             try:
                 import re as _re
-                # Extract recipient hint (name or email after "reply to" / "send to")
                 _to_match = _re.search(r"(?:reply to|respond to|email|send to)\s+([^\s,]+)", user_text, _re.I)
-                # Extract body (text after "saying", "just say", "say", comma)
                 _body_match = _re.search(r"(?:saying|just say|say|,)\s+(.+)$", user_text, _re.I | _re.S)
                 if _to_match and _body_match:
                     recipient_hint = _to_match.group(1).strip().lower().rstrip(".,")
                     reply_body = _body_match.group(1).strip().strip('"\'')
-                    # Search Gmail for recent email from/to this person
-                    candidate = self._email_service.live_search_sync(
-                        dto.user_id, recipient_hint, top_k=1
-                    )
+                    candidate = self._email_service.live_search_sync(dto.user_id, recipient_hint, top_k=1)
                     if candidate:
                         em = candidate[0]
-                        # Send reply via Gmail
-                        import asyncio, concurrent.futures
-                        async def _do_reply():
-                            from memolink_backend.business.services.email_service import _get_valid_token
-                            import httpx as _hx
-                            from email.mime.text import MIMEText
-                            import base64 as _b64
-                            token = await _get_valid_token(self._email_service.account_repo, dto.user_id)
-                            # Determine reply-to address
-                            sender_email = em.get("sender", "").split("<")[-1].strip(">").strip() if "<" in em.get("sender","") else em.get("sender","")
-                            msg = MIMEText(reply_body, "plain", "utf-8")
-                            msg["To"] = sender_email
-                            subj = em.get("subject","")
-                            msg["Subject"] = subj if subj.lower().startswith("re:") else f"Re: {subj}"
-                            msg["In-Reply-To"] = em["id"]
-                            msg["References"] = em["id"]
-                            raw = _b64.urlsafe_b64encode(msg.as_bytes()).decode()
-                            payload: dict = {"raw": raw}
-                            if em.get("thread_id"):
-                                payload["threadId"] = em["thread_id"]
-                            async with _hx.AsyncClient() as c:
-                                r = await c.post(
-                                    "https://www.googleapis.com/gmail/v1/users/me/messages/send",
-                                    headers={"Authorization": f"Bearer {token}"},
-                                    json=payload,
-                                )
-                            return r.status_code == 200
-                        def _run_reply():
-                            return asyncio.run(_do_reply())
-                        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:
-                            sent = ex.submit(_run_reply).result(timeout=15)
-                        if sent:
-                            system_msgs.append({"role": "system", "content": (
-                                f"EMAIL REPLY SENT: You successfully sent a reply to {em.get('sender','')} "
-                                f"on the email '{em.get('subject','')}' with the message: \"{reply_body}\". "
-                                f"Tell the user the reply was sent successfully."
-                            )})
-                        else:
-                            system_msgs.append({"role": "system", "content": (
-                                "EMAIL REPLY FAILED: The reply could not be sent via Gmail. "
-                                "Tell the user the reply failed and suggest trying from Settings → Email."
-                            )})
-            except Exception as _e:
+                        sender = em.get("sender", "")
+                        sender_email = sender.split("<")[-1].strip(">").strip() if "<" in sender else sender
+                        subj = em.get("subject", "")
+                        reply_subj = subj if subj.lower().startswith("re:") else f"Re: {subj}"
+                        # Build a draft tag — frontend renders a confirmation card, never auto-sends
+                        import json as _json
+                        draft_attrs = (
+                            f'to="{sender_email}" '
+                            f'subject="{reply_subj.replace(chr(34), chr(39))}" '
+                            f'body="{reply_body.replace(chr(34), chr(39))}" '
+                            f'message_id="{em.get("id","")}" '
+                            f'thread_id="{em.get("thread_id","")}"'
+                        )
+                        system_msgs.append({"role": "system", "content": (
+                            f"EMAIL DRAFT READY — output this tag EXACTLY as shown, then ask the user to review and confirm before sending:\n\n"
+                            f"<email_draft {draft_attrs}></email_draft>\n\n"
+                            f"Tell the user: 'Here's your draft reply — review it and click Send to deliver, or edit the message first.'"
+                        )})
+            except Exception:
                 pass  # Fall through to normal email RAG
 
         # Email RAG — live Gmail search when user asks about email

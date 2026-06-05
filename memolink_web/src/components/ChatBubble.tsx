@@ -7,9 +7,22 @@ import { QuizRenderer } from "./QuizRenderer";
 import { WorkflowApprovalCard } from "./WorkflowApprovalCard";
 import { WorkflowActionBar } from "./WorkflowActionBar";
 import { EvaluationRatingBar } from "./EvaluationRatingBar";
+import { EmailDraftCard } from "./EmailDraftCard";
 import type { Message } from "../types";
 import "highlight.js/styles/github-dark.css";
 import "../styles/markdown.css";
+
+/** Parse <email_draft to="..." subject="..." body="..." message_id="..." thread_id="..."> tags */
+function parseEmailDrafts(content: string): { before: string; drafts: Array<{ to: string; subject: string; body: string; messageId: string; threadId: string }>; after: string } {
+  const drafts: Array<{ to: string; subject: string; body: string; messageId: string; threadId: string }> = [];
+  const cleaned = content.replace(/<email_draft([^>]*)><\/email_draft>/g, (_, attrs) => {
+    const get = (key: string) => { const m = attrs.match(new RegExp(`${key}="([^"]*)"`)); return m ? m[1] : ""; };
+    drafts.push({ to: get("to"), subject: get("subject"), body: get("body"), messageId: get("message_id"), threadId: get("thread_id") });
+    return "[[EMAIL_DRAFT_PLACEHOLDER]]";
+  });
+  const parts = cleaned.split("[[EMAIL_DRAFT_PLACEHOLDER]]");
+  return { before: parts[0] || "", drafts, after: parts.slice(1).join("") };
+}
 
 function modelLabel(id?: string): string {
   if (!id) return "";
@@ -213,6 +226,7 @@ export default function ChatBubble({ role, content, model, streaming, onAdd, onD
   const isCmdRunning = content.startsWith("__CMD_RUNNING__:");
   const cmdRunningMsg = isCmdRunning ? content.slice("__CMD_RUNNING__:".length) : "";
   const { pre, edit, noteId, post } = (isImageGenerating || isImprovingNote || isQuiz || isWorkflowPlan || isCmdRunning) ? { pre: "", edit: null, noteId: null, post: "" } : parseNoteEdit(content);
+  const { before: draftBefore, drafts: emailDrafts, after: draftAfter } = parseEmailDrafts(pre || content);
 
   async function handleCopy() {
     const textToCopy = translation ?? content;
@@ -335,7 +349,17 @@ export default function ChatBubble({ role, content, model, streaming, onAdd, onD
           <>
             {pre && (
               <span>
-                <ContentWithNoteLinks content={pre} onOpenNote={onOpenNote} />
+                {emailDrafts.length > 0 ? (
+                  <>
+                    {draftBefore && <ContentWithNoteLinks content={draftBefore} onOpenNote={onOpenNote} />}
+                    {emailDrafts.map((d, idx) => (
+                      <EmailDraftCard key={idx} to={d.to} subject={d.subject} body={d.body} messageId={d.messageId} threadId={d.threadId} />
+                    ))}
+                    {draftAfter && <ContentWithNoteLinks content={draftAfter} onOpenNote={onOpenNote} />}
+                  </>
+                ) : (
+                  <ContentWithNoteLinks content={pre} onOpenNote={onOpenNote} />
+                )}
                 {streaming && (
                   <span className="inline-block w-[2px] h-[1em] bg-indigo-400 ml-0.5 align-middle animate-[blink_0.8s_step-end_infinite]" />
                 )}
