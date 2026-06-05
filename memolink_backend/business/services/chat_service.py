@@ -523,36 +523,59 @@ class ChatService(IChatService):
         if rag_blocks:
             system_msgs.append({"role": "system", "content": "--- USER NOTES CONTEXT ---\n" + "\n\n".join(rag_blocks)})
 
-        # Email RAG — search embedded emails when user asks about email
+        # Email RAG — search synced emails when user asks about email
         _email_keywords = {"email", "gmail", "inbox", "message", "attachment", "mail", "sent", "received"}
         _asks_about_email = any(kw in user_text.lower() for kw in _email_keywords)
         if self._email_record_repo and user_text and dto.user_id and _asks_about_email:
             try:
-                query_vec = self.embedding.embed_text(user_text)
-                email_hits = self._email_record_repo.search_by_vector(query_vec, user_id=dto.user_id, top_k=3)
-                if email_hits:
-                    email_blocks = []
-                    for em in email_hits:
-                        date_str = em.email_date.strftime("%d %b %Y %H:%M") if em.email_date else ""
-                        sender = f"{em.sender_name} <{em.sender_email}>" if em.sender_name else em.sender_email
-                        body = (em.body_text or em.snippet or "")[:1500]
-                        email_blocks.append(
-                            f"[EMAIL id={em.id}]\n"
-                            f"Subject: {em.subject}\n"
-                            f"From: {sender}\n"
-                            f"Date: {date_str}\n"
-                            f"Body:\n{body}"
-                        )
-                    system_msgs.append({
-                        "role": "system",
-                        "content": (
+                total_emails = self._email_record_repo.count_for_user(dto.user_id)
+
+                if total_emails == 0:
+                    system_msgs.append({"role": "system", "content": (
+                        "EMAIL CONTEXT: The user has asked about their email, but no emails have been synced to MemoLink yet. "
+                        "Tell the user to go to Settings → Email to connect their Gmail and click Sync. "
+                        "Do not say you cannot access email — MemoLink CAN search synced emails once they are connected."
+                    )})
+                else:
+                    # Try vector search first, fall back to keyword search
+                    email_hits = []
+                    try:
+                        query_vec = self.embedding.embed_text(user_text)
+                        email_hits = self._email_record_repo.search_by_vector(query_vec, user_id=dto.user_id, top_k=3)
+                    except Exception:
+                        pass
+
+                    if not email_hits:
+                        email_hits = self._email_record_repo.keyword_search(dto.user_id, user_text, top_k=3)
+
+                    if email_hits:
+                        email_blocks = []
+                        for em in email_hits:
+                            date_str = em.email_date.strftime("%d %b %Y") if em.email_date else "unknown date"
+                            sender = f"{em.sender_name} <{em.sender_email}>" if em.sender_name else em.sender_email
+                            body = (em.body_text or em.snippet or "")[:1500]
+                            email_blocks.append(
+                                f"[EMAIL id={em.id}]\n"
+                                f"Subject: {em.subject}\n"
+                                f"From: {sender}\n"
+                                f"Date: {date_str}\n"
+                                f"Body:\n{body}"
+                            )
+                        system_msgs.append({"role": "system", "content": (
                             "--- USER EMAIL CONTEXT ---\n"
-                            "The following emails from the user's connected Gmail account are relevant to this question. "
-                            "When referencing an email, mention its subject and sender. "
-                            "If the user asks to reply or take action, acknowledge what you found and let them know they can reply directly from MemoLink.\n\n"
+                            f"MemoLink found {len(email_hits)} synced email(s) relevant to this question "
+                            f"(searched from {total_emails} total synced emails). "
+                            "Reference the subject, sender and date when discussing them. "
+                            "The user can reply, save to note, or download attachments directly in MemoLink.\n\n"
                             + "\n\n".join(email_blocks)
-                        ),
-                    })
+                        )})
+                    else:
+                        system_msgs.append({"role": "system", "content": (
+                            f"EMAIL CONTEXT: The user has {total_emails} synced email(s) in MemoLink but none matched this query. "
+                            "This may be because the email is older than what was synced (MemoLink syncs recent important emails). "
+                            "Tell the user no matching email was found in their synced inbox, and suggest they check Gmail directly "
+                            "or sync more emails. Do not say MemoLink cannot access email — it can search what has been synced."
+                        )})
             except Exception:
                 pass
 

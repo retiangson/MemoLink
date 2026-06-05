@@ -70,6 +70,27 @@ class EmailRecordRepository:
         self.db.commit()
         return count
 
+    def count_for_user(self, user_id: int) -> int:
+        return self.db.query(EmailRecord).filter(EmailRecord.user_id == user_id).count()
+
+    def keyword_search(self, user_id: int, query: str, top_k: int = 3) -> list[EmailRecord]:
+        """Fallback text search on subject + body when vector search finds nothing."""
+        words = [w for w in query.lower().split() if len(w) > 3][:5]
+        if not words:
+            return []
+        results = (
+            self.db.query(EmailRecord)
+            .filter(EmailRecord.user_id == user_id)
+            .order_by(EmailRecord.importance_score.desc(), EmailRecord.email_date.desc())
+            .limit(50)
+            .all()
+        )
+        def score(r: EmailRecord) -> int:
+            text = f"{r.subject or ''} {r.body_text or ''} {r.snippet or ''}".lower()
+            return sum(1 for w in words if w in text)
+        ranked = sorted(results, key=score, reverse=True)
+        return [r for r in ranked if score(r) > 0][:top_k]
+
     def save_embedding(self, email_record_id: int, vector: list[float]) -> None:
         vector_str = "[" + ",".join(str(v) for v in vector) + "]"
         self.db.execute(text("""
