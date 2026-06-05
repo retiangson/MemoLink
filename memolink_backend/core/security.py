@@ -9,6 +9,15 @@ from memolink_backend.core.config import settings
 
 _bearer = HTTPBearer()
 
+
+def verify_token(token: str) -> int:
+    """Validate a raw JWT string and return the user_id. Used for query-param auth on downloads."""
+    try:
+        payload = jwt.decode(token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm])
+        return int(payload["sub"])
+    except (jwt.ExpiredSignatureError, jwt.InvalidTokenError, KeyError, ValueError):
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
 LEVEL_ORDER = {"regular": 0, "plus": 1, "pro": 2}
 
 

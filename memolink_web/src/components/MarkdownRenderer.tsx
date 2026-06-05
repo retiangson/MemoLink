@@ -5,6 +5,7 @@ import "highlight.js/styles/github-dark.css";
 import katex from "katex";
 import "katex/dist/katex.min.css";
 import { API_BASE } from "../api/client";
+import { getToken } from "../utils/auth";
 
 interface Props {
   children: string;
@@ -56,8 +57,12 @@ export default function MarkdownRenderer({ children, className }: Props) {
     const titleAttr = title ? ` title="${title}"` : "";
 
     if (isDownload) {
+      // Append JWT token as query param so direct browser navigation is authenticated
+      const token = getToken() ?? "";
+      const sep = fullHref.includes("?") ? "&" : "?";
+      const authHref = token ? `${fullHref}${sep}token=${encodeURIComponent(token)}` : fullHref;
       // Paperclip + download icon chip — visually distinct from plain text
-      return `<a href="${fullHref}"${titleAttr} download
+      return `<a href="${authHref}"${titleAttr} download
         style="display:inline-flex;align-items:center;gap:6px;padding:4px 10px;margin:2px 0;
                background:rgba(99,102,241,0.12);border:1px solid rgba(99,102,241,0.35);
                border-radius:8px;color:#a5b4fc;text-decoration:none;font-size:0.8rem;
@@ -93,30 +98,6 @@ export default function MarkdownRenderer({ children, className }: Props) {
     return () => buttons.forEach((btn) => btn.removeEventListener("click", handler));
   }, [html]);
 
-  // Intercept attachment download links — fetch with JWT then trigger download
-  useEffect(() => {
-    const links = document.querySelectorAll<HTMLAnchorElement>("a[href*='/api/email/attachment/']");
-    const handler = async (e: Event) => {
-      e.preventDefault();
-      const a = e.currentTarget as HTMLAnchorElement;
-      const href = a.getAttribute("href") || "";
-      const filename = new URL(href, window.location.origin).searchParams.get("filename") || "attachment";
-      try {
-        const { api } = await import("../api/client");
-        const res = await api.get(href.replace(/^https?:\/\/[^/]+/, ""), { responseType: "blob" });
-        const url = URL.createObjectURL(res.data);
-        const tmp = document.createElement("a");
-        tmp.href = url;
-        tmp.download = filename;
-        tmp.click();
-        setTimeout(() => URL.revokeObjectURL(url), 5000);
-      } catch {
-        window.open(href, "_blank");
-      }
-    };
-    links.forEach((l) => l.addEventListener("click", handler));
-    return () => links.forEach((l) => l.removeEventListener("click", handler));
-  }, [html]);
 
   return <div className={`markdown-body ${className || ""}`} dangerouslySetInnerHTML={{ __html: html }} />;
 }

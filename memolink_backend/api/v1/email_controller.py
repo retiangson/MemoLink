@@ -9,10 +9,11 @@ from urllib.parse import quote
 import httpx
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.security import HTTPBearer
 from fastapi.responses import RedirectResponse, Response
 
 from memolink_backend.core.config import settings
-from memolink_backend.core.security import get_current_user
+from memolink_backend.core.security import get_current_user, verify_token
 from memolink_backend.contracts.note_dtos import NoteCreateDTO
 from memolink_backend.domain.models.reminder import Reminder
 from memolink_backend.di.request_container import RequestContainer, get_request_container
@@ -286,12 +287,21 @@ async def download_attachment(
     gmail_message_id: str,
     attachment_id: str,
     filename: str = Query("attachment"),
-    user_id: int = Depends(get_current_user),
+    token: Optional[str] = Query(None),
+    user_id: Optional[int] = Depends(lambda: None),
     c: RequestContainer = Depends(get_request_container),
+    credentials: Optional[object] = Depends(HTTPBearer(auto_error=False)),
 ):
+    # Accept auth via query param (for direct browser downloads) or header
+    if token:
+        resolved_uid = verify_token(token)
+    elif credentials and hasattr(credentials, "credentials"):
+        resolved_uid = get_current_user(credentials)  # type: ignore
+    else:
+        raise HTTPException(status_code=401, detail="Not authenticated")
     """Fetch a Gmail attachment and stream it to the browser as a download."""
     account_repo = c.domain.get_email_account_repository()
-    tokens = account_repo.get_decrypted_tokens(user_id)
+    tokens = account_repo.get_decrypted_tokens(resolved_uid)
     if not tokens:
         raise HTTPException(status_code=403, detail="Gmail not connected")
 
