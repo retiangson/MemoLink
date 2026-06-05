@@ -57,25 +57,12 @@ export default function MarkdownRenderer({ children, className }: Props) {
     const titleAttr = title ? ` title="${title}"` : "";
 
     if (isDownload) {
-      // Append JWT token as query param so direct browser navigation is authenticated
       const token = getToken() ?? "";
       const sep = fullHref.includes("?") ? "&" : "?";
       const authHref = token ? `${fullHref}${sep}token=${encodeURIComponent(token)}` : fullHref;
-      // Paperclip + download icon chip — visually distinct from plain text
-      return `<a href="${authHref}"${titleAttr} download
-        style="display:inline-flex;align-items:center;gap:6px;padding:4px 10px;margin:2px 0;
-               background:rgba(99,102,241,0.12);border:1px solid rgba(99,102,241,0.35);
-               border-radius:8px;color:#a5b4fc;text-decoration:none;font-size:0.8rem;
-               cursor:pointer;white-space:nowrap;">
-        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" fill="currentColor" viewBox="0 0 16 16">
-          <path d="M4.5 3a2.5 2.5 0 0 1 5 0v9a1.5 1.5 0 0 1-3 0V5a.5.5 0 0 1 1 0v7a.5.5 0 0 0 1 0V3a1.5 1.5 0 1 0-3 0v9a2.5 2.5 0 0 0 5 0V5a.5.5 0 0 1 1 0v7a3.5 3.5 0 1 1-7 0z"/>
-        </svg>
-        ${text}
-        <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" fill="currentColor" viewBox="0 0 16 16">
-          <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5"/>
-          <path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708z"/>
-        </svg>
-      </a>`;
+      const clipIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" fill="currentColor" viewBox="0 0 16 16"><path d="M4.5 3a2.5 2.5 0 0 1 5 0v9a1.5 1.5 0 0 1-3 0V5a.5.5 0 0 1 1 0v7a.5.5 0 0 0 1 0V3a1.5 1.5 0 1 0-3 0v9a2.5 2.5 0 0 0 5 0V5a.5.5 0 0 1 1 0v7a3.5 3.5 0 1 1-7 0z"/></svg>`;
+      const dlIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" fill="currentColor" viewBox="0 0 16 16"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5"/><path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708z"/></svg>`;
+      return `<a href="${authHref}"${titleAttr} download style="display:inline-flex;align-items:center;gap:6px;padding:4px 10px;margin:2px 0;background:rgba(99,102,241,0.12);border:1px solid rgba(99,102,241,0.35);border-radius:8px;color:#a5b4fc;text-decoration:none;font-size:0.8rem;cursor:pointer;white-space:nowrap;">${clipIcon}${text}${dlIcon}</a>`;
     }
 
     return `<a href="${fullHref}"${titleAttr} target="_blank" rel="noopener">${text}</a>`;

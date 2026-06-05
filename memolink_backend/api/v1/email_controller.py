@@ -306,6 +306,20 @@ async def download_attachment(
         raise HTTPException(status_code=403, detail="Gmail not connected")
 
     access_token = tokens.get("access_token", "")
+    expiry = tokens.get("token_expiry")
+
+    # Refresh token if expired
+    if expiry and datetime.now(tz=timezone.utc) >= expiry:
+        async with httpx.AsyncClient() as client:
+            ref = await client.post("https://oauth2.googleapis.com/token", data={
+                "client_id": settings.google_client_id,
+                "client_secret": settings.google_client_secret,
+                "refresh_token": tokens.get("refresh_token", ""),
+                "grant_type": "refresh_token",
+            })
+        if ref.status_code == 200:
+            access_token = ref.json().get("access_token", access_token)
+
     headers = {"Authorization": f"Bearer {access_token}"}
 
     async with httpx.AsyncClient() as client:
@@ -315,7 +329,10 @@ async def download_attachment(
         )
 
     if resp.status_code != 200:
-        raise HTTPException(status_code=502, detail="Failed to fetch attachment from Gmail")
+        raise HTTPException(
+            status_code=502,
+            detail=f"Gmail API returned {resp.status_code}: {resp.text[:200]}"
+        )
 
     data = resp.json().get("data", "")
     file_bytes = base64.urlsafe_b64decode(data + "==")
