@@ -9,16 +9,20 @@ interface EmailDraftCardProps {
   threadId: string;
 }
 
+const sentKey = (messageId: string, threadId: string) => `memolink_draft_sent_${messageId || threadId}`;
+
 export function EmailDraftCard({ to, subject, body: initialBody, messageId, threadId }: EmailDraftCardProps) {
   const [body, setBody] = useState(initialBody);
   const [editing, setEditing] = useState(false);
-  const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
+  const alreadySent = !!localStorage.getItem(sentKey(messageId, threadId));
+  const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">(alreadySent ? "sent" : "idle");
   const [errorMsg, setErrorMsg] = useState("");
 
   async function handleSend() {
     setStatus("sending");
     try {
       await api.post("/email/send-draft", { to, subject, body, message_id: messageId, thread_id: threadId });
+      localStorage.setItem(sentKey(messageId, threadId), "1");
       setStatus("sent");
     } catch (e: any) {
       setStatus("error");
