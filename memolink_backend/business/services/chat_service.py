@@ -368,6 +368,7 @@ class ChatService(IChatService):
         log_service=None,
         user_api_key_repo=None,
         graph_repo=None,
+        eval_service=None,  # accepted for backwards-compat with cached callers
     ):
         if conv_repo is not None and note_repo is not None:
             self.repo_conv: IConversationRepository = conv_repo
