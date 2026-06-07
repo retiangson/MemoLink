@@ -548,6 +548,17 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
         {/* ── Unified tab bar ───────────────────────────────────────────── */}
         <div id="tour-tab-bar" className="flex bg-[#0a0a0f] border-b border-[#1e1e2a] shrink-0" style={{ minHeight: 40 }}>
 
+          {/* Sidebar toggle - desktop only, left of tabs, before scrollable area */}
+          {!sidebarOpen && (
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="hidden sm:flex shrink-0 h-full px-3 items-center justify-center hover:bg-[#1e1e2a] transition border-r border-[#1e1e2a]"
+              aria-label="Open sidebar"
+            >
+              <img src="/memolink-icon.png" alt="" className="h-5 w-5 rounded-md bg-white object-cover" />
+            </button>
+          )}
+
           {/* Scrollable tabs - hidden in split modes (each panel has its own tab bar) */}
           <div className="flex items-center overflow-x-auto flex-1">
 
@@ -664,17 +675,6 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
 
           {/* User info - outside overflow so the bell tooltip can extend below freely */}
           <div className="shrink-0 flex items-center gap-3 px-4 text-xs text-gray-500">
-            {/* Sidebar toggle - shown in top right when sidebar is closed */}
-            {!sidebarOpen && (
-              <button
-                onClick={() => setSidebarOpen(true)}
-                className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#1e1e2a] hover:bg-[#2a2a38] transition"
-                aria-label="Open sidebar"
-              >
-                <img src="/memolink-icon.png" alt="" className="h-5 w-5 rounded-md bg-white object-cover" />
-              </button>
-            )}
-
             {/* Bell / reminders - always visible */}
             <div
               className="relative"
@@ -737,6 +737,17 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                   <div className="px-3 py-2.5 border-b border-[#2a2a38]">
                     <p className="text-[11px] text-gray-500 truncate">{user.email}</p>
                   </div>
+
+                  {/* Open Sidebar - mobile only, shown when sidebar is closed */}
+                  {!sidebarOpen && (
+                    <button
+                      onClick={() => { setUserMenuOpen(false); setSidebarOpen(true); }}
+                      className="sm:hidden w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-300 hover:bg-[#2a2a38] hover:text-white transition border-b border-[#2a2a38]"
+                    >
+                      <img src="/memolink-icon.png" alt="" className="h-4 w-4 rounded-sm bg-white object-cover shrink-0" />
+                      Open Sidebar
+                    </button>
+                  )}
 
                   {/* Settings */}
                   <button
