@@ -548,11 +548,11 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
         {/* ── Unified tab bar ───────────────────────────────────────────── */}
         <div id="tour-tab-bar" className="flex bg-[#0a0a0f] border-b border-[#1e1e2a] shrink-0" style={{ minHeight: 40 }}>
 
-          {/* Sidebar toggle - desktop only, left of tabs, before scrollable area */}
+          {/* Sidebar toggle - all screen sizes, left of tabs */}
           {!sidebarOpen && (
             <button
               onClick={() => setSidebarOpen(true)}
-              className="hidden sm:flex shrink-0 h-full px-3 items-center justify-center hover:bg-[#1e1e2a] transition border-r border-[#1e1e2a]"
+              className="flex shrink-0 h-full px-3 items-center justify-center hover:bg-[#1e1e2a] transition border-r border-[#1e1e2a]"
               aria-label="Open sidebar"
             >
               <img src="/memolink-icon.png" alt="" className="h-5 w-5 rounded-md bg-white object-cover" />
@@ -638,41 +638,6 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
 
           </div>{/* end scrollable tabs */}
 
-          {/* Layout toggle */}
-          <div className="shrink-0 flex items-center gap-0.5 px-2 border-l border-[#1e1e2a] ml-1">
-            {([
-              ["stacked", "M2 3h12v4H2zm0 6h12v4H2z", "Stacked (default)"],
-              ["columns", "M2 3h5v10H2zm7 0h5v10H9z", "Side by side"],
-              ["rows", "M2 3h12v4H2zm0 6h12v4H2z", "Top / bottom"],
-            ] as [LayoutMode, string, string][]).map(([mode, , label], idx) => (
-              <button
-                key={mode}
-                title={label}
-                onClick={() => handleLayoutChange(mode)}
-                className={`flex items-center justify-center w-7 h-7 rounded transition ${layoutMode === mode ? "bg-indigo-600 text-white" : "text-gray-500 hover:text-gray-300 hover:bg-[#1e1e2a]"}`}
-              >
-                {idx === 0 && (
-                  <svg viewBox="0 0 16 16" className="w-3.5 h-3.5" fill="currentColor">
-                    <rect x="2" y="3" width="12" height="4" rx="1"/>
-                    <rect x="2" y="9" width="12" height="4" rx="1"/>
-                  </svg>
-                )}
-                {idx === 1 && (
-                  <svg viewBox="0 0 16 16" className="w-3.5 h-3.5" fill="currentColor">
-                    <rect x="2" y="3" width="5" height="10" rx="1"/>
-                    <rect x="9" y="3" width="5" height="10" rx="1"/>
-                  </svg>
-                )}
-                {idx === 2 && (
-                  <svg viewBox="0 0 16 16" className="w-3.5 h-3.5" fill="currentColor">
-                    <rect x="2" y="2" width="12" height="5" rx="1"/>
-                    <rect x="2" y="9" width="12" height="5" rx="1"/>
-                  </svg>
-                )}
-              </button>
-            ))}
-          </div>
-
           {/* User info - outside overflow so the bell tooltip can extend below freely */}
           <div className="shrink-0 flex items-center gap-3 px-4 text-xs text-gray-500">
             {/* Bell / reminders - always visible */}
@@ -738,16 +703,44 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                     <p className="text-[11px] text-gray-500 truncate">{user.email}</p>
                   </div>
 
-                  {/* Open Sidebar - mobile only, shown when sidebar is closed */}
-                  {!sidebarOpen && (
-                    <button
-                      onClick={() => { setUserMenuOpen(false); setSidebarOpen(true); }}
-                      className="sm:hidden w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-300 hover:bg-[#2a2a38] hover:text-white transition border-b border-[#2a2a38]"
-                    >
-                      <img src="/memolink-icon.png" alt="" className="h-4 w-4 rounded-sm bg-white object-cover shrink-0" />
-                      Open Sidebar
-                    </button>
-                  )}
+                  {/* Layout orientation */}
+                  <div className="px-3 py-2 border-b border-[#2a2a38]">
+                    <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1.5">Layout</p>
+                    <div className="flex gap-1">
+                      {([
+                        ["stacked", "Stacked"] as const,
+                        ["columns", "Side by side"] as const,
+                        ["rows", "Top / bottom"] as const,
+                      ]).map(([mode, label], idx) => (
+                        <button
+                          key={mode}
+                          title={label}
+                          onClick={() => { handleLayoutChange(mode); setUserMenuOpen(false); }}
+                          className={`flex-1 flex flex-col items-center gap-1 py-1.5 rounded-lg transition text-[10px] ${layoutMode === mode ? "bg-indigo-600 text-white" : "text-gray-400 hover:bg-[#2a2a38] hover:text-gray-200"}`}
+                        >
+                          {idx === 0 && (
+                            <svg viewBox="0 0 16 16" className="w-4 h-4" fill="currentColor">
+                              <rect x="2" y="3" width="12" height="4" rx="1"/>
+                              <rect x="2" y="9" width="12" height="4" rx="1"/>
+                            </svg>
+                          )}
+                          {idx === 1 && (
+                            <svg viewBox="0 0 16 16" className="w-4 h-4" fill="currentColor">
+                              <rect x="2" y="3" width="5" height="10" rx="1"/>
+                              <rect x="9" y="3" width="5" height="10" rx="1"/>
+                            </svg>
+                          )}
+                          {idx === 2 && (
+                            <svg viewBox="0 0 16 16" className="w-4 h-4" fill="currentColor">
+                              <rect x="2" y="2" width="12" height="5" rx="1"/>
+                              <rect x="2" y="9" width="12" height="5" rx="1"/>
+                            </svg>
+                          )}
+                          <span>{label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
 
                   {/* Settings */}
                   <button
