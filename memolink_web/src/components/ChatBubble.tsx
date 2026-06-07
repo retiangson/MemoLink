@@ -12,6 +12,15 @@ import type { Message } from "../types";
 import "highlight.js/styles/github-dark.css";
 import "../styles/markdown.css";
 
+function b64DecodeUtf8(b64: string): string {
+  try {
+    const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+    return new TextDecoder().decode(bytes);
+  } catch {
+    return atob(b64);
+  }
+}
+
 /** Parse <email_draft to="..." subject="..." body_b64="..." message_id="..." thread_id="..."> tags.
  *  Uses body_b64 (base64-encoded) to avoid issues with > < " in note content. */
 function parseEmailDrafts(content: string): { before: string; drafts: Array<{ to: string; subject: string; body: string; messageId: string; threadId: string }>; after: string } {
@@ -21,7 +30,7 @@ function parseEmailDrafts(content: string): { before: string; drafts: Array<{ to
   const cleaned = content.replace(TAG_RE, (_, attrs) => {
     const get = (key: string) => { const m = attrs.match(new RegExp(`${key}="([^"]*)"`)); return m ? m[1] : ""; };
     const bodyB64 = get("body_b64");
-    const body = bodyB64 ? atob(bodyB64) : get("body");
+    const body = bodyB64 ? b64DecodeUtf8(bodyB64) : get("body");
     drafts.push({ to: get("to"), subject: get("subject"), body, messageId: get("message_id"), threadId: get("thread_id") });
     return "[[EMAIL_DRAFT_PLACEHOLDER]]";
   });

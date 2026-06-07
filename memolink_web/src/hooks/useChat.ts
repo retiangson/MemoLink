@@ -8,6 +8,18 @@ import { TEMP_ID } from "../types";
 
 const STREAMING_ID = -99;
 
+function usePersistedToggle(key: string): [boolean, React.Dispatch<React.SetStateAction<boolean>>] {
+  const [value, setValue] = useState<boolean>(() => localStorage.getItem(key) === "true");
+  const setAndPersist: React.Dispatch<React.SetStateAction<boolean>> = (action) => {
+    setValue((prev) => {
+      const next = typeof action === "function" ? action(prev) : action;
+      localStorage.setItem(key, String(next));
+      return next;
+    });
+  };
+  return [value, setAndPersist];
+}
+
 interface UseChatDeps {
   activeConversation: Conversation | null;
   setActiveConversation: React.Dispatch<React.SetStateAction<Conversation | null>>;
@@ -26,9 +38,11 @@ export function useChat({ activeConversation, setActiveConversation, setConversa
   const [streaming, setStreaming] = useState(false);
   const tts = useTTS();
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
-  const [webSearch, setWebSearch] = useState(false);
-  const [agentMode, setAgentMode] = useState(false);
-  const [researchMode, setResearchMode] = useState(false);
+  const [webSearch, setWebSearch] = usePersistedToggle("memolink_mode_web");
+  const [agentMode, setAgentMode] = usePersistedToggle("memolink_mode_agent");
+  const [researchMode, setResearchMode] = usePersistedToggle("memolink_mode_research");
+  const [writingMode, setWritingMode] = usePersistedToggle("memolink_mode_writing");
+  const [discussionMode, setDiscussionMode] = usePersistedToggle("memolink_mode_discussion");
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const attachmentInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -93,11 +107,15 @@ export function useChat({ activeConversation, setActiveConversation, setConversa
 
         const stream = isSlashCommand
           ? streamCommand(trimmed, conversationId, workspaceId ?? null, model ?? null)
-          : researchMode
-            ? streamResearch(conversationId, trimmed, workspaceId, model)
-            : agentMode
-              ? streamAgentChat(conversationId, trimmed, workspaceId, model)
-              : streamChat(conversationId, trimmed, 5, workspaceId, model, webSearch);
+          : writingMode
+            ? streamCommand(`/Write ${trimmed}`, conversationId, workspaceId ?? null, model ?? null)
+            : discussionMode
+              ? streamCommand(`/Discussion All : ${trimmed}`, conversationId, workspaceId ?? null, model ?? null)
+              : researchMode
+                ? streamResearch(conversationId, trimmed, workspaceId, model)
+                : agentMode
+                  ? streamAgentChat(conversationId, trimmed, workspaceId, model)
+                  : streamChat(conversationId, trimmed, 5, workspaceId, model, webSearch);
 
         for await (const rawEvent of stream) {
           const event = rawEvent as any;
@@ -261,6 +279,8 @@ export function useChat({ activeConversation, setActiveConversation, setConversa
     webSearch, setWebSearch,
     agentMode, setAgentMode,
     researchMode, setResearchMode,
+    writingMode, setWritingMode,
+    discussionMode, setDiscussionMode,
     tts,
   };
 }

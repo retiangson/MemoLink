@@ -211,6 +211,14 @@
     <span class="pill">Gmail Integration</span>
     <span class="pill">OAuth 2.0</span>
     <span class="pill">Email-to-Note</span>
+    <span class="pill">Email Draft from Chat</span>
+    <span class="pill">Resend / Retry Messages</span>
+    <span class="pill">In-App Evaluation</span>
+    <span class="pill">User Ratings</span>
+    <span class="pill">Post-Session Survey</span>
+    <span class="pill">Research Analytics</span>
+    <span class="pill">Budget Tracking</span>
+    <span class="pill">Admin Export</span>
     <span class="pill">AI Memory Graph</span>
     <span class="pill">Graph-Enhanced RAG</span>
     <span class="pill">Proactive Insights</span>
@@ -430,7 +438,7 @@
       <div class="card">
         <div class="card-icon">&#x1F4E7;</div>
         <h3>Gmail Email Integration</h3>
-        <p>Connect Gmail via OAuth 2.0 in Settings → Email. MemoLink fetches unread and important emails, batch-scores importance with GPT (1–5), and saves those scoring ≥ 3. Auto-process appends new emails to a global <strong>Email Digest</strong> note and creates reminders for emails with detected deadlines - both are global (visible across all workspaces). A <strong>Sync from Email</strong> button in the Reminders panel triggers a fresh sync on demand. Email-sourced reminders link back to the original email. Reply to any email in-app: choose a tone (Formal / Friendly / Brief), generate 3 RAG-grounded AI draft suggestions, edit, and send - reply threads correctly in Gmail via <code>In-Reply-To</code> + <code>threadId</code>.</p>
+        <p>Connect Gmail via OAuth 2.0 in Settings → Email. MemoLink fetches unread and important emails, batch-scores importance with GPT (1-5), and saves those scoring ≥ 3. Auto-process appends new emails to a global <strong>Email Digest</strong> note and creates reminders for emails with detected deadlines - both are global (visible across all workspaces). A <strong>Sync from Email</strong> button in the Reminders panel triggers a fresh sync on demand. Email-sourced reminders link back to the original email. Reply to any email in-app: choose a tone (Formal / Friendly / Brief), generate 3 RAG-grounded AI draft suggestions, edit, and send - reply threads correctly in Gmail via <code>In-Reply-To</code> + <code>threadId</code>. <strong>Email Draft from Chat:</strong> say "send [recipient] the [note name]" (optionally "make it nice" / "summarize it") - MemoLink uses AI intent extraction to identify the recipient, matching note, and style hint; builds the draft from the note content (AI rewrites only when a style instruction is given); and presents a <strong>Draft Email</strong> review card with editable To/Subject, a formatted body preview, a full TipTap Edit mode, and a Send button. Sent state is tracked in localStorage to prevent double-sending. Gmail receives a <code>multipart/alternative</code> MIME message (HTML + plain-text fallback) so emails render correctly in all mail clients.</p>
       </div>
       <div class="card">
         <div class="card-icon">&#x1F9E0;</div>
@@ -466,6 +474,26 @@
         <div class="card-icon">&#x2728;</div>
         <h3>Smart Actions (Workflow Agent)</h3>
         <p>After a normal chat reply, MemoLink silently analyses the exchange (<code>POST /api/workflow/suggest</code>) and, when a useful follow-up is possible, renders conversational action buttons beneath the message - no mode or toggle required. Approving an action records the user's click as a chat message, executes it, and streams the result back as a saved assistant reply, so the full exchange survives a reload. Eight actions are supported: <strong>create reminder</strong>, <strong>create note</strong>, <strong>summarise workspace</strong>, <strong>search web</strong>, <strong>organise notes</strong>, <strong>suggest title</strong>, <strong>extract tasks</strong>, and <strong>prepare report outline</strong>. Non-OpenAI models fall back to GPT-4o-mini for the tool-calling step. Per-user suggestions toggle in <strong>Settings → Workflow</strong>; admin kill-switch via the <code>workflow_enabled</code> feature flag. After an action runs, the Notes or Reminders panel refreshes automatically.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">&#x1F504;</div>
+        <h3>Resend / Retry Messages</h3>
+        <p>Every user message shows a <strong>Resend</strong> button (circular arrow) so the prompt can be resubmitted without retyping. Every assistant message shows a <strong>Retry</strong> button that re-runs the same prompt and streams a fresh response, replacing the previous reply in the conversation. Both buttons use the current model and workspace context.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">&#x1F4CA;</div>
+        <h3>In-App Mixed-Method Evaluation</h3>
+        <p>MemoLink embeds a full research evaluation framework directly in the app. Users start an optional <strong>evaluation session</strong> (EvaluationSessionModal) which activates a floating <strong>task checklist</strong> (EvaluationPanel) with 10 guided tasks. After each AI response, an <strong>EvaluationRatingBar</strong> lets users rate retrieved context relevance, answer usefulness, answer faithfulness or supported-by-notes status, citation usefulness, and answer trust. All LLM calls automatically record telemetry to <code>evaluation_ai_metrics</code>: model, provider, tokens, cost, response times, retrieval scores, and confidence level - with no storage of raw prompts or note content. A 30-minute active-time budget per participant is enforced via a heartbeat mechanism; admins can adjust budgets per user.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">&#x1F4CB;</div>
+        <h3>Post-Session Survey</h3>
+        <p>A 37-question in-app survey (SurveyModal) covers seven sections: <strong>Participant Background</strong>, <strong>Knowledge Capture</strong>, <strong>Contextual Retrieval &amp; AI Answers</strong>, <strong>Task Support &amp; Reminders</strong>, <strong>Usability &amp; UX</strong>, <strong>Trust, Privacy &amp; Ethics</strong>, and <strong>Overall Evaluation</strong>. Questions use Likert scales (1-5), single/multi-choice, and free-text formats. The survey is designed so core SUS and usability items remain required, feature-specific sections can be shown only when relevant, and the expected completion time stays around 5-8 minutes. Responses are stored in <code>survey_responses</code> and <code>survey_answers</code> tables and are editable (one submission per account). Admins can add, edit, or reset questions via the Admin Panel Survey tab.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">&#x1F4E4;</div>
+        <h3>Research Data Export</h3>
+        <p>The Admin Panel <strong>Evaluation tab</strong> (AdminEvaluationPanel) shows aggregate metrics: average context relevance, answer usefulness, faithfulness or supported-by-notes status, citation usefulness, trust, response time by feature, fallback rate, confidence alignment (comparing model confidence to user trust ratings), and feature usage totals. Admins can export a <strong>CSV ZIP</strong> (six tables: sessions, tasks, events, ai_metrics, ratings, feature_usage) or a <strong>JSON report</strong> with markdown summary. The <strong>Survey tab</strong> (AdminSurveyPanel) shows per-question distributions and downloads a wide-format CSV. All exports exclude raw prompts, note content, and credentials.</p>
       </div>
       <div class="card">
         <div class="card-icon">&#x1F50A;</div>
@@ -553,7 +581,7 @@
         <tr>
           <td><strong>Email Integration</strong></td>
           <td><code>business/services/email_service</code></td>
-          <td>Gmail OAuth 2.0 connect/disconnect; sync inbox (importance-scored by GPT); auto-process appends to Email Digest note + extracts reminders; RAG-grounded reply suggestions; in-app MIME send with <code>In-Reply-To</code> + <code>threadId</code> threading; tokens encrypted with Fernet</td>
+          <td>Gmail OAuth 2.0 connect/disconnect; sync inbox (importance-scored by GPT); auto-process appends to Email Digest note + extracts reminders; RAG-grounded reply suggestions; in-app MIME send with <code>In-Reply-To</code> + <code>threadId</code> threading; tokens encrypted with Fernet. <strong>Email Draft from Chat:</strong> AI intent extraction (recipient, note, style) → note-content draft → Draft Email review card (TipTap edit, send) → <code>multipart/alternative</code> Gmail send</td>
           <td><span class="tag tag-ai">Gmail API</span><span class="tag tag-ai">OpenAI</span></td>
         </tr>
         <tr>
@@ -573,6 +601,18 @@
           <td><code>api/v1/feedback_controller</code></td>
           <td>Stores bug reports and suggestions in feedback table; optional SMTP notification; admin status management (open/read/resolved)</td>
           <td><span class="tag tag-py">Python</span></td>
+        </tr>
+        <tr>
+          <td><strong>Evaluation Analytics</strong></td>
+          <td><code>api/v1/evaluation_controller</code>, <code>business/services/evaluation_service</code></td>
+          <td>Session + task + event + AI metrics telemetry; per-response user ratings; active-time budget enforcement; admin summary, report, and CSV/JSON export. No raw prompts or note content stored.</td>
+          <td><span class="tag tag-py">FastAPI</span><span class="tag tag-db">PostgreSQL</span></td>
+        </tr>
+        <tr>
+          <td><strong>Survey</strong></td>
+          <td><code>api/v1/survey_controller</code>, <code>business/services/survey_service</code></td>
+          <td>37-question configurable in-app survey with Likert, single/multi-choice, and free-text question types; one response per account; admin question CRUD; wide-format CSV export</td>
+          <td><span class="tag tag-py">FastAPI</span><span class="tag tag-db">PostgreSQL</span></td>
         </tr>
         <tr>
           <td><strong>AI Memory Graph</strong></td>
@@ -693,6 +733,136 @@
 
   <hr class="divider" />
 
+  <!-- EVALUATION -->
+  <section>
+    <div class="section-label">Research Evaluation</div>
+    <h2>In-App Mixed-Method Evaluation</h2>
+    <p>
+      MemoLink collects quantitative and qualitative research data directly through the application,
+      without requiring external survey tools or manual log extraction. Data collection is
+      privacy-preserving: no raw prompts, note content, uploaded files, or credentials are ever stored
+      in evaluation tables.
+    </p>
+
+    <div class="card-grid card-grid-2" style="margin-top:1.6rem;">
+      <div class="card">
+        <h3>Quantitative - Request-Level Metrics</h3>
+        <p>Every LLM call records to <code>evaluation_ai_metrics</code>:</p>
+        <ul style="margin-top:.6rem;padding-left:1.2rem;font-size:.88rem;color:var(--text-muted);line-height:1.8;">
+          <li>Model selected vs. actual model used (fallback detection)</li>
+          <li>First-token latency, total response time, stream duration</li>
+          <li>Embedding time, retrieval time, LLM time (breakdown)</li>
+          <li>Retrieved note count, top-K requested, min/max/avg retrieval score</li>
+          <li>Citation count, source note IDs (no note content)</li>
+          <li>Confidence level (HIGH / MEDIUM / LOW / UNSUPPORTED)</li>
+          <li>Token usage (input, output, total) and estimated cost USD</li>
+          <li>Web search and graph RAG flags</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Quantitative - User Ratings</h3>
+        <p>After each AI response, the <strong>EvaluationRatingBar</strong> collects separate judgments for source-context quality and answer quality:</p>
+        <ul style="margin-top:.6rem;padding-left:1.2rem;font-size:.88rem;color:var(--text-muted);line-height:1.8;">
+          <li><strong>Retrieved context relevance</strong> - 1 to 5 scale</li>
+          <li><strong>Answer usefulness</strong> - 1 to 5 scale</li>
+          <li><strong>Answer faithfulness / supported by notes</strong> - yes / partially / no / not sure</li>
+          <li><strong>Citation usefulness</strong> - 1 to 5 scale</li>
+          <li><strong>Answer trust</strong> - 1 to 5 scale</li>
+          <li><strong>Task difficulty</strong> - 1 to 5 scale</li>
+          <li><strong>System speed</strong> - 1 to 5 scale</li>
+          <li>Optional free-text comment (max 1 000 chars)</li>
+        </ul>
+        <p style="margin-top:.7rem;font-size:.85rem;color:var(--muted);">Ratings are linked to the message ID and restored after page reload via <code>GET /api/evaluation/my-ratings</code>.</p>
+      </div>
+      <div class="card">
+        <h3>Qualitative - Post-Session Survey</h3>
+        <p>37 questions across seven sections, fully editable by admins:</p>
+        <ul style="margin-top:.6rem;padding-left:1.2rem;font-size:.88rem;color:var(--text-muted);line-height:1.8;">
+          <li>A. Participant Background</li>
+          <li>B. Knowledge Capture</li>
+          <li>C. Contextual Retrieval &amp; AI Answers</li>
+          <li>D. Task Support &amp; Reminders</li>
+          <li>E. Usability &amp; User Experience</li>
+          <li>F. Trust, Privacy &amp; Ethics</li>
+          <li>G. Overall Evaluation</li>
+        </ul>
+        <p style="margin-top:.7rem;font-size:.85rem;color:var(--muted);">Likert (1-5), single-choice, multi-choice, and free-text formats. One response per account; editable before final submission. Core SUS and usability questions are always retained, while feature-specific questions can remain optional to reduce burden.</p>
+      </div>
+      <div class="card">
+        <h3>Privacy and Budget Controls</h3>
+        <ul style="margin-top:.6rem;padding-left:1.2rem;font-size:.88rem;color:var(--text-muted);line-height:1.8;">
+          <li>No raw prompts, answers, note content, or files stored in evaluation tables</li>
+          <li>Error messages capped at 500 chars; comments capped at 1 000 chars</li>
+          <li>30-minute active-time budget per participant (admin-adjustable)</li>
+          <li>Heartbeat tracks active seconds; pauses when tab is hidden</li>
+          <li>Budget exhaustion halts all analytics recording</li>
+          <li>Participant codes (P### format) provide pseudonymity</li>
+          <li>Feature flags: <code>evaluation_analytics_enabled</code>, <code>evaluation_survey_enabled</code>, <code>evaluation_admin_export_enabled</code></li>
+        </ul>
+      </div>
+    </div>
+
+    <div style="margin-top:1.6rem;">
+      <p style="margin-bottom:.5rem;"><strong style="color:var(--text)">Evaluation data pipeline</strong></p>
+      <div class="flow">
+        <div class="flow-step">User starts evaluation session</div>
+        <span class="flow-arrow">&rarr;</span>
+        <div class="flow-step">Guided task checklist activates (EvaluationPanel)</div>
+        <span class="flow-arrow">&rarr;</span>
+        <div class="flow-step">Each AI response auto-records to evaluation_ai_metrics</div>
+        <span class="flow-arrow">&rarr;</span>
+        <div class="flow-step">User rates response via EvaluationRatingBar</div>
+        <span class="flow-arrow">&rarr;</span>
+        <div class="flow-step">User completes post-session survey (SurveyModal)</div>
+        <span class="flow-arrow">&rarr;</span>
+        <div class="flow-step">Admin exports CSV ZIP or JSON for analysis</div>
+      </div>
+    </div>
+
+    <div style="margin-top:1.8rem;">
+      <p style="margin-bottom:.5rem;"><strong style="color:var(--text)">Assessment metric mapping</strong></p>
+      <table class="arch-table">
+        <thead>
+          <tr>
+            <th>Metric</th>
+            <th>App Data Source</th>
+            <th>Table</th>
+            <th>Analysis Method</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Retrieval relevance</td><td>User rating plus similarity score</td><td><code>evaluation_user_ratings</code> + <code>evaluation_ai_metrics</code></td><td>Mean score and similarity summary</td></tr>
+          <tr><td>Answer faithfulness</td><td>Supported-by-notes rating</td><td><code>evaluation_user_ratings</code></td><td>Percentage fully or partially supported</td></tr>
+          <tr><td>Task completion time</td><td>Guided task start and end</td><td><code>evaluation_tasks</code></td><td>Mean and median completion time</td></tr>
+          <tr><td>Usability</td><td>SUS and survey questions</td><td><code>survey_answers</code></td><td>Mean SUS score and section summaries</td></tr>
+          <tr><td>Multilingual usefulness</td><td>Survey section plus comments</td><td><code>survey_answers</code></td><td>Mean Likert score and comment review</td></tr>
+          <tr><td>Response time</td><td>LLM telemetry</td><td><code>evaluation_ai_metrics</code></td><td>Mean, median, and maximum response time</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card-grid card-grid-2" style="margin-top:1.6rem;">
+      <div class="card">
+        <h3>Baseline Comparison</h3>
+        <p>The evaluation includes at least one manual baseline task alongside the MemoLink task. Participants first complete a retrieval or follow-up workflow using ordinary notes, transcripts, or manual task tracking, then repeat the same task with MemoLink so completion time, success rate, and perceived effort can be compared.</p>
+      </div>
+      <div class="card">
+        <h3>Action-Item Gold Standard</h3>
+        <p>Action-item extraction is judged against a small gold-standard set prepared from 3-5 sample notes or transcripts. Precision, recall, and F1 are reported using <code>Precision = TP / (TP + FP)</code>, <code>Recall = TP / (TP + FN)</code>, and <code>F1 = 2 x precision x recall / (precision + recall)</code>.</p>
+      </div>
+      <div class="card">
+        <h3>Multilingual Caution</h3>
+        <p>Multilingual output is explicitly assistive rather than certified. It should be reviewed by humans before use, and M&#257;ori or other culturally sensitive material should only be included when approved. The evaluation focuses on usefulness and clarity, not official linguistic correctness.</p>
+      </div>
+      <div class="card">
+        <h3>Core Evaluated Scope</h3>
+        <p>The core evaluated scope is knowledge capture, contextual retrieval, task support, multilingual usefulness, and evaluation analytics. Gmail, graph memory, proactive insights, smart actions, text-to-speech, and custom API keys remain supporting or optional features rather than the centre of the evaluated capstone scope.</p>
+      </div>
+    </div>
+  </section>
+
+  <hr class="divider" />
+
   <!-- TECH STACK -->
   <section>
     <div class="section-label">Technology Stack</div>
@@ -741,7 +911,13 @@
            <strong>proactive_insights table</strong> - AI-detected insight records (note_id, type, title, description, severity, dismissed flag, created_at)<br/>
            <strong>messages.confidence</strong> - VARCHAR(20) column storing HIGH | MEDIUM | LOW | UNSUPPORTED per assistant message<br/>
            <strong>messages.confidence_reason</strong> - TEXT column storing the LLM's or server-side fallback reasoning for the confidence level<br/>
-           <strong>note_timelines table</strong> - one cached timeline per note (UNIQUE note_id); summary TEXT, chapters/action_items/important_moments JSON, estimated_duration_seconds, word_count, generated_at</p>
+           <strong>note_timelines table</strong> - one cached timeline per note (UNIQUE note_id); summary TEXT, chapters/action_items/important_moments JSON, estimated_duration_seconds, word_count, generated_at<br/>
+           <strong>evaluation_sessions / evaluation_tasks / evaluation_events</strong> - participant session lifecycle and feature event log<br/>
+           <strong>evaluation_ai_metrics</strong> - per-LLM-call telemetry (model, tokens, cost, latencies, retrieval scores, confidence) - no raw content<br/>
+           <strong>evaluation_user_ratings</strong> - per-response user ratings (context relevance, answer usefulness, faithfulness, citation usefulness, trust, supported-by-notes)<br/>
+           <strong>consent fields</strong> - evaluation and survey consent confirmation, versioning, timestamps, and withdrawal metadata<br/>
+           <strong>evaluation_feature_usage</strong> - feature action counters per session<br/>
+           <strong>survey_questions / survey_responses / survey_answers</strong> - configurable 37-question survey with Likert, choice, and free-text answers</p>
       </div>
       <div class="card">
         <h3>AI &amp; Media</h3>
@@ -826,6 +1002,6 @@ docker compose up --build   # builds and starts backend + frontend</pre>
 
 </div>
 
-<footer>MemoLink Capstone Project &mdash; 2026</footer>
+<footer>MemoLink Capstone Project - 2026</footer>
 </body>
 </html>

@@ -24,6 +24,10 @@ interface ChatInputProps {
   onToggleWorkflowMode: () => void;
   researchMode: boolean;
   onToggleResearchMode: () => void;
+  writingMode: boolean;
+  onToggleWritingMode: () => void;
+  discussionMode: boolean;
+  onToggleDiscussionMode: () => void;
   flags?: {
     web_search_enabled: boolean;
     agent_mode_enabled: boolean;
@@ -40,7 +44,9 @@ const ALL_SUPPORT = new Set(["improve","enhance","summarize","quiz","discussion"
 export function ChatInput({
   input, setInput, loading, pendingFiles, setPendingFiles,
   textareaRef, attachmentInputRef, onSend, autoResize,
-  webSearch, onToggleWebSearch, agentMode, onToggleAgentMode, workflowMode, onToggleWorkflowMode, researchMode, onToggleResearchMode, flags, notes = [],
+  webSearch, onToggleWebSearch, agentMode, onToggleAgentMode, workflowMode, onToggleWorkflowMode,
+  researchMode, onToggleResearchMode, writingMode, onToggleWritingMode, discussionMode, onToggleDiscussionMode,
+  flags, notes = [],
 }: ChatInputProps) {
   const [showLangPicker, setShowLangPicker] = useState(false);
   const [slashPickerIndex, setSlashPickerIndex] = useState(0);
@@ -62,8 +68,12 @@ export function ChatInput({
   const noteAlreadySelected = /^"[^"]+"/.test(afterSpace) || /^All(\s|$)/i.test(afterSpace);
   // Note picker only for commands that take note names
   const showNotePicker = !!(cmdArgsMatch && !noteAlreadySelected && NOTE_COMMANDS.has(commandWord.toLowerCase()));
-  // Format hint for commands that take free text (feedback, reportbug, reminder)
-  const showFormatHint = !!(cmdArgsMatch && FORMAT_HINTS[commandWord.toLowerCase()] && !afterSpace.includes(" : "));
+  // Format hint for commands that take free text (feedback, reportbug, reminder, write)
+  // For /write: hide once the user has typed 3+ words (they know what they're doing)
+  const _freeTextTyped = commandWord.toLowerCase() === "write"
+    ? afterSpace.trim().split(/\s+/).length < 3
+    : !afterSpace.includes(" : ");
+  const showFormatHint = !!(cmdArgsMatch && FORMAT_HINTS[commandWord.toLowerCase()] && _freeTextTyped);
   const noteQuery = afterSpace; // raw typed text = filter
 
   // Build ordered picker items so ChatInput and NotePickerForCommand agree on indices
@@ -363,6 +373,39 @@ export function ChatInput({
                 </svg>
                 {researchMode && <span>Research</span>}
               </button>}
+
+              {/* Writing mode toggle */}
+              <button
+                onClick={onToggleWritingMode}
+                title={writingMode ? "Writing mode on - multi-model drafts synthesised into best output" : "Enable Writing mode"}
+                className={`flex items-center gap-1.5 px-2.5 h-8 rounded-xl text-xs font-medium transition ${
+                  writingMode
+                    ? "bg-amber-500/15 border border-amber-500/40 text-amber-400 hover:bg-amber-500/25"
+                    : "text-gray-500 hover:text-gray-200 hover:bg-[#252533]"
+                }`}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 shrink-0" fill="currentColor" viewBox="0 0 16 16">
+                  <path d="M12.854.146a.5.5 0 0 0-.707 0L10.5 1.793 14.207 5.5l1.647-1.646a.5.5 0 0 0 0-.708zm.646 6.061L9.793 2.5 3.293 9H3.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.207zm-7.468 7.468A.5.5 0 0 1 6 13.5V13h-.5a.5.5 0 0 1-.5-.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.5-.5V10h-.5a.499.499 0 0 1-.175-.032l-.179.178a.5.5 0 0 0-.11.168l-2 5a.5.5 0 0 0 .65.65l5-2a.5.5 0 0 0 .168-.11z"/>
+                </svg>
+                {writingMode && <span>Writing</span>}
+              </button>
+
+              {/* Discussion mode toggle */}
+              <button
+                onClick={onToggleDiscussionMode}
+                title={discussionMode ? "Discussion mode on - all models debate and reach consensus" : "Enable Discussion mode"}
+                className={`flex items-center gap-1.5 px-2.5 h-8 rounded-xl text-xs font-medium transition ${
+                  discussionMode
+                    ? "bg-rose-500/15 border border-rose-500/40 text-rose-400 hover:bg-rose-500/25"
+                    : "text-gray-500 hover:text-gray-200 hover:bg-[#252533]"
+                }`}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 shrink-0" fill="currentColor" viewBox="0 0 16 16">
+                  <path d="M14 1a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H4.414A2 2 0 0 0 3 11.586l-2 2V2a1 1 0 0 1 1-1zM2 0a2 2 0 0 0-2 2v12.793a.5.5 0 0 0 .854.353l2.853-2.853A1 1 0 0 1 4.414 12H14a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2z"/>
+                  <path d="M3 3.5a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 0 1h-9a.5.5 0 0 1-.5-.5M3 6a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 0 1h-9A.5.5 0 0 1 3 6m0 2.5a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 0 1h-5a.5.5 0 0 1-.5-.5"/>
+                </svg>
+                {discussionMode && <span>Discussion</span>}
+              </button>
 
               {/* Recording status label */}
               {isActive && (

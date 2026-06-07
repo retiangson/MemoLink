@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -194,7 +194,7 @@
   <section>
     <div class="section-label">ERD</div>
     <h2>Entity-Relationship Overview</h2>
-    <p>Nine core tables: <code>users</code>, <code>workspaces</code>, <code>notes</code>, <code>embeddings</code>, <code>conversations</code>, <code>messages</code>, <code>reminders</code>, <code>feature_flags</code>, and <code>feedback</code>. All user-scoped tables cascade-delete when the user is removed. Notes, conversations, and workspaces carry a <code>deleted_at</code> column for soft-delete support. Notes, conversations, and reminders each carry a <code>workspace_id</code> foreign key so every piece of content is scoped to a workspace. Embeddings remain linked to notes; retrieval is workspace-scoped by joining through the note's <code>workspace_id</code>.</p>
+    <p>MemoLink uses nine original core tables - <code>users</code>, <code>workspaces</code>, <code>notes</code>, <code>embeddings</code>, <code>conversations</code>, <code>messages</code>, <code>reminders</code>, <code>feature_flags</code>, and <code>feedback</code> - plus additional extension tables for system logs, translation cache, API keys, Gmail integration, graph memory, proactive insights, evaluation analytics, and survey responses. All user-scoped tables cascade-delete when the user is removed. Notes, conversations, and workspaces carry a <code>deleted_at</code> column for soft-delete support. Notes, conversations, and reminders each carry a <code>workspace_id</code> foreign key so every piece of content is scoped to a workspace. Embeddings remain linked to notes; retrieval is workspace-scoped by joining through the note's <code>workspace_id</code>.</p>
   <p style="margin-top:.7rem;"><strong style="color:var(--text)">Schema stability for most new features:</strong> AI image generation (with fallback chain), multi-model chat, translation, web search, agent mode, and password reset are all stateless at the database layer - they require no additional tables or columns. Generated images are embedded as base64 data URLs inside the existing <code>messages.content</code> TEXT column (base64 is stripped from context before OpenAI calls to prevent token overflow). Model attribution is carried in the SSE stream and rendered client-side. Rich HTML from bulk file upload is stored in <code>notes.content</code>, which already accepts arbitrary HTML including embedded <code>&lt;img&gt;</code> tags.</p>
   <p style="margin-top:.7rem;"><strong style="color:var(--text)">New tables for admin features:</strong> The <code>feature_flags</code> table stores system-wide feature toggles, defaults, and per-feature minimum access levels. The <code>feedback</code> table stores user-submitted bug reports and suggestions. The <code>users</code> table gains an <code>is_admin BOOLEAN</code> column and an <code>access_level VARCHAR</code> column (<code>'regular'</code> | <code>'plus'</code> | <code>'pro'</code>). JWT tokens embed both <code>is_admin</code> and <code>access_level</code> claims; the <code>get_current_user_info</code> dependency decodes them for stateless access-level enforcement without a DB lookup on every request.</p>
 
@@ -962,7 +962,7 @@
             <td class="col-name">target_language</td>
             <td class="col-type">VARCHAR(100)</td>
             <td><span class="badge-nn">NOT NULL</span></td>
-            <td class="col-notes">The target language name as submitted - e.g. <code>"Māori"</code>, <code>"Japanese"</code>, <code>"Tagalog"</code>. Lowercased when building the hash key.</td>
+            <td class="col-notes">The target language name as submitted - e.g. <code>"M&#257;ori"</code>, <code>"Japanese"</code>, <code>"Tagalog"</code>. Lowercased when building the hash key.</td>
           </tr>
           <tr>
             <td class="col-name">translation</td>
@@ -974,7 +974,7 @@
             <td class="col-name">accuracy</td>
             <td class="col-type">INTEGER</td>
             <td>nullable</td>
-            <td class="col-notes">Semantic similarity score 0–100 from the back-translation scoring round. <code>null</code> when scoring was skipped (e.g. GPT fallback path where no scoring round runs).</td>
+            <td class="col-notes">Semantic similarity score 0-100 from the back-translation scoring round. <code>null</code> when scoring was skipped (e.g. GPT fallback path where no scoring round runs).</td>
           </tr>
           <tr>
             <td class="col-name">model</td>
@@ -1331,8 +1331,296 @@
     <p style="margin-top:.7rem;"><strong style="color:var(--text)">S3 pre-signed upload:</strong> The S3 upload feature (<code>POST /api/upload/presign</code> and <code>POST /api/upload/process</code>) requires no database changes. Uploaded files are processed transiently - Lambda downloads each S3 object, creates a note in the existing <code>notes</code> table, then deletes the S3 object. No new columns or tables are needed.</p>
   </section>
 
+  <hr class="divider" />
+
+  <!-- EVALUATION & SURVEY TABLES -->
+  <section>
+    <div class="section-label">Evaluation &amp; Survey</div>
+    <h2>Evaluation &amp; Survey Tables</h2>
+    <p>These tables support the in-app mixed-method research evaluation framework. <strong>No raw prompts, AI answers, note content, uploaded files, or credentials are stored in any evaluation or survey table.</strong> Only metadata, IDs, counts, timings, ratings, and anonymised references are persisted.</p>
+    <p style="margin-top:.7rem;">The evaluation design also uses an explicit consent model. Participants are shown a short participant information statement before data collection starts, consent is versioned and timestamped, and evaluation participation can be withdrawn through an admin-reviewed withdrawal process that either deletes or anonymises the participant's evaluation records. This keeps the research workflow aligned with capstone ethics expectations while preserving pseudonymised analysis where permitted.</p>
+
+    <!-- evaluation_sessions -->
+    <div class="schema-card" style="margin-top:1.4rem;">
+      <div class="schema-header">
+        <span class="schema-icon">&#x1F4CA;</span>
+        <span class="schema-name">evaluation_sessions</span>
+        <span class="schema-desc">One row per participant evaluation session</span>
+      </div>
+      <table class="col-table">
+        <thead><tr><th>Column</th><th>Type</th><th>Constraints</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td class="col-name">id</td><td class="col-type">INTEGER</td><td><span class="badge-pk">PK</span></td><td class="col-notes">Auto-incrementing primary key</td></tr>
+          <tr><td class="col-name">participant_code</td><td class="col-type">VARCHAR(20)</td><td>nullable</td><td class="col-notes">Pseudonymous participant identifier in P### format</td></tr>
+          <tr><td class="col-name">user_id</td><td class="col-type">INTEGER</td><td><span class="badge-fk">FK &rarr; users.id</span><span class="badge-nn">NOT NULL</span></td><td class="col-notes">Owner of this session</td></tr>
+          <tr><td class="col-name">workspace_id</td><td class="col-type">INTEGER</td><td><span class="badge-fk">FK &rarr; workspaces.id</span></td><td class="col-notes">Active workspace at session start</td></tr>
+          <tr><td class="col-name">consent_confirmed</td><td class="col-type">BOOLEAN</td><td>default: false</td><td class="col-notes">Whether the participant confirmed data collection consent</td></tr>
+          <tr><td class="col-name">consent_version</td><td class="col-type">VARCHAR(20)</td><td>nullable</td><td class="col-notes">Version of the participant information and consent text accepted for this session</td></tr>
+          <tr><td class="col-name">consent_timestamp</td><td class="col-type">TIMESTAMPTZ</td><td>nullable</td><td class="col-notes">UTC timestamp when consent was confirmed</td></tr>
+          <tr><td class="col-name">role</td><td class="col-type">VARCHAR(100)</td><td>nullable</td><td class="col-notes">Self-reported participant role (e.g. student, professional)</td></tr>
+          <tr><td class="col-name">ai_tool_usage_frequency</td><td class="col-type">VARCHAR(50)</td><td>nullable</td><td class="col-notes">Self-reported AI usage frequency</td></tr>
+          <tr><td class="col-name">device_type</td><td class="col-type">VARCHAR(50)</td><td>nullable</td><td class="col-notes">Device category detected at session start</td></tr>
+          <tr><td class="col-name">browser</td><td class="col-type">VARCHAR(100)</td><td>nullable</td><td class="col-notes">Browser name and version</td></tr>
+          <tr><td class="col-name">operating_system</td><td class="col-type">VARCHAR(100)</td><td>nullable</td><td class="col-notes">OS name and version</td></tr>
+          <tr><td class="col-name">started_at</td><td class="col-type">TIMESTAMPTZ</td><td>server default: now()</td><td class="col-notes">Session start timestamp (UTC)</td></tr>
+          <tr><td class="col-name">ended_at</td><td class="col-type">TIMESTAMPTZ</td><td>nullable</td><td class="col-notes">Session end timestamp; null if session is still active</td></tr>
+          <tr><td class="col-name">total_time_seconds</td><td class="col-type">INTEGER</td><td>nullable</td><td class="col-notes">Total active seconds tracked by heartbeat</td></tr>
+          <tr><td class="col-name">budget_seconds</td><td class="col-type">INTEGER</td><td>default: 1800</td><td class="col-notes">Allowed active seconds for this participant (default 30 min; admin-adjustable)</td></tr>
+          <tr><td class="col-name">completed</td><td class="col-type">BOOLEAN</td><td>default: false</td><td class="col-notes">Set to true when the session is formally ended</td></tr>
+          <tr><td class="col-name">withdrawn_at</td><td class="col-type">TIMESTAMPTZ</td><td>nullable</td><td class="col-notes">When the participant withdrew from evaluation; triggers deletion or anonymisation workflow</td></tr>
+          <tr><td class="col-name">notes</td><td class="col-type">TEXT</td><td>nullable</td><td class="col-notes">Optional admin notes (max 500 chars)</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- evaluation_tasks -->
+    <div class="schema-card" style="margin-top:1.4rem;">
+      <div class="schema-header">
+        <span class="schema-icon">&#x2705;</span>
+        <span class="schema-name">evaluation_tasks</span>
+        <span class="schema-desc">One row per guided task within a session</span>
+      </div>
+      <table class="col-table">
+        <thead><tr><th>Column</th><th>Type</th><th>Constraints</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td class="col-name">id</td><td class="col-type">INTEGER</td><td><span class="badge-pk">PK</span></td><td class="col-notes">Auto-incrementing primary key</td></tr>
+          <tr><td class="col-name">session_id</td><td class="col-type">INTEGER</td><td><span class="badge-fk">FK &rarr; evaluation_sessions.id</span><span class="badge-nn">NOT NULL</span></td><td class="col-notes">Parent evaluation session</td></tr>
+          <tr><td class="col-name">user_id</td><td class="col-type">INTEGER</td><td><span class="badge-nn">NOT NULL</span></td><td class="col-notes">User performing the task</td></tr>
+          <tr><td class="col-name">workspace_id</td><td class="col-type">INTEGER</td><td>nullable</td><td class="col-notes">Active workspace when task was started</td></tr>
+          <tr><td class="col-name">task_key</td><td class="col-type">VARCHAR(100)</td><td><span class="badge-nn">NOT NULL</span></td><td class="col-notes">Unique task identifier, e.g. <code>task_create_note</code></td></tr>
+          <tr><td class="col-name">task_name</td><td class="col-type">VARCHAR(200)</td><td>nullable</td><td class="col-notes">Human-readable task label shown in the EvaluationPanel checklist</td></tr>
+          <tr><td class="col-name">feature_name</td><td class="col-type">VARCHAR(100)</td><td>nullable</td><td class="col-notes">Feature category this task exercises (e.g. notes, chat, reminders)</td></tr>
+          <tr><td class="col-name">started_at</td><td class="col-type">TIMESTAMPTZ</td><td>nullable</td><td class="col-notes">When the user started this task</td></tr>
+          <tr><td class="col-name">completed_at</td><td class="col-type">TIMESTAMPTZ</td><td>nullable</td><td class="col-notes">When the user marked the task complete</td></tr>
+          <tr><td class="col-name">time_taken_ms</td><td class="col-type">INTEGER</td><td>nullable</td><td class="col-notes">Task duration in milliseconds</td></tr>
+          <tr><td class="col-name">completed</td><td class="col-type">BOOLEAN</td><td>default: false</td><td class="col-notes">Whether the task was completed</td></tr>
+          <tr><td class="col-name">success</td><td class="col-type">BOOLEAN</td><td>nullable</td><td class="col-notes">Whether the task outcome was successful</td></tr>
+          <tr><td class="col-name">error_count</td><td class="col-type">INTEGER</td><td>default: 0</td><td class="col-notes">Number of errors encountered during the task</td></tr>
+          <tr><td class="col-name">retry_count</td><td class="col-type">INTEGER</td><td>default: 0</td><td class="col-notes">Number of retries attempted</td></tr>
+          <tr><td class="col-name">click_count</td><td class="col-type">INTEGER</td><td>default: 0</td><td class="col-notes">Number of UI interactions recorded</td></tr>
+          <tr><td class="col-name">created_object_type</td><td class="col-type">VARCHAR(50)</td><td>nullable</td><td class="col-notes">Type of object created during the task (e.g. note, reminder)</td></tr>
+          <tr><td class="col-name">created_object_id</td><td class="col-type">INTEGER</td><td>nullable</td><td class="col-notes">ID of the created object (no content stored)</td></tr>
+          <tr><td class="col-name">notes</td><td class="col-type">TEXT</td><td>nullable</td><td class="col-notes">Optional task-level notes (max 500 chars)</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- evaluation_events -->
+    <div class="schema-card" style="margin-top:1.4rem;">
+      <div class="schema-header">
+        <span class="schema-icon">&#x1F4C5;</span>
+        <span class="schema-name">evaluation_events</span>
+        <span class="schema-desc">Feature-level event log - one row per discrete feature interaction</span>
+      </div>
+      <table class="col-table">
+        <thead><tr><th>Column</th><th>Type</th><th>Constraints</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td class="col-name">id</td><td class="col-type">INTEGER</td><td><span class="badge-pk">PK</span></td><td class="col-notes">Auto-incrementing primary key</td></tr>
+          <tr><td class="col-name">session_id</td><td class="col-type">INTEGER</td><td><span class="badge-fk">FK &rarr; evaluation_sessions.id</span></td><td class="col-notes">Parent session</td></tr>
+          <tr><td class="col-name">task_id</td><td class="col-type">INTEGER</td><td><span class="badge-fk">FK &rarr; evaluation_tasks.id</span></td><td class="col-notes">Parent task (nullable if event is session-level)</td></tr>
+          <tr><td class="col-name">user_id</td><td class="col-type">INTEGER</td><td><span class="badge-nn">NOT NULL</span></td><td class="col-notes">User who triggered the event</td></tr>
+          <tr><td class="col-name">workspace_id</td><td class="col-type">INTEGER</td><td>nullable</td><td class="col-notes">Active workspace at event time</td></tr>
+          <tr><td class="col-name">conversation_id</td><td class="col-type">INTEGER</td><td>nullable</td><td class="col-notes">Associated conversation (ID only, no content)</td></tr>
+          <tr><td class="col-name">message_id</td><td class="col-type">INTEGER</td><td>nullable</td><td class="col-notes">Associated message (ID only, no content)</td></tr>
+          <tr><td class="col-name">note_id</td><td class="col-type">INTEGER</td><td>nullable</td><td class="col-notes">Associated note (ID only, no content)</td></tr>
+          <tr><td class="col-name">feature_name</td><td class="col-type">VARCHAR(100)</td><td>nullable</td><td class="col-notes">Feature category (e.g. chat, notes, reminders, translation)</td></tr>
+          <tr><td class="col-name">operation_name</td><td class="col-type">VARCHAR(100)</td><td>nullable</td><td class="col-notes">Specific operation within the feature</td></tr>
+          <tr><td class="col-name">event_type</td><td class="col-type">VARCHAR(50)</td><td>nullable</td><td class="col-notes">Event classification (e.g. start, complete, error, cancel)</td></tr>
+          <tr><td class="col-name">status</td><td class="col-type">VARCHAR(20)</td><td>nullable</td><td class="col-notes">Outcome status (success, error, timeout)</td></tr>
+          <tr><td class="col-name">started_at</td><td class="col-type">TIMESTAMPTZ</td><td>server default: now()</td><td class="col-notes">Event start timestamp</td></tr>
+          <tr><td class="col-name">ended_at</td><td class="col-type">TIMESTAMPTZ</td><td>nullable</td><td class="col-notes">Event end timestamp</td></tr>
+          <tr><td class="col-name">duration_ms</td><td class="col-type">INTEGER</td><td>nullable</td><td class="col-notes">Event duration in milliseconds</td></tr>
+          <tr><td class="col-name">error_type</td><td class="col-type">VARCHAR(100)</td><td>nullable</td><td class="col-notes">Error class or type name (no stack traces)</td></tr>
+          <tr><td class="col-name">error_code</td><td class="col-type">VARCHAR(50)</td><td>nullable</td><td class="col-notes">HTTP status code or application error code</td></tr>
+          <tr><td class="col-name">error_message_safe</td><td class="col-type">VARCHAR(500)</td><td>nullable</td><td class="col-notes">Sanitised error message - capped at 500 chars, no raw content</td></tr>
+          <tr><td class="col-name">metadata</td><td class="col-type">JSONB</td><td>nullable</td><td class="col-notes">Optional structured context (counts, flags, IDs) - no raw text content</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- evaluation_ai_metrics -->
+    <div class="schema-card" style="margin-top:1.4rem;">
+      <div class="schema-header">
+        <span class="schema-icon">&#x1F916;</span>
+        <span class="schema-name">evaluation_ai_metrics</span>
+        <span class="schema-desc">Per-LLM-call telemetry - automatically recorded for every AI response</span>
+      </div>
+      <table class="col-table">
+        <thead><tr><th>Column</th><th>Type</th><th>Constraints</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td class="col-name">id</td><td class="col-type">INTEGER</td><td><span class="badge-pk">PK</span></td><td class="col-notes">Auto-incrementing primary key</td></tr>
+          <tr><td class="col-name">session_id</td><td class="col-type">INTEGER</td><td>nullable</td><td class="col-notes">Evaluation session (null if no active session)</td></tr>
+          <tr><td class="col-name">task_id</td><td class="col-type">INTEGER</td><td>nullable</td><td class="col-notes">Active task at the time of the LLM call</td></tr>
+          <tr><td class="col-name">user_id</td><td class="col-type">INTEGER</td><td><span class="badge-nn">NOT NULL</span></td><td class="col-notes">User who triggered the LLM call</td></tr>
+          <tr><td class="col-name">conversation_id</td><td class="col-type">INTEGER</td><td>nullable</td><td class="col-notes">Conversation ID (no content stored)</td></tr>
+          <tr><td class="col-name">message_id</td><td class="col-type">INTEGER</td><td>nullable</td><td class="col-notes">Message ID linking to evaluation_user_ratings (no content stored)</td></tr>
+          <tr><td class="col-name">prompt_length_chars</td><td class="col-type">INTEGER</td><td>nullable</td><td class="col-notes">Character count of the prompt - no raw prompt stored</td></tr>
+          <tr><td class="col-name">prompt_length_words</td><td class="col-type">INTEGER</td><td>nullable</td><td class="col-notes">Word count of the prompt</td></tr>
+          <tr><td class="col-name">answer_length_chars</td><td class="col-type">INTEGER</td><td>nullable</td><td class="col-notes">Character count of the AI answer - no raw answer stored</td></tr>
+          <tr><td class="col-name">answer_length_words</td><td class="col-type">INTEGER</td><td>nullable</td><td class="col-notes">Word count of the AI answer</td></tr>
+          <tr><td class="col-name">selected_model</td><td class="col-type">VARCHAR(100)</td><td>nullable</td><td class="col-notes">Model the user selected or the system default</td></tr>
+          <tr><td class="col-name">actual_model_used</td><td class="col-type">VARCHAR(100)</td><td>nullable</td><td class="col-notes">Model that actually responded (may differ due to fallback)</td></tr>
+          <tr><td class="col-name">provider</td><td class="col-type">VARCHAR(50)</td><td>nullable</td><td class="col-notes">Provider name: openai, gemini, deepseek, custom</td></tr>
+          <tr><td class="col-name">autopilot_used</td><td class="col-type">BOOLEAN</td><td>default: false</td><td class="col-notes">Whether AutoPilot routing was active</td></tr>
+          <tr><td class="col-name">autopilot_reason</td><td class="col-type">VARCHAR(100)</td><td>nullable</td><td class="col-notes">AutoPilot routing reason label</td></tr>
+          <tr><td class="col-name">fallback_used</td><td class="col-type">BOOLEAN</td><td>default: false</td><td class="col-notes">Whether a fallback model was used</td></tr>
+          <tr><td class="col-name">fallback_attempt_count</td><td class="col-type">INTEGER</td><td>default: 0</td><td class="col-notes">Number of fallback attempts before success</td></tr>
+          <tr><td class="col-name">failed_models</td><td class="col-type">JSONB</td><td>nullable</td><td class="col-notes">Array of model IDs that failed before the successful model</td></tr>
+          <tr><td class="col-name">web_search_enabled</td><td class="col-type">BOOLEAN</td><td>default: false</td><td class="col-notes">Whether Brave Search was used for this call</td></tr>
+          <tr><td class="col-name">graph_rag_enabled</td><td class="col-type">BOOLEAN</td><td>default: false</td><td class="col-notes">Whether Graph-Enhanced RAG traversal was used</td></tr>
+          <tr><td class="col-name">top_k_requested</td><td class="col-type">INTEGER</td><td>nullable</td><td class="col-notes">Number of note chunks requested from vector search</td></tr>
+          <tr><td class="col-name">retrieved_note_count</td><td class="col-type">INTEGER</td><td>nullable</td><td class="col-notes">Number of notes actually retrieved by the RAG pipeline</td></tr>
+          <tr><td class="col-name">citation_count</td><td class="col-type">INTEGER</td><td>nullable</td><td class="col-notes">Number of notes cited in the AI answer</td></tr>
+          <tr><td class="col-name">source_note_ids</td><td class="col-type">JSONB</td><td>nullable</td><td class="col-notes">Array of cited note IDs - IDs only, no note content stored</td></tr>
+          <tr><td class="col-name">retrieval_min_score</td><td class="col-type">FLOAT</td><td>nullable</td><td class="col-notes">Minimum cosine similarity score across retrieved notes</td></tr>
+          <tr><td class="col-name">retrieval_max_score</td><td class="col-type">FLOAT</td><td>nullable</td><td class="col-notes">Maximum cosine similarity score across retrieved notes</td></tr>
+          <tr><td class="col-name">retrieval_avg_score</td><td class="col-type">FLOAT</td><td>nullable</td><td class="col-notes">Average cosine similarity score across retrieved notes</td></tr>
+          <tr><td class="col-name">confidence_level</td><td class="col-type">VARCHAR(20)</td><td>nullable</td><td class="col-notes">Answer confidence: HIGH, MEDIUM, LOW, or UNSUPPORTED</td></tr>
+          <tr><td class="col-name">confidence_reason</td><td class="col-type">VARCHAR(200)</td><td>nullable</td><td class="col-notes">Short reason for the confidence classification</td></tr>
+          <tr><td class="col-name">confidence_method</td><td class="col-type">VARCHAR(50)</td><td>nullable</td><td class="col-notes">How confidence was determined: llm_self_assessment or server_fallback</td></tr>
+          <tr><td class="col-name">input_tokens</td><td class="col-type">INTEGER</td><td>nullable</td><td class="col-notes">Token count of the prompt sent to the LLM</td></tr>
+          <tr><td class="col-name">output_tokens</td><td class="col-type">INTEGER</td><td>nullable</td><td class="col-notes">Token count of the LLM's response</td></tr>
+          <tr><td class="col-name">total_tokens</td><td class="col-type">INTEGER</td><td>nullable</td><td class="col-notes">Total tokens consumed (input + output)</td></tr>
+          <tr><td class="col-name">estimated_cost_usd</td><td class="col-type">FLOAT</td><td>nullable</td><td class="col-notes">Estimated cost in USD based on provider pricing at time of call</td></tr>
+          <tr><td class="col-name">first_token_latency_ms</td><td class="col-type">INTEGER</td><td>nullable</td><td class="col-notes">Milliseconds from request start to first SSE token received</td></tr>
+          <tr><td class="col-name">total_response_time_ms</td><td class="col-type">INTEGER</td><td>nullable</td><td class="col-notes">Total milliseconds from request start to final SSE done event</td></tr>
+          <tr><td class="col-name">stream_duration_ms</td><td class="col-type">INTEGER</td><td>nullable</td><td class="col-notes">Duration of the SSE streaming phase</td></tr>
+          <tr><td class="col-name">embedding_time_ms</td><td class="col-type">INTEGER</td><td>nullable</td><td class="col-notes">Time spent generating the prompt embedding</td></tr>
+          <tr><td class="col-name">retrieval_time_ms</td><td class="col-type">INTEGER</td><td>nullable</td><td class="col-notes">Time spent on pgvector similarity search</td></tr>
+          <tr><td class="col-name">llm_time_ms</td><td class="col-type">INTEGER</td><td>nullable</td><td class="col-notes">Time spent waiting for the LLM to respond</td></tr>
+          <tr><td class="col-name">created_at</td><td class="col-type">TIMESTAMPTZ</td><td>server default: now()</td><td class="col-notes">Timestamp when this metric row was written (UTC)</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- evaluation_user_ratings -->
+    <div class="schema-card" style="margin-top:1.4rem;">
+      <div class="schema-header">
+        <span class="schema-icon">&#x2B50;</span>
+        <span class="schema-name">evaluation_user_ratings</span>
+        <span class="schema-desc">Per-response user ratings submitted via EvaluationRatingBar</span>
+      </div>
+      <table class="col-table">
+        <thead><tr><th>Column</th><th>Type</th><th>Constraints</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td class="col-name">id</td><td class="col-type">INTEGER</td><td><span class="badge-pk">PK</span></td><td class="col-notes">Auto-incrementing primary key</td></tr>
+          <tr><td class="col-name">session_id</td><td class="col-type">INTEGER</td><td>nullable</td><td class="col-notes">Parent evaluation session</td></tr>
+          <tr><td class="col-name">task_id</td><td class="col-type">INTEGER</td><td>nullable</td><td class="col-notes">Active task at time of rating</td></tr>
+          <tr><td class="col-name">event_id</td><td class="col-type">INTEGER</td><td>nullable</td><td class="col-notes">Associated evaluation event</td></tr>
+          <tr><td class="col-name">ai_metric_id</td><td class="col-type">INTEGER</td><td>nullable</td><td class="col-notes">Associated AI metrics row (links rating to LLM telemetry)</td></tr>
+          <tr><td class="col-name">message_id</td><td class="col-type">INTEGER</td><td>nullable</td><td class="col-notes">Message being rated (ID only, no content stored)</td></tr>
+          <tr><td class="col-name">rating_type</td><td class="col-type">VARCHAR(50)</td><td><span class="badge-nn">NOT NULL</span></td><td class="col-notes">Type of rating: context_relevance_rating, answer_usefulness_rating, answer_faithfulness_rating, citation_usefulness, answer_trust, answer_supported_by_notes, task_difficulty, system_speed</td></tr>
+          <tr><td class="col-name">rating_value</td><td class="col-type">INTEGER</td><td>nullable</td><td class="col-notes">Numeric rating value (e.g. 1-5 for Likert ratings)</td></tr>
+          <tr><td class="col-name">rating_scale_min</td><td class="col-type">INTEGER</td><td>nullable</td><td class="col-notes">Minimum value of the rating scale</td></tr>
+          <tr><td class="col-name">rating_scale_max</td><td class="col-type">INTEGER</td><td>nullable</td><td class="col-notes">Maximum value of the rating scale</td></tr>
+          <tr><td class="col-name">choice_value</td><td class="col-type">VARCHAR(50)</td><td>nullable</td><td class="col-notes">Text value for categorical ratings (e.g. yes, partially, no, not_sure for answer_supported_by_notes)</td></tr>
+          <tr><td class="col-name">comment</td><td class="col-type">VARCHAR(1000)</td><td>nullable</td><td class="col-notes">Optional free-text comment from the user; capped at 1 000 chars</td></tr>
+          <tr><td class="col-name">created_at</td><td class="col-type">TIMESTAMPTZ</td><td>server default: now()</td><td class="col-notes">Timestamp when the rating was submitted</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- evaluation_feature_usage -->
+    <div class="schema-card" style="margin-top:1.4rem;">
+      <div class="schema-header">
+        <span class="schema-icon">&#x1F4F6;</span>
+        <span class="schema-name">evaluation_feature_usage</span>
+        <span class="schema-desc">Aggregated feature action counters per session</span>
+      </div>
+      <table class="col-table">
+        <thead><tr><th>Column</th><th>Type</th><th>Constraints</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td class="col-name">id</td><td class="col-type">INTEGER</td><td><span class="badge-pk">PK</span></td><td class="col-notes">Auto-incrementing primary key</td></tr>
+          <tr><td class="col-name">session_id</td><td class="col-type">INTEGER</td><td><span class="badge-fk">FK &rarr; evaluation_sessions.id</span></td><td class="col-notes">Parent session</td></tr>
+          <tr><td class="col-name">user_id</td><td class="col-type">INTEGER</td><td><span class="badge-nn">NOT NULL</span></td><td class="col-notes">User who performed the actions</td></tr>
+          <tr><td class="col-name">workspace_id</td><td class="col-type">INTEGER</td><td>nullable</td><td class="col-notes">Workspace context</td></tr>
+          <tr><td class="col-name">feature_name</td><td class="col-type">VARCHAR(100)</td><td><span class="badge-nn">NOT NULL</span></td><td class="col-notes">Feature name (e.g. chat, notes, reminders, translation)</td></tr>
+          <tr><td class="col-name">action_name</td><td class="col-type">VARCHAR(100)</td><td><span class="badge-nn">NOT NULL</span></td><td class="col-notes">Action within the feature (e.g. create, query, generate)</td></tr>
+          <tr><td class="col-name">count</td><td class="col-type">INTEGER</td><td>default: 0</td><td class="col-notes">Number of times this action was performed in the session</td></tr>
+          <tr><td class="col-name">first_used_at</td><td class="col-type">TIMESTAMPTZ</td><td>nullable</td><td class="col-notes">Timestamp of first use of this feature+action in the session</td></tr>
+          <tr><td class="col-name">last_used_at</td><td class="col-type">TIMESTAMPTZ</td><td>nullable</td><td class="col-notes">Timestamp of most recent use</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- survey_questions -->
+    <div class="schema-card" style="margin-top:1.4rem;">
+      <div class="schema-header">
+        <span class="schema-icon">&#x2753;</span>
+        <span class="schema-name">survey_questions</span>
+        <span class="schema-desc">Configurable survey questions - managed via Admin Panel Survey tab</span>
+      </div>
+      <table class="col-table">
+        <thead><tr><th>Column</th><th>Type</th><th>Constraints</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td class="col-name">id</td><td class="col-type">INTEGER</td><td><span class="badge-pk">PK</span></td><td class="col-notes">Auto-incrementing primary key</td></tr>
+          <tr><td class="col-name">section</td><td class="col-type">VARCHAR(10)</td><td>nullable</td><td class="col-notes">Section label: A, B, C, D, E, F, or G</td></tr>
+          <tr><td class="col-name">question_key</td><td class="col-type">VARCHAR(100)</td><td><span class="badge-uq">UNIQUE</span><span class="badge-nn">NOT NULL</span></td><td class="col-notes">Unique machine-readable key used as the join key in survey_answers</td></tr>
+          <tr><td class="col-name">question_text</td><td class="col-type">TEXT</td><td><span class="badge-nn">NOT NULL</span></td><td class="col-notes">Full question text shown to the participant</td></tr>
+          <tr><td class="col-name">answer_type</td><td class="col-type">VARCHAR(20)</td><td><span class="badge-nn">NOT NULL</span></td><td class="col-notes">One of: likert, single, multi, short, long</td></tr>
+          <tr><td class="col-name">options</td><td class="col-type">JSONB</td><td>nullable</td><td class="col-notes">Array of choice strings for single/multi-choice questions; null for text/Likert</td></tr>
+          <tr><td class="col-name">order_index</td><td class="col-type">INTEGER</td><td>default: 0</td><td class="col-notes">Display order within the section</td></tr>
+          <tr><td class="col-name">required</td><td class="col-type">BOOLEAN</td><td>default: true</td><td class="col-notes">Whether an answer is required before submission</td></tr>
+          <tr><td class="col-name">active</td><td class="col-type">BOOLEAN</td><td>default: true</td><td class="col-notes">Inactive questions are hidden from participants but retained for historical answers</td></tr>
+          <tr><td class="col-name">created_at</td><td class="col-type">TIMESTAMPTZ</td><td>server default: now()</td><td class="col-notes">When the question was created</td></tr>
+          <tr><td class="col-name">updated_at</td><td class="col-type">TIMESTAMPTZ</td><td>server default: now()</td><td class="col-notes">When the question was last edited</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- survey_responses -->
+    <div class="schema-card" style="margin-top:1.4rem;">
+      <div class="schema-header">
+        <span class="schema-icon">&#x1F4DD;</span>
+        <span class="schema-name">survey_responses</span>
+        <span class="schema-desc">One row per participant survey submission (one per account)</span>
+      </div>
+      <table class="col-table">
+        <thead><tr><th>Column</th><th>Type</th><th>Constraints</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td class="col-name">id</td><td class="col-type">INTEGER</td><td><span class="badge-pk">PK</span></td><td class="col-notes">Auto-incrementing primary key</td></tr>
+          <tr><td class="col-name">user_id</td><td class="col-type">INTEGER</td><td><span class="badge-fk">FK &rarr; users.id</span><span class="badge-uq">UNIQUE</span><span class="badge-nn">NOT NULL</span></td><td class="col-notes">One survey response per user account</td></tr>
+          <tr><td class="col-name">workspace_id</td><td class="col-type">INTEGER</td><td>nullable</td><td class="col-notes">Active workspace when the survey was submitted</td></tr>
+          <tr><td class="col-name">participant_code</td><td class="col-type">VARCHAR(20)</td><td>nullable</td><td class="col-notes">Pseudonymous participant code (P### format)</td></tr>
+          <tr><td class="col-name">role</td><td class="col-type">VARCHAR(100)</td><td>nullable</td><td class="col-notes">Self-reported participant role</td></tr>
+          <tr><td class="col-name">ai_tool_usage_frequency</td><td class="col-type">VARCHAR(50)</td><td>nullable</td><td class="col-notes">Self-reported AI usage frequency</td></tr>
+          <tr><td class="col-name">consent_confirmed</td><td class="col-type">BOOLEAN</td><td>default: false</td><td class="col-notes">Whether the participant confirmed data use consent</td></tr>
+          <tr><td class="col-name">consent_version</td><td class="col-type">VARCHAR(20)</td><td>nullable</td><td class="col-notes">Version of the survey/evaluation consent statement accepted by the participant</td></tr>
+          <tr><td class="col-name">consent_timestamp</td><td class="col-type">TIMESTAMPTZ</td><td>nullable</td><td class="col-notes">UTC timestamp of survey consent confirmation</td></tr>
+          <tr><td class="col-name">created_at</td><td class="col-type">TIMESTAMPTZ</td><td>server default: now()</td><td class="col-notes">When the survey response record was first created</td></tr>
+          <tr><td class="col-name">submitted_at</td><td class="col-type">TIMESTAMPTZ</td><td>nullable</td><td class="col-notes">When the participant formally submitted; null if draft/in-progress</td></tr>
+          <tr><td class="col-name">withdrawn_at</td><td class="col-type">TIMESTAMPTZ</td><td>nullable</td><td class="col-notes">When the participant withdrew survey participation and requested deletion or anonymisation</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- survey_answers -->
+    <div class="schema-card" style="margin-top:1.4rem;">
+      <div class="schema-header">
+        <span class="schema-icon">&#x1F4AC;</span>
+        <span class="schema-name">survey_answers</span>
+        <span class="schema-desc">One row per question answer within a survey response</span>
+      </div>
+      <table class="col-table">
+        <thead><tr><th>Column</th><th>Type</th><th>Constraints</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td class="col-name">id</td><td class="col-type">INTEGER</td><td><span class="badge-pk">PK</span></td><td class="col-notes">Auto-incrementing primary key</td></tr>
+          <tr><td class="col-name">survey_response_id</td><td class="col-type">INTEGER</td><td><span class="badge-fk">FK &rarr; survey_responses.id</span><span class="badge-nn">NOT NULL</span></td><td class="col-notes">Parent survey response; CASCADE DELETE</td></tr>
+          <tr><td class="col-name">question_key</td><td class="col-type">VARCHAR(100)</td><td><span class="badge-nn">NOT NULL</span></td><td class="col-notes">Foreign key by convention to survey_questions.question_key; denormalised for stability when questions are edited</td></tr>
+          <tr><td class="col-name">question_text</td><td class="col-type">TEXT</td><td>nullable</td><td class="col-notes">Snapshot of the question text at the time of answering</td></tr>
+          <tr><td class="col-name">answer_type</td><td class="col-type">VARCHAR(20)</td><td>nullable</td><td class="col-notes">Snapshot of the answer type at the time of answering</td></tr>
+          <tr><td class="col-name">answer_value</td><td class="col-type">JSONB</td><td>nullable</td><td class="col-notes">Answer payload as JSON: integer for Likert, string for single/short, array for multi, string for long (free text)</td></tr>
+          <tr><td class="col-name">created_at</td><td class="col-type">TIMESTAMPTZ</td><td>server default: now()</td><td class="col-notes">When this answer was recorded</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p style="margin-top:1rem;">Withdrawal is handled through an admin-only process or a participant-facing "Withdraw from evaluation" UI action in future iterations. The minimum documented workflow is: mark the session or survey response as withdrawn, export any approved aggregate data if required by supervision, delete or anonymise participant-linked rows, and record the action in the admin audit trail so the research dataset remains traceable.</p>
+
+  </section>
+
 </div>
 
-<footer>MemoLink Capstone Project &mdash; 2026</footer>
+<footer>MemoLink Capstone Project - 2026</footer>
 </body>
 </html>

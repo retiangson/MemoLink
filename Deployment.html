@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -69,7 +69,7 @@
 
     .divider { border: none; border-top: 1px solid var(--border); margin: 2.5rem 0; }
 
-    /* ── CODE BLOCKS ── */
+    /* CODE BLOCKS */
     pre {
       background: #0b0b10;
       border: 1px solid var(--border);
@@ -99,7 +99,7 @@
     .va  { color: #9cdcfe; }  /* variable */
     .nu  { color: #b5cea8; }  /* number */
 
-    /* ── CARDS ── */
+    /* CARDS */
     .card-grid { display: grid; gap: 1rem; margin-top: 1.4rem; }
     .card-grid-2 { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
     .card-grid-3 { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
@@ -112,7 +112,7 @@
     }
     .card h3 { font-size: .97rem; }
 
-    /* ── OPTION CARDS ── */
+    /* OPTION CARDS */
     .option-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; margin-top: 1.4rem; }
     .option-card {
       background: var(--card);
@@ -133,7 +133,7 @@
     .option-badge.free { background: rgba(34,197,94,.15); color: var(--green); }
     .option-badge.simple { background: rgba(34,211,238,.15); color: var(--cyan); }
 
-    /* ── STEPS ── */
+    /* STEPS */
     .steps { margin-top: 1.2rem; }
     .step {
       display: flex; gap: 1rem; align-items: flex-start;
@@ -156,7 +156,7 @@
     .step-body h4 { font-size: .93rem; font-weight: 600; color: var(--text); }
     .step-body p  { font-size: .88rem; margin-top: .25rem; }
 
-    /* ── ENV TABLE ── */
+    /* ENV TABLE */
     .env-table { width: 100%; border-collapse: collapse; margin-top: 1.2rem; font-size: .86rem; }
     .env-table th {
       text-align: left; font-size: .72rem; font-weight: 700;
@@ -175,7 +175,7 @@
     .tag-req  { background: rgba(248,113,113,.15); color: var(--red);   font-size: .7rem; font-weight: 700; padding: .1rem .45rem; border-radius: 999px; white-space: nowrap; }
     .tag-opt  { background: rgba(245,158,11,.12);  color: var(--amber); font-size: .7rem; font-weight: 700; padding: .1rem .45rem; border-radius: 999px; white-space: nowrap; }
 
-    /* ── CHECKLIST ── */
+    /* CHECKLIST */
     .checklist { list-style: none; margin-top: 1.2rem; }
     .checklist li {
       display: flex; gap: .75rem; align-items: flex-start;
@@ -184,9 +184,9 @@
       font-size: .9rem; color: var(--muted);
     }
     .checklist li:last-child { border-bottom: none; }
-    .checklist li::before { content: "☐"; color: var(--accent-lt); font-size: 1rem; flex-shrink: 0; margin-top: .05rem; }
+    .checklist li::before { content: "\\2610"; color: var(--accent-lt); font-size: 1rem; flex-shrink: 0; margin-top: .05rem; }
 
-    /* ── NOTICE ── */
+    /* NOTICE */
     .notice {
       background: rgba(99,102,241,.08);
       border: 1px solid rgba(99,102,241,.25);
@@ -225,7 +225,7 @@
 
 <div class="container">
 
-  <!-- ── OVERVIEW ── -->
+  <!-- OVERVIEW -->
   <section>
     <div class="section-label">Overview</div>
     <h2>Deployment Options at a Glance</h2>
@@ -252,7 +252,7 @@
 
   <hr class="divider" />
 
-  <!-- ── OPTION 1: DOCKER COMPOSE ── -->
+  <!-- OPTION 1: DOCKER COMPOSE -->
   <section>
     <div class="section-label">Option 1 - Local / Self-Hosted</div>
     <h2>Docker Compose (Single Machine)</h2>
@@ -313,7 +313,7 @@ docker compose down            <span class="cm"># stop</span></pre>
 
   <hr class="divider" />
 
-  <!-- ── OPTION 2: CLOUD ── -->
+  <!-- OPTION 2: CLOUD -->
   <section>
     <div class="section-label">Option 2 - Cloud (Recommended)</div>
     <h2>Cloud Deployment</h2>
@@ -334,7 +334,7 @@ docker compose down            <span class="cm"># stop</span></pre>
       <div class="option-card recommended">
         <span class="option-badge">Recommended</span>
         <h3>Backend &rarr; Railway</h3>
-        <p>Zero-config container deployments. Push to GitHub → Railway builds from the root
+        <p>Zero-config container deployments. Push to GitHub &rarr; Railway builds from the root
         <code>Dockerfile</code> automatically. Free trial included; production plans are
         usage-based (scales to zero when idle).</p>
       </div>
@@ -350,7 +350,7 @@ docker compose down            <span class="cm"># stop</span></pre>
 
   <hr class="divider" />
 
-  <!-- ── FRONTEND DEPLOY ── -->
+  <!-- FRONTEND DEPLOY -->
   <section>
     <div class="section-label">Frontend Deployment</div>
     <h2>Azure Static Web Apps</h2>
@@ -366,7 +366,7 @@ docker compose down            <span class="cm"># stop</span></pre>
         <div class="step-body">
           <h4>Create the Static Web App resource</h4>
           <p>
-            In the <strong>Azure Portal</strong>, search for <em>Static Web Apps</em> → <em>Create</em>.
+            In the <strong>Azure Portal</strong>, search for <em>Static Web Apps</em> &rarr; <em>Create</em>.
             Select your GitHub repo and set the build configuration:
           </p>
           <pre>App location:    /memolink_web
@@ -379,7 +379,7 @@ Build command:   npm run build</pre>
         <div class="step-body">
           <h4>Set the <code>VITE_API_BASE_URL</code> environment variable</h4>
           <p>
-            In the Static Web App resource → <em>Configuration</em> → <em>Application settings</em>,
+            In the Static Web App resource &rarr; <em>Configuration</em> &rarr; <em>Application settings</em>,
             add one entry:
           </p>
           <pre>VITE_API_BASE_URL = https://&lt;your-backend-url&gt;/api</pre>
@@ -423,7 +423,7 @@ Build command:   npm run build</pre>
           <span class="kw">VITE_API_BASE_URL:</span> <span class="st">${{ secrets.VITE_API_BASE_URL }}</span></pre>
           <p>
             Add <code>AZURE_STATIC_WEB_APPS_API_TOKEN</code> and <code>VITE_API_BASE_URL</code>
-            as GitHub repository secrets (Settings → Secrets and variables → Actions).
+            as GitHub repository secrets (Settings &rarr; Secrets and variables &rarr; Actions).
           </p>
         </div>
       </div>
@@ -444,7 +444,7 @@ Build command:   npm run build</pre>
 
   <hr class="divider" />
 
-  <!-- ── BACKEND: RAILWAY ── -->
+  <!-- BACKEND: RAILWAY -->
   <section>
     <div class="section-label">Backend Deployment - Recommended</div>
     <h2>Railway</h2>
@@ -458,7 +458,7 @@ Build command:   npm run build</pre>
         <div class="step-num">1</div>
         <div class="step-body">
           <h4>Create a new project</h4>
-          <p>Go to <strong>railway.app</strong> → <em>New Project</em> → <em>Deploy from GitHub repo</em>.
+          <p>Go to <strong>railway.app</strong> &rarr; <em>New Project</em> &rarr; <em>Deploy from GitHub repo</em>.
           Select your MemoLink repository.</p>
         </div>
       </div>
@@ -466,7 +466,7 @@ Build command:   npm run build</pre>
         <div class="step-num">2</div>
         <div class="step-body">
           <h4>Set environment variables</h4>
-          <p>In the service settings → <em>Variables</em>, add all keys from <code>.env.example</code>.
+          <p>In the service settings &rarr; <em>Variables</em>, add all keys from <code>.env.example</code>.
           At minimum:</p>
           <pre>DATABASE_URL       = postgresql+psycopg2://...
 OPENAI_API_KEY     = sk-...
@@ -487,7 +487,7 @@ FRONTEND_ORIGINS   = https://&lt;your-azure-static-url&gt;</pre>
         <div class="step-num">4</div>
         <div class="step-body">
           <h4>Generate a public domain</h4>
-          <p>In the service → <em>Settings</em> → <em>Networking</em> → <em>Generate Domain</em>.
+          <p>In the service &rarr; <em>Settings</em> &rarr; <em>Networking</em> &rarr; <em>Generate Domain</em>.
           Copy the URL (e.g. <code>https://memolink-production.up.railway.app</code>) and use it
           as the <code>VITE_API_BASE_URL</code> in the frontend (append <code>/api</code>).</p>
         </div>
@@ -502,7 +502,7 @@ FRONTEND_ORIGINS   = https://&lt;your-azure-static-url&gt;</pre>
 
   <hr class="divider" />
 
-  <!-- ── BACKEND: AZURE CONTAINER APPS ── -->
+  <!-- BACKEND: AZURE CONTAINER APPS -->
   <section>
     <div class="section-label">Backend Deployment - Azure-Native</div>
     <h2>Azure Container Apps</h2>
@@ -611,7 +611,7 @@ az acr build --registry memlinkacr \
 
   <hr class="divider" />
 
-  <!-- ── BACKEND DOCKERFILE ── -->
+  <!-- BACKEND DOCKERFILE -->
   <section>
     <div class="section-label">Reference</div>
     <h2>Dockerfiles</h2>
@@ -675,7 +675,7 @@ az acr build --registry memlinkacr \
 
   <hr class="divider" />
 
-  <!-- ── ENV VARS ── -->
+  <!-- ENV VARS -->
   <section>
     <div class="section-label">Configuration</div>
     <h2>Environment Variables Reference</h2>
@@ -760,7 +760,7 @@ az acr build --registry memlinkacr \
 
   <hr class="divider" />
 
-  <!-- ── CORS NOTE ── -->
+  <!-- CORS NOTE -->
   <section>
     <div class="section-label">Cross-Origin</div>
     <h2>CORS Configuration</h2>
@@ -784,14 +784,14 @@ FRONTEND_ORIGINS=https://&lt;random&gt;.azurestaticapps.net,https://memolink.you
 
   <hr class="divider" />
 
-  <!-- ── DATABASE ── -->
+  <!-- DATABASE -->
   <section>
     <div class="section-label">Database</div>
     <h2>Supabase (No Additional Setup Required)</h2>
     <p>
       MemoLink's database is already hosted on Supabase with the <code>pgvector</code> extension
       enabled. The backend runs schema migrations automatically at startup using
-      <code>ALTER TABLE … IF NOT EXISTS</code> and <code>CREATE TABLE … IF NOT EXISTS</code>
+      <code>ALTER TABLE ... IF NOT EXISTS</code> and <code>CREATE TABLE ... IF NOT EXISTS</code>
       statements - no manual migration tool is needed.
     </p>
 
@@ -828,7 +828,70 @@ FRONTEND_ORIGINS=https://&lt;random&gt;.azurestaticapps.net,https://memolink.you
 
   <hr class="divider" />
 
-  <!-- ── POST-DEPLOY CHECKLIST ── -->
+  <!-- EVALUATION DEPLOYMENT NOTE -->
+  <section>
+    <div class="section-label">Evaluation &amp; Survey</div>
+    <h2>Evaluation &amp; Survey Deployment Notes</h2>
+    <p>
+      The in-app evaluation and survey framework requires no additional services, infrastructure,
+      or environment variables beyond what MemoLink already uses.
+    </p>
+    <div class="card-grid card-grid-2" style="margin-top:1.4rem;">
+      <div class="card">
+        <h3>Database - No Extra Setup</h3>
+        <p>
+          All evaluation and survey tables (<code>evaluation_sessions</code>,
+          <code>evaluation_tasks</code>, <code>evaluation_events</code>,
+          <code>evaluation_ai_metrics</code>, <code>evaluation_user_ratings</code>,
+          <code>evaluation_feature_usage</code>, <code>survey_questions</code>,
+          <code>survey_responses</code>, <code>survey_answers</code>) are created
+          automatically at startup via SQLAlchemy <code>create_all</code> using
+          <code>CREATE TABLE IF NOT EXISTS</code> semantics. No manual migrations or
+          additional Supabase configuration are required.
+        </p>
+      </div>
+      <div class="card">
+        <h3>Feature Flags - Defaults to Enabled</h3>
+        <p>
+          Three feature flags control evaluation data collection - all default to
+          <code>true</code> on first startup:
+        </p>
+        <ul style="margin-top:.6rem;font-size:.88rem;color:var(--muted);list-style:disc;padding-left:1.2rem;line-height:1.9;">
+          <li><code>evaluation_analytics_enabled</code> - gates all telemetry recording</li>
+          <li><code>evaluation_survey_enabled</code> - shows/hides the survey to participants</li>
+          <li><code>evaluation_admin_export_enabled</code> - gates CSV/JSON export endpoints</li>
+        </ul>
+        <p style="margin-top:.7rem;font-size:.88rem;">Admins can disable any flag from the Admin Panel Feature Flags tab without redeployment.</p>
+      </div>
+      <div class="card">
+        <h3>Environment Variables - None Required</h3>
+        <p>
+          Evaluation uses only the existing <code>DATABASE_URL</code>, <code>OPENAI_API_KEY</code>,
+          and <code>SECRET_KEY</code> already required by the application. No new environment
+          variables are needed for evaluation or survey functionality.
+        </p>
+      </div>
+      <div class="card">
+        <h3>SMTP - Not Used by Evaluation</h3>
+        <p>
+          SMTP is optional and already configured for password reset and bug report notifications.
+          The evaluation and survey features do not send any emails - no SMTP configuration is
+          needed for evaluation to function.
+        </p>
+      </div>
+    </div>
+    <div class="notice" style="margin-top:1.2rem;">
+      <strong>Privacy reminder:</strong> Evaluation tables store no raw prompts, AI answers,
+      note content, uploaded files, API keys, or other private content. Only metadata, IDs,
+      counts, timings, ratings, and anonymised participant codes are persisted. The 30-minute
+      default budget per participant limits exposure. Admins can adjust budgets or disable
+      all collection via feature flags at any time.
+    </div>
+  </section>
+
+  <hr class="divider" />
+
+  <!-- POST-DEPLOY CHECKLIST -->
   <section>
     <div class="section-label">Go-Live</div>
     <h2>Post-Deployment Checklist</h2>
@@ -844,12 +907,35 @@ FRONTEND_ORIGINS=https://&lt;random&gt;.azurestaticapps.net,https://memolink.you
       <li>If SMTP is configured: trigger a password reset and confirm the email arrives</li>
       <li>Verify Web Search toggle works (requires <code>BRAVE_SEARCH_API_KEY</code>)</li>
       <li>Verify Gemini models are selectable (requires <code>GOOGLE_API_KEY</code>)</li>
+      <li>Start an evaluation session and confirm the guided task checklist appears</li>
+      <li>Complete at least one guided evaluation task and confirm task timing is recorded</li>
+      <li>Submit a per-response AI rating and verify it appears in the participant's rating history</li>
+      <li>Submit the survey and confirm required core questions and optional feature-specific sections behave correctly</li>
+      <li>Check the admin evaluation summary and confirm response-time, rating, and task metrics are populated</li>
+      <li>Export evaluation CSV and JSON outputs and confirm raw prompts, answers, and note content are excluded</li>
       <li>Confirm no <code>.env</code> file or secrets appear in the GitHub repository</li>
+    </ul>
+  </section>
+
+  <section style="margin-top:2rem;">
+    <div class="section-label">Assessment Evidence</div>
+    <h2>Recommended Screenshot Set</h2>
+    <ul class="checklist">
+      <li>Login or dashboard landing page</li>
+      <li>Workspace and note editor view</li>
+      <li>RAG answer with citations visible</li>
+      <li>Per-response rating bar after an AI answer</li>
+      <li>Evaluation panel with guided task checklist</li>
+      <li>Survey modal or survey page</li>
+      <li>Admin evaluation dashboard summary</li>
+      <li>CSV or JSON export confirmation view</li>
+      <li>Database table or endpoint documentation relevant to evaluation</li>
+      <li>Deployment or feature-flag configuration page</li>
     </ul>
   </section>
 
 </div>
 
-<footer>MemoLink Capstone Project &mdash; 2026</footer>
+<footer>MemoLink Capstone Project - 2026</footer>
 </body>
 </html>

@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -297,7 +297,7 @@
         </tr>
         <tr>
           <td class="req-id">FR-24</td>
-          <td class="req-text">The note editor must support uploading audio/video files (MP4, M4A, WebM, MP3, WAV, MOV up to 200 MB) and transcribing them - files &lt;5 MB via OpenAI Whisper, files ≥5 MB via Deepgram Nova-2 (Whisper fallback up to 25 MB) - for use as note content.</td>
+          <td class="req-text">The note editor must support uploading audio/video files (MP4, M4A, WebM, MP3, WAV, MOV up to 200 MB) and transcribing them - files &lt;5 MB via OpenAI Whisper, files &ge;5 MB via Deepgram Nova-2 (Whisper fallback up to 25 MB) - for use as note content.</td>
           <td><span class="req-priority p-high">High</span></td>
           <td><span class="req-cat c-func">Video</span></td>
         </tr>
@@ -405,19 +405,19 @@
         </tr>
         <tr>
           <td class="req-id">FR-42</td>
-          <td class="req-text">The translation endpoint must use a quality-improvement loop: (1) Gemini 2.0 Flash Lite performs the initial translation; (2) the result is back-translated to the source language; (3) GPT scores semantic similarity on a 0–100 scale; (4) if the score is below 85, the feedback is returned to Gemini for a refined translation. This loop repeats for up to 3 rounds. A 1.2-second sleep between API calls must be applied to avoid burst-rate detection. If Gemini is unavailable due to rate limits, the system must fall back to GPT-4o-mini for the full translation. Māori translation must inject a hint for macron usage (ā ē ī ō ū) and natural fluency.</td>
+          <td class="req-text">The translation endpoint must use a quality-improvement loop: (1) Gemini 2.0 Flash Lite performs the initial translation; (2) the result is back-translated to the source language; (3) GPT scores semantic similarity on a 0-100 scale; (4) if the score is below 85, the feedback is returned to Gemini for a refined translation. This loop repeats for up to 3 rounds. A 1.2-second sleep between API calls must be applied to avoid burst-rate detection. If Gemini is unavailable due to rate limits, the system must fall back to GPT-4o-mini for the full translation. M&#257;ori translation must inject a hint for macron usage (<code>&#257; &#275; &#299; &#333; &#363;</code>) and natural fluency.</td>
           <td><span class="req-priority p-high">High</span></td>
           <td><span class="req-cat c-func">Translation</span></td>
         </tr>
         <tr>
           <td class="req-id">FR-43</td>
-          <td class="req-text">The translation bubble in the UI must display the model used and the final accuracy score (e.g. "by Gemini 2.0 Flash Lite · 87% accuracy"). The accuracy score must be colour-coded: green for ≥ 85, amber for ≥ 70, red for &lt; 70. The translation response must include <code>translation</code>, <code>accuracy</code> (integer or null), and <code>model</code> fields.</td>
+          <td class="req-text">The translation bubble in the UI must display the model used and the final accuracy score (e.g. "by Gemini 2.0 Flash Lite &middot; 87% accuracy"). The accuracy score must be colour-coded: green for &ge; 85, amber for &ge; 70, red for &lt; 70. The translation response must include <code>translation</code>, <code>accuracy</code> (integer or null), and <code>model</code> fields.</td>
           <td><span class="req-priority p-med">Medium</span></td>
           <td><span class="req-cat c-func">Translation</span></td>
         </tr>
         <tr>
           <td class="req-id">FR-44</td>
-          <td class="req-text">The bulk note upload endpoint (<code>POST /api/notes/bulk</code>) must preserve rich formatting from uploaded files. DOCX files must preserve headings (H1–H4 from paragraph style names), bold, italic, and underline inline runs, bullet and numbered lists, and tables (with <code>&lt;th&gt;</code> header rows), interleaved in document order. PDF files must infer headings by font-size ratio (≥ 1.5× body → H1; ≥ 1.3× → H2; ≥ 1.15× or bold+short → H3). PPTX files must map slide titles to <code>&lt;h2&gt;</code>, content items to <code>&lt;ul&gt;</code> with indent levels, and separate slides with <code>&lt;hr&gt;</code>.</td>
+          <td class="req-text">The bulk note upload endpoint (<code>POST /api/notes/bulk</code>) must preserve rich formatting from uploaded files. DOCX files must preserve headings (H1-H4 from paragraph style names), bold, italic, and underline inline runs, bullet and numbered lists, and tables (with <code>&lt;th&gt;</code> header rows), interleaved in document order. PDF files must infer headings by font-size ratio (&ge; 1.5x body &rarr; H1; &ge; 1.3x &rarr; H2; &ge; 1.15x or bold+short &rarr; H3). PPTX files must map slide titles to <code>&lt;h2&gt;</code>, content items to <code>&lt;ul&gt;</code> with indent levels, and separate slides with <code>&lt;hr&gt;</code>.</td>
           <td><span class="req-priority p-high">High</span></td>
           <td><span class="req-cat c-func">Files</span></td>
         </tr>
@@ -489,7 +489,7 @@
         </tr>
         <tr>
           <td class="req-id">FR-56</td>
-          <td class="req-text">The image generation pipeline must attempt models in the following fallback order: <strong>gpt-image-2</strong> → <strong>gpt-image-1</strong> → <strong>DALL-E 3</strong> → <strong>DALL-E 2</strong> → <strong>Pollinations.ai</strong> (free HTTP API, no API key). If all paid models fail, the Pollinations.ai URL-based endpoint must be called as a final fallback. Images must always be stored as base64 data URLs in <code>messages.content</code> - no file storage. Base64 image content must be stripped from the conversation history and RAG context before sending to OpenAI to prevent token overflow. An animated spinner must be shown in the UI while the image is generating.</td>
+          <td class="req-text">The image generation pipeline must attempt models in the following fallback order: <strong>gpt-image-2</strong> &rarr; <strong>gpt-image-1</strong> &rarr; <strong>DALL-E 3</strong> &rarr; <strong>DALL-E 2</strong> &rarr; <strong>Pollinations.ai</strong> (free HTTP API, no API key). If all paid models fail, the Pollinations.ai URL-based endpoint must be called as a final fallback. Images must always be stored as base64 data URLs in <code>messages.content</code> - no file storage. Base64 image content must be stripped from the conversation history and RAG context before sending to OpenAI to prevent token overflow. An animated spinner must be shown in the UI while the image is generating.</td>
           <td><span class="req-priority p-high">High</span></td>
           <td><span class="req-cat c-func">AI/Chat</span></td>
         </tr>
@@ -501,7 +501,7 @@
         </tr>
         <tr>
           <td class="req-id">FR-58</td>
-          <td class="req-text">The academic paper search component of Research Mode must use <strong>OpenAlex</strong> as the primary source (free, no API key, no rate limit). If a <code>SEMANTIC_SCHOLAR_API_KEY</code> is configured, Semantic Scholar must be used instead, with OpenAlex as a transparent fallback on failure. The Semantic Scholar integration must implement exponential backoff on HTTP 429 responses (1 s → 2 s → 4 s). When the user's prompt is a meta-question about their notes (containing words such as "gap", "notes", "review", "summarize"), the system must derive a search query from the first retrieved note title rather than sending the raw conversational prompt to the academic API.</td>
+          <td class="req-text">The academic paper search component of Research Mode must use <strong>OpenAlex</strong> as the primary source (free, no API key, no rate limit). If a <code>SEMANTIC_SCHOLAR_API_KEY</code> is configured, Semantic Scholar must be used instead, with OpenAlex as a transparent fallback on failure. The Semantic Scholar integration must implement exponential backoff on HTTP 429 responses (1 s &rarr; 2 s &rarr; 4 s). When the user's prompt is a meta-question about their notes (containing words such as "gap", "notes", "review", "summarize"), the system must derive a search query from the first retrieved note title rather than sending the raw conversational prompt to the academic API.</td>
           <td><span class="req-priority p-med">Medium</span></td>
           <td><span class="req-cat c-func">AI/Research</span></td>
         </tr>
@@ -549,7 +549,7 @@
         </tr>
         <tr>
           <td class="req-id">FR-66</td>
-          <td class="req-text">The audio/video transcription upload limit must be <strong>200 MB</strong>. Files &lt;5 MB must be transcribed via <strong>OpenAI Whisper</strong>. Files ≥5 MB must be routed to <strong>Deepgram Nova-2</strong>, configured via the <code>DEEPGRAM_API_KEY</code> environment variable (free $200 credit at deepgram.com, no credit card required); if Deepgram fails, Whisper must be used as a fallback for files up to 25 MB. The transcription routing must be implemented in <code>file_extractor.py</code> <code>transcribe_audio()</code> and must be transparent to controllers - they receive the transcript regardless of which service was used. Each transcription event (service used, file size, success/failure) must be written to <code>system_logs</code>.</td>
+          <td class="req-text">The audio/video transcription upload limit must be <strong>200 MB</strong>. Files &lt;5 MB must be transcribed via <strong>OpenAI Whisper</strong>. Files &ge;5 MB must be routed to <strong>Deepgram Nova-2</strong>, configured via the <code>DEEPGRAM_API_KEY</code> environment variable (free $200 credit at deepgram.com, no credit card required); if Deepgram fails, Whisper must be used as a fallback for files up to 25 MB. The transcription routing must be implemented in <code>file_extractor.py</code> <code>transcribe_audio()</code> and must be transparent to controllers - they receive the transcript regardless of which service was used. Each transcription event (service used, file size, success/failure) must be written to <code>system_logs</code>.</td>
           <td><span class="req-priority p-high">High</span></td>
           <td><span class="req-cat c-func">Video</span></td>
         </tr>
@@ -561,19 +561,19 @@
         </tr>
         <tr>
           <td class="req-id">FR-68</td>
-          <td class="req-text">The translation UI must display a green "Cached" badge when the result is served from cache. A "Re-translate" button (indigo pill with refresh icon) must be shown to allow the user to force a fresh LLM translation. A spinning loading indicator must appear while translation is in progress (both initial request and forced re-translate). The "Re-translate" button must be hidden and replaced by a spinner during active translation. The loading state must also display contextual text such as "Translating to [Language]…".</td>
+          <td class="req-text">The translation UI must display a green "Cached" badge when the result is served from cache. A "Re-translate" button (indigo pill with refresh icon) must be shown to allow the user to force a fresh LLM translation. A spinning loading indicator must appear while translation is in progress (both initial request and forced re-translate). The "Re-translate" button must be hidden and replaced by a spinner during active translation. The loading state must also display contextual text such as "Translating to [Language]...".</td>
           <td><span class="req-priority p-high">High</span></td>
           <td><span class="req-cat c-func">Translation</span></td>
         </tr>
         <tr>
           <td class="req-id">FR-69</td>
-          <td class="req-text">When the selected chat model fails for any reason (rate limit, API error, network error, invalid key), the system must automatically try the next available model in the fallback chain: primary model → GPT-4o-mini (always available) → Gemini 2.0 Flash (if <code>GEMINI_API_KEY</code> is set) → DeepSeek Chat (if <code>DEEPSEEK_API_KEY</code> is set). The fallback chain must be built by <code>_build_fallback_chain(primary)</code> and applied to both <code>ask()</code> and <code>ask_stream()</code> methods in ChatService. Each failed attempt must be logged to <code>system_logs</code> as WARNING. Only after all configured models are exhausted must an error message be shown to the user: "⚠ All available AI models are currently unavailable. Please try again later." The same fallback chain must apply to note improvement AI calls.</td>
+          <td class="req-text">When the selected chat model fails for any reason (rate limit, API error, network error, invalid key), the system must automatically try the next available model in the fallback chain: primary model &rarr; GPT-4o-mini (always available) &rarr; Gemini 2.0 Flash (if <code>GEMINI_API_KEY</code> is set) &rarr; DeepSeek Chat (if <code>DEEPSEEK_API_KEY</code> is set). The fallback chain must be built by <code>_build_fallback_chain(primary)</code> and applied to both <code>ask()</code> and <code>ask_stream()</code> methods in ChatService. Each failed attempt must be logged to <code>system_logs</code> as WARNING. Only after all configured models are exhausted must an error message be shown to the user: "Warning: All available AI models are currently unavailable. Please try again later." The same fallback chain must apply to note improvement AI calls.</td>
           <td><span class="req-priority p-high">High</span></td>
           <td><span class="req-cat c-func">AI/Chat</span></td>
         </tr>
         <tr>
           <td class="req-id">FR-70</td>
-          <td class="req-text">The chat interface must detect note improvement intent from natural language prompts matching patterns such as "improve my note X", "reformat note X", "clean up my note X", "polish note X", "rewrite note X" - detected via the <code>_IMPROVE_NOTE_RE</code> regex in ChatService. On detection, the system must: (1) close the note's editor tab if currently open via a <code>close_note</code> SSE event; (2) show an animated dual-ring spinner in the chat with "Improving [title]…" via an <code>improving_note</code> SSE event; (3) find the note by fuzzy title match (exact → starts-with → contains → name-in-title); (4) call the AI to improve the HTML content using the fallback chain; (5) auto-save the improved content to the database; (6) stream a success response via a <code>replace</code> SSE event containing a clickable "Open Note: X →" button rendered from the <code>[[NOTE_LINK:id:title]]</code> marker. No user confirmation is required before saving. The <code>onCloseNote</code> and <code>onOpenNote</code> callbacks must be wired from the chat hook through to the message renderer.</td>
+          <td class="req-text">The chat interface must detect note improvement intent from natural language prompts matching patterns such as "improve my note X", "reformat note X", "clean up my note X", "polish note X", "rewrite note X" - detected via the <code>_IMPROVE_NOTE_RE</code> regex in ChatService. On detection, the system must: (1) close the note's editor tab if currently open via a <code>close_note</code> SSE event; (2) show an animated dual-ring spinner in the chat with "Improving [title]..." via an <code>improving_note</code> SSE event; (3) find the note by fuzzy title match (exact &rarr; starts-with &rarr; contains &rarr; name-in-title); (4) call the AI to improve the HTML content using the fallback chain; (5) auto-save the improved content to the database; (6) stream a success response via a <code>replace</code> SSE event containing a clickable "Open Note: X &rarr;" button rendered from the <code>[[NOTE_LINK:id:title]]</code> marker. No user confirmation is required before saving. The <code>onCloseNote</code> and <code>onOpenNote</code> callbacks must be wired from the chat hook through to the message renderer.</td>
           <td><span class="req-priority p-med">Medium</span></td>
           <td><span class="req-cat c-func">AI/Chat</span></td>
         </tr>
@@ -583,6 +583,130 @@
           <td><span class="req-priority p-high">High</span></td>
           <td><span class="req-cat c-func">Files</span></td>
         </tr>
+        <tr>
+          <td class="req-id">FR-72</td>
+          <td class="req-text">The chat interface must support composing and sending a new email to any recipient directly from natural language. When the user says "send [recipient] the [note name]" (optionally with a style instruction such as "make it nice" or "summarize it"), the system must: (1) use AI intent extraction to identify the recipient address/name, the matching note title, and any style instruction; (2) locate the note by fuzzy title match; (3) build the draft body from the note content - applying an AI rewrite only when a style instruction is explicitly given; (4) base64-encode the body and emit an <code>&lt;email_draft&gt;</code> SSE tag containing to, subject, and body_b64 fields; (5) render a <strong>Draft Email</strong> card in chat with formatted body preview, full TipTap edit mode, and a Send button; (6) on confirmation call <code>POST /api/email/send-draft</code> which sends a <code>multipart/alternative</code> MIME message (HTML + plain-text fallback) via Gmail. Sent state must be tracked in localStorage keyed by messageId/threadId to prevent double-sending after page reload.</td>
+          <td><span class="req-priority p-high">High</span></td>
+          <td><span class="req-cat c-func">Email</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">FR-73</td>
+          <td class="req-text">Every user chat message must display a <strong>Resend</strong> button (circular-arrow icon) that resubmits the same prompt to the AI without the user retyping. Every assistant message must display a <strong>Retry</strong> button that re-runs the preceding user prompt and streams a fresh response, replacing the assistant message in the conversation. Both operations must use the current model selection and workspace context. The Retry response must be persisted to the conversation history, replacing the old assistant message.</td>
+          <td><span class="req-priority p-med">Medium</span></td>
+          <td><span class="req-cat c-func">Chat</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">FR-74</td>
+          <td class="req-text">Users can start an in-app evaluation session that activates a guided task checklist (EvaluationPanel) with 10 tasks covering the core MemoLink feature set.</td>
+          <td><span class="req-priority p-high">High</span></td>
+          <td><span class="req-cat c-func">Evaluation</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">FR-75</td>
+          <td class="req-text">After each AI response, users can rate retrieved context relevance (1-5), answer usefulness (1-5), answer faithfulness or supported-by-notes status (yes / partially / no / not sure), citation usefulness (1-5), and answer trust (1-5), with an optional comment. This separates source-note relevance from answer quality.</td>
+          <td><span class="req-priority p-high">High</span></td>
+          <td><span class="req-cat c-func">Evaluation</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">FR-76</td>
+          <td class="req-text">Every LLM call automatically records telemetry to evaluation_ai_metrics: model used, provider, token counts, estimated cost, first-token latency, total response time, retrieved note count, min/max/avg retrieval similarity score, citation count, confidence level, and fallback details. No raw prompts, answers, or note content are stored.</td>
+          <td><span class="req-priority p-high">High</span></td>
+          <td><span class="req-cat c-func">Evaluation</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">FR-77</td>
+          <td class="req-text">A 37-question in-app post-session survey (SurveyModal) collects qualitative feedback across seven sections using Likert scales, single/multi-choice, and free-text formats. The core usability and SUS items remain required, optional sections can be shown only when a participant used the related feature, the target completion time is 5-8 minutes, and one response per account is editable before final submission.</td>
+          <td><span class="req-priority p-high">High</span></td>
+          <td><span class="req-cat c-func">Survey</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">FR-78</td>
+          <td class="req-text">Participant active time is tracked via a heartbeat mechanism. A default 30-minute budget per participant limits data collection exposure; admins can adjust budgets per user. Analytics recording stops automatically when the budget is exhausted.</td>
+          <td><span class="req-priority p-high">High</span></td>
+          <td><span class="req-cat c-func">Evaluation</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">FR-79</td>
+          <td class="req-text">The Admin Panel includes an Evaluation tab (AdminEvaluationPanel) showing aggregate metrics: average ratings by type, response time by feature, fallback rate, confidence alignment, and feature usage. Admins can export a CSV ZIP (six tables) or JSON report.</td>
+          <td><span class="req-priority p-high">High</span></td>
+          <td><span class="req-cat c-func">Admin</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">FR-80</td>
+          <td class="req-text">The Admin Panel includes a Survey tab (AdminSurveyPanel) showing per-question response distributions and averages. Admins can add, edit, or reset survey questions. A wide-format CSV export is available.</td>
+          <td><span class="req-priority p-high">High</span></td>
+          <td><span class="req-cat c-func">Admin</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">FR-81</td>
+          <td class="req-text">Three feature flags control evaluation data collection: evaluation_analytics_enabled (gates all telemetry recording), evaluation_survey_enabled (shows/hides the survey), and evaluation_admin_export_enabled (gates CSV/JSON export endpoints).</td>
+          <td><span class="req-priority p-med">Medium</span></td>
+          <td><span class="req-cat c-func">Evaluation</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">FR-82</td>
+          <td class="req-text">The evaluation design must include at least one baseline comparison task where a participant completes the same retrieval or follow-up workflow manually and then with MemoLink so task completion time, success rate, and perceived effort can be compared.</td>
+          <td><span class="req-priority p-high">High</span></td>
+          <td><span class="req-cat c-func">Evaluation</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">FR-83</td>
+          <td class="req-text">Action-item extraction must be evaluated against a small gold-standard set of expected action items prepared from 3-5 sample notes or transcripts. Precision, recall, and F1-score must be reported using the documented formulas.</td>
+          <td><span class="req-priority p-high">High</span></td>
+          <td><span class="req-cat c-func">Evaluation</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section style="margin-top:2rem;">
+    <div class="section-label">Evaluation Mapping</div>
+    <h2>Assessment Metric Mapping</h2>
+    <p>The evaluation metrics are mapped directly to app data sources so the assessment criteria can be supported by reproducible evidence rather than narrative claims alone.</p>
+    <table class="req-table" style="margin-top:1rem;">
+      <thead>
+        <tr>
+          <th>Metric</th>
+          <th>App Data Source</th>
+          <th>Table</th>
+          <th>Analysis Method</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>Retrieval relevance</td><td>User ratings plus similarity telemetry</td><td><code>evaluation_user_ratings</code> + <code>evaluation_ai_metrics</code></td><td>Mean rating, relevance distribution, similarity-score summary</td></tr>
+        <tr><td>Answer faithfulness</td><td>Supported-by-notes ratings and comments</td><td><code>evaluation_user_ratings</code></td><td>Percentage fully or partially supported, thematic review of comments</td></tr>
+        <tr><td>Task completion time</td><td>Guided task start and completion timestamps</td><td><code>evaluation_tasks</code></td><td>Mean and median completion time; baseline comparison</td></tr>
+        <tr><td>Usability</td><td>SUS and post-session survey responses</td><td><code>survey_answers</code></td><td>Mean SUS score and section-level summaries</td></tr>
+        <tr><td>Multilingual usefulness</td><td>Survey items and optional response comments</td><td><code>survey_answers</code></td><td>Mean Likert rating plus qualitative comment review</td></tr>
+        <tr><td>Response time</td><td>Telemetry from LLM requests</td><td><code>evaluation_ai_metrics</code></td><td>Mean, median, and max response-time summary</td></tr>
+      </tbody>
+    </table>
+
+    <p style="margin-top:1rem;"><strong>Action-item extraction formulas</strong></p>
+    <p><code>Precision = TP / (TP + FP)</code><br/><code>Recall = TP / (TP + FN)</code><br/><code>F1 = 2 x precision x recall / (precision + recall)</code></p>
+  </section>
+
+  <section style="margin-top:2rem;">
+    <div class="section-label">Feasibility</div>
+    <h2>Implementation Feasibility Summary</h2>
+    <table class="req-table" style="margin-top:1rem;">
+      <thead>
+        <tr>
+          <th>Feature</th>
+          <th>Priority</th>
+          <th>Tool / Technology</th>
+          <th>Risk</th>
+          <th>Fallback</th>
+          <th>Expected Evidence</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>Knowledge capture</td><td>Core</td><td>Workspace notes, uploads, transcription pipeline</td><td>Large-file and transcript variability</td><td>Use controlled sample notes and smaller uploads</td><td>Imported notes, captured sessions, screenshots</td></tr>
+        <tr><td>Contextual retrieval</td><td>Core</td><td>pgvector, embeddings, workspace-scoped search</td><td>Low-quality retrieval on sparse notes</td><td>Use curated note sets and metadata filters</td><td>Similarity scores, retrieval ratings, cited-note evidence</td></tr>
+        <tr><td>Task support</td><td>Core</td><td>Reminder extraction and action-item prompts</td><td>Ambiguous or missing action items</td><td>Evaluate against gold-standard transcripts</td><td>Precision, recall, F1, reminder screenshots</td></tr>
+        <tr><td>Multilingual usefulness</td><td>Core</td><td>Translation pipeline and multilingual prompts</td><td>Cross-lingual drift or hallucination</td><td>Limit to selected prompts and human-reviewed outputs</td><td>Usefulness ratings, grounded examples, reviewer notes</td></tr>
+        <tr><td>Evaluation analytics</td><td>Core</td><td>Evaluation session, task, rating, survey tables</td><td>Telemetry noise or incomplete sessions</td><td>Guide users through required core tasks</td><td>Exportable CSV/JSON, admin dashboard, summary metrics</td></tr>
+        <tr><td>Gmail, graph memory, proactive insights, smart actions, TTS, custom API keys</td><td>Optional</td><td>Existing extension services</td><td>Scope growth beyond capstone needs</td><td>Document as supporting features, exclude from core evaluation</td><td>Optional screenshots only</td></tr>
       </tbody>
     </table>
   </section>
@@ -646,6 +770,30 @@
           <td><span class="req-cat c-non">Usability</span></td>
         </tr>
         <tr>
+          <td class="req-id">NFR-E1</td>
+          <td class="req-text">Evaluation data collection must not store raw user prompts, AI answers, note content, uploaded files, API keys, or other private content. Only metadata, IDs, counts, timings, ratings, and anonymised references are persisted.</td>
+          <td><span class="req-priority p-high">High</span></td>
+          <td><span class="req-cat c-non">Privacy</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">NFR-E2</td>
+          <td class="req-text">Participants must be pseudonymised using generated participant codes (P### format). No PII beyond user_id (a database integer) is written to evaluation or survey tables.</td>
+          <td><span class="req-priority p-high">High</span></td>
+          <td><span class="req-cat c-non">Privacy</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">NFR-E3</td>
+          <td class="req-text">The evaluation system must be non-intrusive: all telemetry recording must be wrapped in try/except blocks so that any analytics failure does not affect the user-facing chat, notes, or reminders features.</td>
+          <td><span class="req-priority p-high">High</span></td>
+          <td><span class="req-cat c-non">Reliability</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">NFR-E4</td>
+          <td class="req-text">Survey and evaluation export endpoints must be restricted to admin-authenticated users only. Unauthenticated and regular-user requests must receive a 403 response.</td>
+          <td><span class="req-priority p-high">High</span></td>
+          <td><span class="req-cat c-non">Security</span></td>
+        </tr>
+        <tr>
           <td class="req-id">NFR-08</td>
           <td class="req-text">The frontend must be accessible on desktop and mobile viewports without horizontal scroll.</td>
           <td><span class="req-priority p-med">Medium</span></td>
@@ -671,7 +819,7 @@
         </tr>
         <tr>
           <td class="req-id">NFR-12</td>
-          <td class="req-text">AI image generation via DALL-E 3 must complete and deliver the image to the user within 15 seconds under normal network conditions. The first streaming token ("🎨 Generating your image…") must appear within 1 second of the request.</td>
+          <td class="req-text">AI image generation via DALL-E 3 must complete and deliver the image to the user within 15 seconds under normal network conditions. The first streaming token ("Generating your image...") must appear within 1 second of the request.</td>
           <td><span class="req-priority p-med">Medium</span></td>
           <td><span class="req-cat c-non">Performance</span></td>
         </tr>
@@ -774,7 +922,7 @@
       <div class="uc-card">
         <div class="uc-actor">Actor: Logged-in User</div>
         <div class="uc-title">UC-12 &middot; Upload Meeting Recording</div>
-        <div class="uc-desc">User drags an MP4/M4A/WebM/MP3/WAV/MOV file (up to 200 MB) onto the Upload File tab. System routes it to OpenAI Whisper (&lt;5 MB) or Deepgram Nova-2 (≥5 MB) for transcription and inserts the result as note content.</div>
+        <div class="uc-desc">User drags an MP4/M4A/WebM/MP3/WAV/MOV file (up to 200 MB) onto the Upload File tab. System routes it to OpenAI Whisper (&lt;5 MB) or Deepgram Nova-2 (&ge;5 MB) for transcription and inserts the result as note content.</div>
       </div>
       <div class="uc-card">
         <div class="uc-actor">Actor: Logged-in User</div>
@@ -834,7 +982,7 @@
       <div class="uc-card">
         <div class="uc-actor">Actor: Logged-in User</div>
         <div class="uc-title">UC-24 &middot; Translate with Quality Score</div>
-        <div class="uc-desc">User selects text in the chat and requests translation to Māori. MemoLink runs the quality loop (Gemini → back-translate → GPT score → refine up to 3×), then displays the translation with "by Gemini 2.0 Flash Lite · 91% accuracy" in a green badge.</div>
+        <div class="uc-desc">User selects text in the chat and requests translation to M&#257;ori. MemoLink runs the quality loop (Gemini &rarr; back-translate &rarr; GPT score &rarr; refine up to 3x), then displays the translation with "by Gemini 2.0 Flash Lite &middot; 91% accuracy" in a green badge.</div>
       </div>
       <div class="uc-card">
         <div class="uc-actor">Actor: Logged-in User</div>
@@ -986,7 +1134,7 @@
     </div>
     <div class="story">
       <span class="req-id">US-23</span> &nbsp;
-      <span class="story-as">As a Māori language student,</span> I want high-quality translation with an accuracy score so that <span class="story-so">I can trust the output and understand how confident the system is in the result.</span>
+      <span class="story-as">As a M&#257;ori language student,</span> I want high-quality translation with an accuracy score so that <span class="story-so">I can trust the output and understand how confident the system is in the result.</span>
     </div>
     <div class="story">
       <span class="req-id">US-24</span> &nbsp;
@@ -1072,6 +1220,11 @@
       </div>
       <div class="constraint">
         <div class="constraint-icon">&#x1F310;</div>
+        <h4>Assistive Multilingual Output</h4>
+        <p>Multilingual output is assistive rather than certified. Maori and other culturally sensitive content require human review and should only be used when approved for the evaluation context.</p>
+      </div>
+      <div class="constraint">
+        <div class="constraint-icon">&#x1F310;</div>
         <h4>Browser-Based Only</h4>
         <p>The frontend is a web SPA. Native mobile apps are out of scope for this version.</p>
       </div>
@@ -1083,7 +1236,7 @@
       <div class="constraint">
         <div class="constraint-icon">&#x1F4E4;</div>
         <h4>Transcription Routing</h4>
-        <p>Audio and video files up to 200 MB are supported. Files &lt;5 MB are transcribed via OpenAI Whisper. Files ≥5 MB are routed to Deepgram Nova-2; if Deepgram fails, Whisper is used as a fallback for files up to 25 MB.</p>
+        <p>Audio and video files up to 200 MB are supported. Files &lt;5 MB are transcribed via OpenAI Whisper. Files &ge;5 MB are routed to Deepgram Nova-2; if Deepgram fails, Whisper is used as a fallback for files up to 25 MB.</p>
       </div>
       <div class="constraint">
         <div class="constraint-icon">&#x1F5C2;&#xFE0F;</div>
@@ -1110,6 +1263,6 @@
 
 </div>
 
-<footer>MemoLink Capstone Project &mdash; 2026</footer>
+<footer>MemoLink Capstone Project - 2026</footer>
 </body>
 </html>

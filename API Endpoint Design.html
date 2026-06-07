@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -232,6 +232,33 @@
         <tr><td><span class="method m-put">PUT</span></td><td><code>/settings/api-keys/{id}</code></td><td>Update an existing custom provider by ID</td><td>Settings</td></tr>
         <tr><td><span class="method m-delete">DELETE</span></td><td><code>/settings/api-keys/{id}</code></td><td>Remove a custom provider by ID</td><td>Settings</td></tr>
         <tr><td><span class="method m-post">POST</span></td><td><code>/commands/execute</code></td><td>Execute a slash command - streams SSE response (14 commands supported)</td><td>Commands</td></tr>
+        <tr><td><span class="method m-post">POST</span></td><td><code>/evaluation/session/start</code></td><td>Start a new evaluation session for the authenticated user</td><td>Evaluation</td></tr>
+        <tr><td><span class="method m-post">POST</span></td><td><code>/evaluation/session/end</code></td><td>End the active evaluation session</td><td>Evaluation</td></tr>
+        <tr><td><span class="method m-post">POST</span></td><td><code>/evaluation/task/start</code></td><td>Mark a guided task as started within a session</td><td>Evaluation</td></tr>
+        <tr><td><span class="method m-post">POST</span></td><td><code>/evaluation/task/complete</code></td><td>Mark a guided task as complete</td><td>Evaluation</td></tr>
+        <tr><td><span class="method m-post">POST</span></td><td><code>/evaluation/event</code></td><td>Record a feature-level evaluation event</td><td>Evaluation</td></tr>
+        <tr><td><span class="method m-post">POST</span></td><td><code>/evaluation/rating</code></td><td>Submit a per-response user rating</td><td>Evaluation</td></tr>
+        <tr><td><span class="method m-get">GET</span></td><td><code>/evaluation/my-ratings</code></td><td>Get all ratings submitted by the authenticated user</td><td>Evaluation</td></tr>
+        <tr><td><span class="method m-post">POST</span></td><td><code>/evaluation/heartbeat</code></td><td>Record active time heartbeat for budget tracking</td><td>Evaluation</td></tr>
+        <tr><td><span class="method m-get">GET</span></td><td><code>/evaluation/budget</code></td><td>Get remaining budget seconds for the active session</td><td>Evaluation</td></tr>
+        <tr><td><span class="method m-get">GET</span></td><td><code>/evaluation/admin/summary</code></td><td>Get aggregate evaluation metrics (admin only)</td><td>Evaluation Admin</td></tr>
+        <tr><td><span class="method m-get">GET</span></td><td><code>/evaluation/admin/report</code></td><td>Get full evaluation report with markdown summary (admin only)</td><td>Evaluation Admin</td></tr>
+        <tr><td><span class="method m-post">POST</span></td><td><code>/evaluation/admin/reset</code></td><td>Reset all evaluation data (admin only)</td><td>Evaluation Admin</td></tr>
+        <tr><td><span class="method m-get">GET</span></td><td><code>/evaluation/admin/participants</code></td><td>List all evaluation participants (admin only)</td><td>Evaluation Admin</td></tr>
+        <tr><td><span class="method m-post">POST</span></td><td><code>/evaluation/admin/budget</code></td><td>Adjust budget seconds for a participant (admin only)</td><td>Evaluation Admin</td></tr>
+        <tr><td><span class="method m-get">GET</span></td><td><code>/evaluation/admin/export/csv</code></td><td>Download CSV ZIP of six evaluation tables (admin only)</td><td>Evaluation Admin</td></tr>
+        <tr><td><span class="method m-get">GET</span></td><td><code>/evaluation/admin/export/json</code></td><td>Download JSON evaluation report (admin only)</td><td>Evaluation Admin</td></tr>
+        <tr><td><span class="method m-get">GET</span></td><td><code>/survey</code></td><td>Get all active survey questions</td><td>Survey</td></tr>
+        <tr><td><span class="method m-get">GET</span></td><td><code>/survey/me</code></td><td>Get the authenticated user's survey response and answers</td><td>Survey</td></tr>
+        <tr><td><span class="method m-post">POST</span></td><td><code>/survey/submit</code></td><td>Submit or update the user's survey answers</td><td>Survey</td></tr>
+        <tr><td><span class="method m-get">GET</span></td><td><code>/survey/admin/questions</code></td><td>List all survey questions including inactive (admin only)</td><td>Survey Admin</td></tr>
+        <tr><td><span class="method m-post">POST</span></td><td><code>/survey/admin/questions</code></td><td>Add a new survey question (admin only)</td><td>Survey Admin</td></tr>
+        <tr><td><span class="method m-put">PUT</span></td><td><code>/survey/admin/questions/{id}</code></td><td>Update an existing survey question (admin only)</td><td>Survey Admin</td></tr>
+        <tr><td><span class="method m-delete">DELETE</span></td><td><code>/survey/admin/questions/{id}</code></td><td>Delete a survey question (admin only)</td><td>Survey Admin</td></tr>
+        <tr><td><span class="method m-post">POST</span></td><td><code>/survey/admin/questions/reset</code></td><td>Reset survey questions to defaults (admin only)</td><td>Survey Admin</td></tr>
+        <tr><td><span class="method m-get">GET</span></td><td><code>/survey/admin/report</code></td><td>Get per-question distribution and averages (admin only)</td><td>Survey Admin</td></tr>
+        <tr><td><span class="method m-get">GET</span></td><td><code>/survey/admin/responses</code></td><td>List all survey responses with metadata (admin only)</td><td>Survey Admin</td></tr>
+        <tr><td><span class="method m-get">GET</span></td><td><code>/survey/admin/export</code></td><td>Download wide-format survey CSV (admin only)</td><td>Survey Admin</td></tr>
       </tbody>
     </table>
   </section>
@@ -609,11 +636,11 @@
             Accepts one or more file uploads (DOCX, PDF, PPTX, TXT) as <code>multipart/form-data</code> and creates one note per file.
             Uses <code>extract_formatted_html()</code> instead of plain text extraction to preserve rich document structure:
             <br/><br/>
-            <strong>DOCX</strong> - headings (H1–H4 from paragraph style names), bold/italic/underline inline runs, bullet and numbered lists, tables (with <code>&lt;th&gt;</code> header rows), embedded images as base64 <code>&lt;img&gt;</code> tags; paragraphs and tables interleaved in document order.
+            <strong>DOCX</strong> - headings (H1-H4 from paragraph style names), bold/italic/underline inline runs, bullet and numbered lists, tables (with <code>&lt;th&gt;</code> header rows), embedded images as base64 <code>&lt;img&gt;</code> tags; paragraphs and tables interleaved in document order.
             <br/>
-            <strong>PDF</strong> - word-level extraction via pdfplumber; headings inferred by font-size ratio (≥ 1.5× body → H1; ≥ 1.3× → H2; ≥ 1.15× or bold+short → H3); bold text detected by fontname.
+            <strong>PDF</strong> - word-level extraction via pdfplumber; headings inferred by font-size ratio (&ge; 1.5x body &rarr; H1; &ge; 1.3x &rarr; H2; &ge; 1.15x or bold+short &rarr; H3); bold text detected by fontname.
             <br/>
-            <strong>PPTX</strong> - slide title → <code>&lt;h2&gt;</code>; content items → <code>&lt;ul&gt;</code> with indent levels; slide separator → <code>&lt;hr&gt;</code>; picture shapes extracted as base64 <code>&lt;img&gt;</code> tags.
+            <strong>PPTX</strong> - slide title &rarr; <code>&lt;h2&gt;</code>; content items &rarr; <code>&lt;ul&gt;</code> with indent levels; slide separator &rarr; <code>&lt;hr&gt;</code>; picture shapes extracted as base64 <code>&lt;img&gt;</code> tags.
             <br/><br/>
             Each created note is automatically embedded for RAG retrieval.
           </p>
@@ -716,7 +743,7 @@
             Same RAG pipeline as <code>/chat</code> but returns <code>Content-Type: text/event-stream</code>.
             The selected model is called with <code>stream=True</code>. Each token is forwarded immediately.
             Supports optional web search context injection (<code>web_search: true</code>) and multi-model selection via the <code>model</code> field.
-            When an image-generation intent is detected, yields "🎨 Generating your image…" first, then the base64 image tag.
+            When an image-generation intent is detected, yields "Generating your image..." first, then the base64 image tag.
             nginx must have <code>proxy_buffering off</code> and <code>X-Accel-Buffering: no</code> - both are set in <code>nginx.conf</code>.
             The frontend displays a blinking cursor while streaming; the cursor disappears when <code>done</code> is received.
           </p>
@@ -1022,11 +1049,11 @@
         <div class="ep-header" onclick="toggle('ep-transcribe')">
           <span class="method m-post">POST</span>
           <span class="ep-path">/api/v1/transcribe</span>
-          <span class="ep-summary">Transcribe audio/video via Whisper (&lt;5 MB) or Deepgram (≥5 MB)</span>
+          <span class="ep-summary">Transcribe audio/video via Whisper (&lt;5 MB) or Deepgram (&ge;5 MB)</span>
           <span class="ep-toggle">&#x25BC;</span>
         </div>
         <div class="ep-body">
-          <p class="ep-desc">Accepts a multipart <code>file</code> upload (MP4, M4A, WebM, MP3, WAV, MOV - maximum 200 MB). Files &lt;5 MB are transcribed via OpenAI Whisper; files ≥5 MB are routed to Deepgram Nova-2 (Whisper fallback up to 25 MB). Returns the plain-text transcript. Used internally by the note editor's Record button.</p>
+          <p class="ep-desc">Accepts a multipart <code>file</code> upload (MP4, M4A, WebM, MP3, WAV, MOV - maximum 200 MB). Files &lt;5 MB are transcribed via OpenAI Whisper; files &ge;5 MB are routed to Deepgram Nova-2 (Whisper fallback up to 25 MB). Returns the plain-text transcript. Used internally by the note editor's Record button.</p>
           <div class="schema-row">
             <div class="schema-box">
               <div class="schema-box-title">Form Fields</div>
@@ -1067,11 +1094,11 @@
             Translates text using a multi-round quality loop:
             (1) Gemini 2.0 Flash Lite performs the initial translation;
             (2) the result is back-translated to the source language;
-            (3) GPT scores semantic similarity (0–100);
+            (3) GPT scores semantic similarity (0-100);
             (4) if the score is below 85, the feedback is fed back to Gemini for a refined translation - this repeats for up to 3 rounds.
             A 1.2-second sleep is applied between API calls to avoid burst-rate detection.
             If Gemini hits a rate limit the entire pipeline falls back to GPT-4o-mini.
-            For Māori translations a hint is injected specifying correct macron usage (ā ē ī ō ū) and natural fluency.
+            For M&#257;ori translations a hint is injected specifying correct macron usage (<code>&#257; &#275; &#299; &#333; &#363;</code>) and natural fluency.
             The <code>accuracy</code> field in the response is the final similarity score; it is <code>null</code> when the fallback model is used without a scoring round.
             Results are cached in the <code>translation_cache</code> table - repeated requests for the same text and language are served instantly with <code>"cached": true</code>.
             The optional <code>force</code> boolean field (default <code>false</code>) bypasses the cache: when <code>true</code>, the full LLM pipeline runs and the cache entry is updated with the fresh result.
@@ -1163,14 +1190,14 @@
         <div class="ep-header" onclick="toggle('ep-video-upload')">
           <span class="method m-post">POST</span>
           <span class="ep-path">/api/v1/video/upload</span>
-          <span class="ep-summary">Upload audio/video file - Whisper (&lt;5 MB) / Deepgram (≥5 MB)</span>
+          <span class="ep-summary">Upload audio/video file - Whisper (&lt;5 MB) / Deepgram (&ge;5 MB)</span>
           <span class="ep-toggle">&#x25BC;</span>
         </div>
         <div class="ep-body">
           <p class="ep-desc">
             Accepts a multipart <code>file</code> upload (MP4, M4A, WebM, MP3, WAV, MOV - maximum 200 MB).
             Intended for Zoom, Teams, and Google Meet recordings.
-            Files &lt;5 MB are transcribed via OpenAI Whisper; files ≥5 MB are routed to Deepgram Nova-2 (with Whisper as fallback up to 25 MB). The result is wrapped in HTML for direct insertion into the Tiptap note editor.
+            Files &lt;5 MB are transcribed via OpenAI Whisper; files &ge;5 MB are routed to Deepgram Nova-2 (with Whisper as fallback up to 25 MB). The result is wrapped in HTML for direct insertion into the Tiptap note editor.
           </p>
           <div class="schema-row">
             <div class="schema-box">
@@ -2113,7 +2140,7 @@ data: <span class="json-str">[DONE]</span></pre>
         </div>
         <div class="ep-body">
           <p class="ep-desc">
-            Validates that the file size is ≤200 MB and that <code>S3_UPLOAD_BUCKET</code> is configured. Generates an S3 pre-signed PUT URL with a 1-hour TTL (3600 seconds) scoped to the authenticated user's folder. The client uploads file bytes directly to S3 using an HTTP <code>PUT</code> request to the returned URL - Lambda is never in the upload path so the 6 MB Lambda payload limit does not apply. Auth: Bearer token required.
+            Validates that the file size is &le;200 MB and that <code>S3_UPLOAD_BUCKET</code> is configured. Generates an S3 pre-signed PUT URL with a 1-hour TTL (3600 seconds) scoped to the authenticated user's folder. The client uploads file bytes directly to S3 using an HTTP <code>PUT</code> request to the returned URL - Lambda is never in the upload path so the 6 MB Lambda payload limit does not apply. Auth: Bearer token required.
           </p>
           <div class="schema-row">
             <div class="schema-box">
@@ -2154,7 +2181,7 @@ data: <span class="json-str">[DONE]</span></pre>
         </div>
         <div class="ep-body">
           <p class="ep-desc">
-            Lambda downloads each S3 object by key, runs <code>extract_formatted_html</code> on the file bytes, creates a note per file, then deletes the S3 object. Each key is processed independently - one failure does not block the others. Supports all file types including audio/video (Whisper &lt;5 MB, Deepgram Nova-2 ≥5 MB with Whisper fallback up to 25 MB). Auth: Bearer token required.
+            Lambda downloads each S3 object by key, runs <code>extract_formatted_html</code> on the file bytes, creates a note per file, then deletes the S3 object. Each key is processed independently - one failure does not block the others. Supports all file types including audio/video (Whisper &lt;5 MB, Deepgram Nova-2 &ge;5 MB with Whisper fallback up to 25 MB). Auth: Bearer token required.
           </p>
           <div class="schema-row">
             <div class="schema-box">
@@ -2371,9 +2398,664 @@ data: <span class="json-str">[DONE]</span></pre>
     </div>
   </section>
 
+  <hr class="divider" />
+
+  <!-- EVALUATION API -->
+  <section>
+    <div class="section-label">Evaluation</div>
+    <h2>Evaluation API - User Endpoints</h2>
+    <p>All endpoints require a valid JWT. Telemetry recording is gated by the <code>evaluation_analytics_enabled</code> feature flag. Budget is enforced by the heartbeat; when exhausted, all recording stops silently without affecting the user experience.</p>
+    <div class="ep-group">
+
+      <div class="ep-card" id="ep-eval-session-start">
+        <div class="ep-header" onclick="toggle('ep-eval-session-start')">
+          <span class="method m-post">POST</span>
+          <span class="ep-path">/api/v1/evaluation/session/start</span>
+          <span class="ep-summary">Start an evaluation session</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">Creates a new evaluation session for the authenticated user. Returns the session ID and participant code. Only one active session is allowed per user at a time. The request records explicit consent confirmation, a consent version, and the acceptance timestamp for the participant information statement.</p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Request Body</div>
+              <pre>{
+  <span class="json-key">"participant_code"</span>: <span class="json-str">"P001"</span>,
+  <span class="json-key">"consent_confirmed"</span>: <span class="json-bool">true</span>,
+  <span class="json-key">"consent_version"</span>: <span class="json-str">"v1.0"</span>,
+  <span class="json-key">"role"</span>: <span class="json-str">"student"</span>,
+  <span class="json-key">"ai_tool_usage_frequency"</span>: <span class="json-str">"daily"</span>,
+  <span class="json-key">"workspace_id"</span>: <span class="json-num">3</span>
+}</pre>
+            </div>
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200</div>
+              <pre>{
+  <span class="json-key">"session_id"</span>: <span class="json-num">42</span>,
+  <span class="json-key">"participant_code"</span>: <span class="json-str">"P001"</span>,
+  <span class="json-key">"budget_seconds"</span>: <span class="json-num">1800</span>,
+  <span class="json-key">"started_at"</span>: <span class="json-str">"2026-06-01T10:00:00Z"</span>
+}</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="ep-card" id="ep-eval-session-end">
+        <div class="ep-header" onclick="toggle('ep-eval-session-end')">
+          <span class="method m-post">POST</span>
+          <span class="ep-path">/api/v1/evaluation/session/end</span>
+          <span class="ep-summary">End the active evaluation session</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">Marks the active session as completed and records the total active time. Returns 404 if no active session exists.</p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Request Body</div>
+              <pre>{
+  <span class="json-key">"session_id"</span>: <span class="json-num">42</span>
+}</pre>
+            </div>
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200</div>
+              <pre>{
+  <span class="json-key">"session_id"</span>: <span class="json-num">42</span>,
+  <span class="json-key">"completed"</span>: <span class="json-bool">true</span>,
+  <span class="json-key">"total_time_seconds"</span>: <span class="json-num">1243</span>
+}</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="ep-card" id="ep-eval-task-start">
+        <div class="ep-header" onclick="toggle('ep-eval-task-start')">
+          <span class="method m-post">POST</span>
+          <span class="ep-path">/api/v1/evaluation/task/start</span>
+          <span class="ep-summary">Mark a guided task as started</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">Records the start time for a specific guided task within the active session.</p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Request Body</div>
+              <pre>{
+  <span class="json-key">"session_id"</span>: <span class="json-num">42</span>,
+  <span class="json-key">"task_key"</span>: <span class="json-str">"task_create_note"</span>,
+  <span class="json-key">"task_name"</span>: <span class="json-str">"Create a note"</span>,
+  <span class="json-key">"feature_name"</span>: <span class="json-str">"notes"</span>
+}</pre>
+            </div>
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200</div>
+              <pre>{
+  <span class="json-key">"task_id"</span>: <span class="json-num">7</span>,
+  <span class="json-key">"task_key"</span>: <span class="json-str">"task_create_note"</span>,
+  <span class="json-key">"started_at"</span>: <span class="json-str">"2026-06-01T10:02:00Z"</span>
+}</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="ep-card" id="ep-eval-task-complete">
+        <div class="ep-header" onclick="toggle('ep-eval-task-complete')">
+          <span class="method m-post">POST</span>
+          <span class="ep-path">/api/v1/evaluation/task/complete</span>
+          <span class="ep-summary">Mark a guided task as complete</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">Records task completion time and outcome. <code>time_taken_ms</code> is calculated server-side from <code>started_at</code>.</p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Request Body</div>
+              <pre>{
+  <span class="json-key">"task_id"</span>: <span class="json-num">7</span>,
+  <span class="json-key">"success"</span>: <span class="json-bool">true</span>
+}</pre>
+            </div>
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200</div>
+              <pre>{
+  <span class="json-key">"task_id"</span>: <span class="json-num">7</span>,
+  <span class="json-key">"completed"</span>: <span class="json-bool">true</span>,
+  <span class="json-key">"time_taken_ms"</span>: <span class="json-num">34200</span>
+}</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="ep-card" id="ep-eval-event">
+        <div class="ep-header" onclick="toggle('ep-eval-event')">
+          <span class="method m-post">POST</span>
+          <span class="ep-path">/api/v1/evaluation/event</span>
+          <span class="ep-summary">Record a feature-level evaluation event</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">Records a single feature interaction event. Silently no-ops if no active session or budget is exhausted. No raw prompts or content may be included.</p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Request Body</div>
+              <pre>{
+  <span class="json-key">"session_id"</span>: <span class="json-num">42</span>,
+  <span class="json-key">"task_id"</span>: <span class="json-num">7</span>,
+  <span class="json-key">"feature_name"</span>: <span class="json-str">"chat"</span>,
+  <span class="json-key">"operation_name"</span>: <span class="json-str">"stream_response"</span>,
+  <span class="json-key">"event_type"</span>: <span class="json-str">"complete"</span>,
+  <span class="json-key">"status"</span>: <span class="json-str">"success"</span>,
+  <span class="json-key">"duration_ms"</span>: <span class="json-num">2340</span>,
+  <span class="json-key">"message_id"</span>: <span class="json-num">110</span>
+}</pre>
+            </div>
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200</div>
+              <pre>{
+  <span class="json-key">"event_id"</span>: <span class="json-num">55</span>,
+  <span class="json-key">"recorded"</span>: <span class="json-bool">true</span>
+}</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="ep-card" id="ep-eval-rating">
+        <div class="ep-header" onclick="toggle('ep-eval-rating')">
+          <span class="method m-post">POST</span>
+          <span class="ep-path">/api/v1/evaluation/rating</span>
+          <span class="ep-summary">Submit a per-response user rating</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">Stores a single rating from the EvaluationRatingBar. Multiple rating types may be submitted for the same message (one POST per rating type). Upserts on (session_id, message_id, rating_type). The rating model intentionally separates retrieved-context relevance from answer usefulness and answer faithfulness.</p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Request Body</div>
+              <pre>{
+  <span class="json-key">"session_id"</span>: <span class="json-num">42</span>,
+  <span class="json-key">"message_id"</span>: <span class="json-num">110</span>,
+  <span class="json-key">"rating_type"</span>: <span class="json-str">"context_relevance_rating"</span>,
+  <span class="json-key">"rating_value"</span>: <span class="json-num">4</span>,
+  <span class="json-key">"comment"</span>: <span class="json-str">"Mostly on-target"</span>
+}</pre>
+            </div>
+            <div class="schema-box">
+              <div class="schema-box-title">Rating Types</div>
+              <pre><span class="json-str">context_relevance_rating</span> <span class="json-type">1-5</span>
+<span class="json-str">answer_usefulness_rating</span> <span class="json-type">1-5</span>
+<span class="json-str">answer_faithfulness_rating</span>
+                       <span class="json-type">yes|partially|no|not_sure</span>
+<span class="json-str">citation_usefulness</span>   <span class="json-type">1-5</span>
+<span class="json-str">answer_trust</span>          <span class="json-type">1-5</span>
+<span class="json-str">answer_supported_by_notes</span>
+                       <span class="json-type">yes|partially|no|not_sure</span>
+<span class="json-str">task_difficulty</span>       <span class="json-type">1-5</span>
+<span class="json-str">system_speed</span>          <span class="json-type">1-5</span></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="ep-card" id="ep-eval-my-ratings">
+        <div class="ep-header" onclick="toggle('ep-eval-my-ratings')">
+          <span class="method m-get">GET</span>
+          <span class="ep-path">/api/v1/evaluation/my-ratings</span>
+          <span class="ep-summary">Get all ratings by the authenticated user</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">Returns all rating rows submitted by the current user, keyed by message ID. Used by the frontend to restore rating state after a page reload.</p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200</div>
+              <pre>[
+  {
+    <span class="json-key">"message_id"</span>: <span class="json-num">110</span>,
+    <span class="json-key">"rating_type"</span>: <span class="json-str">"context_relevance_rating"</span>,
+    <span class="json-key">"rating_value"</span>: <span class="json-num">4</span>,
+    <span class="json-key">"choice_value"</span>: <span class="json-null">null</span>,
+    <span class="json-key">"comment"</span>: <span class="json-str">"Mostly on-target"</span>
+  }
+]</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="ep-card" id="ep-eval-heartbeat">
+        <div class="ep-header" onclick="toggle('ep-eval-heartbeat')">
+          <span class="method m-post">POST</span>
+          <span class="ep-path">/api/v1/evaluation/heartbeat</span>
+          <span class="ep-summary">Record active-time heartbeat</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">Called by <code>useEvaluationHeartbeat</code> every 10 seconds while the tab is visible. Increments active time and returns the remaining budget. Returns <code>budget_exhausted: true</code> when the budget is used up.</p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Request Body</div>
+              <pre>{
+  <span class="json-key">"session_id"</span>: <span class="json-num">42</span>,
+  <span class="json-key">"seconds"</span>: <span class="json-num">10</span>
+}</pre>
+            </div>
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200</div>
+              <pre>{
+  <span class="json-key">"total_time_seconds"</span>: <span class="json-num">250</span>,
+  <span class="json-key">"budget_seconds"</span>: <span class="json-num">1800</span>,
+  <span class="json-key">"remaining_seconds"</span>: <span class="json-num">1550</span>,
+  <span class="json-key">"budget_exhausted"</span>: <span class="json-bool">false</span>
+}</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="ep-card" id="ep-eval-budget">
+        <div class="ep-header" onclick="toggle('ep-eval-budget')">
+          <span class="method m-get">GET</span>
+          <span class="ep-path">/api/v1/evaluation/budget</span>
+          <span class="ep-summary">Get remaining budget for the active session</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">Returns remaining active-time budget in seconds. Returns 404 if no active session.</p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200</div>
+              <pre>{
+  <span class="json-key">"session_id"</span>: <span class="json-num">42</span>,
+  <span class="json-key">"budget_seconds"</span>: <span class="json-num">1800</span>,
+  <span class="json-key">"used_seconds"</span>: <span class="json-num">250</span>,
+  <span class="json-key">"remaining_seconds"</span>: <span class="json-num">1550</span>
+}</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <h2 style="margin-top:2rem;">Evaluation API - Admin Endpoints</h2>
+    <p>All admin endpoints require <code>is_admin: true</code> in the JWT. Non-admin requests receive HTTP 403. Gated by <code>evaluation_admin_export_enabled</code> flag for export endpoints.</p>
+    <div class="ep-group">
+
+      <div class="ep-card" id="ep-eval-admin-summary">
+        <div class="ep-header" onclick="toggle('ep-eval-admin-summary')">
+          <span class="method m-get">GET</span>
+          <span class="ep-path">/api/v1/evaluation/admin/summary</span>
+          <span class="ep-summary">Aggregate evaluation metrics (admin only)</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">Returns aggregate statistics: average ratings by type, response times by feature, fallback rate, confidence alignment, total sessions, and feature usage breakdown.</p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200 (excerpt)</div>
+              <pre>{
+  <span class="json-key">"total_sessions"</span>: <span class="json-num">12</span>,
+  <span class="json-key">"avg_context_relevance_rating"</span>: <span class="json-num">3.9</span>,
+  <span class="json-key">"avg_citation_usefulness"</span>: <span class="json-num">3.6</span>,
+  <span class="json-key">"avg_answer_trust"</span>: <span class="json-num">3.7</span>,
+  <span class="json-key">"fallback_rate"</span>: <span class="json-num">0.08</span>,
+  <span class="json-key">"avg_total_response_time_ms"</span>: <span class="json-num">2430</span>
+}</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="ep-card" id="ep-eval-admin-report">
+        <div class="ep-header" onclick="toggle('ep-eval-admin-report')">
+          <span class="method m-get">GET</span>
+          <span class="ep-path">/api/v1/evaluation/admin/report</span>
+          <span class="ep-summary">Full evaluation report with markdown summary (admin only)</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">Returns detailed JSON report including per-feature breakdowns and a pre-rendered markdown summary string for quick review.</p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200 (excerpt)</div>
+              <pre>{
+  <span class="json-key">"summary_markdown"</span>: <span class="json-str">"## Evaluation Report..."</span>,
+  <span class="json-key">"ratings_by_feature"</span>: {...},
+  <span class="json-key">"response_times_by_feature"</span>: {...},
+  <span class="json-key">"confidence_alignment"</span>: {...}
+}</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="ep-card" id="ep-eval-admin-reset">
+        <div class="ep-header" onclick="toggle('ep-eval-admin-reset')">
+          <span class="method m-post">POST</span>
+          <span class="ep-path">/api/v1/evaluation/admin/reset</span>
+          <span class="ep-summary">Reset all evaluation data (admin only)</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">Truncates all evaluation tables. Irreversible. This endpoint is admin-only, should require an explicit confirmation step in the UI, should be audit logged, and should be disabled in production or guarded by a feature flag where possible. Exporting CSV or JSON before reset is strongly recommended. Returns the count of deleted rows per table.</p>
+        </div>
+      </div>
+
+      <div class="ep-card" id="ep-eval-admin-participants">
+        <div class="ep-header" onclick="toggle('ep-eval-admin-participants')">
+          <span class="method m-get">GET</span>
+          <span class="ep-path">/api/v1/evaluation/admin/participants</span>
+          <span class="ep-summary">List evaluation participants (admin only)</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">Lists all evaluation sessions with participant codes, session times, task counts, and budget usage. No PII beyond participant codes is returned.</p>
+        </div>
+      </div>
+
+      <div class="ep-card" id="ep-eval-admin-budget">
+        <div class="ep-header" onclick="toggle('ep-eval-admin-budget')">
+          <span class="method m-post">POST</span>
+          <span class="ep-path">/api/v1/evaluation/admin/budget</span>
+          <span class="ep-summary">Adjust participant budget (admin only)</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">Updates the <code>budget_seconds</code> for a specific session. Use to extend time for participants who need more.</p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Request Body</div>
+              <pre>{
+  <span class="json-key">"session_id"</span>: <span class="json-num">42</span>,
+  <span class="json-key">"budget_seconds"</span>: <span class="json-num">2700</span>
+}</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="ep-card" id="ep-eval-admin-export-csv">
+        <div class="ep-header" onclick="toggle('ep-eval-admin-export-csv')">
+          <span class="method m-get">GET</span>
+          <span class="ep-path">/api/v1/evaluation/admin/export/csv</span>
+          <span class="ep-summary">Download evaluation CSV ZIP (admin only)</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">Returns a ZIP archive containing six CSV files: <code>sessions.csv</code>, <code>tasks.csv</code>, <code>events.csv</code>, <code>ai_metrics.csv</code>, <code>ratings.csv</code>, <code>feature_usage.csv</code>. No raw prompts or note content are included. Gated by <code>evaluation_admin_export_enabled</code>.</p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Response</div>
+              <pre><span class="json-type">Content-Type: application/zip</span>
+<span class="json-type">Content-Disposition: attachment; filename=evaluation_export.zip</span></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="ep-card" id="ep-eval-admin-export-json">
+        <div class="ep-header" onclick="toggle('ep-eval-admin-export-json')">
+          <span class="method m-get">GET</span>
+          <span class="ep-path">/api/v1/evaluation/admin/export/json</span>
+          <span class="ep-summary">Download evaluation JSON report (admin only)</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">Returns a structured JSON object with all evaluation data including a markdown summary section. Gated by <code>evaluation_admin_export_enabled</code>.</p>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <hr class="divider" />
+
+  <!-- SURVEY API -->
+  <section>
+    <div class="section-label">Survey</div>
+    <h2>Survey API - User Endpoints</h2>
+    <p>Survey endpoints require a valid JWT. Survey visibility is gated by the <code>evaluation_survey_enabled</code> feature flag.</p>
+    <div class="ep-group">
+
+      <div class="ep-card" id="ep-survey-get">
+        <div class="ep-header" onclick="toggle('ep-survey-get')">
+          <span class="method m-get">GET</span>
+          <span class="ep-path">/api/v1/survey</span>
+          <span class="ep-summary">Get all active survey questions</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">Returns all active survey questions ordered by section and order_index. Inactive questions are excluded. Used by SurveyModal to render the form.</p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200 (excerpt)</div>
+              <pre>[
+  {
+    <span class="json-key">"id"</span>: <span class="json-num">1</span>,
+    <span class="json-key">"section"</span>: <span class="json-str">"A"</span>,
+    <span class="json-key">"question_key"</span>: <span class="json-str">"background_role"</span>,
+    <span class="json-key">"question_text"</span>: <span class="json-str">"What is your primary role?"</span>,
+    <span class="json-key">"answer_type"</span>: <span class="json-str">"single"</span>,
+    <span class="json-key">"options"</span>: [<span class="json-str">"Student"</span>, <span class="json-str">"Professional"</span>, <span class="json-str">"Researcher"</span>],
+    <span class="json-key">"required"</span>: <span class="json-bool">true</span>
+  }
+]</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="ep-card" id="ep-survey-me">
+        <div class="ep-header" onclick="toggle('ep-survey-me')">
+          <span class="method m-get">GET</span>
+          <span class="ep-path">/api/v1/survey/me</span>
+          <span class="ep-summary">Get authenticated user's survey response</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">Returns the user's existing survey response and all their saved answers. Returns 404 if no response exists yet. Used to pre-fill the survey form on re-open.</p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200</div>
+              <pre>{
+  <span class="json-key">"response_id"</span>: <span class="json-num">5</span>,
+  <span class="json-key">"submitted_at"</span>: <span class="json-null">null</span>,
+  <span class="json-key">"answers"</span>: [
+    {
+      <span class="json-key">"question_key"</span>: <span class="json-str">"background_role"</span>,
+      <span class="json-key">"answer_value"</span>: <span class="json-str">"Student"</span>
+    }
+  ]
+}</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="ep-card" id="ep-survey-submit">
+        <div class="ep-header" onclick="toggle('ep-survey-submit')">
+          <span class="method m-post">POST</span>
+          <span class="ep-path">/api/v1/survey/submit</span>
+          <span class="ep-summary">Submit or update survey answers</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">Creates or updates the user's survey response. Answers are upserted by question_key. Pass <code>finalize: true</code> to set <code>submitted_at</code> and lock the response. Only one response per user account is allowed. The survey is intended to take about 5-8 minutes, with core usability items retained and feature-specific sections optionally shown only when relevant.</p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Request Body</div>
+              <pre>{
+  <span class="json-key">"participant_code"</span>: <span class="json-str">"P001"</span>,
+  <span class="json-key">"consent_confirmed"</span>: <span class="json-bool">true</span>,
+  <span class="json-key">"consent_version"</span>: <span class="json-str">"v1.0"</span>,
+  <span class="json-key">"finalize"</span>: <span class="json-bool">false</span>,
+  <span class="json-key">"answers"</span>: [
+    {
+      <span class="json-key">"question_key"</span>: <span class="json-str">"background_role"</span>,
+      <span class="json-key">"answer_value"</span>: <span class="json-str">"Student"</span>
+    }
+  ]
+}</pre>
+            </div>
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200</div>
+              <pre>{
+  <span class="json-key">"response_id"</span>: <span class="json-num">5</span>,
+  <span class="json-key">"saved_count"</span>: <span class="json-num">1</span>,
+  <span class="json-key">"submitted_at"</span>: <span class="json-null">null</span>
+}</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <h2 style="margin-top:2rem;">Survey API - Admin Endpoints</h2>
+    <p>All admin survey endpoints require <code>is_admin: true</code> in the JWT and return HTTP 403 otherwise. Export is gated by <code>evaluation_admin_export_enabled</code>.</p>
+    <div class="ep-group">
+
+      <div class="ep-card" id="ep-survey-admin-questions-get">
+        <div class="ep-header" onclick="toggle('ep-survey-admin-questions-get')">
+          <span class="method m-get">GET</span>
+          <span class="ep-path">/api/v1/survey/admin/questions</span>
+          <span class="ep-summary">List all survey questions including inactive (admin only)</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">Returns all questions including inactive ones, ordered by section and order_index. Used by AdminSurveyPanel to show the full question management view.</p>
+        </div>
+      </div>
+
+      <div class="ep-card" id="ep-survey-admin-questions-post">
+        <div class="ep-header" onclick="toggle('ep-survey-admin-questions-post')">
+          <span class="method m-post">POST</span>
+          <span class="ep-path">/api/v1/survey/admin/questions</span>
+          <span class="ep-summary">Add a new survey question (admin only)</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">Creates a new survey question. <code>question_key</code> must be unique. <code>options</code> is required for <code>single</code> and <code>multi</code> answer types.</p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Request Body</div>
+              <pre>{
+  <span class="json-key">"section"</span>: <span class="json-str">"G"</span>,
+  <span class="json-key">"question_key"</span>: <span class="json-str">"overall_recommend"</span>,
+  <span class="json-key">"question_text"</span>: <span class="json-str">"Would you recommend MemoLink?"</span>,
+  <span class="json-key">"answer_type"</span>: <span class="json-str">"likert"</span>,
+  <span class="json-key">"required"</span>: <span class="json-bool">true</span>,
+  <span class="json-key">"order_index"</span>: <span class="json-num">37</span>
+}</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="ep-card" id="ep-survey-admin-questions-put">
+        <div class="ep-header" onclick="toggle('ep-survey-admin-questions-put')">
+          <span class="method m-put">PUT</span>
+          <span class="ep-path">/api/v1/survey/admin/questions/{id}</span>
+          <span class="ep-summary">Update a survey question (admin only)</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">Updates any fields on a survey question. Changing <code>answer_type</code> or <code>options</code> affects future answers but does not invalidate existing responses. Returns 404 if the question does not exist.</p>
+        </div>
+      </div>
+
+      <div class="ep-card" id="ep-survey-admin-questions-delete">
+        <div class="ep-header" onclick="toggle('ep-survey-admin-questions-delete')">
+          <span class="method m-delete">DELETE</span>
+          <span class="ep-path">/api/v1/survey/admin/questions/{id}</span>
+          <span class="ep-summary">Delete a survey question (admin only)</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">Hard-deletes the question. Existing answers referencing this question_key are preserved (denormalised snapshot). Returns 404 if not found.</p>
+        </div>
+      </div>
+
+      <div class="ep-card" id="ep-survey-admin-questions-reset">
+        <div class="ep-header" onclick="toggle('ep-survey-admin-questions-reset')">
+          <span class="method m-post">POST</span>
+          <span class="ep-path">/api/v1/survey/admin/questions/reset</span>
+          <span class="ep-summary">Reset questions to defaults (admin only)</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">Truncates the <code>survey_questions</code> table and re-seeds the 37 default questions. Existing survey_answers are also deleted. Irreversible.</p>
+        </div>
+      </div>
+
+      <div class="ep-card" id="ep-survey-admin-report">
+        <div class="ep-header" onclick="toggle('ep-survey-admin-report')">
+          <span class="method m-get">GET</span>
+          <span class="ep-path">/api/v1/survey/admin/report</span>
+          <span class="ep-summary">Per-question distribution and averages (admin only)</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">Returns per-question statistics: response count, average (for Likert), and frequency distribution of choices (for single/multi). Used by AdminSurveyPanel charts.</p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200 (excerpt)</div>
+              <pre>{
+  <span class="json-key">"total_responses"</span>: <span class="json-num">12</span>,
+  <span class="json-key">"questions"</span>: [
+    {
+      <span class="json-key">"question_key"</span>: <span class="json-str">"rag_relevance"</span>,
+      <span class="json-key">"average"</span>: <span class="json-num">3.8</span>,
+      <span class="json-key">"distribution"</span>: {<span class="json-str">"1"</span>:<span class="json-num">0</span>, <span class="json-str">"5"</span>:<span class="json-num">4</span>}
+    }
+  ]
+}</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="ep-card" id="ep-survey-admin-responses">
+        <div class="ep-header" onclick="toggle('ep-survey-admin-responses')">
+          <span class="method m-get">GET</span>
+          <span class="ep-path">/api/v1/survey/admin/responses</span>
+          <span class="ep-summary">List all survey responses (admin only)</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">Returns all survey response records with participant codes, submission timestamps, and answer counts. Individual answer content is accessible via each response's answers array. Participant withdrawal or deletion requests should be managed through an admin-reviewed process so the response can be deleted or anonymised consistently across survey and evaluation tables.</p>
+        </div>
+      </div>
+
+      <div class="ep-card" id="ep-survey-admin-export">
+        <div class="ep-header" onclick="toggle('ep-survey-admin-export')">
+          <span class="method m-get">GET</span>
+          <span class="ep-path">/api/v1/survey/admin/export</span>
+          <span class="ep-summary">Download wide-format survey CSV (admin only)</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">Returns a CSV file where each row is a participant response and each column is a question. Wide format is optimised for statistical analysis in spreadsheet tools. Gated by <code>evaluation_admin_export_enabled</code>.</p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Response</div>
+              <pre><span class="json-type">Content-Type: text/csv</span>
+<span class="json-type">Content-Disposition: attachment; filename=survey_export.csv</span></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
 </div>
 
-<footer>MemoLink Capstone Project &mdash; 2026</footer>
+<footer>MemoLink Capstone Project - 2026</footer>
 
 <script>
   function toggle(id) {

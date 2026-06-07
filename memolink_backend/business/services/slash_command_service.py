@@ -227,6 +227,8 @@ class SlashCommandService:
             yield from self._cmd_quiz(p, dto, model)
         elif c == "discussion":
             yield from self._cmd_discussion(p, dto, model)
+        elif c == "write":
+            yield from self._cmd_write(p, dto, model)
         elif c == "read":
             yield from self._cmd_read(p, dto)
         elif c == "feedback":
@@ -702,6 +704,159 @@ Base questions ONLY on the provided notes. Do not invent facts not in the notes.
             yield _sse({"t": synth})
         except Exception:
             pass
+
+    # ── /Write ───────────────────────────────────────────────────────────────
+
+    def _cmd_write(self, p: ParsedCommand, dto: SlashCommandRequestDTO, model: str) -> Iterator[str]:
+        from memolink_backend.utils.web_search import brave_search
+        from memolink_backend.utils.academic_search import search_papers, format_papers_context
+
+        # Build writing prompt from target and/or instruction
+        if p.target and p.instruction:
+            writing_prompt = f"{p.target}: {p.instruction}"
+        elif p.target:
+            writing_prompt = p.target
+        elif p.instruction:
+            writing_prompt = p.instruction
+        else:
+            yield _sse({"t": '`/Write` requires a prompt.\n\nExample: `/Write Help me write an essay about AI ethics`'})
+            return
+
+        user_keys_named: dict = {}
+        if dto.user_id and self._user_api_key_repo:
+            try:
+                user_keys_named = self._user_api_key_repo.get_all_decrypted_with_names(dto.user_id)
+            except Exception:
+                pass
+        user_keys = {m: {"key": v["key"], "base_url": v.get("base_url")} for m, v in user_keys_named.items()}
+
+        # ── Step 1: gather notes (silent inspiration) ────────────────────────
+        yield _sse({"t": "*Searching your notes for ideas and rubrics…*\n\n"})
+        notes_context = ""
+        if dto.user_id:
+            all_notes = self.note_repo.get_for_user(dto.user_id, dto.workspace_id)
+            if all_notes:
+                try:
+                    qvec = self.embedding.embed_text(writing_prompt)
+                    top_notes = self.note_repo.search_hybrid(writing_prompt, qvec, top_k=8, workspace_id=dto.workspace_id)
+                except Exception:
+                    top_notes = all_notes[:8]
+                blocks = []
+                for n in top_notes:
+                    plain = re.sub(r"<[^>]+>", " ", n.content).strip()[:2000]
+                    blocks.append(f"[{n.title or 'Untitled'}]\n{plain}")
+                notes_context = "\n\n---\n\n".join(blocks)
+
+        # ── Step 2: web search ───────────────────────────────────────────────
+        web_context = ""
+        if settings.brave_search_api_key:
+            yield _sse({"t": "*Searching the web…*\n\n"})
+            web_context = brave_search(writing_prompt) or ""
+
+        # ── Step 3: academic papers ──────────────────────────────────────────
+        yield _sse({"t": "*Finding academic sources…*\n\n"})
+        papers = search_papers(writing_prompt[:150], limit=5, api_key=settings.semantic_scholar_api_key)
+        paper_context = format_papers_context(papers)
+
+        # Assemble silent context block for all writers
+        context_parts = []
+        if notes_context:
+            context_parts.append(
+                "=== YOUR KNOWLEDGE BASE ===\n"
+                "Use the content below as silent inspiration: draw from its ideas, structures, rubrics, "
+                "and prior work. Do NOT cite or reference these notes in your output.\n\n"
+                + notes_context
+            )
+        if web_context:
+            context_parts.append("=== WEB CONTEXT ===\n" + web_context)
+        if paper_context:
+            context_parts.append("=== ACADEMIC SOURCES ===\n" + paper_context)
+        full_context = "\n\n".join(context_parts)
+
+        writer_system = (
+            "You are an expert writer producing high-quality, original content.\n\n"
+            "Rules:\n"
+            "- Draw silently from the knowledge base: ideas, rubrics, structures, prior work — but NEVER cite or mention notes\n"
+            "- Write as if this knowledge is already yours\n"
+            "- Output only the content itself — no preamble, no 'Draft:', no model name prefix\n"
+            "- Prioritise depth, clarity, and logical flow\n\n"
+            + (f"Knowledge base (silent):\n{full_context}" if full_context else "")
+        )
+
+        # ── Step 4: each model writes a draft ────────────────────────────────
+        writing_models: list[tuple[str, str]] = [("GPT", settings.openai_chat_model)]
+        if settings.gemini_api_key:
+            writing_models.append(("Gemini", "gemini-2.5-flash"))
+        if settings.deepseek_api_key:
+            writing_models.append(("DeepSeek", "deepseek-chat"))
+        existing_ids = {m for _, m in writing_models}
+        for mid, info in user_keys_named.items():
+            if mid not in existing_ids:
+                writing_models.append((info.get("name", mid), mid))
+                existing_ids.add(mid)
+
+        drafts: list[tuple[str, str]] = []
+        for name, wmodel in writing_models:
+            yield _sse({"t": f"*{name} writing draft…*\n\n"})
+            try:
+                draft = _get_client(wmodel, user_keys).chat.completions.create(
+                    model=wmodel,
+                    messages=[
+                        {"role": "system", "content": writer_system},
+                        {"role": "user", "content": writing_prompt},
+                    ],
+                    max_tokens=4096,
+                ).choices[0].message.content or ""
+                if draft.strip():
+                    drafts.append((name, draft.strip()))
+            except Exception as exc:
+                yield _sse({"t": f"*{name} unavailable: {exc}*\n\n"})
+
+        if not drafts:
+            yield _sse({"t": "Writing failed: no models could produce a draft."})
+            return
+
+        # Single model — stream draft directly
+        if len(drafts) == 1:
+            yield _sse({"t": "---\n\n"})
+            yield _sse({"t": drafts[0][1]})
+            return
+
+        # ── Step 5: synthesise the best output ───────────────────────────────
+        yield _sse({"t": f"*Synthesising the best output from {len(drafts)} drafts…*\n\n---\n\n"})
+
+        drafts_block = "\n\n---\n\n".join(f"### {name} Draft:\n{draft}" for name, draft in drafts)
+        synth_system = (
+            "You are the final editor. Multiple AI models wrote independent drafts for the same writing request. "
+            "Synthesise them into ONE final version that is better than any individual draft by:\n"
+            "1. Taking the strongest structure, ideas, and phrasing from each\n"
+            "2. Resolving any contradictions using your best judgment\n"
+            "3. Filling gaps with your own expertise\n"
+            "4. Producing polished, coherent, high-quality writing\n\n"
+            "Output ONLY the final content — no preamble, no 'Here is the synthesis', just the writing itself."
+        )
+        synth_prompt = (
+            f"Writing request: {writing_prompt}\n\n"
+            f"Drafts to synthesise:\n{drafts_block}\n\n"
+            "Produce the single best final version:"
+        )
+        synth_model = settings.openai_chat_model
+        try:
+            stream = _get_client(synth_model, user_keys).chat.completions.create(
+                model=synth_model,
+                messages=[
+                    {"role": "system", "content": synth_system},
+                    {"role": "user", "content": synth_prompt},
+                ],
+                stream=True,
+                max_tokens=8192,
+            )
+            for chunk in stream:
+                delta = chunk.choices[0].delta.content or ""
+                if delta:
+                    yield _sse({"t": delta})
+        except Exception as exc:
+            yield _sse({"t": f"\n\nSynthesis failed: {exc}\n\nBest draft (from {drafts[0][0]}):\n\n{drafts[0][1]}"})
 
     # ── /Read ─────────────────────────────────────────────────────────────────
 

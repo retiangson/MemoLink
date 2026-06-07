@@ -6,6 +6,14 @@ export const NOTE_COMMANDS = new Set([
 ]);
 
 export const FORMAT_HINTS: Record<string, { format: string; examples: string[] }> = {
+  write: {
+    format: "/Write  your writing prompt",
+    examples: [
+      "Write a research essay on context-aware AI systems",
+      "Help me write Assessment 2 for MSE907 covering RAG architecture",
+      "Draft a professional email to my supervisor about project progress",
+    ],
+  },
   feedback:  {
     format: "/Feedback  title : message",
     examples: [

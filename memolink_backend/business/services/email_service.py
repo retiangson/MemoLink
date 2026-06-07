@@ -283,6 +283,7 @@ class EmailService:
 
     async def send_reply(self, user_id: int, record_id: int, body: str) -> bool:
         from email.mime.text import MIMEText
+        from email.mime.multipart import MIMEMultipart
         import base64 as _b64
 
         r = self.record_repo.get_by_id(user_id, record_id)
@@ -290,7 +291,18 @@ class EmailService:
             return False
         access_token = await _get_valid_token(self.account_repo, user_id)
 
-        msg = MIMEText(body, "plain", "utf-8")
+        _is_html = bool(re.search(r"<(p|br|ul|ol|li|h[1-6]|strong|em|div)\b", body, re.I))
+        if _is_html:
+            _plain = re.sub(r"<br\s*/?>|</p>|</li>|</h[1-6]>", "\n", body, flags=re.I)
+            _plain = re.sub(r"<[^>]+>", "", _plain)
+            import html as _html_mod
+            _plain = _html_mod.unescape(_plain).strip()
+            msg = MIMEMultipart("alternative")
+            msg.attach(MIMEText(_plain, "plain", "utf-8"))
+            msg.attach(MIMEText(body, "html", "utf-8"))
+        else:
+            msg = MIMEText(body, "plain", "utf-8")
+
         msg["To"] = r.sender_email
         msg["Subject"] = r.subject if r.subject.lower().startswith("re:") else f"Re: {r.subject}"
         msg["In-Reply-To"] = r.gmail_message_id

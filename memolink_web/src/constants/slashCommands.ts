@@ -10,6 +10,7 @@ export const SLASH_COMMANDS = [
   { cmd: "Reminder",   syntax: '/Reminder title : YYYY-MM-DD HH:MM', desc: "Create a reminder" },
   { cmd: "Quiz",       syntax: '/Quiz "Note Name" : 10',             desc: "Generate interactive quiz",     hasAll: true },
   { cmd: "Discussion", syntax: '/Discussion "Note Name"',            desc: "Multi-model discussion",        hasAll: true },
+  { cmd: "Write",      syntax: "/Write your writing prompt",         desc: "Multi-model writing + synthesis" },
   { cmd: "Read",       syntax: '/Read "Note Name"',                  desc: "Read note in chat" },
   { cmd: "Feedback",   syntax: '/Feedback title : message',          desc: "Submit a suggestion" },
   { cmd: "ReportBug",  syntax: '/ReportBug title : description',     desc: "Report a bug" },

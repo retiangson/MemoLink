@@ -136,8 +136,28 @@ class ResearchService:
         workspace_id: Optional[int],
         model: Optional[str],
     ) -> Iterator[str]:
+        _GEMINI_MODELS = {"gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.5-pro"}
+        _DEEPSEEK_MODELS = {"deepseek-chat", "deepseek-reasoner", "deepseek-coder"}
+        _GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
+        _DEEPSEEK_BASE_URL = "https://api.deepseek.com/v1"
+
         model = model or settings.openai_chat_model
-        client = OpenAI(api_key=settings.openai_api_key)
+        # Route to the correct OpenAI-compatible endpoint; non-OpenAI models that lack
+        # a configured key fall back to the default OpenAI model.
+        if model in _GEMINI_MODELS:
+            if settings.gemini_api_key:
+                client = OpenAI(api_key=settings.gemini_api_key, base_url=_GEMINI_BASE_URL)
+            else:
+                model = settings.openai_chat_model
+                client = OpenAI(api_key=settings.openai_api_key)
+        elif model in _DEEPSEEK_MODELS:
+            if settings.deepseek_api_key:
+                client = OpenAI(api_key=settings.deepseek_api_key, base_url=_DEEPSEEK_BASE_URL)
+            else:
+                model = settings.openai_chat_model
+                client = OpenAI(api_key=settings.openai_api_key)
+        else:
+            client = OpenAI(api_key=settings.openai_api_key)
 
         # Persist user message
         self.repo_conv.add_message(conversation_id, "user", prompt)

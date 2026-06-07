@@ -18,12 +18,16 @@ _HTML_TAG = re.compile(r"<[^>]+>")
 _BASE64_IMG_MD = re.compile(r'!\[([^\]]*)\]\(data:[^)]{20,}\)', re.IGNORECASE)
 # Matches HTML img tags whose src is a base64 data URL
 _BASE64_IMG_HTML = re.compile(r'<img\b[^>]*\bsrc=["\']data:[^"\']{20,}["\'][^>]*>', re.IGNORECASE)
+# Strips body_b64 attribute from email_draft tags so large note bodies don't bloat conversation history
+_EMAIL_DRAFT_BODY = re.compile(r'\s+body_b64="[^"]*"', re.IGNORECASE)
 
 
 def _strip_base64_images(text: str) -> str:
-    """Replace embedded base64 images with a short placeholder to prevent token overflow."""
+    """Replace embedded base64 images with a short placeholder to prevent token overflow.
+    Also strips email draft body_b64 attributes from conversation history."""
     text = _BASE64_IMG_MD.sub(r'[generated image: \1]', text)
     text = _BASE64_IMG_HTML.sub('[embedded image]', text)
+    text = _EMAIL_DRAFT_BODY.sub('', text)
     return text
 from memolink_backend.domain.repositories.conversation_repository import ConversationRepository
 from memolink_backend.domain.repositories.note_repository import NoteRepository
@@ -545,81 +549,212 @@ class ChatService(IChatService):
         if (_asks_compose or _asks_reply) and self._email_service and dto.user_id:
             try:
                 import re as _re
-                # Recipient: after "to", "reply to", "email to", etc.
-                _to_match = _re.search(
-                    r"(?:reply(?: again)? to|respond to|write back to|get back to|follow[- ]?up (?:with|to)|"
-                    r"send(?: an?)?(?: email)?(?: message)? to|email to|email|message to|shoot(?: an? email)? to)\s+([^\s,@]+(?:@[^\s,]+)?)",
-                    user_text, _re.I
-                )
-                # Body hint: after "saying/say/about/regarding/telling/letting know" — intentionally no bare "with"
-                _body_match = _re.search(
-                    r"(?:saying|just say|say|about|regarding|on the topic of|"
-                    r"with details (?:of|about|on)|with info (?:about|on)|"
-                    r"telling (?:them|him|her) about|letting (?:them|him|her) know about|"
-                    r"containing|with content|,)\s+(.+)$",
-                    user_text, _re.I | _re.S
-                )
-                if _to_match and _body_match:
-                    recipient_hint = (_to_match.group(_to_match.lastindex) or "").strip().lower().rstrip(".,")
-                    topic = _body_match.group(1).strip().strip('"\'')
-                    is_reply = _asks_reply and not _asks_compose
+                import json as _json
 
-                    if is_reply:
-                        # Search Gmail for a thread to reply to
-                        candidate = self._email_service.live_search_sync(dto.user_id, recipient_hint, top_k=1)
-                        if candidate:
-                            em = candidate[0]
-                            sender = em.get("sender", "")
-                            to_addr = sender.split("<")[-1].strip(">").strip() if "<" in sender else sender
-                            subj = em.get("subject", "")
-                            subject = subj if subj.lower().startswith("re:") else f"Re: {subj}"
-                            mid = em.get("id", "")
-                            tid = em.get("thread_id", "")
-                        else:
-                            to_addr, subject, mid, tid = recipient_hint, f"Re: {topic}", "", ""
-                    else:
-                        # New email — recipient is likely an email address or name
-                        to_addr = recipient_hint if "@" in recipient_hint else f"{recipient_hint}@gmail.com"
-                        subject = topic.replace('"', "'").capitalize()
-                        mid, tid = "", ""
+                def _html_to_plain(html: str) -> str:
+                    import re as _r
+                    text = _r.sub(r"<br\s*/?>|</p>|</li>|</h[1-6]>", "\n", html, flags=_r.I)
+                    text = _r.sub(r"<[^>]+>", "", text)
+                    import html as _html_mod
+                    text = _html_mod.unescape(text)
+                    text = text.replace(" ", " ")
+                    return _r.sub(r"\n{3,}", "\n\n", text).strip()
 
-                    def _html_to_plain(html: str) -> str:
-                        import re as _r
-                        text = _r.sub(r"<br\s*/?>|</p>|</li>|</h[1-6]>", "\n", html, flags=_r.I)
-                        text = _r.sub(r"<[^>]+>", "", text)
-                        import html as _html_mod
-                        text = _html_mod.unescape(text)
-                        return _r.sub(r"\n{3,}", "\n\n", text).strip()
+                # --- AI-based intent extraction ---
+                # Build a note title list so the AI can pick the right one
+                _note_titles: list[str] = []
+                try:
+                    _note_titles = [n.title for n in self.repo_notes.get_for_user(dto.user_id) if n.title]
+                except Exception:
+                    pass
 
-                    # Only use a note if its TITLE closely matches the topic (avoid picking wrong content)
-                    body_text = f"Hi,\n\nI wanted to share some details about: {topic}.\n\nPlease let me know if you have any questions."
-                    if hasattr(self, "repo_notes") and self.repo_notes and dto.user_id:
+                _intent: dict = {}
+                try:
+                    _extract_prompt = (
+                        "You are an email intent extractor. Given the user request below, return ONLY a valid JSON object with these fields:\n"
+                        "  recipient   — the recipient name or email address (string, just the raw value the user said)\n"
+                        "  note_name   — the title of the note to use as email body, or null if none mentioned\n"
+                        "  subject     — a concise, appropriate email subject line\n"
+                        "  is_reply    — true if the user wants to reply to an existing email, false for a new email\n"
+                        "  style       — any style/tone instructions like 'make it nice', 'be formal', or null\n\n"
+                        f"Available note titles (match one if mentioned): {_note_titles}\n\n"
+                        f"User request: {user_text}\n\n"
+                        "Return ONLY the JSON object, no explanation."
+                    )
+                    # Use the best available model — try the user's selected model first,
+                    # then fall back through the same chain used for chat
+                    _extract_chain = _build_fallback_chain(dto.model or settings.openai_chat_model)
+                    _raw = ""
+                    for _em in _extract_chain:
                         try:
-                            _stop_note = {"the", "a", "an", "of", "in", "on", "for", "and", "or",
-                                          "details", "info", "information", "about", "detail"}
-                            _kw_words = [w.lower() for w in topic.split() if w.lower() not in _stop_note and len(w) > 2]
-                            if _kw_words:
-                                all_notes = self.repo_notes.get_for_user(dto.user_id)
-                                for note in all_notes:
-                                    title_lower = (note.title or "").lower()
-                                    if sum(1 for w in _kw_words if w in title_lower) >= max(1, len(_kw_words) // 2):
-                                        body_text = _html_to_plain(note.content)[:1500]
-                                        break
+                            _ec = _get_client(_em)
+                            _er = _ec.chat.completions.create(
+                                model=_em,
+                                messages=[{"role": "user", "content": _extract_prompt}],
+                                max_tokens=200,
+                                temperature=0,
+                            )
+                            _raw = (_er.choices[0].message.content or "").strip()
+                            break
                         except Exception:
-                            pass
+                            continue
+                    if _raw:
+                        _raw = _re.sub(r"^```(?:json)?\s*|\s*```$", "", _raw, flags=_re.S).strip()
+                        _intent = _json.loads(_raw)
+                except Exception:
+                    pass  # Falls through to regex fallback below
 
-                    import base64 as _b64
-                    body_b64 = _b64.b64encode(body_text[:2000].encode()).decode()
-                    subj_safe = subject.replace('"', "'")
-                    draft_tag = (
-                        f'<email_draft to="{to_addr}" subject="{subj_safe}" '
-                        f'body_b64="{body_b64}" message_id="{mid}" thread_id="{tid}"></email_draft>'
+                # --- Populate fields from AI intent or regex fallback ---
+                recipient_hint: str = ""
+                topic: str = ""
+                style_hint: str = ""
+                is_reply: bool = _asks_reply and not _asks_compose
+
+                if _intent.get("recipient"):
+                    recipient_hint = str(_intent["recipient"]).strip().lower().rstrip(".,")
+                    topic = str(_intent.get("note_name") or _intent.get("subject") or "").strip()
+                    style_hint = str(_intent.get("style") or "").strip()
+                    is_reply = bool(_intent.get("is_reply", is_reply))
+                else:
+                    # Regex fallback — covers all common phrasings
+                    _to_match = _re.search(
+                        r"(?:reply(?: again)? to|respond to|write back to|get back to|follow[- ]?up (?:with|to)|"
+                        r"send(?: an?)?(?: email)?(?: message)? to|email to|email|message to|shoot(?: an? email)? to)\s+([^\s,@]+(?:@[^\s,]+)?)",
+                        user_text, _re.I
                     )
-                    action = "reply" if is_reply else "email"
-                    _email_draft_prefill = (
-                        f"Here's your draft {action} — review it and click **Send** to deliver, "
-                        f"or click **Edit** to adjust the message first.\n\n{draft_tag}"
+                    # Priority 1: "the [name] from/in (my) note(s)"
+                    _from_note_match = _re.search(
+                        r"\bthe\s+(.+?)\s+(?:from|in)\s+(?:my\s+)?notes?\b",
+                        user_text, _re.I
                     )
+                    # Priority 2: "the [name] note" — e.g. "the Capstone Adviser note"
+                    _bare_note_match = _re.search(
+                        r"\bthe\s+(.+?)\s+notes?\b",
+                        user_text, _re.I
+                    )
+                    # Priority 3: keyword body hint — "about X", "regarding X", trailing ", X"
+                    _body_match = _re.search(
+                        r"(?:saying|just say|say|about|regarding|on the topic of|"
+                        r"with details (?:of|about|on)|with info (?:about|on)|"
+                        r"telling (?:them|him|her) about|letting (?:them|him|her) know about|"
+                        r"containing|with content|,)\s+(.+)$",
+                        user_text, _re.I | _re.S
+                    )
+                    if _to_match:
+                        recipient_hint = (_to_match.group(_to_match.lastindex) or "").strip().lower().rstrip(".,")
+                    if _from_note_match:
+                        topic = _from_note_match.group(1).strip().strip('"\'')
+                    elif _bare_note_match:
+                        topic = _bare_note_match.group(1).strip().strip('"\'')
+                    elif _body_match:
+                        topic = _body_match.group(1).strip().strip('"\'')
+
+                    # When note was found via explicit reference AND body_match also captured
+                    # something, that captured text is a style instruction, not the topic
+                    if (_from_note_match or _bare_note_match) and _body_match:
+                        style_hint = _body_match.group(1).strip().strip('"\'')
+
+                if not recipient_hint or not topic:
+                    raise ValueError("insufficient intent: need recipient and topic")
+
+                if is_reply:
+                    candidate = self._email_service.live_search_sync(dto.user_id, recipient_hint, top_k=1)
+                    if candidate:
+                        em = candidate[0]
+                        sender = em.get("sender", "")
+                        to_addr = sender.split("<")[-1].strip(">").strip() if "<" in sender else sender
+                        subj = em.get("subject", "")
+                        subject = subj if subj.lower().startswith("re:") else f"Re: {subj}"
+                        mid = em.get("id", "")
+                        tid = em.get("thread_id", "")
+                    else:
+                        to_addr = recipient_hint if "@" in recipient_hint else f"{recipient_hint}@gmail.com"
+                        subject = str(_intent.get("subject") or f"Re: {topic}").replace('"', "'")
+                        mid, tid = "", ""
+                else:
+                    to_addr = recipient_hint if "@" in recipient_hint else f"{recipient_hint}@gmail.com"
+                    subject = str(_intent.get("subject") or topic).replace('"', "'").capitalize()
+                    mid, tid = "", ""
+
+                # --- Find the matching note and build body ---
+                # Use AI-extracted note_name if available, otherwise fall back to topic keywords
+                note_name_hint = str(_intent.get("note_name") or topic).strip()
+                body_text = f"Hi,\n\nI wanted to share some details about: {note_name_hint or topic}.\n\nPlease let me know if you have any questions."
+                if note_name_hint and self.repo_notes and dto.user_id:
+                    try:
+                        _stop_note = {"the", "a", "an", "of", "in", "on", "for", "and", "or",
+                                      "details", "info", "information", "about", "detail"}
+                        _kw_words = [w.lower() for w in note_name_hint.split() if w.lower() not in _stop_note and len(w) > 2]
+                        if _kw_words:
+                            _all_notes = self.repo_notes.get_for_user(dto.user_id)
+                            for _note in _all_notes:
+                                title_lower = (_note.title or "").lower()
+                                if sum(1 for w in _kw_words if w in title_lower) >= max(1, len(_kw_words) // 2):
+                                    # Strip HTML, also drop leading nav/badge lines (short lines < 60 chars
+                                    # at the top are usually navigation or icon badges, not real content)
+                                    _full_plain = _html_to_plain(_note.content)
+                                    _lines = _full_plain.splitlines()
+                                    # Skip short header/nav lines at the top until we hit substantive content
+                                    _skip = 0
+                                    for _ln in _lines:
+                                        if len(_ln.strip()) < 60 and _skip < 15:
+                                            _skip += 1
+                                        else:
+                                            break
+                                    _cleaned = "\n".join(_lines[_skip:]).strip()
+                                    # No cap for direct send; AI-rewrite path is capped separately below
+                                    raw_body = _cleaned or _full_plain
+
+                                    # style_hint is set from AI extraction or regex fallback
+                                    _style = style_hint
+                                    if _style:
+                                        # User asked for a specific style/tone — let AI rewrite accordingly
+                                        try:
+                                            _rewrite_chain = _build_fallback_chain(dto.model or settings.openai_chat_model)
+                                            for _rm in _rewrite_chain:
+                                                try:
+                                                    _rr = _get_client(_rm).chat.completions.create(
+                                                        model=_rm,
+                                                        messages=[
+                                                            {"role": "system", "content": (
+                                                                "You are a professional email writer. "
+                                                                "Rewrite the note content below as an email body following the style instruction. "
+                                                                "Cover all key sections — do not collapse into one sentence. "
+                                                                "Use paragraphs, bold headings, and bullet points where appropriate. "
+                                                                "Do NOT include a subject line or sign-off — email body only."
+                                                            )},
+                                                            {"role": "user", "content": f"Style instruction: {_style}\n\nNote title: {_note.title}\n\nNote content:\n{raw_body[:10000]}"},
+                                                        ],
+                                                        max_tokens=1200,
+                                                        temperature=0.4,
+                                                    )
+                                                    body_text = (_rr.choices[0].message.content or "").strip() or raw_body
+                                                    break
+                                                except Exception:
+                                                    continue
+                                        except Exception:
+                                            body_text = raw_body
+                                    else:
+                                        # No style instruction — send the note content directly, no AI rewriting
+                                        body_text = raw_body
+                                    break
+                    except Exception:
+                        pass
+
+                import base64 as _b64
+                # Cap at 15 000 chars — covers virtually any real note while keeping
+                # the base64 blob a manageable size in the email and in storage
+                body_b64 = _b64.b64encode(body_text[:15000].encode()).decode()
+                subj_safe = subject.replace('"', "'")
+                draft_tag = (
+                    f'<email_draft to="{to_addr}" subject="{subj_safe}" '
+                    f'body_b64="{body_b64}" message_id="{mid}" thread_id="{tid}"></email_draft>'
+                )
+                action = "reply" if is_reply else "email"
+                _email_draft_prefill = (
+                    f"Here's your draft {action} — review it and click **Send** to deliver, "
+                    f"or click **Edit** to adjust the message first.\n\n{draft_tag}"
+                )
             except Exception:
                 pass  # Fall through to normal email RAG
 
@@ -784,34 +919,83 @@ class ChatService(IChatService):
         yield f"data: {json.dumps({'close_note': note.id})}\n\n"
         yield f"data: {json.dumps({'improving_note': note.title})}\n\n"
 
-        plain = _HTML_TAG.sub(" ", note.content or "").strip()
-        improve_messages = [
-            {"role": "system", "content": (
-                "You are a document formatting expert. Improve the structure, formatting, and clarity of the given note. "
-                "Rules: use proper HTML tags (h2, h3 for headings, p for paragraphs, ul/ol/li for lists, "
-                "<strong> for key terms, <em> for emphasis, <table> for tabular data). "
-                "Do NOT change the meaning, remove content, or add new information. "
-                "Return ONLY the improved HTML - no markdown fences, no doctype, no html/body tags, no commentary."
-            )},
-            {"role": "user", "content": f"Note title: {note.title}\n\nContent:\n{plain[:5000]}"},
-        ]
+        _IMPROVE_SYSTEM = (
+            "You are a document formatting expert. Improve the structure, formatting, and clarity of the given note. "
+            "Rules: use proper HTML tags (h2, h3 for headings, p for paragraphs, ul/ol/li for lists, "
+            "<strong> for key terms, <em> for emphasis, <table> for tabular data). "
+            "Do NOT change the meaning, remove content, or add new information. "
+            "Return ONLY the improved HTML - no markdown fences, no doctype, no html/body tags, no commentary."
+        )
+        # 5 000 chars ≈ 1 250 input tokens; output of similar size stays well within
+        # even the tightest per-model output budget (4 096 tokens ≈ 16 000 chars out).
+        _CHUNK_LIMIT = 5000
 
         user_keys = self._resolve_user_keys(dto.user_id)
         chain = _build_fallback_chain(dto.model or settings.openai_chat_model)
-        improved_html: str | None = None
-        for attempt in chain:
-            try:
-                completion = _get_client(attempt, user_keys).chat.completions.create(
-                    model=attempt, messages=improve_messages,
-                    **_completion_kwargs(attempt),
-                )
-                improved_html = (completion.choices[0].message.content or "").strip()
-                break
-            except Exception:
-                continue
+
+        def _call_improve(content_chunk: str) -> str | None:
+            for attempt in chain:
+                try:
+                    _kw = dict(_completion_kwargs(attempt))
+                    _kw.setdefault("max_tokens", 8192)
+                    completion = _get_client(attempt, user_keys).chat.completions.create(
+                        model=attempt,
+                        messages=[
+                            {"role": "system", "content": _IMPROVE_SYSTEM},
+                            {"role": "user", "content": f"Note title: {note.title}\n\nContent:\n{content_chunk}"},
+                        ],
+                        **_kw,
+                    )
+                    result = (completion.choices[0].message.content or "").strip()
+                    return result or None
+                except Exception as _exc:
+                    self._syslog("warn", f"/improve chunk failed on {attempt}: {_exc}", {}, dto.user_id)
+                    continue
+            return None
+
+        import re as _re
+        raw_content = note.content or ""
+        _raw_len = len(raw_content)
+        self._syslog("info", f"/improve '{note.title}': raw_content={_raw_len} chars, CHUNK_LIMIT={_CHUNK_LIMIT}", {}, dto.user_id)
+
+        if _raw_len <= _CHUNK_LIMIT:
+            improved_html = _call_improve(raw_content)
+        else:
+            # Split on section boundaries — handles <hr>, <hr/>, <hr />, <h2>, <h3>
+            _pieces = _re.split(r'(?=<hr\b[^>]*>|<h[23]\b)', raw_content, flags=_re.I)
+            self._syslog("info", f"/improve split into {len(_pieces)} pieces", {}, dto.user_id)
+
+            # Merge small pieces into chunks that fit _CHUNK_LIMIT
+            _chunks: list[str] = []
+            _buf = ""
+            for _piece in _pieces:
+                if len(_buf) + len(_piece) <= _CHUNK_LIMIT:
+                    _buf += _piece
+                else:
+                    if _buf:
+                        _chunks.append(_buf)
+                    if len(_piece) > _CHUNK_LIMIT:
+                        for _i in range(0, len(_piece), _CHUNK_LIMIT):
+                            _chunks.append(_piece[_i:_i + _CHUNK_LIMIT])
+                        _buf = ""
+                    else:
+                        _buf = _piece
+            if _buf:
+                _chunks.append(_buf)
+
+            self._syslog("info", f"/improve merged into {len(_chunks)} chunks: {[len(c) for c in _chunks]}", {}, dto.user_id)
+
+            _improved_parts: list[str] = []
+            for _i, _chunk in enumerate(_chunks):
+                _part = _call_improve(_chunk)
+                if _part is None:
+                    self._syslog("warn", f"/improve chunk {_i} failed — keeping original", {}, dto.user_id)
+                _improved_parts.append(_part if _part else _chunk)
+
+            improved_html = "\n".join(_improved_parts) if _improved_parts else None
 
         if not improved_html:
-            msg = "⚠ Failed to improve the note - all AI models are currently unavailable."
+            msg = "⚠ Failed to improve the note — all AI models are currently unavailable."
             assistant_msg = self.repo_conv.add_message(conversation_id, "assistant", msg)
             yield f"data: {json.dumps({'t': msg})}\n\n"
             yield f"data: {json.dumps({'done': True, 'id': assistant_msg.id})}\n\n"
@@ -1076,6 +1260,8 @@ class ChatService(IChatService):
         content_blocks: list = [{"type": "text", "text": prompt}]
         attachments: List[ChatAttachmentDTO] = []
 
+        openai_client = OpenAI(api_key=settings.openai_api_key)
+
         for file in files:
             filename = file.filename or "file"
             mime = file.content_type or mimetypes.guess_type(filename)[0] or "application/octet-stream"
@@ -1086,9 +1272,6 @@ class ChatService(IChatService):
             if _is_image(filename, mime):
                 b64 = base64.b64encode(file_bytes).decode()
                 content_blocks.append({"type": "image_url", "image_url": {"url": f"data:{mime};base64,{b64}"}})
-            elif filename.lower().endswith(".pdf"):
-                uploaded = client.files.create(file=(filename, file_bytes, mime), purpose="vision")
-                content_blocks.append({"type": "file", "file": {"file_id": uploaded.id}})
             else:
                 extracted = extract_text_local(file_bytes, filename)
                 content_blocks.append({"type": "text", "text": f"FILE: {filename}\n\n{extracted}"})
@@ -1096,7 +1279,6 @@ class ChatService(IChatService):
         attachment_label = "Attached: " + ", ".join(a.filename for a in attachments)
         self.repo_conv.add_message(conversation_id, "user", f"{attachment_label}\n\n{prompt}")
 
-        openai_client = OpenAI(api_key=settings.openai_api_key)
         completion = openai_client.chat.completions.create(
             model=settings.openai_chat_model,
             messages=[

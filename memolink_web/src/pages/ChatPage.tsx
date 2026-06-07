@@ -87,6 +87,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
   const [isSyncingEmail, setIsSyncingEmail] = useState(false);
   const [emailSyncResult, setEmailSyncResult] = useState<string | null>(null);
   const [showTour, setShowTour] = useState(() => !localStorage.getItem("memolink_walkthrough_done"));
+  const [bellTooltipVisible, setBellTooltipVisible] = useState(false);
 
   // Tab drag-and-drop
   const dragSrcRef = useRef<{ type: "chat" | "note"; index: number } | null>(null);
@@ -473,33 +474,6 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
         </div>
       )}
 
-      {!sidebarOpen && (
-        <button
-          onClick={() => setSidebarOpen(true)}
-          className="absolute top-[52px] left-4 z-20 flex h-9 w-9 items-center justify-center rounded-lg bg-[#1e1e2a] hover:bg-[#2a2a38] transition"
-          aria-label="Open sidebar"
-        >
-          <img src="/memolink-icon.png" alt="" className="h-6 w-6 rounded-md bg-white object-cover" />
-        </button>
-      )}
-
-
-      {!rightPanelOpen && (
-        <button
-          onClick={() => setRightPanelOpen(true)}
-          className="absolute top-[52px] right-4 z-20 flex h-9 w-9 items-center justify-center rounded-lg bg-[#1e1e2a] hover:bg-[#2a2a38] transition"
-          title="Open suggestions & reminders"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-indigo-400" fill="currentColor" viewBox="0 0 16 16">
-            <path d="M2 6a6 6 0 1 1 10.174 4.31c-.203.196-.359.4-.453.619l-.762 1.769A.5.5 0 0 1 10.5 13h-5a.5.5 0 0 1-.46-.302l-.761-1.77a2 2 0 0 0-.453-.618A5.98 5.98 0 0 1 2 6m3 8.5a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 0 1l-.224.447a1 1 0 0 1-.894.553H6.618a1 1 0 0 1-.894-.553L5.5 15a.5.5 0 0 1-.5-.5"/>
-          </svg>
-          {urgentCount > 0 && (
-            <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-amber-500 text-[9px] font-bold text-black leading-none">
-              {urgentCount}
-            </span>
-          )}
-        </button>
-      )}
 
       <Sidebar
         open={sidebarOpen}
@@ -690,35 +664,54 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
 
           {/* User info - outside overflow so the bell tooltip can extend below freely */}
           <div className="shrink-0 flex items-center gap-3 px-4 text-xs text-gray-500">
-            {urgentCount > 0 && (
-              <div className="relative group">
-                <button
-                  onClick={() => setRightPanelOpen(true)}
-                  className="relative flex items-center justify-center w-7 h-7 rounded-lg hover:bg-amber-500/10 transition"
-                  title={`${urgentCount} reminder${urgentCount > 1 ? "s" : ""} due today`}
-                >
-                  <span className="animate-ping absolute inline-flex w-3.5 h-3.5 rounded-full bg-amber-400 opacity-30" />
-                  <svg xmlns="http://www.w3.org/2000/svg" className="relative w-4 h-4 text-amber-400" fill="currentColor" viewBox="0 0 16 16">
-                    <path d="M8 16a2 2 0 0 0 2-2H6a2 2 0 0 0 2 2M8 1.918l-.797.161A4 4 0 0 0 4 6c0 .628-.134 2.197-.459 3.742-.16.767-.376 1.566-.663 2.258h10.244c-.287-.692-.502-1.49-.663-2.258C12.134 8.197 12 6.628 12 6a4 4 0 0 0-3.203-3.92zM14.22 12c.223.447.481.801.78 1H1c.299-.199.557-.553.78-1C2.68 10.2 3 6.88 3 6c0-2.42 1.72-4.44 4.005-4.901a1 1 0 1 1 1.99 0A5 5 0 0 1 13 6c0 .88.32 4.2 1.22 6"/>
-                  </svg>
+            {/* Sidebar toggle - shown in top right when sidebar is closed */}
+            {!sidebarOpen && (
+              <button
+                onClick={() => setSidebarOpen(true)}
+                className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#1e1e2a] hover:bg-[#2a2a38] transition"
+                aria-label="Open sidebar"
+              >
+                <img src="/memolink-icon.png" alt="" className="h-5 w-5 rounded-md bg-white object-cover" />
+              </button>
+            )}
+
+            {/* Bell / reminders - always visible */}
+            <div
+              className="relative"
+              onMouseEnter={() => { if (urgentCount > 0) setBellTooltipVisible(true); }}
+              onMouseLeave={() => setBellTooltipVisible(false)}
+            >
+              <button
+                onClick={() => setRightPanelOpen(true)}
+                className={`relative flex items-center justify-center w-7 h-7 rounded-lg transition ${urgentCount > 0 ? "hover:bg-amber-500/10" : "hover:bg-[#2a2a38]"}`}
+                title={urgentCount > 0 ? `${urgentCount} reminder${urgentCount > 1 ? "s" : ""} due today` : "Open suggestions & reminders"}
+              >
+                {urgentCount > 0 && <span className="animate-ping absolute inline-flex w-3.5 h-3.5 rounded-full bg-amber-400 opacity-30" />}
+                <svg xmlns="http://www.w3.org/2000/svg" className={`relative w-4 h-4 ${urgentCount > 0 ? "text-amber-400" : "text-gray-500"}`} fill="currentColor" viewBox="0 0 16 16">
+                  <path d="M8 16a2 2 0 0 0 2-2H6a2 2 0 0 0 2 2M8 1.918l-.797.161A4 4 0 0 0 4 6c0 .628-.134 2.197-.459 3.742-.16.767-.376 1.566-.663 2.258h10.244c-.287-.692-.502-1.49-.663-2.258C12.134 8.197 12 6.628 12 6a4 4 0 0 0-3.203-3.92zM14.22 12c.223.447.481.801.78 1H1c.299-.199.557-.553.78-1C2.68 10.2 3 6.88 3 6c0-2.42 1.72-4.44 4.005-4.901a1 1 0 1 1 1.99 0A5 5 0 0 1 13 6c0 .88.32 4.2 1.22 6"/>
+                </svg>
+                {urgentCount > 0 && (
                   <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-amber-500 text-[8px] font-bold text-black leading-none">
                     {urgentCount}
                   </span>
-                </button>
-                {/* Tooltip - renders below the bell, unclipped */}
-                <div className="pointer-events-none absolute right-0 top-full mt-1 z-[9999] hidden group-hover:block w-56 rounded-xl bg-[#1e1e2a] border border-amber-500/30 shadow-xl p-2.5">
+                )}
+              </button>
+              {bellTooltipVisible && urgentCount > 0 && (
+                <div className="absolute right-0 top-full mt-1 z-[9999] w-56 rounded-xl bg-[#1e1e2a] border border-amber-500/30 shadow-xl p-2.5">
                   <p className="text-[10px] font-semibold text-amber-400 uppercase tracking-wider mb-1.5">Due today</p>
-                  {todayItems.map((item) => (
-                    <div key={item.id} className="py-0.5 border-b border-[#2a2a38] last:border-0">
-                      <p className="text-[11px] text-gray-300 leading-snug">{item.text}</p>
-                      {item.due_time && (
-                        <p className="text-[10px] text-amber-400/70 mt-0.5">{item.due_time}</p>
-                      )}
-                    </div>
-                  ))}
+                  <div className="overflow-y-auto max-h-40" onScroll={() => setBellTooltipVisible(false)}>
+                    {todayItems.map((item) => (
+                      <div key={item.id} className="py-0.5 border-b border-[#2a2a38] last:border-0">
+                        <p className="text-[11px] text-gray-300 leading-snug">{item.text}</p>
+                        {item.due_time && (
+                          <p className="text-[10px] text-amber-400/70 mt-0.5">{item.due_time}</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
 
             {/* User avatar + dropdown */}
             <div className="relative">
@@ -1005,6 +998,10 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                 onToggleWorkflowMode={() => {}}
                 researchMode={chat.researchMode}
                 onToggleResearchMode={() => chat.setResearchMode((v) => !v)}
+                writingMode={chat.writingMode}
+                onToggleWritingMode={() => chat.setWritingMode((v) => !v)}
+                discussionMode={chat.discussionMode}
+                onToggleDiscussionMode={() => chat.setDiscussionMode((v) => !v)}
                 flags={flags}
                 notes={notes}
               />
@@ -1134,6 +1131,10 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                   onToggleWorkflowMode={() => {}}
                   researchMode={chat.researchMode}
                   onToggleResearchMode={() => chat.setResearchMode((v) => !v)}
+                  writingMode={chat.writingMode}
+                  onToggleWritingMode={() => chat.setWritingMode((v) => !v)}
+                  discussionMode={chat.discussionMode}
+                  onToggleDiscussionMode={() => chat.setDiscussionMode((v) => !v)}
                   flags={flags}
                   notes={notes}
                 />

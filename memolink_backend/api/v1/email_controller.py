@@ -319,9 +319,29 @@ async def send_draft(
         if ref.status_code == 200:
             access_token = ref.json().get("access_token", access_token)
 
-    msg = MIMEText(body, "plain", "utf-8")
-    msg["To"] = to
-    msg["Subject"] = subject
+    from email.mime.multipart import MIMEMultipart
+    import re as _re
+
+    _is_html = bool(_re.search(r"<(p|br|ul|ol|li|h[1-6]|strong|em|div)\b", body, _re.I))
+
+    if _is_html:
+        # Strip tags to produce a plain-text fallback
+        _plain = _re.sub(r"<br\s*/?>|</p>|</li>|</h[1-6]>", "\n", body, flags=_re.I)
+        _plain = _re.sub(r"<[^>]+>", "", _plain)
+        import html as _html_mod
+        _plain = _html_mod.unescape(_plain)
+        _plain = _re.sub(r"\n{3,}", "\n\n", _plain).strip()
+
+        msg = MIMEMultipart("alternative")
+        msg["To"] = to
+        msg["Subject"] = subject
+        msg.attach(MIMEText(_plain, "plain", "utf-8"))
+        msg.attach(MIMEText(body, "html", "utf-8"))
+    else:
+        msg = MIMEText(body, "plain", "utf-8")
+        msg["To"] = to
+        msg["Subject"] = subject
+
     if message_id:
         msg["In-Reply-To"] = message_id
         msg["References"] = message_id
