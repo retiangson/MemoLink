@@ -9,7 +9,9 @@ export interface Message {
   model?: string;
   confidence?: ConfidenceLevel;
   confidence_reason?: string;
-  routing_reason?: string;   // set when AutoPilot selected this model (e.g. "Deep Research")
+  routing_reason?: string;
+  suggest_web_search?: boolean;
+  search_query_suggestion?: string;
 }
 
 export interface Conversation {
@@ -51,3 +53,28 @@ export interface Workspace {
   created_at: string | null;
   alert_count: number;
 }
+
+export type ChatStreamEvent =
+  | { type: "message.delta"; text: string }
+  | { type: "message.replace"; content: string }
+  | {
+      type: "message.complete";
+      message_id: number | null;
+      model?: string;
+      confidence?: ConfidenceLevel;
+      confidence_reason?: string;
+      routing_reason?: string;
+      suggest_web_search?: boolean;
+      search_query_suggestion?: string;
+    }
+  | { type: "note.close"; note_id: number }
+  | { type: "note.open"; note_id: number }
+  | { type: "note.updated"; note_id: number }
+  | { type: "note.improving"; title: string }
+  | { type: "image.generating" }
+  | { type: "command.running"; command: string }
+  | { type: "quiz.ready"; quiz: unknown }
+  | { type: "tts.speak"; text: string }
+  | { type: "tool.start"; label: string; tool_call?: string }
+  | { type: "tool.complete"; ok: boolean; result?: string }
+  | { type: "unknown"; raw: unknown };

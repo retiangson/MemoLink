@@ -45,15 +45,14 @@ import uuid
 from typing import Iterator, Optional
 
 from openai import OpenAI
-from sqlalchemy.orm import Session
 
 from memolink_backend.core.config import settings
 from memolink_backend.contracts.workflow_dtos import (
     WorkflowAction, WorkflowPlanResponse, WorkflowConfirmResponse, WorkflowChatMessage,
 )
-from memolink_backend.domain.models.reminder import Reminder
 from memolink_backend.domain.repositories.note_repository import NoteRepository
 from memolink_backend.domain.repositories.conversation_repository import ConversationRepository
+from memolink_backend.domain.repositories.reminder_repository import ReminderRepository
 from memolink_backend.business.services.embedding_service import EmbeddingService
 from memolink_backend.utils.web_search import brave_image_search, brave_search
 
@@ -104,12 +103,14 @@ Rules:
 class WorkflowService:
     def __init__(
         self,
-        db: Session,
+        conv_repo: ConversationRepository,
+        note_repo: NoteRepository,
+        reminder_repo: ReminderRepository,
         embedding_service: Optional[EmbeddingService] = None,
     ):
-        self._db       = db
-        self._notes    = NoteRepository(db)
-        self._convs    = ConversationRepository(db)
+        self._notes    = note_repo
+        self._convs    = conv_repo
+        self._reminders = reminder_repo
         self._embed    = embedding_service or EmbeddingService()
         self._client   = OpenAI(api_key=settings.openai_api_key)
 
@@ -336,15 +337,15 @@ class WorkflowService:
         p = action.params
 
         if action.type == "create_reminder":
-            r = Reminder(
-                user_id=user_id, workspace_id=workspace_id,
+            self._reminders.create_reminder(
+                user_id=user_id,
                 text=p.get("title", "Reminder"),
+                workspace_id=workspace_id,
                 description=p.get("description"),
-                type="ai",
+                reminder_type="ai",
                 due_date=p.get("due_date"),
                 due_time=p.get("due_time"),
             )
-            self._db.add(r); self._db.commit()
             due = f" - due {p['due_date']}" if p.get("due_date") else ""
             return f"Reminder '{p.get('title', 'Reminder')}'{due} created"
 
@@ -355,7 +356,7 @@ class WorkflowService:
                 self._notes.save_embedding(note.id, vec)
             except Exception:
                 pass
-            self._db.commit()
+            self._notes.db.commit()
             return f"Note '{p['title']}' created (ID {note.id})"
 
         if action.type == "summarise_workspace":
@@ -375,7 +376,7 @@ class WorkflowService:
             )
             summary_text = resp.choices[0].message.content or ""
             note = self._notes.create_note(user_id, "Workspace Summary", summary_text, "workflow", workspace_id)
-            self._db.commit()
+            self._notes.db.commit()
             return f"Summary note created (ID {note.id})"
 
         if action.type == "search_web":
@@ -406,7 +407,7 @@ class WorkflowService:
             )
             outline = resp.choices[0].message.content or ""
             note = self._notes.create_note(user_id, "Note Organisation Map", outline, "workflow", workspace_id)
-            self._db.commit()
+            self._notes.db.commit()
             return f"Organisation map created (ID {note.id})"
 
         if action.type == "suggest_title":
@@ -425,7 +426,6 @@ class WorkflowService:
             )
             new_title = (resp.choices[0].message.content or "").strip().strip('"')
             self._notes.update_note(note_id, new_title, None)
-            self._db.commit()
             return f"Title updated to: {new_title}"
 
         if action.type == "extract_tasks":
@@ -443,7 +443,7 @@ class WorkflowService:
             )
             tasks_text = resp.choices[0].message.content or ""
             note = self._notes.create_note(user_id, "Extracted Tasks", tasks_text, "workflow", workspace_id)
-            self._db.commit()
+            self._notes.db.commit()
             return f"Tasks note created (ID {note.id})"
 
         if action.type == "prepare_report_outline":
@@ -462,7 +462,7 @@ class WorkflowService:
             outline = resp.choices[0].message.content or ""
             title = f"Report Outline: {topic}" if topic else "Report Outline"
             note = self._notes.create_note(user_id, title, outline, "workflow", workspace_id)
-            self._db.commit()
+            self._notes.db.commit()
             return f"Report outline created (ID {note.id})"
 
         raise ValueError(f"Unknown action type: {action.type}")

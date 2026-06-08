@@ -9,12 +9,11 @@ import re
 from typing import Iterator, Optional
 
 from openai import OpenAI
-from sqlalchemy.orm import Session
 
 from memolink_backend.core.config import settings
-from memolink_backend.domain.models.reminder import Reminder
 from memolink_backend.domain.repositories.note_repository import NoteRepository
 from memolink_backend.domain.repositories.conversation_repository import ConversationRepository
+from memolink_backend.domain.repositories.reminder_repository import ReminderRepository
 from memolink_backend.business.services.embedding_service import EmbeddingService
 from memolink_backend.utils.web_search import brave_search
 
@@ -120,12 +119,14 @@ _SYSTEM_PROMPT = (
 class AgentService:
     def __init__(
         self,
-        db: Session,
+        conv_repo: ConversationRepository,
+        note_repo: NoteRepository,
+        reminder_repo: ReminderRepository,
         embedding_service: Optional[EmbeddingService] = None,
     ):
-        self.db = db
-        self.note_repo = NoteRepository(db)
-        self.conv_repo = ConversationRepository(db)
+        self.note_repo = note_repo
+        self.conv_repo = conv_repo
+        self.reminder_repo = reminder_repo
         self.embedding = embedding_service or EmbeddingService()
         self.client = OpenAI(api_key=settings.openai_api_key)
 
@@ -151,14 +152,13 @@ class AgentService:
             self.note_repo.save_embedding(note.id, vec)
         except Exception:
             pass
-        self.db.commit()
+        self.note_repo.db.commit()
         return f"Created note '{title}' (ID: {note.id})"
 
     def _edit_note(self, note_id: int, content: str, title: Optional[str]) -> str:
         note = self.note_repo.update_note(note_id, title, content)
         if not note:
             return f"Note {note_id} not found."
-        self.db.commit()
         return f"Updated note '{note.title or 'Untitled'}' (ID: {note_id})"
 
     def _create_reminder(
@@ -167,17 +167,15 @@ class AgentService:
         due_date: Optional[str] = None,
         due_time: Optional[str] = None,
     ) -> str:
-        reminder = Reminder(
+        self.reminder_repo.create_reminder(
             user_id=user_id,
-            workspace_id=workspace_id,
             text=text,
+            workspace_id=workspace_id,
             description=description,
-            type="ai",
+            reminder_type="ai",
             due_date=due_date,
             due_time=due_time,
         )
-        self.db.add(reminder)
-        self.db.commit()
         date_str = f" for {due_date}" if due_date else ""
         time_str = f" at {due_time}" if due_time else ""
         return f"Created reminder '{text}'{date_str}{time_str}"

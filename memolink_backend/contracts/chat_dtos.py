@@ -11,6 +11,8 @@ class ChatRequestDTO(BaseModel):
     cross_workspace: bool = False
     model: Optional[str] = None
     web_search: bool = False
+    search_query_override: Optional[str] = None
+    smart_mode: bool = True
 
 
 class ChatAnswerSource(BaseModel):

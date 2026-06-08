@@ -9,8 +9,8 @@ export const FORMAT_HINTS: Record<string, { format: string; examples: string[] }
   write: {
     format: "/Write  your writing prompt",
     examples: [
-      "Write a research essay on context-aware AI systems",
-      "Help me write Assessment 2 for MSE907 covering RAG architecture",
+      "Write a research essay on adaptive AI systems",
+      "Help me write my assessment report on distributed systems security",
       "Draft a professional email to my supervisor about project progress",
     ],
   },

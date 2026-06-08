@@ -210,7 +210,7 @@ export function LoginPage({ onLogin, initialResetToken }: { onLogin: () => void;
             className="mx-auto mb-6 h-24 w-auto rounded-2xl bg-white/95 p-3 shadow-2xl shadow-indigo-900/40"
           />
           <p className="text-gray-300 max-w-sm mx-auto leading-relaxed text-lg">
-            Your context-aware AI companion for knowledge capture, retrieval, and task support.
+            Your smart AI companion for capturing ideas, finding context, and getting things done.
           </p>
           <div className="mt-8 flex flex-col gap-3 text-left max-w-xs mx-auto">
             {["Upload notes & documents", "Ask AI questions grounded in your notes", "Persistent conversation history", "Save AI answers back as notes"].map((f) => (

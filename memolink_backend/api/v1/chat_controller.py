@@ -64,7 +64,7 @@ async def upload_chat(
     conversation_id: int = Form(...),
     prompt: str = Form(""),
     files: List[UploadFile] = File(...),
-    _: int = Depends(get_current_user),
+    current_user_id: int = Depends(get_current_user),
     c: RequestContainer = Depends(get_request_container),
 ):
-    return await c.chat().handle_file_upload(conversation_id, prompt, files)
+    return await c.chat().handle_file_upload(conversation_id, prompt, files, user_id=current_user_id)

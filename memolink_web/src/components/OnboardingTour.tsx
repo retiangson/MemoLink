@@ -7,7 +7,7 @@ function buildSteps(isAdmin: boolean): Step[] {
       target: "body",
       placement: "center",
       title: "Welcome to MemoLink",
-      content: "Your context-aware AI knowledge companion. Let's take a quick tour of the main features.",
+      content: "Your smart AI companion for notes, chat, and planning. Let's take a quick tour of the main features.",
       skipBeacon: true,
     },
     {

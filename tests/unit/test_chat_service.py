@@ -1,4 +1,6 @@
 from types import SimpleNamespace
+import base64
+import re
 
 import memolink_backend.business.services.chat_service as chat_module
 from memolink_backend.business.services.chat_service import ChatService
@@ -18,6 +20,23 @@ class FakeOpenAIChat:
         message = SimpleNamespace(content=self.answer)
         choice = SimpleNamespace(message=message)
         return SimpleNamespace(choices=[choice])
+
+
+class FakeEmailService:
+    def live_search_sync(self, user_id, query, top_k=1):
+        return []
+
+
+def _extract_draft_body(answer: str) -> str:
+    match = re.search(r'body_b64="([^"]+)"', answer)
+    assert match, answer
+    return base64.b64decode(match.group(1)).decode()
+
+
+def _extract_draft_subject(answer: str) -> str:
+    match = re.search(r'subject="([^"]+)"', answer)
+    assert match, answer
+    return match.group(1)
 
 
 def test_chat_service_returns_empty_prompt_message():
@@ -55,6 +74,90 @@ def test_chat_service_uses_notes_as_context_and_saves_assistant_message(monkeypa
     assert result.sources[0].note_id == note.id
     assert any("USER NOTES CONTEXT" in m["content"] for m in fake_chat.last_messages)
     assert list(conv_repo.messages.values())[-1].role == "assistant"
+
+
+def test_chat_service_builds_email_draft_for_send_that_as_email_phrase(monkeypatch):
+    conv_repo = FakeConversationRepository()
+    conv = conv_repo.create_conversation(1, "Email draft")
+    conv_repo.add_message(conv.id, "assistant", "## Research Summary\n\nThis is the generated research content that should be emailed.")
+
+    extractor = FakeOpenAIChat('{"recipient":"rectiangson@gmail.com","note_name":null,"subject":"Research Paper Submission","is_reply":false,"style":null}')
+    monkeypatch.setattr(
+        chat_module,
+        "_get_client",
+        lambda model, user_keys=None: SimpleNamespace(chat=SimpleNamespace(completions=extractor)),
+    )
+
+    service = ChatService(
+        conv_repo=conv_repo,
+        note_repo=FakeNoteRepository(),
+        embedding_service=FakeEmbeddingService(),
+        email_service=FakeEmailService(),
+    )
+
+    result = service.ask(ChatRequestDTO(
+        user_id=1,
+        conversation_id=conv.id,
+        prompt="can you send that as email the research we generated to rectiangson@gmail.com",
+    ))
+
+    assert '<email_draft to="rectiangson@gmail.com"' in result.answer
+    assert "click **Send**" in result.answer
+    assert "generated research content" in _extract_draft_body(result.answer)
+
+
+def test_chat_service_uses_prior_context_when_user_only_replies_with_email_address(monkeypatch):
+    conv_repo = FakeConversationRepository()
+    conv = conv_repo.create_conversation(1, "Email follow-up")
+    conv_repo.add_message(conv.id, "assistant", "## Research Paper\n\nThis is the completed research paper content from the earlier step.")
+    conv_repo.add_message(conv.id, "user", "can you send that as email the research we generated to rectiangson")
+    conv_repo.add_message(conv.id, "assistant", "What is the email address of Rectiangson and what specific research content should be included in the email?")
+
+    extractor = FakeOpenAIChat('{"recipient":"rectiangson@gmail.com","note_name":null,"subject":"Research Paper Submission - MSE907 Assessment 2","is_reply":false,"style":null}')
+    monkeypatch.setattr(
+        chat_module,
+        "_get_client",
+        lambda model, user_keys=None: SimpleNamespace(chat=SimpleNamespace(completions=extractor)),
+    )
+
+    service = ChatService(
+        conv_repo=conv_repo,
+        note_repo=FakeNoteRepository(),
+        embedding_service=FakeEmbeddingService(),
+        email_service=FakeEmailService(),
+    )
+
+    result = service.ask(ChatRequestDTO(
+        user_id=1,
+        conversation_id=conv.id,
+        prompt="rectiangson@gmail.com",
+    ))
+
+    assert '<email_draft to="rectiangson@gmail.com"' in result.answer
+    assert _extract_draft_subject(result.answer) == "Research Paper Submission - MSE907 Assessment 2"
+    assert "completed research paper content" in _extract_draft_body(result.answer)
+
+
+def test_derive_web_search_query_uses_previous_topic_for_generic_follow_up():
+    message_history = [
+        {"role": "user", "content": "What is changing with Microsoft enterprise licensing this month?"},
+        {"role": "assistant", "content": "I need live search for that."},
+        {"role": "user", "content": "can you search online latest news?"},
+    ]
+
+    query = chat_module._derive_web_search_query("can you search online latest news?", message_history)
+
+    assert query == "What is changing with Microsoft enterprise licensing this month? latest news"
+
+
+def test_derive_web_search_query_keeps_explicit_topic_requests():
+    message_history = [
+        {"role": "user", "content": "search online latest OpenAI enterprise pricing updates"},
+    ]
+
+    query = chat_module._derive_web_search_query("search online latest OpenAI enterprise pricing updates", message_history)
+
+    assert query == "search online latest OpenAI enterprise pricing updates"
 
 
 # ── Large-context re-routing guard ───────────────────────────────────────────

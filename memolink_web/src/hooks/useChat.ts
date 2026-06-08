@@ -1,9 +1,9 @@
 import { useState, useRef } from "react";
-import { streamChat, streamAgentChat, streamResearch, uploadChat } from "../api/chatApi";
+import { streamChat, streamAgentChat, uploadChat } from "../api/chatApi";
 import { streamCommand } from "../api/commandApi";
 import { createConversation, renameConversation } from "../api/conversationApi";
 import { useTTS } from "./useTTS";
-import type { Conversation, Message } from "../types";
+import type { ChatStreamEvent, Conversation, Message } from "../types";
 import { TEMP_ID } from "../types";
 
 const STREAMING_ID = -99;
@@ -40,9 +40,9 @@ export function useChat({ activeConversation, setActiveConversation, setConversa
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [webSearch, setWebSearch] = usePersistedToggle("memolink_mode_web");
   const [agentMode, setAgentMode] = usePersistedToggle("memolink_mode_agent");
-  const [researchMode, setResearchMode] = usePersistedToggle("memolink_mode_research");
-  const [writingMode, setWritingMode] = usePersistedToggle("memolink_mode_writing");
   const [discussionMode, setDiscussionMode] = usePersistedToggle("memolink_mode_discussion");
+  // Last user prompt — needed so searchOnline can re-send the same turn with web search enabled
+  const lastUserPromptRef = useRef<string>("");
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const attachmentInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -51,8 +51,8 @@ export function useChat({ activeConversation, setActiveConversation, setConversa
     if (el) { el.style.height = "auto"; el.style.height = `${el.scrollHeight}px`; }
   }
 
-  async function handleSend() {
-    const trimmed = input.trim();
+  async function handleSend(overrideInput?: string, options?: { webSearchOverride?: boolean; searchQueryOverride?: string }) {
+    const trimmed = (overrideInput ?? input).trim();
     const hasText = trimmed.length > 0;
     const hasFiles = pendingFiles.length > 0;
     if (!hasText && !hasFiles) return;
@@ -105,160 +105,165 @@ export function useChat({ activeConversation, setActiveConversation, setConversa
         let firstContent = true;
         const isSlashCommand = trimmed.startsWith("/");
 
+        // Store prompt so searchOnline can re-send it with web_search=true
+        lastUserPromptRef.current = trimmed;
+
+        const effectiveWebSearch = options?.webSearchOverride ?? webSearch;
         const stream = isSlashCommand
           ? streamCommand(trimmed, conversationId, workspaceId ?? null, model ?? null)
-          : writingMode
-            ? streamCommand(`/Write ${trimmed}`, conversationId, workspaceId ?? null, model ?? null)
-            : discussionMode
-              ? streamCommand(`/Discussion All : ${trimmed}`, conversationId, workspaceId ?? null, model ?? null)
-              : researchMode
-                ? streamResearch(conversationId, trimmed, workspaceId, model)
-                : agentMode
-                  ? streamAgentChat(conversationId, trimmed, workspaceId, model)
-                  : streamChat(conversationId, trimmed, 5, workspaceId, model, webSearch);
+          : discussionMode
+            ? streamCommand(`/Discussion All : ${trimmed}`, conversationId, workspaceId ?? null, model ?? null)
+            : agentMode
+              ? streamAgentChat(conversationId, trimmed, workspaceId, model)
+              : streamChat(
+                  conversationId,
+                  trimmed,
+                  5,
+                  workspaceId,
+                  model,
+                  effectiveWebSearch,
+                  options?.searchQueryOverride ?? null,
+                );
 
         for await (const rawEvent of stream) {
-          const event = rawEvent as any;
-          if (event.close_note !== undefined) {
-            onCloseNote?.(event.close_note);
-            continue;
-          }
-
-          if (event.open_note !== undefined) {
-            onOpenNote?.(event.open_note);
-            continue;
-          }
-
-          if (event.speak !== undefined) {
-            tts.speak(event.speak);
-            continue;
-          }
-
-          if (event.note_updated !== undefined) {
-            onNoteUpdated?.(event.note_updated);
-            continue;
-          }
-
-          if (event.cmd_running !== undefined) {
-            const content = `__CMD_RUNNING__:${event.cmd_running}`;
-            accum = content;
-            setActiveConversation((prev) => {
-              if (!prev) return prev;
-              return { ...prev, messages: prev.messages.map((m) => m.id === STREAMING_ID ? { ...m, content } : m) };
-            });
-            if (firstContent) { firstContent = false; setLoading(false); setStreaming(true); }
-            continue;
-          }
-
-          if (event.quiz !== undefined) {
-            const quizContent = `__QUIZ__:${JSON.stringify(event.quiz)}`;
-            accum = quizContent;
-            setActiveConversation((prev) => {
-              if (!prev) return prev;
-              return { ...prev, messages: prev.messages.map((m) => m.id === STREAMING_ID ? { ...m, content: quizContent } : m) };
-            });
-            if (firstContent) { firstContent = false; setLoading(false); setStreaming(true); }
-            continue;
-          }
-
-          if (event.improving_note !== undefined) {
-            const content = `__IMPROVING_NOTE__:${event.improving_note}`;
-            setActiveConversation((prev) => {
-              if (!prev) return prev;
-              return { ...prev, messages: prev.messages.map((m) => m.id === STREAMING_ID ? { ...m, content } : m) };
-            });
-            if (firstContent) { firstContent = false; setLoading(false); setStreaming(true); }
-            continue;
-          }
-
-          if (event.image_generating) {
-            setActiveConversation((prev) => {
-              if (!prev) return prev;
-              return { ...prev, messages: prev.messages.map((m) => m.id === STREAMING_ID ? { ...m, content: "__IMAGE_GENERATING__" } : m) };
-            });
-            if (firstContent) {
-              firstContent = false;
-              setLoading(false);
-              setStreaming(true);
-            }
-            continue;
-          }
-
-          if (event.done) {
-            const finalId = event.id ?? STREAMING_ID;
-            const finalModel = event.model;
-            const confidence = event.confidence ?? undefined;
-            const confidenceReason = event.confidence_reason ?? undefined;
-            const routingReason = event.routing_reason ?? undefined;
-            // Strip the <confidence> tag that was streamed as tokens but shouldn't display
-            const stripTag = (s: string) => s.replace(/<confidence[^>]*>[\s\S]*?<\/confidence>/gi, "").trimEnd();
-            setActiveConversation((prev) => {
-              if (!prev) return prev;
-              return { ...prev, messages: prev.messages.map((m) => m.id === STREAMING_ID ? { ...m, id: finalId, model: finalModel, content: stripTag(m.content), confidence, confidence_reason: confidenceReason, routing_reason: routingReason } : m) };
-            });
-            setConversations((p) =>
-              p.map((c) =>
-                c.id === conversationId
-                  ? { ...c, messages: c.messages.map((m) => m.id === STREAMING_ID ? { ...m, id: finalId, model: finalModel, content: stripTag(m.content), confidence, confidence_reason: confidenceReason, routing_reason: routingReason } : m) }
-                  : c
-              )
-            );
-            break;
-          }
-
-          // Agent tool-call status chips
-          if (event.tool_call && event.label) {
-            toolStatus += (toolStatus ? "\n" : "") + `_🔧 ${event.label}…_`;
-            const content = toolStatus;
-            setActiveConversation((prev) => {
-              if (!prev) return prev;
-              return { ...prev, messages: prev.messages.map((m) => m.id === STREAMING_ID ? { ...m, content } : m) };
-            });
-            if (firstContent) {
-              firstContent = false;
-              setLoading(false);
-              setStreaming(true);
-            }
-          }
-
-          if (event.tool_result && event.ok) {
-            // Mark last tool line as done
-            toolStatus = toolStatus.replace(/…_$/, " ✓_");
-            const content = toolStatus;
-            setActiveConversation((prev) => {
-              if (!prev) return prev;
-              return { ...prev, messages: prev.messages.map((m) => m.id === STREAMING_ID ? { ...m, content } : m) };
-            });
-          }
-
-          if (event.replace !== undefined) {
-            accum = event.replace;
-            setActiveConversation((prev) => {
-              if (!prev) return prev;
-              return { ...prev, messages: prev.messages.map((m) => m.id === STREAMING_ID ? { ...m, content: event.replace! } : m) };
-            });
-            bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-          }
-
-          if (event.t) {
-            if (accum.startsWith("__CMD_RUNNING__:")) accum = "";
-            accum += event.t;
-            const content = toolStatus ? toolStatus + "\n\n" + accum : accum;
-            if (firstContent) {
-              firstContent = false;
-              setLoading(false);
-              setStreaming(true);
-              const withPlaceholder = { ...updated, messages: [...updated.messages] };
-              withPlaceholder.messages[withPlaceholder.messages.length - 1] = { ...placeholderMsg, content };
-              setActiveConversation(withPlaceholder);
-              setConversations((p) => [withPlaceholder, ...p.filter((c) => c.id !== withPlaceholder.id)]);
-            } else {
+          const event = rawEvent as ChatStreamEvent;
+          switch (event.type) {
+            case "note.close":
+              onCloseNote?.(event.note_id);
+              continue;
+            case "note.open":
+              onOpenNote?.(event.note_id);
+              continue;
+            case "tts.speak":
+              tts.speak(event.text);
+              continue;
+            case "note.updated":
+              onNoteUpdated?.(event.note_id);
+              continue;
+            case "command.running": {
+              const content = `__CMD_RUNNING__:${event.command}`;
+              accum = content;
               setActiveConversation((prev) => {
                 if (!prev) return prev;
                 return { ...prev, messages: prev.messages.map((m) => m.id === STREAMING_ID ? { ...m, content } : m) };
               });
+              if (firstContent) { firstContent = false; setLoading(false); setStreaming(true); }
+              continue;
             }
-            bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+            case "quiz.ready": {
+              const quizContent = `__QUIZ__:${JSON.stringify(event.quiz)}`;
+              accum = quizContent;
+              setActiveConversation((prev) => {
+                if (!prev) return prev;
+                return { ...prev, messages: prev.messages.map((m) => m.id === STREAMING_ID ? { ...m, content: quizContent } : m) };
+              });
+              if (firstContent) { firstContent = false; setLoading(false); setStreaming(true); }
+              continue;
+            }
+            case "note.improving": {
+              const content = `__IMPROVING_NOTE__:${event.title}`;
+              setActiveConversation((prev) => {
+                if (!prev) return prev;
+                return { ...prev, messages: prev.messages.map((m) => m.id === STREAMING_ID ? { ...m, content } : m) };
+              });
+              if (firstContent) { firstContent = false; setLoading(false); setStreaming(true); }
+              continue;
+            }
+            case "image.generating":
+              setActiveConversation((prev) => {
+                if (!prev) return prev;
+                return { ...prev, messages: prev.messages.map((m) => m.id === STREAMING_ID ? { ...m, content: "__IMAGE_GENERATING__" } : m) };
+              });
+              if (firstContent) {
+                firstContent = false;
+                setLoading(false);
+                setStreaming(true);
+              }
+              continue;
+            case "message.complete": {
+              const finalId = event.message_id ?? STREAMING_ID;
+              const finalModel = event.model;
+              const confidence = event.confidence ?? undefined;
+              const confidenceReason = event.confidence_reason ?? undefined;
+              const routingReason = event.routing_reason ?? undefined;
+              const suggestWebSearch = event.suggest_web_search === true && !effectiveWebSearch;
+              const searchQuerySuggestion = event.search_query_suggestion ?? undefined;
+              const stripTag = (s: string) => s.replace(/<confidence[^>]*>[\s\S]*?<\/confidence>/gi, "").trimEnd();
+              setActiveConversation((prev) => {
+                if (!prev) return prev;
+                return { ...prev, messages: prev.messages.map((m) => m.id === STREAMING_ID ? { ...m, id: finalId, model: finalModel, content: stripTag(m.content), confidence, confidence_reason: confidenceReason, routing_reason: routingReason, suggest_web_search: suggestWebSearch, search_query_suggestion: searchQuerySuggestion } : m) };
+              });
+              setConversations((p) =>
+                p.map((c) =>
+                  c.id === conversationId
+                    ? { ...c, messages: c.messages.map((m) => m.id === STREAMING_ID ? { ...m, id: finalId, model: finalModel, content: stripTag(m.content), confidence, confidence_reason: confidenceReason, routing_reason: routingReason, suggest_web_search: suggestWebSearch, search_query_suggestion: searchQuerySuggestion } : m) }
+                    : c
+                )
+              );
+              break;
+            }
+            case "tool.start":
+              toolStatus += (toolStatus ? "\n" : "") + `_🔧 ${event.label}…_`;
+              setActiveConversation((prev) => {
+                if (!prev) return prev;
+                return { ...prev, messages: prev.messages.map((m) => m.id === STREAMING_ID ? { ...m, content: toolStatus } : m) };
+              });
+              if (firstContent) {
+                firstContent = false;
+                setLoading(false);
+                setStreaming(true);
+              }
+              continue;
+            case "tool.complete":
+              if (event.ok) {
+                toolStatus = toolStatus.replace(/…_$/, " ✓_");
+                setActiveConversation((prev) => {
+                  if (!prev) return prev;
+                  return { ...prev, messages: prev.messages.map((m) => m.id === STREAMING_ID ? { ...m, content: toolStatus } : m) };
+                });
+              }
+              continue;
+            case "message.replace":
+              accum = event.content;
+              if (firstContent) {
+                firstContent = false;
+                setLoading(false);
+                setStreaming(true);
+                const withPlaceholder = { ...updated, messages: [...updated.messages] };
+                withPlaceholder.messages[withPlaceholder.messages.length - 1] = { ...placeholderMsg, content: event.content };
+                setActiveConversation(withPlaceholder);
+                setConversations((p) => [withPlaceholder, ...p.filter((c) => c.id !== withPlaceholder.id)]);
+              } else {
+                setActiveConversation((prev) => {
+                  if (!prev) return prev;
+                  return { ...prev, messages: prev.messages.map((m) => m.id === STREAMING_ID ? { ...m, content: event.content } : m) };
+                });
+              }
+              bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+              continue;
+            case "message.delta": {
+              if (accum.startsWith("__CMD_RUNNING__:")) accum = "";
+              accum += event.text;
+              const content = toolStatus ? toolStatus + "\n\n" + accum : accum;
+              if (firstContent) {
+                firstContent = false;
+                setLoading(false);
+                setStreaming(true);
+                const withPlaceholder = { ...updated, messages: [...updated.messages] };
+                withPlaceholder.messages[withPlaceholder.messages.length - 1] = { ...placeholderMsg, content };
+                setActiveConversation(withPlaceholder);
+                setConversations((p) => [withPlaceholder, ...p.filter((c) => c.id !== withPlaceholder.id)]);
+              } else {
+                setActiveConversation((prev) => {
+                  if (!prev) return prev;
+                  return { ...prev, messages: prev.messages.map((m) => m.id === STREAMING_ID ? { ...m, content } : m) };
+                });
+              }
+              bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+              continue;
+            }
+            default:
+              continue;
           }
         }
       }
@@ -269,17 +274,24 @@ export function useChat({ activeConversation, setActiveConversation, setConversa
     }
   }
 
+  // Re-send the last user prompt with web search enabled (triggered by the "Search online?" chip)
+  async function searchOnline(searchQuerySuggestion?: string) {
+    const prompt = lastUserPromptRef.current;
+    if (!prompt || loading) return;
+    setWebSearch(true);
+    setInput(prompt);
+    await handleSend(prompt, { webSearchOverride: true, searchQueryOverride: searchQuerySuggestion?.trim() || undefined });
+  }
+
   return {
     input, setInput,
     loading,
     streaming,
     pendingFiles, setPendingFiles,
     textareaRef, attachmentInputRef,
-    autoResize, handleSend,
+    autoResize, handleSend, searchOnline,
     webSearch, setWebSearch,
     agentMode, setAgentMode,
-    researchMode, setResearchMode,
-    writingMode, setWritingMode,
     discussionMode, setDiscussionMode,
     tts,
   };

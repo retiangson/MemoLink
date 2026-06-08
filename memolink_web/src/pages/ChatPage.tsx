@@ -953,20 +953,17 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                       const msg = msgs[idx];
                       if (!msg || chat.loading || chat.streaming) return;
                       if (msg.role === "user") {
-                        // Resend this user message directly
-                        chat.setInput(msg.content);
-                        setTimeout(() => chat.handleSend(), 0);
+                        void chat.handleSend(msg.content);
                       } else {
-                        // Retry assistant — find the preceding user message
                         for (let i = idx - 1; i >= 0; i--) {
                           if (msgs[i].role === "user") {
-                            chat.setInput(msgs[i].content);
-                            setTimeout(() => chat.handleSend(), 0);
+                            void chat.handleSend(msgs[i].content);
                             break;
                           }
                         }
                       }
                     }}
+                    onSearchOnline={chat.searchOnline}
                   />
                 </div>
               </main>
@@ -1000,10 +997,6 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                 onToggleAgentMode={() => chat.setAgentMode((v) => !v)}
                 workflowMode={false}
                 onToggleWorkflowMode={() => {}}
-                researchMode={chat.researchMode}
-                onToggleResearchMode={() => chat.setResearchMode((v) => !v)}
-                writingMode={chat.writingMode}
-                onToggleWritingMode={() => chat.setWritingMode((v) => !v)}
                 discussionMode={chat.discussionMode}
                 onToggleDiscussionMode={() => chat.setDiscussionMode((v) => !v)}
                 flags={flags}
@@ -1087,18 +1080,17 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                         const msg = msgs[idx];
                         if (!msg || chat.loading || chat.streaming) return;
                         if (msg.role === "user") {
-                          chat.setInput(msg.content);
-                          setTimeout(() => chat.handleSend(), 0);
+                          void chat.handleSend(msg.content);
                         } else {
                           for (let i = idx - 1; i >= 0; i--) {
                             if (msgs[i].role === "user") {
-                              chat.setInput(msgs[i].content);
-                              setTimeout(() => chat.handleSend(), 0);
+                              void chat.handleSend(msgs[i].content);
                               break;
                             }
                           }
                         }
                       }}
+                      onSearchOnline={chat.searchOnline}
                     />
                   </div>
                 </main>
@@ -1133,10 +1125,6 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                   onToggleAgentMode={() => chat.setAgentMode((v) => !v)}
                   workflowMode={false}
                   onToggleWorkflowMode={() => {}}
-                  researchMode={chat.researchMode}
-                  onToggleResearchMode={() => chat.setResearchMode((v) => !v)}
-                  writingMode={chat.writingMode}
-                  onToggleWritingMode={() => chat.setWritingMode((v) => !v)}
                   discussionMode={chat.discussionMode}
                   onToggleDiscussionMode={() => chat.setDiscussionMode((v) => !v)}
                   flags={flags}

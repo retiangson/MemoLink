@@ -41,7 +41,9 @@ class ServiceInstaller:
     def get_agent_service(self):
         from memolink_backend.business.services.agent_service import AgentService
         return AgentService(
-            db=self._domain.get_db(),
+            conv_repo=self._domain.get_conversation_repository(),
+            note_repo=self._domain.get_note_repository(),
+            reminder_repo=self._domain.get_reminder_repository(),
             embedding_service=self._domain.get_embedding_service(),
         )
 
@@ -100,7 +102,9 @@ class ServiceInstaller:
     def get_workflow_service(self):
         from memolink_backend.business.services.workflow_service import WorkflowService
         return WorkflowService(
-            db=self._domain.get_db(),
+            conv_repo=self._domain.get_conversation_repository(),
+            note_repo=self._domain.get_note_repository(),
+            reminder_repo=self._domain.get_reminder_repository(),
             embedding_service=self._domain.get_embedding_service(),
         )
 
@@ -140,6 +144,7 @@ class ServiceInstaller:
         return SlashCommandService(
             note_repo=self._domain.get_note_repository(),
             conv_repo=self._domain.get_conversation_repository(),
+            reminder_repo=self._domain.get_reminder_repository(),
             embedding_service=self._domain.get_embedding_service(),
             db=self._domain.get_db(),
             log_service=self.get_system_log_service(),

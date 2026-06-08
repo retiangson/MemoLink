@@ -1,0 +1,43 @@
+"""Compatibility wrapper for MemoLink's extracted LLM smart-engine modules."""
+
+from memolink_backend.business.services.llm import (
+    ANALYSER_PROMPT,
+    MODE_PROMPTS,
+    MODE_SETTINGS,
+    MODES,
+    QUALITY_CHECK_MODES,
+    QUALITY_PROMPT,
+    analyse_request,
+    build_context_engine,
+    build_dynamic_academic_queries,
+    build_dynamic_academic_title,
+    build_optimized_task_message,
+    build_primary_system_prompt,
+    extract_course_codes,
+    extract_topic_terms,
+    get_mode_prompt,
+    get_mode_settings,
+    parse_word_targets,
+    quality_check,
+)
+
+__all__ = [
+    "ANALYSER_PROMPT",
+    "MODE_PROMPTS",
+    "MODE_SETTINGS",
+    "MODES",
+    "QUALITY_CHECK_MODES",
+    "QUALITY_PROMPT",
+    "analyse_request",
+    "build_context_engine",
+    "build_dynamic_academic_queries",
+    "build_dynamic_academic_title",
+    "build_optimized_task_message",
+    "build_primary_system_prompt",
+    "extract_course_codes",
+    "extract_topic_terms",
+    "get_mode_prompt",
+    "get_mode_settings",
+    "parse_word_targets",
+    "quality_check",
+]

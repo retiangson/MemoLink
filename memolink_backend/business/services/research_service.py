@@ -5,13 +5,13 @@ import logging
 import re
 from typing import Iterator, Optional
 
-from openai import OpenAI
 from sqlalchemy.orm import Session
 
 from memolink_backend.core.config import settings
 from memolink_backend.domain.repositories.conversation_repository import ConversationRepository
 from memolink_backend.domain.repositories.note_repository import NoteRepository
 from memolink_backend.business.services.embedding_service import EmbeddingService
+from memolink_backend.business.services.llm.client_factory import canonical_model, get_client
 from memolink_backend.utils.academic_search import search_papers, format_papers_context
 from memolink_backend.utils.web_search import brave_search
 
@@ -111,8 +111,14 @@ class ResearchService:
         conv_repo=None,
         note_repo=None,
     ):
-        self.repo_conv = conv_repo or ConversationRepository(db)
-        self.repo_notes = note_repo or NoteRepository(db)
+        if conv_repo is not None and note_repo is not None:
+            self.repo_conv = conv_repo
+            self.repo_notes = note_repo
+        else:
+            if db is None:
+                raise ValueError("Either repos or db must be provided.")
+            self.repo_conv = ConversationRepository(db)
+            self.repo_notes = NoteRepository(db)
         self.embedding = embedding_service or EmbeddingService()
 
     # ── helpers ──────────────────────────────────────────────────────────────
@@ -136,28 +142,12 @@ class ResearchService:
         workspace_id: Optional[int],
         model: Optional[str],
     ) -> Iterator[str]:
-        _GEMINI_MODELS = {"gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.5-pro"}
-        _DEEPSEEK_MODELS = {"deepseek-chat", "deepseek-reasoner", "deepseek-coder"}
-        _GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
-        _DEEPSEEK_BASE_URL = "https://api.deepseek.com/v1"
-
-        model = model or settings.openai_chat_model
-        # Route to the correct OpenAI-compatible endpoint; non-OpenAI models that lack
-        # a configured key fall back to the default OpenAI model.
-        if model in _GEMINI_MODELS:
-            if settings.gemini_api_key:
-                client = OpenAI(api_key=settings.gemini_api_key, base_url=_GEMINI_BASE_URL)
-            else:
-                model = settings.openai_chat_model
-                client = OpenAI(api_key=settings.openai_api_key)
-        elif model in _DEEPSEEK_MODELS:
-            if settings.deepseek_api_key:
-                client = OpenAI(api_key=settings.deepseek_api_key, base_url=_DEEPSEEK_BASE_URL)
-            else:
-                model = settings.openai_chat_model
-                client = OpenAI(api_key=settings.openai_api_key)
-        else:
-            client = OpenAI(api_key=settings.openai_api_key)
+        model = canonical_model(model or settings.openai_chat_model)
+        if model.startswith("gemini-") and not settings.gemini_api_key:
+            model = settings.openai_chat_model
+        elif model.startswith("deepseek-") and not settings.deepseek_api_key:
+            model = settings.openai_chat_model
+        client = get_client(model)
 
         # Persist user message
         self.repo_conv.add_message(conversation_id, "user", prompt)
