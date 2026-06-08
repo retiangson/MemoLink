@@ -291,7 +291,7 @@ export function ChatInput({
 
           {/* Toolbar row */}
           <div className="flex items-center justify-between px-3 pb-3 pt-1">
-            {/* Left side - attachment */}
+            {/* Left side - attachment + mode toggles */}
             <div className="flex items-center gap-1">
               {(!flags || flags.file_upload_enabled) && (
                 <>
@@ -307,105 +307,131 @@ export function ChatInput({
                       }
                     }}
                   />
-                  <button
-                    onClick={() => attachmentInputRef.current?.click()}
-                    title="Attach file"
-                    className="w-8 h-8 rounded-xl flex items-center justify-center text-gray-500 hover:text-gray-200 hover:bg-[#252533] transition"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-                    </svg>
-                  </button>
+                  <div className="relative group">
+                    <button
+                      onClick={() => attachmentInputRef.current?.click()}
+                      className="w-8 h-8 rounded-xl flex items-center justify-center text-gray-500 hover:text-gray-200 hover:bg-[#252533] transition"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                      </svg>
+                    </button>
+                    <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-1.5 py-0.5 text-[10px] text-white bg-[#1e1e2a] border border-[#2a2a38] rounded whitespace-nowrap hidden group-hover:block pointer-events-none z-50">
+                      Attach file
+                    </span>
+                  </div>
                 </>
               )}
 
               {/* Web search toggle */}
               {(!flags || flags.web_search_enabled) && (
-                <button
-                  onClick={onToggleWebSearch}
-                  title={webSearch ? "Web search on - click to disable" : "Enable web search"}
-                  className={`flex items-center gap-1.5 px-2.5 h-8 rounded-xl text-xs font-medium transition ${
-                    webSearch
-                      ? "bg-sky-500/15 border border-sky-500/40 text-sky-400 hover:bg-sky-500/25"
-                      : "text-gray-500 hover:text-gray-200 hover:bg-[#252533]"
-                  }`}
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <circle cx="12" cy="12" r="10" />
-                    <path strokeLinecap="round" d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
-                  </svg>
-                  {webSearch && <span>Web</span>}
-                </button>
+                <div className="relative group">
+                  <button
+                    onClick={onToggleWebSearch}
+                    className={`flex items-center gap-1.5 px-2.5 h-8 rounded-xl text-xs font-medium transition ${
+                      webSearch
+                        ? "bg-sky-500/15 border border-sky-500/40 text-sky-400 hover:bg-sky-500/25"
+                        : "text-gray-500 hover:text-gray-200 hover:bg-[#252533]"
+                    }`}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <circle cx="12" cy="12" r="10" />
+                      <path strokeLinecap="round" d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+                    </svg>
+                    {webSearch && <span>Web</span>}
+                  </button>
+                  <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-1.5 py-0.5 text-[10px] text-white bg-[#1e1e2a] border border-[#2a2a38] rounded whitespace-nowrap hidden group-hover:block pointer-events-none z-50">
+                    {webSearch ? "Web search on" : "Web search"}
+                  </span>
+                </div>
               )}
 
               {/* Agent mode toggle */}
               {(!flags || flags.agent_mode_enabled) && (
+                <div className="relative group">
+                  <button
+                    onClick={onToggleAgentMode}
+                    className={`flex items-center gap-1.5 px-2.5 h-8 rounded-xl text-xs font-medium transition ${
+                      agentMode
+                        ? "bg-violet-500/15 border border-violet-500/40 text-violet-400 hover:bg-violet-500/25"
+                        : "text-gray-500 hover:text-gray-200 hover:bg-[#252533]"
+                    }`}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 shrink-0" fill="currentColor" viewBox="0 0 16 16">
+                      <path d="M6 12.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 0 1h-3a.5.5 0 0 1-.5-.5M3 8.062C3 6.76 4.235 5.765 5.53 5.886a26.6 26.6 0 0 0 4.94 0C11.765 5.765 13 6.76 13 8.062v1.157a.93.93 0 0 1-.765.935c-.845.147-2.34.346-4.235.346s-3.39-.2-4.235-.346A.93.93 0 0 1 3 9.219zm4.542-.827a.25.25 0 0 0-.217.068l-.92.9a25 25 0 0 1-1.871-.183.25.25 0 0 0-.068.495c.55.076 1.232.149 2.02.193a.25.25 0 0 0 .189-.071l.754-.736.847 1.71a.25.25 0 0 0 .404.062l.932-.97a25 25 0 0 0 1.922-.188.25.25 0 0 0-.068-.495c-.538.074-1.207.145-1.98.189a.25.25 0 0 0-.166.076l-.754.785-.842-1.7a.25.25 0 0 0-.182-.134"/>
+                      <path d="M8 1.783C7.015.936 5.587.81 4.287.94c-1.514.153-3.042.672-3.994 1.105A.5.5 0 0 0 0 2.5v11a.5.5 0 0 0 .707.455c.882-.4 2.303-.881 3.68-1.02 1.409-.142 2.59.087 3.223.877a.5.5 0 0 0 .78 0c.633-.79 1.814-1.019 3.222-.877 1.378.139 2.8.62 3.681 1.02A.5.5 0 0 0 16 13.5v-11a.5.5 0 0 0-.293-.455c-.952-.433-2.48-.952-3.994-1.105C10.413.809 8.985.936 8 1.783"/>
+                    </svg>
+                    {agentMode && <span>Agent</span>}
+                  </button>
+                  <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-1.5 py-0.5 text-[10px] text-white bg-[#1e1e2a] border border-[#2a2a38] rounded whitespace-nowrap hidden group-hover:block pointer-events-none z-50">
+                    {agentMode ? "Agent mode on" : "Agent mode"}
+                  </span>
+                </div>
+              )}
+
+              {/* Research mode toggle */}
+              {(!flags || flags.research_mode_enabled) && (
+                <div className="relative group">
+                  <button
+                    onClick={onToggleResearchMode}
+                    className={`flex items-center gap-1.5 px-2.5 h-8 rounded-xl text-xs font-medium transition ${
+                      researchMode
+                        ? "bg-emerald-500/15 border border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/25"
+                        : "text-gray-500 hover:text-gray-200 hover:bg-[#252533]"
+                    }`}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 shrink-0" fill="currentColor" viewBox="0 0 16 16">
+                      <path d="M14.5 3a.5.5 0 0 1 .5.5v9a.5.5 0 0 1-.5.5h-13a.5.5 0 0 1-.5-.5v-9a.5.5 0 0 1 .5-.5zm-13-1A1.5 1.5 0 0 0 0 3.5v9A1.5 1.5 0 0 0 1.5 14h13a1.5 1.5 0 0 0 1.5-1.5v-9A1.5 1.5 0 0 0 14.5 2z"/>
+                      <path d="M3 5.5a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 0 1h-9a.5.5 0 0 1-.5-.5M3 8a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 0 1h-9A.5.5 0 0 1 3 8m0 2.5a.5.5 0 0 1 .5-.5h6a.5.5 0 0 1 0 1h-6a.5.5 0 0 1-.5-.5"/>
+                    </svg>
+                    {researchMode && <span>Research</span>}
+                  </button>
+                  <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-1.5 py-0.5 text-[10px] text-white bg-[#1e1e2a] border border-[#2a2a38] rounded whitespace-nowrap hidden group-hover:block pointer-events-none z-50">
+                    {researchMode ? "Research mode on" : "Research mode"}
+                  </span>
+                </div>
+              )}
+
+              {/* Writing mode toggle */}
+              <div className="relative group">
                 <button
-                  onClick={onToggleAgentMode}
-                  title={agentMode ? "Agent mode on - AI can create notes, add reminders, and more" : "Enable Agent mode"}
+                  onClick={onToggleWritingMode}
                   className={`flex items-center gap-1.5 px-2.5 h-8 rounded-xl text-xs font-medium transition ${
-                    agentMode
-                      ? "bg-violet-500/15 border border-violet-500/40 text-violet-400 hover:bg-violet-500/25"
+                    writingMode
+                      ? "bg-amber-500/15 border border-amber-500/40 text-amber-400 hover:bg-amber-500/25"
                       : "text-gray-500 hover:text-gray-200 hover:bg-[#252533]"
                   }`}
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 shrink-0" fill="currentColor" viewBox="0 0 16 16">
-                    <path d="M6 12.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 0 1h-3a.5.5 0 0 1-.5-.5M3 8.062C3 6.76 4.235 5.765 5.53 5.886a26.6 26.6 0 0 0 4.94 0C11.765 5.765 13 6.76 13 8.062v1.157a.93.93 0 0 1-.765.935c-.845.147-2.34.346-4.235.346s-3.39-.2-4.235-.346A.93.93 0 0 1 3 9.219zm4.542-.827a.25.25 0 0 0-.217.068l-.92.9a25 25 0 0 1-1.871-.183.25.25 0 0 0-.068.495c.55.076 1.232.149 2.02.193a.25.25 0 0 0 .189-.071l.754-.736.847 1.71a.25.25 0 0 0 .404.062l.932-.97a25 25 0 0 0 1.922-.188.25.25 0 0 0-.068-.495c-.538.074-1.207.145-1.98.189a.25.25 0 0 0-.166.076l-.754.785-.842-1.7a.25.25 0 0 0-.182-.134"/>
-                    <path d="M8 1.783C7.015.936 5.587.81 4.287.94c-1.514.153-3.042.672-3.994 1.105A.5.5 0 0 0 0 2.5v11a.5.5 0 0 0 .707.455c.882-.4 2.303-.881 3.68-1.02 1.409-.142 2.59.087 3.223.877a.5.5 0 0 0 .78 0c.633-.79 1.814-1.019 3.222-.877 1.378.139 2.8.62 3.681 1.02A.5.5 0 0 0 16 13.5v-11a.5.5 0 0 0-.293-.455c-.952-.433-2.48-.952-3.994-1.105C10.413.809 8.985.936 8 1.783"/>
+                    <path d="M12.854.146a.5.5 0 0 0-.707 0L10.5 1.793 14.207 5.5l1.647-1.646a.5.5 0 0 0 0-.708zm.646 6.061L9.793 2.5 3.293 9H3.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.207zm-7.468 7.468A.5.5 0 0 1 6 13.5V13h-.5a.5.5 0 0 1-.5-.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.5-.5V10h-.5a.499.499 0 0 1-.175-.032l-.179.178a.5.5 0 0 0-.11.168l-2 5a.5.5 0 0 0 .65.65l5-2a.5.5 0 0 0 .168-.11z"/>
                   </svg>
-                  {agentMode && <span>Agent</span>}
+                  {writingMode && <span>Writing</span>}
                 </button>
-              )}
-
-              {/* Research mode toggle */}
-              {(!flags || flags.research_mode_enabled) && <button
-                onClick={onToggleResearchMode}
-                title={researchMode ? "Research mode on - deep multi-source analysis with academic papers" : "Enable Research mode"}
-                className={`flex items-center gap-1.5 px-2.5 h-8 rounded-xl text-xs font-medium transition ${
-                  researchMode
-                    ? "bg-emerald-500/15 border border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/25"
-                    : "text-gray-500 hover:text-gray-200 hover:bg-[#252533]"
-                }`}
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 shrink-0" fill="currentColor" viewBox="0 0 16 16">
-                  <path d="M14.5 3a.5.5 0 0 1 .5.5v9a.5.5 0 0 1-.5.5h-13a.5.5 0 0 1-.5-.5v-9a.5.5 0 0 1 .5-.5zm-13-1A1.5 1.5 0 0 0 0 3.5v9A1.5 1.5 0 0 0 1.5 14h13a1.5 1.5 0 0 0 1.5-1.5v-9A1.5 1.5 0 0 0 14.5 2z"/>
-                  <path d="M3 5.5a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 0 1h-9a.5.5 0 0 1-.5-.5M3 8a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 0 1h-9A.5.5 0 0 1 3 8m0 2.5a.5.5 0 0 1 .5-.5h6a.5.5 0 0 1 0 1h-6a.5.5 0 0 1-.5-.5"/>
-                </svg>
-                {researchMode && <span>Research</span>}
-              </button>}
-
-              {/* Writing mode toggle */}
-              <button
-                onClick={onToggleWritingMode}
-                title={writingMode ? "Writing mode on - multi-model drafts synthesised into best output" : "Enable Writing mode"}
-                className={`flex items-center gap-1.5 px-2.5 h-8 rounded-xl text-xs font-medium transition ${
-                  writingMode
-                    ? "bg-amber-500/15 border border-amber-500/40 text-amber-400 hover:bg-amber-500/25"
-                    : "text-gray-500 hover:text-gray-200 hover:bg-[#252533]"
-                }`}
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 shrink-0" fill="currentColor" viewBox="0 0 16 16">
-                  <path d="M12.854.146a.5.5 0 0 0-.707 0L10.5 1.793 14.207 5.5l1.647-1.646a.5.5 0 0 0 0-.708zm.646 6.061L9.793 2.5 3.293 9H3.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.207zm-7.468 7.468A.5.5 0 0 1 6 13.5V13h-.5a.5.5 0 0 1-.5-.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.5-.5V10h-.5a.499.499 0 0 1-.175-.032l-.179.178a.5.5 0 0 0-.11.168l-2 5a.5.5 0 0 0 .65.65l5-2a.5.5 0 0 0 .168-.11z"/>
-                </svg>
-                {writingMode && <span>Writing</span>}
-              </button>
+                <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-1.5 py-0.5 text-[10px] text-white bg-[#1e1e2a] border border-[#2a2a38] rounded whitespace-nowrap hidden group-hover:block pointer-events-none z-50">
+                  {writingMode ? "Writing mode on" : "Writing mode"}
+                </span>
+              </div>
 
               {/* Discussion mode toggle */}
-              <button
-                onClick={onToggleDiscussionMode}
-                title={discussionMode ? "Discussion mode on - all models debate and reach consensus" : "Enable Discussion mode"}
-                className={`flex items-center gap-1.5 px-2.5 h-8 rounded-xl text-xs font-medium transition ${
-                  discussionMode
-                    ? "bg-rose-500/15 border border-rose-500/40 text-rose-400 hover:bg-rose-500/25"
-                    : "text-gray-500 hover:text-gray-200 hover:bg-[#252533]"
-                }`}
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 shrink-0" fill="currentColor" viewBox="0 0 16 16">
-                  <path d="M14 1a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H4.414A2 2 0 0 0 3 11.586l-2 2V2a1 1 0 0 1 1-1zM2 0a2 2 0 0 0-2 2v12.793a.5.5 0 0 0 .854.353l2.853-2.853A1 1 0 0 1 4.414 12H14a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2z"/>
-                  <path d="M3 3.5a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 0 1h-9a.5.5 0 0 1-.5-.5M3 6a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 0 1h-9A.5.5 0 0 1 3 6m0 2.5a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 0 1h-5a.5.5 0 0 1-.5-.5"/>
-                </svg>
-                {discussionMode && <span>Discussion</span>}
-              </button>
+              <div className="relative group">
+                <button
+                  onClick={onToggleDiscussionMode}
+                  className={`flex items-center gap-1.5 px-2.5 h-8 rounded-xl text-xs font-medium transition ${
+                    discussionMode
+                      ? "bg-rose-500/15 border border-rose-500/40 text-rose-400 hover:bg-rose-500/25"
+                      : "text-gray-500 hover:text-gray-200 hover:bg-[#252533]"
+                  }`}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 shrink-0" fill="currentColor" viewBox="0 0 16 16">
+                    <path d="M14 1a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H4.414A2 2 0 0 0 3 11.586l-2 2V2a1 1 0 0 1 1-1zM2 0a2 2 0 0 0-2 2v12.793a.5.5 0 0 0 .854.353l2.853-2.853A1 1 0 0 1 4.414 12H14a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2z"/>
+                    <path d="M3 3.5a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 0 1h-9a.5.5 0 0 1-.5-.5M3 6a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 0 1h-9A.5.5 0 0 1 3 6m0 2.5a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 0 1h-5a.5.5 0 0 1-.5-.5"/>
+                  </svg>
+                  {discussionMode && <span>Discussion</span>}
+                </button>
+                <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-1.5 py-0.5 text-[10px] text-white bg-[#1e1e2a] border border-[#2a2a38] rounded whitespace-nowrap hidden group-hover:block pointer-events-none z-50">
+                  {discussionMode ? "Discussion mode on" : "Discussion mode"}
+                </span>
+              </div>
 
               {/* Recording status label */}
               {isActive && (
@@ -428,45 +454,51 @@ export function ChatInput({
             {/* Right side - mic + send */}
             <div className="flex items-center gap-2">
               {/* Mic button */}
-              <button
-                onClick={handleMicClick}
-                title={recording.isRecording ? "Stop recording" : "Voice input"}
-                disabled={recording.isTranscribing || loading}
-                className={`w-8 h-8 rounded-xl flex items-center justify-center transition ${
-                  recording.isRecording
-                    ? "bg-red-500/20 text-red-400 hover:bg-red-500/30"
-                    : "text-gray-500 hover:text-gray-200 hover:bg-[#252533]"
-                } disabled:opacity-40`}
-              >
-                {recording.isRecording ? (
-                  /* Stop square */
-                  <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 16 16">
-                    <path d="M3.5 3.5h9v9h-9z" />
-                  </svg>
-                ) : (
-                  /* Microphone */
-                  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="currentColor" viewBox="0 0 16 16">
-                    <path d="M3.5 6.5A.5.5 0 0 1 4 7v1a4 4 0 0 0 8 0V7a.5.5 0 0 1 1 0v1a5 5 0 0 1-4.5 4.975V15h3a.5.5 0 0 1 0 1h-7a.5.5 0 0 1 0-1h3v-2.025A5 5 0 0 1 3 8V7a.5.5 0 0 1 .5-.5" />
-                    <path d="M10 8a2 2 0 1 1-4 0V3a2 2 0 1 1 4 0z" />
-                  </svg>
-                )}
-              </button>
+              <div className="relative group">
+                <button
+                  onClick={handleMicClick}
+                  disabled={recording.isTranscribing || loading}
+                  className={`w-8 h-8 rounded-xl flex items-center justify-center transition ${
+                    recording.isRecording
+                      ? "bg-red-500/20 text-red-400 hover:bg-red-500/30"
+                      : "text-gray-500 hover:text-gray-200 hover:bg-[#252533]"
+                  } disabled:opacity-40`}
+                >
+                  {recording.isRecording ? (
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 16 16">
+                      <path d="M3.5 3.5h9v9h-9z" />
+                    </svg>
+                  ) : (
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="currentColor" viewBox="0 0 16 16">
+                      <path d="M3.5 6.5A.5.5 0 0 1 4 7v1a4 4 0 0 0 8 0V7a.5.5 0 0 1 1 0v1a5 5 0 0 1-4.5 4.975V15h3a.5.5 0 0 1 0 1h-7a.5.5 0 0 1 0-1h3v-2.025A5 5 0 0 1 3 8V7a.5.5 0 0 1 .5-.5" />
+                      <path d="M10 8a2 2 0 1 1-4 0V3a2 2 0 1 1 4 0z" />
+                    </svg>
+                  )}
+                </button>
+                <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-1.5 py-0.5 text-[10px] text-white bg-[#1e1e2a] border border-[#2a2a38] rounded whitespace-nowrap hidden group-hover:block pointer-events-none z-50">
+                  {recording.isRecording ? "Stop recording" : "Voice input"}
+                </span>
+              </div>
 
               {/* Send button */}
-              <button
-                onClick={onSend}
-                disabled={!canSend}
-                title="Send message"
-                className={`w-8 h-8 rounded-xl flex items-center justify-center transition ${
-                  canSend
-                    ? "bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-900/40"
-                    : "bg-[#252533] text-gray-600 cursor-not-allowed"
-                }`}
-              >
-                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M2 21l21-9L2 3v7l15 2-15 2v7z" />
-                </svg>
-              </button>
+              <div className="relative group">
+                <button
+                  onClick={onSend}
+                  disabled={!canSend}
+                  className={`w-8 h-8 rounded-xl flex items-center justify-center transition ${
+                    canSend
+                      ? "bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-900/40"
+                      : "bg-[#252533] text-gray-600 cursor-not-allowed"
+                  }`}
+                >
+                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M2 21l21-9L2 3v7l15 2-15 2v7z" />
+                  </svg>
+                </button>
+                <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-1.5 py-0.5 text-[10px] text-white bg-[#1e1e2a] border border-[#2a2a38] rounded whitespace-nowrap hidden group-hover:block pointer-events-none z-50">
+                  Send
+                </span>
+              </div>
             </div>
           </div>
         </div>

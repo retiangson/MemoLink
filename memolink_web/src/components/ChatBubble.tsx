@@ -287,7 +287,7 @@ export default function ChatBubble({ role, content, model, streaming, onAdd, onD
   }
 
   const translateButton = (
-    <div className="relative">
+    <div className="relative group">
       {showLangPicker && (
         <>
           <div className="fixed inset-0 z-[9]" onClick={() => setShowLangPicker(false)} />
@@ -304,20 +304,23 @@ export default function ChatBubble({ role, content, model, streaming, onAdd, onD
           </div>
         </>
       )}
+      <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-1.5 py-0.5 text-[10px] text-white bg-[#1e1e2a] border border-[#2a2a38] rounded whitespace-nowrap hidden group-hover:block pointer-events-none z-50">
+        {isTranslating ? "Translating…" : "Translate"}
+      </span>
       <button
         onClick={() => setShowLangPicker((v) => !v)}
-        className="flex items-center gap-1 px-2 py-1 bg-[#2A2A2A]/60 backdrop-blur-sm rounded-md hover:text-indigo-300"
+        className="flex items-center justify-center w-7 h-7 rounded-md hover:text-indigo-300 hover:bg-white/10"
       >
         {isTranslating ? (
-          <span className="animate-pulse">Translating…</span>
+          <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+          </svg>
         ) : (
-          <>
-            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" viewBox="0 0 16 16">
-              <path d="M4.545 6.714 4.11 8H3l1.862-5h1.284L8 8H6.833l-.435-1.286H4.545zm1.634-.736L5.5 3.956h-.049l-.679 2.022H6.18z"/>
-              <path d="M0 2a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v3h3a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-3H2a2 2 0 0 1-2-2V2zm2-1a1 1 0 0 0-1 1v7a1 1 0 0 0 1 1h7a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H2zm7.138 9.995c.193.301.402.583.63.846-.748.575-1.673 1.001-2.768 1.292.178.217.451.635.555.867 1.125-.359 2.08-.844 2.886-1.494.777.665 1.739 1.165 2.93 1.472.133-.254.414-.673.629-.89-1.125-.253-2.057-.694-2.82-1.284.681-.747 1.222-1.651 1.621-2.757H14v-.91h-3v-.703h-.905v.703h-3v.91h1.05c.171.592.43 1.147.774 1.657a6.08 6.08 0 0 1-1.927 1.292 5.085 5.085 0 0 0 .536.732 6.73 6.73 0 0 0 1.862-1.276z"/>
-            </svg>
-            Translate
-          </>
+          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" viewBox="0 0 16 16">
+            <path d="M4.545 6.714 4.11 8H3l1.862-5h1.284L8 8H6.833l-.435-1.286H4.545zm1.634-.736L5.5 3.956h-.049l-.679 2.022H6.18z"/>
+            <path d="M0 2a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v3h3a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-3H2a2 2 0 0 1-2-2V2zm2-1a1 1 0 0 0-1 1v7a1 1 0 0 0 1 1h7a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H2zm7.138 9.995c.193.301.402.583.63.846-.748.575-1.673 1.001-2.768 1.292.178.217.451.635.555.867 1.125-.359 2.08-.844 2.886-1.494.777.665 1.739 1.165 2.93 1.472.133-.254.414-.673.629-.89-1.125-.253-2.057-.694-2.82-1.284.681-.747 1.222-1.651 1.621-2.757H14v-.91h-3v-.703h-.905v.703h-3v.91h1.05c.171.592.43 1.147.774 1.657a6.08 6.08 0 0 1-1.927 1.292 5.085 5.085 0 0 0 .536.732 6.73 6.73 0 0 0 1.862-1.276z"/>
+          </svg>
         )}
       </button>
     </div>
@@ -521,37 +524,59 @@ export default function ChatBubble({ role, content, model, streaming, onAdd, onD
       {/* Action bar - always at the bottom of whatever is last */}
       {!isUser && (
         <div className="flex flex-col gap-0.5 pl-3">
-        <div className="flex items-center gap-2 text-xs text-gray-500 opacity-60 hover:opacity-100 transition">
+        <div className="flex items-center gap-1 text-xs text-gray-500 opacity-60 hover:opacity-100 transition">
           {translationEnabled && translateButton}
-          <button onClick={handleCopy} className="flex items-center gap-1 px-2 py-1 bg-[#2A2A2A]/60 backdrop-blur-sm rounded-md hover:text-indigo-300">
-            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" fill="currentColor" viewBox="0 0 16 16">
-              <path d="M10 1.5A1.5 1.5 0 0 1 11.5 3v8A1.5 1.5 0 0 1 10 12.5H4A1.5 1.5 0 0 1 2.5 11V3A1.5 1.5 0 0 1 4 1.5h6Zm-6 1A.5.5 0 0 0 3.5 3v8a.5.5 0 0 0 .5.5h6a.5.5 0 0 0 .5-.5V3a.5.5 0 0 0-.5-.5H4Zm9 1.5v7.528a2.5 2.5 0 0 1-2 2.45V13h1a1.5 1.5 0 0 0 1.5-1.5V4h-.5Z"/>
-            </svg>
-            {copied ? "Copied!" : "Copy"}
-          </button>
-          {onAdd && (
-            <button onClick={() => onAdd(translation ?? content)} className="flex items-center gap-1 px-2 py-1 bg-[#2A2A2A]/60 backdrop-blur-sm rounded-md hover:text-indigo-300">
-              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M17 3H7a2 2 0 00-2 2v16l7-3 7 3V5a2 2 0 00-2-2z" />
-              </svg>
-              Save
+          <div className="relative group">
+            <button onClick={handleCopy} className="flex items-center justify-center w-7 h-7 rounded-md hover:text-indigo-300 hover:bg-white/10">
+              {copied ? (
+                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+              ) : (
+                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" fill="currentColor" viewBox="0 0 16 16">
+                  <path d="M10 1.5A1.5 1.5 0 0 1 11.5 3v8A1.5 1.5 0 0 1 10 12.5H4A1.5 1.5 0 0 1 2.5 11V3A1.5 1.5 0 0 1 4 1.5h6Zm-6 1A.5.5 0 0 0 3.5 3v8a.5.5 0 0 0 .5.5h6a.5.5 0 0 0 .5-.5V3a.5.5 0 0 0-.5-.5H4Zm9 1.5v7.528a2.5 2.5 0 0 1-2 2.45V13h1a1.5 1.5 0 0 0 1.5-1.5V4h-.5Z"/>
+                </svg>
+              )}
             </button>
+            <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-1.5 py-0.5 text-[10px] text-white bg-[#1e1e2a] border border-[#2a2a38] rounded whitespace-nowrap hidden group-hover:block pointer-events-none z-50">
+              {copied ? "Copied!" : "Copy"}
+            </span>
+          </div>
+          {onAdd && (
+            <div className="relative group">
+              <button onClick={() => onAdd(translation ?? content)} className="flex items-center justify-center w-7 h-7 rounded-md hover:text-indigo-300 hover:bg-white/10">
+                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M17 3H7a2 2 0 00-2 2v16l7-3 7 3V5a2 2 0 00-2-2z" />
+                </svg>
+              </button>
+              <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-1.5 py-0.5 text-[10px] text-white bg-[#1e1e2a] border border-[#2a2a38] rounded whitespace-nowrap hidden group-hover:block pointer-events-none z-50">
+                Save to notes
+              </span>
+            </div>
           )}
           {!isUser && onRetry && !streaming && (
-            <button onClick={onRetry} className="flex items-center gap-1 px-2 py-1 bg-[#2A2A2A]/60 backdrop-blur-sm rounded-md hover:text-indigo-300">
-              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-              Retry
-            </button>
+            <div className="relative group">
+              <button onClick={onRetry} className="flex items-center justify-center w-7 h-7 rounded-md hover:text-indigo-300 hover:bg-white/10">
+                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+              </button>
+              <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-1.5 py-0.5 text-[10px] text-white bg-[#1e1e2a] border border-[#2a2a38] rounded whitespace-nowrap hidden group-hover:block pointer-events-none z-50">
+                Try again
+              </span>
+            </div>
           )}
           {onDelete && (
-            <button onClick={onDelete} className="flex items-center gap-1 px-2 py-1 bg-[#2A2A2A]/60 backdrop-blur-sm rounded-md hover:text-red-300">
-              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-              </svg>
-              Delete
-            </button>
+            <div className="relative group">
+              <button onClick={onDelete} className="flex items-center justify-center w-7 h-7 rounded-md hover:text-red-300 hover:bg-white/10">
+                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </button>
+              <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-1.5 py-0.5 text-[10px] text-white bg-[#1e1e2a] border border-[#2a2a38] rounded whitespace-nowrap hidden group-hover:block pointer-events-none z-50">
+                Delete
+              </span>
+            </div>
           )}
         </div>
         {!streaming && (
@@ -616,21 +641,31 @@ export default function ChatBubble({ role, content, model, streaming, onAdd, onD
         </div>
       )}
       {isUser && (
-        <div className="flex items-center gap-2 text-xs text-gray-500 opacity-60 hover:opacity-100 transition pr-3">
+        <div className="flex items-center gap-1 text-xs text-gray-500 opacity-60 hover:opacity-100 transition pr-3">
           {translationEnabled && translateButton}
           {onRetry && (
-            <button onClick={onRetry} title="Resend" className="flex items-center gap-1 px-2 py-1 bg-[#2A2A2A]/60 backdrop-blur-sm rounded-md hover:text-indigo-300">
-              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-              </svg>
-            </button>
+            <div className="relative group">
+              <button onClick={onRetry} className="flex items-center justify-center w-7 h-7 rounded-md hover:text-indigo-300 hover:bg-white/10">
+                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+              </button>
+              <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-1.5 py-0.5 text-[10px] text-white bg-[#1e1e2a] border border-[#2a2a38] rounded whitespace-nowrap hidden group-hover:block pointer-events-none z-50">
+                Try again
+              </span>
+            </div>
           )}
           {onDelete && (
-            <button onClick={onDelete} className="flex items-center gap-1 px-2 py-1 bg-[#2A2A2A]/60 backdrop-blur-sm rounded-md hover:text-red-300">
-              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-              </svg>
-            </button>
+            <div className="relative group">
+              <button onClick={onDelete} className="flex items-center justify-center w-7 h-7 rounded-md hover:text-red-300 hover:bg-white/10">
+                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </button>
+              <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-1.5 py-0.5 text-[10px] text-white bg-[#1e1e2a] border border-[#2a2a38] rounded whitespace-nowrap hidden group-hover:block pointer-events-none z-50">
+                Delete
+              </span>
+            </div>
           )}
         </div>
       )}
