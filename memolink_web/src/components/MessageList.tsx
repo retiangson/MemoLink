@@ -40,13 +40,14 @@ interface MessageListProps {
   evaluationActive?: boolean;
   evalRatings?: Record<string, Record<string, number | string>>;
   onRetry?: (index: number) => void;
+  onSearchOnline?: (searchQuerySuggestion?: string) => void;
 }
 
 export function MessageList({
   messages, loading, streaming, activeConversation,
   messagesContainerRef, bottomRef,
   onLoadOlder, onAddToNotes, onDeleteMessage, onDropFiles,
-  onApplyNoteEdit, onOpenNote, onSaveNote, hasOpenNote, translationEnabled = true, modelAttributionEnabled = true, confidenceEnabled = true, autopilotEnabled = true, workflowContext, workflowSuggestions, onWorkflowActionDone, onWorkflowConversationMessages, evaluationActive = false, evalRatings, onRetry,
+  onApplyNoteEdit, onOpenNote, onSaveNote, hasOpenNote, translationEnabled = true, modelAttributionEnabled = true, confidenceEnabled = true, autopilotEnabled = true, workflowContext, workflowSuggestions, onWorkflowActionDone, onWorkflowConversationMessages, evaluationActive = false, evalRatings, onRetry, onSearchOnline,
 }: MessageListProps) {
   return (
     <div
@@ -91,6 +92,8 @@ export function MessageList({
               evaluationActive={ratingReady}
               evalRating={evalRatings?.[String(msg.id)]}
               onRetry={!isStreamingMsg && onRetry ? () => onRetry(idx) : undefined}
+              suggestWebSearch={!isStreamingMsg && msg.role === "assistant" && isLast ? msg.suggest_web_search : undefined}
+              onSearchOnline={!isStreamingMsg && msg.role === "assistant" && isLast && onSearchOnline ? () => onSearchOnline(msg.search_query_suggestion) : undefined}
             />
           );
         })}

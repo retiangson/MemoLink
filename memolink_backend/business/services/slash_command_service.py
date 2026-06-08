@@ -5,14 +5,15 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Iterator, Optional
 
-from openai import OpenAI
 from sqlalchemy.orm import Session
 
 from memolink_backend.core.config import settings
 from memolink_backend.domain.repositories.note_repository import NoteRepository
 from memolink_backend.domain.repositories.conversation_repository import ConversationRepository
-from memolink_backend.domain.models.reminder import Reminder
+from memolink_backend.domain.repositories.reminder_repository import ReminderRepository
 from memolink_backend.business.services.embedding_service import EmbeddingService
+from memolink_backend.business.services.llm.client_factory import canonical_model as _canonical_model
+from memolink_backend.business.services.llm.client_factory import get_client as _get_client
 from memolink_backend.contracts.slash_command_dtos import SlashCommandRequestDTO
 
 logger = logging.getLogger(__name__)
@@ -66,37 +67,6 @@ def _parse(text: str) -> Optional[ParsedCommand]:
     return ParsedCommand(raw=text, command=command, target=target_part or None, is_all=False, instruction=instruction)
 
 
-# ── OpenAI client helper (reuses chat_service pattern) ────────────────────────
-
-_GEMINI_MODELS = {"gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.5-pro"}
-_DEEPSEEK_MODELS = {"deepseek-chat", "deepseek-reasoner", "deepseek-coder"}
-_GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
-_DEEPSEEK_BASE_URL = "https://api.deepseek.com/v1"
-_MODEL_ALIASES = {
-    "gemini-2.0-flash": "gemini-2.5-flash",
-    "gemini-2.0-flash-lite": "gemini-2.5-flash-lite",
-    "gemini-1.5-flash-8b": "gemini-2.5-flash-lite",
-    "gemini-1.5-pro": "gemini-2.5-pro",
-}
-
-
-def _canonical_model(model: str) -> str:
-    return _MODEL_ALIASES.get(model, model)
-
-
-def _get_client(model: str, user_keys: dict | None = None) -> OpenAI:
-    model = _canonical_model(model)
-    keys = user_keys or {}
-    if model in keys:
-        cfg = keys[model]
-        return OpenAI(api_key=cfg["key"], base_url=cfg.get("base_url") or None)
-    if model in _GEMINI_MODELS:
-        return OpenAI(api_key=settings.gemini_api_key, base_url=_GEMINI_BASE_URL)
-    if model in _DEEPSEEK_MODELS:
-        return OpenAI(api_key=settings.deepseek_api_key, base_url=_DEEPSEEK_BASE_URL)
-    return OpenAI(api_key=settings.openai_api_key)
-
-
 def _sse(data: dict) -> str:
     return f"data: {json.dumps(data)}\n\n"
 
@@ -108,6 +78,7 @@ class SlashCommandService:
         self,
         note_repo: NoteRepository,
         conv_repo: ConversationRepository,
+        reminder_repo: ReminderRepository,
         embedding_service: EmbeddingService,
         db: Session,
         log_service=None,
@@ -115,6 +86,7 @@ class SlashCommandService:
     ):
         self.note_repo = note_repo
         self.conv_repo = conv_repo
+        self.reminder_repo = reminder_repo
         self.embedding = embedding_service
         self.db = db
         self._log = log_service
@@ -494,17 +466,14 @@ class SlashCommandService:
         else:
             yield _sse({"t": "Please specify a date and time. Example: `/Reminder Submit draft : 2026-06-05 18:00`"})
             return
-        reminder = Reminder(
+        self.reminder_repo.create_reminder(
             user_id=dto.user_id,
-            workspace_id=dto.workspace_id,
             text=title,
-            type="manual",
-            done=False,
+            workspace_id=dto.workspace_id,
+            reminder_type="manual",
             due_date=due_date,
             due_time=due_time,
         )
-        self.db.add(reminder)
-        self.db.commit()
         time_str = f" at {due_time}" if due_time else ""
         yield _sse({"t": f"✅ Reminder set: **{title}** on {due_date}{time_str}."})
 

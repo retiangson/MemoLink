@@ -420,7 +420,7 @@ function StudyPlanTab({ workspaceId }: { workspaceId: number | null }) {
             type="text"
             value={goal}
             onChange={e => setGoal(e.target.value)}
-            placeholder="e.g. Prepare for MSE907 final exam"
+            placeholder="e.g. Prepare for my final exam in operating systems"
             className="bg-[#12121a] border border-[#2a2a38] rounded-lg px-2.5 py-1.5 text-xs text-gray-300 placeholder-gray-600 focus:outline-none focus:border-indigo-500/50"
           />
         </div>

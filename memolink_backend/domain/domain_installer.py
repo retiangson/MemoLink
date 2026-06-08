@@ -13,6 +13,7 @@ from memolink_backend.domain.repositories.translation_cache_repository import Tr
 from memolink_backend.domain.repositories.user_api_key_repository import UserApiKeyRepository
 from memolink_backend.domain.repositories.email_account_repository import EmailAccountRepository
 from memolink_backend.domain.repositories.email_record_repository import EmailRecordRepository
+from memolink_backend.domain.repositories.reminder_repository import ReminderRepository
 from memolink_backend.domain.repositories.teams_account_repository import TeamsAccountRepository
 from memolink_backend.business.services.embedding_service import EmbeddingService
 
@@ -53,6 +54,9 @@ class DomainInstaller:
 
     def get_teams_account_repository(self) -> TeamsAccountRepository:
         return TeamsAccountRepository(self._db)
+
+    def get_reminder_repository(self) -> ReminderRepository:
+        return ReminderRepository(self._db)
 
     def get_proactive_insight_repository(self):
         from memolink_backend.domain.repositories.proactive_insight_repository import ProactiveInsightRepository

@@ -170,6 +170,8 @@ interface Props {
   evaluationActive?: boolean;
   evalRating?: Record<string, number | string>;
   onRetry?: () => void;
+  suggestWebSearch?: boolean;
+  onSearchOnline?: () => void;
 }
 
 const TRANSLATE_LANGUAGES = [
@@ -218,7 +220,7 @@ function ImageGeneratingSpinner() {
   );
 }
 
-export default function ChatBubble({ role, content, model, streaming, onAdd, onDelete, onApplyEdit, onOpenNote, onSaveNote, hasOpenNote, translationEnabled = true, modelAttributionEnabled = true, confidence, confidenceReason, confidenceEnabled = true, routingReason, autopilotEnabled = true, workflowContext, workflowActions, onWorkflowActionDone, onWorkflowConversationMessages, messageId, evaluationActive, evalRating, onRetry }: Props) {
+export default function ChatBubble({ role, content, model, streaming, onAdd, onDelete, onApplyEdit, onOpenNote, onSaveNote, hasOpenNote, translationEnabled = true, modelAttributionEnabled = true, confidence, confidenceReason, confidenceEnabled = true, routingReason, autopilotEnabled = true, workflowContext, workflowActions, onWorkflowActionDone, onWorkflowConversationMessages, messageId, evaluationActive, evalRating, onRetry, suggestWebSearch, onSearchOnline }: Props) {
   const isUser = role === "user";
   const [copied, setCopied] = useState(false);
   const [showLangPicker, setShowLangPicker] = useState(false);
@@ -623,6 +625,22 @@ export default function ChatBubble({ role, content, model, streaming, onAdd, onD
             })()}
           </div>
         )}
+        {/* Web search suggestion chip — shown when notes had no relevant content */}
+        {!streaming && suggestWebSearch && onSearchOnline && (
+          <div className="mt-2">
+            <button
+              onClick={onSearchOnline}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-medium bg-sky-500/10 border border-sky-500/25 text-sky-400 hover:bg-sky-500/20 hover:border-sky-500/40 transition"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <circle cx="12" cy="12" r="10" />
+                <path strokeLinecap="round" d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+              </svg>
+              Not in your notes — search online?
+            </button>
+          </div>
+        )}
+
         {/* Workflow action buttons - appear below AI message when suggestions are ready */}
         {!streaming && workflowActions && workflowActions.length > 0 && workflowContext && (
           <WorkflowActionBar

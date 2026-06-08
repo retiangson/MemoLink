@@ -37,8 +37,19 @@ from memolink_backend.business.services.embedding_service import EmbeddingServic
 from memolink_backend.business.interfaces.i_chat_service import IChatService
 from memolink_backend.utils.file_extractor import extract_text_local
 from memolink_backend.utils.web_search import brave_search
+from memolink_backend.utils.academic_search import search_papers, format_papers_context
 from memolink_backend.contracts.chat_dtos import ChatResponseDTO, ChatAnswerSource, ChatRequestDTO, ChatAttachmentDTO
+from memolink_backend.contracts.chat_stream_dtos import (
+    ImageGeneratingEvent,
+    MessageCompleteEvent,
+    MessageDeltaEvent,
+    MessageReplaceEvent,
+    NoteCloseEvent,
+    NoteImprovingEvent,
+    sse_event,
+)
 from memolink_backend.business.services.autopilot_service import route as autopilot_route
+from memolink_backend.business.services import smart_engine
 
 _GEMINI_MODELS = {
     "gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.5-pro",
@@ -130,6 +141,75 @@ _WEB_SEARCH_EMPTY_MSG = (
     "WEB SEARCH MODE WAS REQUESTED, but MemoLink did not receive usable Brave Search results for this turn. "
     "Do not claim the model simply cannot browse. Instead, explain briefly that the configured web search provider returned no results or may be unavailable, then answer from notes/general knowledge if possible."
 )
+
+_GENERIC_WEB_SEARCH_PHRASES = (
+    "search online",
+    "search the internet",
+    "search the web",
+    "search web",
+    "look it up",
+    "check online",
+    "search for it",
+    "latest news",
+    "latest updates",
+    "current news",
+    "current updates",
+    "real time",
+    "realtime",
+    "web search",
+)
+_GENERIC_WEB_SEARCH_STOPWORDS = {
+    "a", "an", "and", "any", "can", "could", "do", "for", "find", "get", "give", "i", "it",
+    "latest", "look", "me", "news", "now", "of", "on", "online", "please", "recent", "search",
+    "show", "tell", "that", "the", "this", "today", "updates", "up", "web", "what", "with",
+}
+_WEB_SEARCH_FRESHNESS_CUES = (
+    "latest", "recent", "current", "today", "now", "news", "real time", "realtime", "live",
+)
+
+
+def _is_generic_web_search_request(text: str) -> bool:
+    lower = (text or "").lower().strip()
+    if not lower:
+        return False
+
+    cleaned = lower
+    for phrase in _GENERIC_WEB_SEARCH_PHRASES:
+        cleaned = cleaned.replace(phrase, " ")
+    cleaned = re.sub(r"[^a-z0-9\s]", " ", cleaned)
+    tokens = [
+        token for token in cleaned.split()
+        if token not in _GENERIC_WEB_SEARCH_STOPWORDS and len(token) > 2 and not token.isdigit()
+    ]
+    has_search_cue = any(cue in lower for cue in _GENERIC_WEB_SEARCH_PHRASES + _WEB_SEARCH_FRESHNESS_CUES)
+    return has_search_cue and not tokens
+
+
+def _derive_web_search_query(user_text: str, message_history: list[dict]) -> str:
+    current = (user_text or "").strip()
+    if not current:
+        return ""
+    if not _is_generic_web_search_request(current):
+        return current[:200]
+
+    current_lower = current.lower()
+    wants_freshness = any(cue in current_lower for cue in _WEB_SEARCH_FRESHNESS_CUES)
+
+    for message in reversed(message_history[:-1]):
+        if message.get("role") != "user":
+            continue
+        candidate = (message.get("content") or "").strip()
+        if not candidate or _is_generic_web_search_request(candidate):
+            continue
+        if len(candidate) < 8:
+            continue
+
+        query = candidate
+        if wants_freshness and not any(cue in candidate.lower() for cue in _WEB_SEARCH_FRESHNESS_CUES):
+            query = f"{candidate} latest news"
+        return query[:200]
+
+    return current[:200]
 
 
 def _parse_confidence(text: str) -> tuple[str, str | None, str | None]:
@@ -335,19 +415,22 @@ def _generate_image(prompt: str) -> tuple[str, str, str]:
     return f"data:image/png;base64,{b64}", prompt, "stable-diffusion"
 
 _SYSTEM_PROMPT = (
-    "You are MemoLink, a context-aware AI knowledge assistant and research companion. "
-    "You have access to the user's personal notes and should use them as your primary source. "
+    "You are MemoLink, a smart AI companion. "
+    "You have access to the user's notes and should use them as your primary source whenever they are relevant. "
     "You also have access to the user's Gmail account — when email context appears below you MUST "
     "use it to answer questions about emails. NEVER say you cannot access email — MemoLink has "
     "native Gmail integration and can search, read, display emails, AND send replies directly in the chat. "
     "When asked to reply to someone, MemoLink will send it and you will be told whether it succeeded. "
-    "Always be thorough, well-structured, and grounded in the actual content of the notes. "
+    "Always be thoughtful, capable, and grounded in the actual available context. "
+    "Act like a smart, supportive collaborator who solves the user's real problem instead of giving shallow generic replies. "
+    "Default to a strong first answer with enough substance to be useful immediately. "
     "Format every substantive response using rich markdown: "
     "## headings for major sections, ### for subsections, **bold** for key terms, "
     "bullet or numbered lists, and tables where data is tabular. "
     "Never respond with a wall of plain text. "
-    "Cite note sources (e.g. 'According to your Requirements Analysis note...') where relevant. "
-    "Only be brief for genuinely trivial one-line questions; for everything else, go deep.\n\n"
+    "Cite note or source context where relevant. "
+    "Only be brief for genuinely trivial one-line questions; for everything else, go deep. "
+    "If the user asks for a full, complete, detailed, or thorough answer, honor that request explicitly rather than compressing it.\n\n"
 
     "RESEARCH AWARENESS:\n"
     "- When a question touches on facts, cite where the information comes from\n"
@@ -452,6 +535,360 @@ class ChatService(IChatService):
         except Exception:
             return {}
 
+    def _run_completion_chain(
+        self,
+        primary_model: str,
+        user_keys: dict,
+        messages: list[dict],
+        extra_kwargs: dict | None = None,
+    ) -> tuple[str, str]:
+        chosen_model, _ = _reroute_large_request(
+            primary_model,
+            _estimate_tokens(messages),
+            settings.gemini_api_key,
+            settings.openai_chat_model,
+        )
+        chain = _build_fallback_chain(chosen_model, user_keys)
+        last_error = ""
+        for attempt in chain:
+            try:
+                kwargs = {**_completion_kwargs(attempt), **(extra_kwargs or {})}
+                completion = _get_client(attempt, user_keys).chat.completions.create(
+                    model=attempt,
+                    messages=messages,
+                    **kwargs,
+                )
+                return (completion.choices[0].message.content or "").strip(), attempt
+            except Exception as exc:
+                last_error = str(exc)
+                logger.warning("Long-form model %s failed: %s", attempt, exc)
+        raise RuntimeError(last_error or "All completion attempts failed")
+
+    def _is_long_academic_request(self, prompt: str, smart_analysis: dict | None) -> bool:
+        if (smart_analysis or {}).get("mode") != "academic_writer":
+            return False
+        lower = prompt.lower()
+        min_words, _ = smart_engine.parse_word_targets(prompt)
+        strong_keywords = (
+            "complete paper",
+            "entire research paper",
+            "full report",
+            "final paper",
+            "final submission",
+            "fulfill all rubric",
+            "fulfil all rubric",
+            "assessment",
+            "citations and references",
+        )
+        return min_words >= 3000 or any(k in lower for k in strong_keywords)
+
+    def _long_academic_outline(self, prompt: str, min_words: int, max_words: int) -> list[dict]:
+        target_total = max(min_words or 5000, 5000)
+        if max_words:
+            target_total = min(target_total + 800, max_words)
+        prompt_lc = prompt.lower()
+        if "literature review" in prompt_lc:
+            sections = [
+                ("Abstract", 300),
+                ("Introduction", 650),
+                ("Literature Review", 1700),
+                ("Comparative Analysis and Synthesis", 1200),
+                ("Implications and Gaps", 700),
+                ("Conclusion", 400),
+                ("References", 250),
+            ]
+        elif any(term in prompt_lc for term in ("proposal", "proposed", "research design", "methodology")):
+            sections = [
+                ("Abstract", 300),
+                ("Introduction", 600),
+                ("Background and Problem Statement", 850),
+                ("Literature Review", 1200),
+                ("Research Objectives and Questions", 500),
+                ("Methodology and Approach", 1200),
+                ("Expected Outcomes and Evaluation Plan", 700),
+                ("Ethical Considerations", 450),
+                ("Conclusion", 350),
+                ("References", 250),
+            ]
+        else:
+            sections = [
+                ("Abstract", 300),
+                ("Introduction", 650),
+                ("Background and Literature Review", 1400),
+                ("Main Analysis", 1200),
+                ("Methodology or Approach", 900),
+                ("Findings, Evaluation, or Critical Discussion", 900),
+                ("Conclusion", 400),
+                ("References", 250),
+            ]
+        scale = target_total / sum(words for _, words in sections)
+        planned = []
+        for heading, words in sections:
+            planned.append({
+                "heading": heading,
+                "purpose": f"Write the {heading.lower()} section for the requested academic paper.",
+                "target_words": int(words * scale),
+            })
+        return planned
+
+    def _select_long_academic_notes(self, user_id: int, workspace_id: int | None, prompt: str, smart_analysis: dict | None) -> list:
+        all_notes = self.repo_notes.get_for_user(user_id, workspace_id) if user_id else []
+        if not all_notes:
+            return []
+
+        prompt_course_codes = {code.lower() for code in smart_engine.extract_course_codes(prompt)}
+        rubric_hits = []
+        for n in all_notes:
+            hay = f"{n.title or ''}\n{_HTML_TAG.sub(' ', n.content or '')}".lower()
+            if (
+                any(key in hay for key in ("requirement", "requirements", "rubric", "assessment", "criteria", "marking guide", "brief"))
+                or any(code in hay for code in prompt_course_codes)
+            ):
+                rubric_hits.append(n)
+
+        queries = list((smart_analysis or {}).get("retrieval_queries", []) or [])
+        queries += [
+            prompt,
+            "requirements rubric assessment criteria",
+            "research design methodology literature review evaluation ethics",
+        ]
+        queries.extend(f"{code} rubric requirements" for code in list(prompt_course_codes)[:2])
+
+        seen: set[int] = set()
+        selected = []
+        for note in rubric_hits:
+            if note.id not in seen:
+                seen.add(note.id)
+                selected.append(note)
+
+        for q in queries[:8]:
+            try:
+                q_vec = self.embedding.embed_text(q)
+                hits = self.repo_notes.search_by_vector(q_vec, top_k=8, workspace_id=workspace_id)
+                for note in hits:
+                    if note.id not in seen:
+                        seen.add(note.id)
+                        selected.append(note)
+            except Exception:
+                continue
+
+        if not selected:
+            return all_notes[:15]
+        return selected[:18]
+
+    def _notes_to_context(self, notes: list, per_note_chars: int = 2500, max_total_chars: int = 26000) -> str:
+        parts: list[str] = []
+        used = 0
+        for note in notes:
+            plain = _strip_base64_images(_HTML_TAG.sub(" ", note.content or "")).strip()
+            block = f"[NOTE {note.id}: {note.title or 'Untitled'}]\n{plain[:per_note_chars]}"
+            if used + len(block) > max_total_chars:
+                break
+            parts.append(block)
+            used += len(block)
+        return "\n\n".join(parts)
+
+    def _plan_long_academic_sections(
+        self,
+        prompt: str,
+        source_context: str,
+        min_words: int,
+        max_words: int,
+        model: str,
+        user_keys: dict,
+    ) -> list[dict]:
+        fallback = self._long_academic_outline(prompt, min_words, max_words)
+        planner_system = (
+            "You are planning a long academic paper from a rubric and project notes.\n"
+            "Return ONLY valid JSON with this shape:\n"
+            '{"title":"...","sections":[{"heading":"...","purpose":"...","target_words":800}]}\n'
+            "Rules:\n"
+            "- Produce 8 to 10 major sections.\n"
+            "- Follow the rubric/requirements context if present.\n"
+            "- Total target_words should fit inside the requested word-count range.\n"
+            "- Prefer formal academic section headings.\n"
+            "- Include References as the final section.\n"
+            "- Do not include appendices."
+        )
+        planner_user = (
+            f"User request:\n{prompt}\n\n"
+            f"Requested minimum words: {min_words or 5000}\n"
+            f"Requested maximum words: {max_words or 10000}\n\n"
+            f"Available source context:\n{source_context[:18000]}"
+        )
+        try:
+            raw, _ = self._run_completion_chain(
+                model,
+                user_keys,
+                [{"role": "system", "content": planner_system}, {"role": "user", "content": planner_user}],
+                {"temperature": 0.1, "max_tokens": 1800},
+            )
+            cleaned = re.sub(r"^```(?:json)?\s*|\s*```$", "", raw, flags=re.S).strip()
+            data = json.loads(cleaned)
+            sections = data.get("sections") or []
+            if sections:
+                return sections
+        except Exception:
+            pass
+        return fallback
+
+    def _render_long_academic_status(
+        self,
+        phase: str,
+        *,
+        section_idx: int | None = None,
+        section_total: int | None = None,
+        heading: str | None = None,
+    ) -> str:
+        lines = [
+            "## Building your paper",
+            "",
+            f"**Status:** {phase}",
+        ]
+        if section_idx is not None and section_total is not None:
+            lines.append(f"**Progress:** Section {section_idx} of {section_total}")
+        if heading:
+            lines.append(f"**Current section:** {heading}")
+        lines.extend([
+            "",
+            "MemoLink is still working. This draft path gathers sources, plans the structure, writes each section, and then runs a final quality pass.",
+        ])
+        return "\n".join(lines)
+
+    def _iter_long_academic_draft(
+        self,
+        prompt: str,
+        user_id: int,
+        workspace_id: int | None,
+        smart_analysis: dict,
+        model: str,
+        user_keys: dict,
+    ):
+        yield {"type": "status", "content": self._render_long_academic_status("Collecting relevant notes and requirements")}
+
+        min_words, max_words = smart_engine.parse_word_targets(prompt)
+        selected_notes = self._select_long_academic_notes(user_id, workspace_id, prompt, smart_analysis)
+        notes_context = self._notes_to_context(selected_notes)
+        note_titles = [n.title or "" for n in selected_notes if getattr(n, "title", None)]
+
+        yield {"type": "status", "content": self._render_long_academic_status("Searching supporting academic sources")}
+        paper_queries = smart_engine.build_dynamic_academic_queries(prompt, smart_analysis, note_titles)
+        papers: list[dict] = []
+        seen_titles: set[str] = set()
+        for query in paper_queries[:2]:
+            try:
+                batch = search_papers(query[:150], limit=6, api_key=settings.semantic_scholar_api_key)
+                for paper in batch:
+                    key = (paper.get("title") or "").lower()[:80]
+                    if key and key not in seen_titles:
+                        seen_titles.add(key)
+                        papers.append(paper)
+            except Exception:
+                continue
+        paper_context = format_papers_context(papers[:10]) if papers else ""
+
+        combined_context = notes_context
+        if paper_context:
+            combined_context += "\n\n--- ACADEMIC SOURCES ---\n" + paper_context
+
+        yield {"type": "status", "content": self._render_long_academic_status("Planning the paper structure from your brief and sources")}
+        sections = self._plan_long_academic_sections(
+            prompt=prompt,
+            source_context=combined_context,
+            min_words=min_words,
+            max_words=max_words,
+            model=model,
+            user_keys=user_keys,
+        )
+
+        mode_prompt = smart_engine.get_mode_prompt("academic_writer")
+        section_outputs: list[str] = []
+        used_model = model
+        section_total = len(sections)
+
+        for idx, section in enumerate(sections, start=1):
+            heading = str(section.get("heading") or f"Section {idx}").strip()
+            purpose = str(section.get("purpose") or "").strip()
+            target_words = int(section.get("target_words") or 700)
+            yield {
+                "type": "status",
+                "content": self._render_long_academic_status(
+                    "Drafting the next section",
+                    section_idx=idx,
+                    section_total=section_total,
+                    heading=heading,
+                ),
+            }
+            section_query = f"{heading}\n{purpose}\n{prompt}"
+            section_notes = self._select_long_academic_notes(user_id, workspace_id, section_query, smart_analysis)[:8]
+            section_context = self._notes_to_context(section_notes, per_note_chars=2200, max_total_chars=14000)
+            section_user = (
+                f"User request:\n{prompt}\n\n"
+                f"Paper section to write: {heading}\n"
+                f"Purpose: {purpose}\n"
+                f"Target length: about {target_words} words.\n\n"
+                "Write ONLY this section in polished academic prose.\n"
+                "Do not write an outline. Do not include commentary about what you are doing.\n"
+                "Use citations when supported by the provided notes or academic sources.\n"
+                "If project-specific evidence is missing, add a precise [ADD NOTES] marker.\n"
+                "Avoid repeating the exact same introduction in every section.\n\n"
+                f"Section source context:\n{section_context}"
+            )
+            if paper_context:
+                section_user += f"\n\nAcademic sources:\n{paper_context[:12000]}"
+            drafted, used_model = self._run_completion_chain(
+                model,
+                user_keys,
+                [
+                    {"role": "system", "content": mode_prompt},
+                    {"role": "user", "content": section_user},
+                ],
+                {"temperature": 0.2, "max_tokens": min(max(target_words * 2, 1200), 5000)},
+            )
+            section_outputs.append(drafted.strip())
+
+        yield {"type": "status", "content": self._render_long_academic_status("Running the final quality and citation check")}
+        title = smart_engine.build_dynamic_academic_title(prompt)
+        draft = title + "\n\n".join(section_outputs)
+        checklist = list((smart_analysis or {}).get("quality_checks", []))
+        checklist += [
+            "The response is a complete long-form paper, not a short scaffold",
+            "The paper meaningfully attempts the requested word-count range",
+        ]
+        improved = smart_engine.quality_check(
+            draft=draft,
+            checklist=checklist,
+            user_message=prompt,
+            client=_get_client(used_model, user_keys),
+            model=used_model,
+            note_context=combined_context,
+        )
+        yield {"type": "result", "content": improved or draft, "model": used_model}
+
+    def _generate_long_academic_draft(
+        self,
+        prompt: str,
+        user_id: int,
+        workspace_id: int | None,
+        smart_analysis: dict,
+        model: str,
+        user_keys: dict,
+    ) -> tuple[str, str]:
+        final_content = ""
+        used_model = model
+        for item in self._iter_long_academic_draft(
+            prompt=prompt,
+            user_id=user_id,
+            workspace_id=workspace_id,
+            smart_analysis=smart_analysis,
+            model=model,
+            user_keys=user_keys,
+        ):
+            if item.get("type") == "result":
+                final_content = str(item.get("content") or "")
+                used_model = str(item.get("model") or model)
+        return (final_content, used_model)
+
     def _build_chat_context(self, dto: ChatRequestDTO):
         """Prepare conversation id, OpenAI messages list, and sources for a chat request."""
         user_text = (dto.prompt or "").strip()
@@ -466,6 +903,7 @@ class ChatService(IChatService):
 
         history = self.repo_conv.get_messages_paginated(conversation_id, limit=50, before_id=None)
         message_history = [{"role": m.role, "content": _strip_base64_images(m.content)} for m in reversed(history)]
+        suggested_web_query = _derive_web_search_query(user_text, message_history)
 
         ws_filter = None if getattr(dto, "cross_workspace", False) else getattr(dto, "workspace_id", None)
 
@@ -543,8 +981,78 @@ class ChatService(IChatService):
             "reply", "reply to", "respond", "respond to", "write back", "email back",
             "get back to", "follow up", "follow-up", "reply again", "send a reply",
         }
-        _asks_compose = any(kw in user_text.lower() for kw in _compose_keywords)
-        _asks_reply = any(kw in user_text.lower() for kw in _reply_keywords)
+        _compose_patterns = (
+            r"\bsend\b(?:\s+\w+){0,4}\s+\bemail\b",
+            r"\bemail\b(?:\s+\w+){0,4}\s+\bto\b",
+            r"\bsend\s+(?:this|that|it)\s+as\s+email\b",
+            r"\bemail\s+(?:this|that|it)\s+to\b",
+            r"\bshare\s+(?:this|that|it)\s+by\s+email\b",
+        )
+        _lower_user_text = user_text.lower()
+
+        def _has_email_compose_intent(text: str) -> bool:
+            _lower = (text or "").lower()
+            return any(kw in _lower for kw in _compose_keywords) or any(re.search(pattern, _lower, re.I) for pattern in _compose_patterns)
+
+        _asks_compose = _has_email_compose_intent(user_text)
+        _asks_reply = any(kw in _lower_user_text for kw in _reply_keywords)
+
+        _recent_conversation = message_history[-8:]
+        _previous_conversation = message_history[:-1]
+        _recent_transcript = "\n\n".join(
+            f"{m['role'].upper()}: {_strip_base64_images(m.get('content', ''))[:2000]}"
+            for m in _recent_conversation
+        )
+
+        def _recent_substantive_assistant_message() -> str:
+            for _msg in reversed(_previous_conversation):
+                if _msg.get("role") != "assistant":
+                    continue
+                _content = _strip_base64_images(_msg.get("content", "")).strip()
+                _content, _, _ = _parse_confidence(_content)
+                _content = _content.strip()
+                if not _content or "<email_draft" in _content:
+                    continue
+                _lower = _content.lower()
+                if any(
+                    cue in _lower
+                    for cue in (
+                        "what is the email address",
+                        "what specific research content should be included",
+                        "would you like to make any changes",
+                        "before i send it",
+                    )
+                ):
+                    continue
+                if len(_content) < 60:
+                    continue
+                return _content[:15000]
+            return ""
+
+        _assistant_requested_email_details = any(
+            m.get("role") == "assistant"
+            and any(
+                cue in (m.get("content", "")).lower()
+                for cue in (
+                    "email address",
+                    "should be included in the email",
+                    "make any changes to this email",
+                    "before i send it",
+                )
+            )
+            for m in _recent_conversation[-3:]
+        )
+        _current_is_bare_email = bool(re.fullmatch(r"[\w.\-+]+@[\w.\-]+\.\w+", user_text.strip(), re.I))
+        _prior_email_request = next(
+            (
+                (m.get("content", "") or "").strip()
+                for m in reversed(_previous_conversation)
+                if m.get("role") == "user" and (_has_email_compose_intent(m.get("content", "")) or any(kw in (m.get("content", "")).lower() for kw in _reply_keywords))
+            ),
+            "",
+        )
+        if _current_is_bare_email and (_assistant_requested_email_details or bool(_prior_email_request)):
+            _asks_compose = True
         _email_draft_prefill: str | None = None
         if (_asks_compose or _asks_reply) and self._email_service and dto.user_id:
             try:
@@ -577,17 +1085,21 @@ class ChatService(IChatService):
                         "  subject     — a concise, appropriate email subject line\n"
                         "  is_reply    — true if the user wants to reply to an existing email, false for a new email\n"
                         "  style       — any style/tone instructions like 'make it nice', 'be formal', or null\n\n"
+                        "Use recent conversation context to resolve follow-up messages like a bare email address, "
+                        "or references such as 'that', 'it', or 'the research we generated'.\n"
+                        "If the user wants to send previously generated content from this conversation, infer a suitable subject.\n\n"
                         f"Available note titles (match one if mentioned): {_note_titles}\n\n"
+                        f"Recent conversation context:\n{_recent_transcript}\n\n"
                         f"User request: {user_text}\n\n"
                         "Return ONLY the JSON object, no explanation."
                     )
                     # Use the best available model — try the user's selected model first,
                     # then fall back through the same chain used for chat
-                    _extract_chain = _build_fallback_chain(dto.model or settings.openai_chat_model)
+                    _extract_chain = _build_fallback_chain(dto.model or settings.openai_chat_model, self._resolve_user_keys(dto.user_id))
                     _raw = ""
                     for _em in _extract_chain:
                         try:
-                            _ec = _get_client(_em)
+                            _ec = _get_client(_em, self._resolve_user_keys(dto.user_id))
                             _er = _ec.chat.completions.create(
                                 model=_em,
                                 messages=[{"role": "user", "content": _extract_prompt}],
@@ -654,6 +1166,16 @@ class ChatService(IChatService):
                     if (_from_note_match or _bare_note_match) and _body_match:
                         style_hint = _body_match.group(1).strip().strip('"\'')
 
+                if not recipient_hint and _current_is_bare_email and (_assistant_requested_email_details or _prior_email_request):
+                    recipient_hint = user_text.strip().lower()
+
+                _conversation_body_source = _recent_substantive_assistant_message()
+                if not topic:
+                    if _prior_email_request and any(term in _prior_email_request.lower() for term in ("research", "paper", "report", "assessment", "essay")):
+                        topic = "the generated research"
+                    elif _conversation_body_source:
+                        topic = "the generated content from this conversation"
+
                 if not recipient_hint or not topic:
                     raise ValueError("insufficient intent: need recipient and topic")
 
@@ -673,13 +1195,14 @@ class ChatService(IChatService):
                         mid, tid = "", ""
                 else:
                     to_addr = recipient_hint if "@" in recipient_hint else f"{recipient_hint}@gmail.com"
-                    subject = str(_intent.get("subject") or topic).replace('"', "'").capitalize()
+                    subject = str(_intent.get("subject") or topic).replace('"', "'").strip()
                     mid, tid = "", ""
 
                 # --- Find the matching note and build body ---
                 # Use AI-extracted note_name if available, otherwise fall back to topic keywords
                 note_name_hint = str(_intent.get("note_name") or topic).strip()
                 body_text = f"Hi,\n\nI wanted to share some details about: {note_name_hint or topic}.\n\nPlease let me know if you have any questions."
+                matched_note = False
                 if note_name_hint and self.repo_notes and dto.user_id:
                     try:
                         _stop_note = {"the", "a", "an", "of", "in", "on", "for", "and", "or",
@@ -737,9 +1260,13 @@ class ChatService(IChatService):
                                     else:
                                         # No style instruction — send the note content directly, no AI rewriting
                                         body_text = raw_body
+                                    matched_note = True
                                     break
                     except Exception:
                         pass
+
+                if not matched_note and _conversation_body_source:
+                    body_text = _conversation_body_source
 
                 import base64 as _b64
                 # Cap at 15 000 chars — covers virtually any real note while keeping
@@ -890,7 +1417,8 @@ class ChatService(IChatService):
                 )})
 
         if getattr(dto, "web_search", False) and user_text:
-            web_block = brave_search(user_text, count=8)
+            web_query = (getattr(dto, "search_query_override", None) or "").strip() or suggested_web_query or user_text
+            web_block = brave_search(web_query, count=8)
             if web_block:
                 system_msgs.append({"role": "system", "content": _WEB_SEARCH_SYSTEM_MSG})
                 system_msgs.append({"role": "system", "content": web_block})
@@ -903,7 +1431,7 @@ class ChatService(IChatService):
         # Pre-compute a deterministic confidence fallback so the badge always shows
         pre_conf_level, pre_conf_reason = _pre_confidence(all_notes, top_notes_for_confidence)
 
-        return conversation_id, system_msgs + message_history, sources, pre_conf_level, pre_conf_reason, _email_draft_prefill
+        return conversation_id, system_msgs + message_history, sources, pre_conf_level, pre_conf_reason, _email_draft_prefill, suggested_web_query
 
     def _handle_improve_note_stream(self, dto: ChatRequestDTO, note_name: str, conversation_id: int) -> Iterator[str]:
         workspace_id = getattr(dto, "workspace_id", None)
@@ -912,12 +1440,12 @@ class ChatService(IChatService):
         if not note:
             msg = f'I couldn\'t find a note matching **"{note_name}"**. Please check the title and try again.\n\nAvailable notes can be found in your sidebar.'
             assistant_msg = self.repo_conv.add_message(conversation_id, "assistant", msg)
-            yield f"data: {json.dumps({'t': msg})}\n\n"
-            yield f"data: {json.dumps({'done': True, 'id': assistant_msg.id})}\n\n"
+            yield sse_event(MessageDeltaEvent(text=msg))
+            yield sse_event(MessageCompleteEvent(message_id=assistant_msg.id))
             return
 
-        yield f"data: {json.dumps({'close_note': note.id})}\n\n"
-        yield f"data: {json.dumps({'improving_note': note.title})}\n\n"
+        yield sse_event(NoteCloseEvent(note_id=note.id))
+        yield sse_event(NoteImprovingEvent(title=note.title))
 
         _IMPROVE_SYSTEM = (
             "You are a document formatting expert. Improve the structure, formatting, and clarity of the given note. "
@@ -997,8 +1525,8 @@ class ChatService(IChatService):
         if not improved_html:
             msg = "⚠ Failed to improve the note — all AI models are currently unavailable."
             assistant_msg = self.repo_conv.add_message(conversation_id, "assistant", msg)
-            yield f"data: {json.dumps({'t': msg})}\n\n"
-            yield f"data: {json.dumps({'done': True, 'id': assistant_msg.id})}\n\n"
+            yield sse_event(MessageDeltaEvent(text=msg))
+            yield sse_event(MessageCompleteEvent(message_id=assistant_msg.id))
             return
 
         self.repo_notes.update_note(note.id, None, improved_html)
@@ -1013,8 +1541,8 @@ class ChatService(IChatService):
             "- Key terms and readability"
         )
         assistant_msg = self.repo_conv.add_message(conversation_id, "assistant", response)
-        yield f"data: {json.dumps({'replace': response})}\n\n"
-        yield f"data: {json.dumps({'done': True, 'id': assistant_msg.id})}\n\n"
+        yield sse_event(MessageReplaceEvent(content=response))
+        yield sse_event(MessageCompleteEvent(message_id=assistant_msg.id))
 
     def ask(self, dto: ChatRequestDTO) -> ChatResponseDTO:
         user_text = (dto.prompt or "").strip()
@@ -1034,7 +1562,8 @@ class ChatService(IChatService):
             openai_key=settings.openai_api_key,
         )
 
-        conversation_id, messages, sources, pre_conf_level, pre_conf_reason, email_draft_prefill = self._build_chat_context(dto)
+        conversation_id, messages, sources, pre_conf_level, pre_conf_reason, email_draft_prefill, suggested_web_query = self._build_chat_context(dto)
+        ws_filter = None if getattr(dto, "cross_workspace", False) else getattr(dto, "workspace_id", None)
 
         # Email draft — return immediately without calling the LLM
         if email_draft_prefill:
@@ -1050,6 +1579,46 @@ class ChatService(IChatService):
                 answer = f"⚠ Image generation failed: {exc}"
             assistant_msg = self.repo_conv.add_message(conversation_id, "assistant", answer, model=img_model)
             return ChatResponseDTO(answer=answer, sources=[], message_id=assistant_msg.id)
+
+        if getattr(dto, "smart_mode", True):
+            try:
+                smart_analysis = smart_engine.analyse_request(user_text, _get_client(model, user_keys), model)
+                _context_engine = smart_engine.build_context_engine(smart_analysis.get("mode", "general_chat"))
+                _prepared_context = _context_engine.prepare(
+                    messages=messages,
+                    user_text=user_text,
+                    smart_analysis=smart_analysis,
+                    today=date.today(),
+                )
+                messages = _prepared_context.messages
+                if self._is_long_academic_request(user_text, smart_analysis):
+                    answer, used_model = self._generate_long_academic_draft(
+                        prompt=user_text,
+                        user_id=dto.user_id,
+                        workspace_id=ws_filter,
+                        smart_analysis=smart_analysis,
+                        model=model,
+                        user_keys=user_keys,
+                    )
+                    clean_answer, conf_level, conf_reason = _parse_confidence(answer)
+                    final_conf = conf_level or pre_conf_level
+                    final_reason = conf_reason or pre_conf_reason
+                    assistant_msg = self.repo_conv.add_message(
+                        conversation_id,
+                        "assistant",
+                        clean_answer,
+                        model=used_model,
+                        confidence=final_conf,
+                        confidence_reason=final_reason,
+                    )
+                    return ChatResponseDTO(
+                        answer=clean_answer,
+                        sources=sources,
+                        message_id=assistant_msg.id,
+                        routing_reason=routing_reason or "Smart: academic_writer",
+                    )
+            except Exception as exc:
+                logger.warning("Long academic draft path failed in ask(); falling back: %s", exc)
 
         # Proactive size guard — re-route oversized requests off low-TPM OpenAI models.
         _rm, _large_reason = _reroute_large_request(model, _estimate_tokens(messages), settings.gemini_api_key, settings.openai_chat_model)
@@ -1093,11 +1662,11 @@ class ChatService(IChatService):
         return ChatResponseDTO(answer=clean_answer, sources=sources, message_id=assistant_msg.id, routing_reason=routing_reason)
 
     def ask_stream(self, dto: ChatRequestDTO) -> Iterator[str]:
-        """Yield SSE-formatted chunks. Each event is JSON: {"t":"<token>"} or {"done":true,"id":<int>}."""
+        """Yield SSE-formatted chat stream events."""
         user_text = (dto.prompt or "").strip()
         if not user_text:
-            yield f"data: {json.dumps({'t': 'I did not receive any message.'})}\n\n"
-            yield f"data: {json.dumps({'done': True, 'id': None})}\n\n"
+            yield sse_event(MessageDeltaEvent(text="I did not receive any message."))
+            yield sse_event(MessageCompleteEvent(message_id=None))
             return
 
         model = dto.model or settings.openai_chat_model
@@ -1115,14 +1684,15 @@ class ChatService(IChatService):
 
         t_total = time.perf_counter()
         t_ctx = time.perf_counter()
-        conversation_id, messages, sources, pre_conf_level, pre_conf_reason, email_draft_prefill = self._build_chat_context(dto)
+        conversation_id, messages, sources, pre_conf_level, pre_conf_reason, email_draft_prefill, suggested_web_query = self._build_chat_context(dto)
         ctx_ms = int((time.perf_counter() - t_ctx) * 1000)
+        ws_filter = None if getattr(dto, "cross_workspace", False) else getattr(dto, "workspace_id", None)
 
         # Email draft — bypass LLM entirely; emit the full draft as a single replace event
         if email_draft_prefill:
             assistant_msg = self.repo_conv.add_message(conversation_id, "assistant", email_draft_prefill)
-            yield f"data: {json.dumps({'replace': email_draft_prefill})}\n\n"
-            yield f"data: {json.dumps({'done': True, 'id': assistant_msg.id, 'model': 'memolink'})}\n\n"
+            yield sse_event(MessageReplaceEvent(content=email_draft_prefill))
+            yield sse_event(MessageCompleteEvent(message_id=assistant_msg.id, model="memolink"))
             return
 
         note_name = _extract_improve_note_name(user_text)
@@ -1131,7 +1701,7 @@ class ChatService(IChatService):
             return
 
         if _is_image_request(user_text):
-            yield f"data: {json.dumps({'image_generating': True})}\n\n"
+            yield sse_event(ImageGeneratingEvent())
             prompt = _extract_image_prompt(user_text)
             img_model = "stable-diffusion"
             try:
@@ -1139,10 +1709,95 @@ class ChatService(IChatService):
                 answer = f"![Generated image]({data_url})\n\n*{revised}*"
             except Exception as exc:
                 answer = f"⚠ Image generation failed: {exc}"
-            yield f"data: {json.dumps({'replace': answer})}\n\n"
+            yield sse_event(MessageReplaceEvent(content=answer))
             assistant_msg = self.repo_conv.add_message(conversation_id, "assistant", answer, model=img_model)
-            yield f"data: {json.dumps({'done': True, 'id': assistant_msg.id, 'model': img_model})}\n\n"
+            yield sse_event(MessageCompleteEvent(message_id=assistant_msg.id, model=img_model))
             return
+
+        # ── Smart Response Engine ──────────────────────────────────────────────
+        # Runs a fast analysis pass (Call 1) to detect intent, choose a specialist
+        # prompt, and build an optimized internal task description.
+        # All failures are silently swallowed — chat always works without it.
+        _smart_analysis: dict | None = None
+        _smart_mode_name = "general_chat"
+        _extra_completion_kwargs: dict = {}
+
+        if getattr(dto, "smart_mode", True):
+            try:
+                _analyser_client = _get_client(model, user_keys)
+                _smart_analysis = smart_engine.analyse_request(user_text, _analyser_client, model)
+
+                # If the model wants clarification, return the question and stop
+                if _smart_analysis.get("needs_clarification") and _smart_analysis.get("clarifying_question"):
+                    _cq = _smart_analysis["clarifying_question"]
+                    _cq_msg = self.repo_conv.add_message(conversation_id, "assistant", _cq)
+                    yield sse_event(MessageReplaceEvent(content=_cq))
+                    yield sse_event(MessageCompleteEvent(message_id=_cq_msg.id, model=model))
+                    return
+
+                _smart_mode_name = _smart_analysis.get("mode", "general_chat")
+                _context_engine = smart_engine.build_context_engine(_smart_mode_name)
+                _prepared_context = _context_engine.prepare(
+                    messages=messages,
+                    user_text=user_text,
+                    smart_analysis=_smart_analysis,
+                    today=date.today(),
+                )
+                messages = _prepared_context.messages
+
+                # Apply mode-specific temperature and max_tokens
+                mode_settings = _prepared_context.mode_settings
+                _extra_completion_kwargs = {
+                    "temperature": mode_settings["temperature"],
+                    "max_tokens": mode_settings["max_tokens"],
+                }
+
+                routing_reason = routing_reason or f"Smart: {_smart_mode_name}"
+                self._syslog("info", f"Smart engine: mode={_smart_mode_name} intent={_smart_analysis.get('intent','')}",
+                             {"mode": _smart_mode_name, "needs_retrieval": _smart_analysis.get("needs_retrieval")}, dto.user_id)
+
+            except Exception as _se:
+                logger.debug("Smart engine integration failed (non-fatal): %s", _se)
+
+        if _smart_analysis is not None and self._is_long_academic_request(user_text, _smart_analysis):
+            try:
+                long_answer = ""
+                used_model = model
+                for item in self._iter_long_academic_draft(
+                    prompt=user_text,
+                    user_id=dto.user_id,
+                    workspace_id=ws_filter,
+                    smart_analysis=_smart_analysis,
+                    model=model,
+                    user_keys=user_keys,
+                ):
+                    if item.get("type") == "status":
+                        yield sse_event(MessageReplaceEvent(content=str(item.get("content") or "")))
+                    elif item.get("type") == "result":
+                        long_answer = str(item.get("content") or "")
+                        used_model = str(item.get("model") or model)
+                clean_answer, conf_level, conf_reason = _parse_confidence(long_answer)
+                final_conf = conf_level or pre_conf_level
+                final_reason = conf_reason or pre_conf_reason
+                assistant_msg = self.repo_conv.add_message(
+                    conversation_id,
+                    "assistant",
+                    clean_answer,
+                    model=used_model,
+                    confidence=final_conf,
+                    confidence_reason=final_reason,
+                )
+                yield sse_event(MessageReplaceEvent(content=clean_answer))
+                yield sse_event(MessageCompleteEvent(
+                    message_id=assistant_msg.id,
+                    model=used_model,
+                    confidence=final_conf,
+                    confidence_reason=final_reason,
+                    routing_reason=routing_reason or "Smart: academic_writer",
+                ))
+                return
+            except Exception as exc:
+                logger.warning("Long academic draft path failed in ask_stream(); falling back: %s", exc)
 
         # Proactive size guard: a large RAG context can 429 on low-TPM OpenAI
         # models before the fallback even runs — re-route to Gemini up front.
@@ -1166,11 +1821,12 @@ class ChatService(IChatService):
         for attempt in chain:
             try:
                 t_llm = time.perf_counter()
+                _call_kwargs = {**_completion_kwargs(attempt), **_extra_completion_kwargs}
                 stream = _get_client(attempt, user_keys).chat.completions.create(
                     model=attempt,
                     messages=messages,
                     stream=True,
-                    **_completion_kwargs(attempt),
+                    **_call_kwargs,
                 )
                 if attempt != model:
                     self._syslog("warning", f"Fell back from {model} → {attempt} (stream)", {"original": model, "fallback": attempt}, dto.user_id)
@@ -1180,7 +1836,7 @@ class ChatService(IChatService):
                         if first_token_ms is None:
                             first_token_ms = int((time.perf_counter() - t_llm) * 1000)
                         full_answer += delta
-                        yield f"data: {json.dumps({'t': delta})}\n\n"
+                        yield sse_event(MessageDeltaEvent(text=delta))
                 used_model = attempt
                 llm_ms = int((time.perf_counter() - t_llm) * 1000)
                 succeeded = True
@@ -1197,13 +1853,64 @@ class ChatService(IChatService):
         if not succeeded:
             self._syslog("error", f"All models exhausted {chain} (stream) - returning error to user", {"chain": chain, "last_error": last_error}, dto.user_id)
             full_answer = f"⚠ All available AI models are currently unavailable. Please try again later.\n\n*Last error: {last_error}*"
-            yield f"data: {json.dumps({'t': full_answer})}\n\n"
+            yield sse_event(MessageDeltaEvent(text=full_answer))
+
+        # ── Smart quality check (academic/code modes only) ─────────────────────
+        # Runs a silent review pass after streaming. If the answer improves,
+        # a `replace` event is sent so the UI swaps in the better version.
+        if (
+            succeeded
+            and _smart_analysis is not None
+            and _smart_mode_name in smart_engine.QUALITY_CHECK_MODES
+            and full_answer.strip()
+        ):
+            try:
+                _qc_client = _get_client(used_model, user_keys)
+                _checklist = _smart_analysis.get("quality_checks", [])
+                # Academic mode: enforce citation and quality checks
+                if _smart_mode_name == "academic_writer":
+                    _forced = [
+                        "No placeholder text or bracketed instructions remain in the output",
+                        "No self-citations — '(StudentName, Year)' referring to this project are forbidden",
+                        "Literature Review cites specific real papers with Author (Year) — from notes or ACADEMIC SOURCES",
+                        "References list only real external papers from notes or ACADEMIC SOURCES",
+                        "No invented quantitative data — mark as [Metric pending]",
+                    ]
+                    _checklist = _forced + [c for c in _checklist if c not in _forced]
+                # Include both notes AND academic search papers in QC context
+                _note_ctx = next((m["content"] for m in messages if m.get("role") == "system" and "USER NOTES CONTEXT" in m.get("content", "")), "")
+                _paper_ctx = next((m["content"] for m in messages if m.get("role") == "system" and "ACADEMIC SOURCES" in m.get("content", "")), "")
+                if _paper_ctx:
+                    _note_ctx = _note_ctx + "\n\n" + _paper_ctx
+                _improved = smart_engine.quality_check(full_answer, _checklist, user_text, _qc_client, used_model, note_context=_note_ctx)
+                if _improved and _improved.strip() != full_answer.strip():
+                    full_answer = _improved
+                    yield sse_event(MessageReplaceEvent(content=_improved))
+                    self._syslog("info", f"Smart quality check improved answer (mode={_smart_mode_name})",
+                                 {"mode": _smart_mode_name}, dto.user_id)
+            except Exception as _qe:
+                logger.debug("Smart quality check failed (non-fatal): %s", _qe)
 
         clean_answer, conf_level, conf_reason = _parse_confidence(full_answer)
         final_conf = conf_level or pre_conf_level
         final_reason = conf_reason or pre_conf_reason
         assistant_msg = self.repo_conv.add_message(conversation_id, "assistant", clean_answer, model=used_model, confidence=final_conf, confidence_reason=final_reason)
-        yield f"data: {json.dumps({'done': True, 'id': assistant_msg.id, 'model': used_model, 'confidence': final_conf, 'confidence_reason': final_reason, 'routing_reason': routing_reason})}\n\n"
+
+        # Suggest web search when notes had no relevant content and user didn't already enable it
+        _suggest_web = (
+            succeeded
+            and final_conf in ("LOW", "UNSUPPORTED")
+            and not getattr(dto, "web_search", False)
+        )
+        yield sse_event(MessageCompleteEvent(
+            message_id=assistant_msg.id,
+            model=used_model,
+            confidence=final_conf,
+            confidence_reason=final_reason,
+            routing_reason=routing_reason,
+            suggest_web_search=_suggest_web,
+            search_query_suggestion=suggested_web_query if _suggest_web else None,
+        ))
 
         # ── Evaluation analytics (safe, gated, never breaks chat) ──────────────
         if self._eval is not None:
@@ -1255,38 +1962,251 @@ class ChatService(IChatService):
         conversation_id: int,
         prompt: str,
         files: List[UploadFile],
+        user_id: int | None = None,
     ) -> ChatResponseDTO:
         prompt = prompt.strip() or "Please analyse the attached file(s) in detail."
-        content_blocks: list = [{"type": "text", "text": prompt}]
         attachments: List[ChatAttachmentDTO] = []
+        file_content_blocks: list = []   # for the LLM user message
+        extracted_texts: list[str] = []  # for smart engine analysis
 
-        openai_client = OpenAI(api_key=settings.openai_api_key)
-
+        # ── 1. Extract file content ────────────────────────────────────────────
         for file in files:
             filename = file.filename or "file"
             mime = file.content_type or mimetypes.guess_type(filename)[0] or "application/octet-stream"
             file_bytes = await file.read()
-
             attachments.append(ChatAttachmentDTO(filename=filename, content_type=mime, size=len(file_bytes)))
-
             if _is_image(filename, mime):
                 b64 = base64.b64encode(file_bytes).decode()
-                content_blocks.append({"type": "image_url", "image_url": {"url": f"data:{mime};base64,{b64}"}})
+                file_content_blocks.append({"type": "image_url", "image_url": {"url": f"data:{mime};base64,{b64}"}})
             else:
                 extracted = extract_text_local(file_bytes, filename)
-                content_blocks.append({"type": "text", "text": f"FILE: {filename}\n\n{extracted}"})
+                file_content_blocks.append({"type": "text", "text": f"[ATTACHED FILE: {filename}]\n{extracted}"})
+                extracted_texts.append(f"{filename}:\n{extracted[:1000]}")
 
         attachment_label = "Attached: " + ", ".join(a.filename for a in attachments)
         self.repo_conv.add_message(conversation_id, "user", f"{attachment_label}\n\n{prompt}")
 
-        completion = openai_client.chat.completions.create(
-            model=settings.openai_chat_model,
-            messages=[
-                {"role": "system", "content": "You are MemoLink. Analyse all attached files and answer the prompt."},
-                {"role": "user", "content": content_blocks},
-            ],
-        )
-        answer = completion.choices[0].message.content
-        assistant_msg = self.repo_conv.add_message(conversation_id, "assistant", answer, model=settings.openai_chat_model)
+        # ── 2. Load conversation history ───────────────────────────────────────
+        history = self.repo_conv.get_messages_paginated(conversation_id, limit=30, before_id=None)
+        # Exclude the just-added user message (last in history) — it will be sent as the file message
+        message_history = [
+            {"role": m.role, "content": _strip_base64_images(m.content)}
+            for m in reversed(history)
+        ][:-1]
 
-        return ChatResponseDTO(answer=answer, sources=[], attachments=attachments, message_id=assistant_msg.id)
+        # ── 3. Smart engine — analyse first so retrieval queries inform RAG ──────
+        _smart_analysis: dict | None = None
+        _smart_mode = "general_chat"
+        _extra_kwargs: dict = {}
+        try:
+            _se_client = _get_client(settings.openai_chat_model)
+            _combined = prompt + "\n" + "\n".join(extracted_texts)
+            _smart_analysis = smart_engine.analyse_request(_combined, _se_client, settings.openai_chat_model)
+            _smart_mode = _smart_analysis.get("mode", "general_chat")
+            _mode_settings = smart_engine.get_mode_settings(_smart_mode)
+            _extra_kwargs = {"temperature": _mode_settings["temperature"], "max_tokens": _mode_settings["max_tokens"]}
+        except Exception:
+            pass
+
+        # ── 4. RAG — multi-query retrieval using smart engine's retrieval_queries ─
+        rag_blocks: list[str] = []
+        if user_id and self.repo_notes:
+            try:
+                all_notes = self.repo_notes.get_for_user(user_id)
+                if len(all_notes) <= 20:
+                    # Small workspace — include all notes in full (higher limit for academic tasks)
+                    char_limit = 6000 if _smart_mode == "academic_writer" else 2000
+                    for n in all_notes:
+                        plain = _strip_base64_images(_HTML_TAG.sub(" ", n.content)).strip()
+                        rag_blocks.append(f"[NOTE {n.id}: {n.title or 'Untitled'}]\n{plain[:char_limit]}")
+                else:
+                    # Large workspace — run multiple queries from smart engine for better coverage
+                    retrieval_queries = (_smart_analysis or {}).get("retrieval_queries", []) if _smart_analysis else []
+                    if not retrieval_queries:
+                        retrieval_queries = [prompt + " " + " ".join(a.filename for a in attachments)]
+                    # Always add a literature-specific query for academic tasks
+                    if _smart_mode == "academic_writer":
+                        retrieval_queries = list(retrieval_queries) + [
+                            "academic papers literature review references citations",
+                            "research findings methodology evaluation",
+                        ]
+                    seen_ids: set[int] = set()
+                    top_notes: list = []
+                    for q in retrieval_queries[:6]:  # max 6 queries
+                        try:
+                            q_vec = self.embedding.embed_text(q)
+                            hits = self.repo_notes.search_by_vector(q_vec, top_k=6)
+                            for n in hits:
+                                if n.id not in seen_ids:
+                                    seen_ids.add(n.id)
+                                    top_notes.append(n)
+                        except Exception:
+                            continue
+                    if not top_notes:
+                        top_notes = all_notes[:12]
+                    char_limit = 6000 if _smart_mode == "academic_writer" else 2000
+                    for n in top_notes:
+                        plain = _strip_base64_images(_HTML_TAG.sub(" ", n.content)).strip()
+                        rag_blocks.append(f"[NOTE {n.id}: {n.title or 'Untitled'}]\n{plain[:char_limit]}")
+            except Exception:
+                pass
+
+        # ── 4b. Academic paper search (academic_writer only) ──────────────────
+        # Derives queries from note titles (topic-aware) and hardcoded RAG/AI defaults.
+        _paper_system_block: str = ""
+        if _smart_mode == "academic_writer":
+            try:
+                # Derive queries from note titles — they reflect the actual research topic
+                _title_queries: list[str] = []
+                for _blk in rag_blocks[:8]:
+                    _first = _blk.split("\n")[0]
+                    if ": " in _first and _first.startswith("[NOTE"):
+                        _ntitle = _first.split(": ", 1)[1].rstrip("]").strip()
+                        # Skip generic/file-like titles
+                        if len(_ntitle) > 8 and not _ntitle.lower().endswith((".pdf", ".docx")):
+                            _title_queries.append(_ntitle[:80])
+                _acad_queries = smart_engine.build_dynamic_academic_queries(prompt, _smart_analysis, _title_queries[:4])
+                _all_papers: list[dict] = []
+                _seen_titles: set[str] = set()
+                for _q in _acad_queries[:3]:
+                    _batch = search_papers(_q[:150], limit=5, api_key=settings.semantic_scholar_api_key)
+                    for _p in _batch:
+                        _t = (_p.get("title") or "").lower()[:60]
+                        if _t and _t not in _seen_titles:
+                            _seen_titles.add(_t)
+                            _all_papers.append(_p)
+                if _all_papers:
+                    _paper_system_block = (
+                        "--- ACADEMIC SOURCES ---\n"
+                        "Real published papers. READ EACH ABSTRACT — only cite papers whose abstract "
+                        "is directly relevant to AI, knowledge management, RAG, or the specific topic "
+                        "you are writing about. Do NOT cite a paper just because it appears here.\n\n"
+                        + format_papers_context(_all_papers[:12])
+                    )
+            except Exception as _ae:
+                logger.debug("Academic paper search failed (non-fatal): %s", _ae)
+
+        # ── 5. Build system messages ───────────────────────────────────────────
+        mode_prompt = smart_engine.get_mode_prompt(_smart_mode) if _smart_analysis else _SYSTEM_PROMPT
+        optimized = (_smart_analysis or {}).get("optimized_task", "") if _smart_analysis else ""
+        primary_prompt = smart_engine.build_primary_system_prompt(
+            mode_prompt=mode_prompt,
+            original_message=prompt,
+            optimized_task=optimized,
+            today=date.today(),
+        )
+        system_msgs: list[dict] = [{"role": "system", "content": primary_prompt}]
+
+        if rag_blocks:
+            system_msgs.append({
+                "role": "system",
+                "content": (
+                    "--- USER NOTES CONTEXT ---\n"
+                    "These are the user's personal project notes. Use them as the PRIMARY SOURCE of "
+                    "specific details, content, and evidence when writing the response.\n\n"
+                    + "\n\n".join(rag_blocks)
+                ),
+            })
+
+        if _paper_system_block:
+            system_msgs.append({"role": "system", "content": _paper_system_block})
+
+        # Extract word count constraint from user prompt
+        import re as _re
+        _wc_match = _re.search(r'(\d[\d,]*)\s*(?:k\b)?[\s\-–]*(?:word|words|w\b)', prompt, _re.IGNORECASE)
+        _min_words = 0
+        if _wc_match:
+            _raw = _wc_match.group(1).replace(",", "")
+            _min_words = int(_raw) * 1000 if "k" in prompt[_wc_match.start():_wc_match.end() + 2].lower() else int(_raw)
+        # Also check "minimum of X" / "at least X"
+        if not _min_words:
+            _wc2 = _re.search(r'(?:minimum|min|at least)\s+(?:of\s+)?(\d[\d,]*)\s*(?:k\b)?', prompt, _re.IGNORECASE)
+            if _wc2:
+                _raw2 = _wc2.group(1).replace(",", "")
+                _min_words = int(_raw2) * 1000 if "k" in prompt[_wc2.start():_wc2.end() + 2].lower() else int(_raw2)
+        _wc_instruction = ""
+        if _min_words >= 1000:
+            _wc_instruction = (
+                f"\nWORD COUNT REQUIREMENT: Write a MINIMUM of {_min_words:,} words across all sections. "
+                "Every major section must be substantive — at least 3–5 full paragraphs of detailed analysis. "
+                "Do not summarise where you can elaborate. Expand every point with explanation, evidence, and implications."
+            )
+
+        # Instruction: decide dynamically whether the attached file is rubric/brief or source material.
+        file_role_instruction = (
+            "ATTACHED FILE ROLE: If the attached file appears to be a rubric, marking guide, assignment brief, "
+            "requirements sheet, or assessment instructions, use it as the controlling brief for structure and criteria. "
+            "Otherwise, treat the attached file as substantive source material alongside the user's notes.\n"
+            "USER NOTES = the primary source of project-specific details when they exist.\n"
+            + _wc_instruction + "\n\n"
+            "PROJECT-SPECIFIC CLAIMS must come from notes (system decisions, real data, sprint outcomes, evaluation results).\n"
+            "GENERAL ACADEMIC CONTENT (methodology rationale, research context, ethics principles) can be written from knowledge.\n"
+            "When notes have NO content for a project-specific claim, add:\n"
+            "> 📝 **[ADD NOTES]** [describe what specific project content is needed]\n\n"
+            "Never invent metrics or percentages. "
+            "Date fields: use today's date. Never output [Pending]."
+        )
+        system_msgs.append({"role": "system", "content": file_role_instruction})
+
+        # ── 6. Build full messages: system + history + current file message ────
+        user_content: list = [{"type": "text", "text": prompt}] + file_content_blocks
+        messages = system_msgs + message_history + [{"role": "user", "content": user_content}]
+
+        # ── 7. Call model with fallback chain ──────────────────────────────────
+        chain = _build_fallback_chain(settings.openai_chat_model)
+        answer: str | None = None
+        used_model = settings.openai_chat_model
+        for attempt in chain:
+            try:
+                kw = {**_completion_kwargs(attempt), **_extra_kwargs}
+                completion = _get_client(attempt).chat.completions.create(
+                    model=attempt,
+                    messages=messages,
+                    **kw,
+                )
+                answer = completion.choices[0].message.content
+                used_model = attempt
+                break
+            except Exception as exc:
+                logger.warning("File upload model %s failed: %s", attempt, exc)
+                continue
+
+        if not answer:
+            answer = "⚠ All AI models are currently unavailable. Please try again later."
+
+        # ── 8. Quality check for academic/code modes ───────────────────────────
+        if _smart_analysis and _smart_mode in smart_engine.QUALITY_CHECK_MODES and answer.strip():
+            try:
+                _qc_client = _get_client(used_model)
+                # Include both notes AND academic search papers so the checker
+                # knows which citations are valid and doesn't strip real ones.
+                _note_ctx = "\n\n".join(rag_blocks)
+                if _paper_system_block:
+                    _note_ctx += "\n\n" + _paper_system_block
+                _qc_checklist = _smart_analysis.get("quality_checks", [])
+                if _smart_mode == "academic_writer":
+                    _qc_forced = [
+                        "No placeholder text or bracketed instructions remain",
+                        "No self-citations — '(StudentName, Year)' referring to this project are forbidden",
+                        "Literature Review cites specific real papers with Author (Year) — from notes or ACADEMIC SOURCES",
+                        "References list only real external papers from notes or ACADEMIC SOURCES",
+                        "No invented quantitative data — mark as [Metric pending]",
+                    ]
+                    _qc_checklist = _qc_forced + [c for c in _qc_checklist if c not in _qc_forced]
+                _improved = smart_engine.quality_check(
+                    answer,
+                    _qc_checklist,
+                    prompt,
+                    _qc_client,
+                    used_model,
+                    note_context=_note_ctx,
+                )
+                if _improved and _improved.strip() != answer.strip():
+                    answer = _improved
+            except Exception:
+                pass
+
+        # ── 9. Save and return ────────────────────────────────────────────────
+        clean_answer, _, _ = _parse_confidence(answer)
+        assistant_msg = self.repo_conv.add_message(conversation_id, "assistant", clean_answer, model=used_model)
+        return ChatResponseDTO(answer=clean_answer, sources=[], attachments=attachments, message_id=assistant_msg.id)

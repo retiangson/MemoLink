@@ -1,12 +1,50 @@
 import { api, API_BASE } from "./client";
 import { getToken } from "../utils/auth";
+import type { ChatStreamEvent } from "../types";
+
+function normalizeChatStreamEvent(raw: any): ChatStreamEvent {
+  if (raw && typeof raw.type === "string") return raw as ChatStreamEvent;
+  if (typeof raw?.t === "string") return { type: "message.delta", text: raw.t };
+  if (typeof raw?.replace === "string") return { type: "message.replace", content: raw.replace };
+  if (raw?.done) {
+    return {
+      type: "message.complete",
+      message_id: raw.id ?? null,
+      model: raw.model,
+      confidence: raw.confidence,
+      confidence_reason: raw.confidence_reason,
+      routing_reason: raw.routing_reason,
+      suggest_web_search: raw.suggest_web_search === true,
+      search_query_suggestion: typeof raw.search_query_suggestion === "string" ? raw.search_query_suggestion : undefined,
+    };
+  }
+  if (typeof raw?.close_note === "number") return { type: "note.close", note_id: raw.close_note };
+  if (typeof raw?.open_note === "number") return { type: "note.open", note_id: raw.open_note };
+  if (typeof raw?.note_updated === "number") return { type: "note.updated", note_id: raw.note_updated };
+  if (typeof raw?.improving_note === "string") return { type: "note.improving", title: raw.improving_note };
+  if (raw?.image_generating) return { type: "image.generating" };
+  if (typeof raw?.cmd_running === "string") return { type: "command.running", command: raw.cmd_running };
+  if (typeof raw?.speak === "string") return { type: "tts.speak", text: raw.speak };
+  if (raw?.quiz !== undefined) return { type: "quiz.ready", quiz: raw.quiz };
+  if (raw?.tool_call && raw?.label) return { type: "tool.start", label: raw.label, tool_call: raw.tool_call };
+  if (raw?.ok !== undefined && raw?.tool_result !== undefined) return { type: "tool.complete", ok: !!raw.ok, result: raw.tool_result };
+  return { type: "unknown", raw };
+}
 
 export async function sendChat(conversation_id: number, prompt: string, top_k = 5, workspace_id?: number | null, model?: string | null) {
   return (await api.post("/chat", { conversation_id, prompt, top_k, workspace_id: workspace_id ?? null, model: model ?? null })).data;
 }
 
 /** Async generator that yields parsed SSE events from /chat/stream. */
-export async function* streamChat(conversation_id: number, prompt: string, top_k = 5, workspace_id?: number | null, model?: string | null, web_search = false) {
+export async function* streamChat(
+  conversation_id: number,
+  prompt: string,
+  top_k = 5,
+  workspace_id?: number | null,
+  model?: string | null,
+  web_search = false,
+  search_query_override?: string | null,
+) {
   const token = getToken();
   const res = await fetch(`${API_BASE}/chat/stream`, {
     method: "POST",
@@ -14,7 +52,15 @@ export async function* streamChat(conversation_id: number, prompt: string, top_k
       "Content-Type": "application/json",
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
-    body: JSON.stringify({ conversation_id, prompt, top_k, workspace_id: workspace_id ?? null, model: model ?? null, web_search }),
+    body: JSON.stringify({
+      conversation_id,
+      prompt,
+      top_k,
+      workspace_id: workspace_id ?? null,
+      model: model ?? null,
+      web_search,
+      search_query_override: search_query_override ?? null,
+    }),
   });
 
   if (!res.ok || !res.body) throw new Error(`Stream error: ${res.status}`);
@@ -31,13 +77,13 @@ export async function* streamChat(conversation_id: number, prompt: string, top_k
     buf = lines.pop() ?? "";
     for (const line of lines) {
       if (line.startsWith("data: ")) {
-        yield JSON.parse(line.slice(6)) as { t?: string; replace?: string; done?: boolean; id?: number | null; model?: string; tool_call?: string; label?: string; tool_result?: string; ok?: boolean; image_generating?: boolean; close_note?: number; improving_note?: string };
+        yield normalizeChatStreamEvent(JSON.parse(line.slice(6)));
       }
     }
   }
 }
 
-export async function* streamAgentChat(conversation_id: number, prompt: string, workspace_id?: number | null, model?: string | null) {
+export async function* streamAgentChat(conversation_id: number, prompt: string, workspace_id?: number | null, model?: string | null): AsyncGenerator<ChatStreamEvent> {
   const token = getToken();
   const res = await fetch(`${API_BASE}/chat/agent/stream`, {
     method: "POST",
@@ -62,16 +108,7 @@ export async function* streamAgentChat(conversation_id: number, prompt: string, 
     buf = lines.pop() ?? "";
     for (const line of lines) {
       if (line.startsWith("data: ")) {
-        yield JSON.parse(line.slice(6)) as {
-          t?: string;
-          done?: boolean;
-          id?: number | null;
-          model?: string;
-          tool_call?: string;
-          label?: string;
-          tool_result?: string;
-          ok?: boolean;
-        };
+        yield normalizeChatStreamEvent(JSON.parse(line.slice(6)));
       }
     }
   }
@@ -107,7 +144,7 @@ export async function translateText(
   return (await api.post("/translate", { text, target_language: targetLanguage, force })).data;
 }
 
-export async function* streamResearch(conversation_id: number, prompt: string, workspace_id?: number | null, model?: string | null) {
+export async function* streamResearch(conversation_id: number, prompt: string, workspace_id?: number | null, model?: string | null): AsyncGenerator<ChatStreamEvent> {
   const token = getToken();
   const res = await fetch(`${API_BASE}/research/stream`, {
     method: "POST",
@@ -132,11 +169,7 @@ export async function* streamResearch(conversation_id: number, prompt: string, w
     buf = lines.pop() ?? "";
     for (const line of lines) {
       if (line.startsWith("data: ")) {
-        yield JSON.parse(line.slice(6)) as {
-          t?: string; done?: boolean; id?: number | null; model?: string;
-          tool_call?: string; label?: string; tool_result?: string; ok?: boolean;
-          replace?: string; image_generating?: boolean;
-        };
+        yield normalizeChatStreamEvent(JSON.parse(line.slice(6)));
       }
     }
   }

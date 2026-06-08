@@ -38,12 +38,12 @@ const CONTENT: Record<string, React.ReactNode> = {
   overview: (
     <div className="space-y-4">
       <p className="text-sm text-gray-400 leading-relaxed">
-        <span className="text-white font-medium">MemoLink</span> is a context-aware AI knowledge companion designed for students and knowledge workers. It combines intelligent note management, RAG-powered AI chat, and productivity tools into one workspace.
+        <span className="text-white font-medium">MemoLink</span> is a smart AI companion for thinking, writing, planning, and staying organised. It combines notes, grounded chat, and practical tools in one workspace.
       </p>
       <div className="grid grid-cols-2 gap-3">
         {[
           { label: "Workspaces", desc: "Separate contexts for different subjects or projects" },
-          { label: "AI Chat", desc: "Grounded answers from your own notes via RAG" },
+          { label: "AI Chat", desc: "Grounded answers from your own notes and connected context" },
           { label: "Smart Notes", desc: "Rich editor with voice, images, and formatting" },
           { label: "File & Video", desc: "Import PDFs, DOCX, PPTX, YouTube, and recordings" },
           { label: "AI Tools", desc: "Web search, agent mode, research, image generation" },
@@ -87,7 +87,7 @@ const CONTENT: Record<string, React.ReactNode> = {
 
   chat: (
     <div className="space-y-3 text-sm text-gray-400 leading-relaxed">
-      <p>MemoLink uses <span className="text-white">Retrieval-Augmented Generation (RAG)</span> - every AI answer is grounded in the notes you've uploaded to the current workspace. Sources are cited below the reply.</p>
+      <p>MemoLink grounds answers in the notes and context available in your current workspace. Sources are cited below the reply so you can see where an answer came from.</p>
       <ul className="space-y-2">
         {[
           "Start a new conversation from the sidebar. Conversations are scoped to the active workspace.",
@@ -535,7 +535,7 @@ const CONTENT: Record<string, React.ReactNode> = {
           { title: "Opening MemoGraph", desc: "Click the graph icon (⬡) in the top toolbar. MemoLink builds or re-uses the graph for your current workspace. Click \"Rebuild\" to re-scan all notes." },
           { title: "Node types", desc: "note (indigo) · reminder (amber) · person (green) · topic (cyan) · project (orange) · deadline (red) · decision (yellow) · action item (pink) · question (purple) · theme (teal). Each type can be toggled with the filter chips at the top." },
           { title: "Pan & Zoom", desc: "Drag on empty canvas to pan. Scroll to zoom in/out. Click \"Fit\" to auto-scale so all nodes are visible. Drag a node to pin it - it will stay fixed until you drag it again." },
-          { title: "Graph-Enhanced RAG", desc: "The graph isn't just visual - it improves AI answers. When you chat, MemoLink traverses the graph from the top vector-search hits to find related notes you might not have mentioned. This expands the context beyond simple similarity." },
+          { title: "Graph-Enhanced Answers", desc: "The graph isn't just visual - it helps MemoLink find related notes you might not have mentioned, so answers can use broader and more connected context." },
           { title: "How entities are extracted", desc: "GPT processes your notes in batches of 5. It identifies people, topics, projects, deadlines, decisions, action items, questions, and themes. Notes that share an entity are automatically linked with a \"related_to\" edge." },
         ].map((t) => (
           <div key={t.title}>
@@ -669,7 +669,7 @@ const CONTENT: Record<string, React.ReactNode> = {
           { icon: "🃏", title: "Flashcards", desc: "Generate question/answer cards from a single note or the whole workspace. Flip each card to reveal the answer and step through them for spaced review." },
           { icon: "❓", title: "Quiz", desc: "Build an interactive quiz (single- and multiple-choice) from any note or all notes - the same engine as the /Quiz slash command. Submit to see your score, the correct answers, and explanations, then save the result as a note." },
           { icon: "📋", title: "Exam Review", desc: "Pick one or more notes to get a reviewer: key concepts, definitions, important facts, likely exam questions, and the topics to focus on most." },
-          { icon: "📅", title: "Study Plan", desc: "Describe your goal and time frame (e.g. \"before my MSE907 presentation\") and get a day-by-day plan - each day lists focus topics, tasks, and which notes to revise." },
+          { icon: "📅", title: "Study Plan", desc: "Describe your goal and time frame (e.g. \"before my final presentation\" or \"before my operating systems exam\") and get a day-by-day plan - each day lists focus topics, tasks, and which notes to revise." },
           { icon: "🔍", title: "Weak Topics", desc: "AI scans the questions you keep asking across your chats and notes, identifies recurring weak spots, and explains each one simply with a study tip." },
           { icon: "📝", title: "Summary", desc: "Summarise any note at three levels - short, medium, or detailed - with optional bullet points. Great for a quick refresher or a condensed revision sheet." },
         ].map((t) => (
@@ -755,7 +755,7 @@ const CONTENT: Record<string, React.ReactNode> = {
           "Email-sourced reminders are global - they appear in every workspace, not just the one that was active when they were created.",
           "Reply to emails directly from a reminder detail or the email list in Settings → Email - MemoLink builds 3 AI-drafted options based on your notes, and sends the reply threaded correctly in Gmail.",
           "Open the AI Memory Graph (⬡ icon in toolbar) to see how your notes are connected through shared entities. Rebuild the graph after adding new notes to update the relationships.",
-          "Graph-Enhanced RAG is automatic - when you chat, MemoLink traverses the knowledge graph to find related notes beyond the top vector search results, giving more complete answers.",
+          "Graph-enhanced retrieval is automatic - when you chat, MemoLink can pull in related notes beyond the first search hits to give more complete answers.",
           "Use the AI Insights scan (Reminders panel → AI Insights → Scan Notes) before important deadlines to catch anything you may have forgotten to set a reminder for.",
           "The Answer Confidence badge tells you how grounded each AI reply is. UNSUPPORTED means the topic isn't in your notes - try uploading a relevant document first.",
           "AutoPilot automatically routes coding questions to DeepSeek Coder - just mention any language name (Python, Go, Rust, SQL…) in your message.",
@@ -835,7 +835,7 @@ export function HelpModal({ show, onClose }: HelpModalProps) {
         {/* Footer */}
         <div className="px-6 py-3 border-t border-[#2a2a38] shrink-0">
           <p className="text-[11px] text-gray-700 text-center">
-            MemoLink - AI Knowledge Companion &nbsp;·&nbsp; Capstone Project
+            MemoLink - Smart AI Companion
           </p>
         </div>
       </div>
