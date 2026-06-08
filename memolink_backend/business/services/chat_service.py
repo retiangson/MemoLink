@@ -161,7 +161,7 @@ _GENERIC_WEB_SEARCH_PHRASES = (
 _GENERIC_WEB_SEARCH_STOPWORDS = {
     "a", "an", "and", "any", "can", "could", "do", "for", "find", "get", "give", "i", "it",
     "latest", "look", "me", "news", "now", "of", "on", "online", "please", "recent", "search",
-    "show", "tell", "that", "the", "this", "today", "updates", "up", "web", "what", "with",
+    "show", "tell", "that", "the", "this", "today", "updates", "up", "web", "what", "with", "you",
 }
 _WEB_SEARCH_FRESHNESS_CUES = (
     "latest", "recent", "current", "today", "now", "news", "real time", "realtime", "live",
