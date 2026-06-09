@@ -206,6 +206,8 @@ if os.getenv("MEMOLINK_SKIP_DB_BOOTSTRAP") != "1":
                 display_name VARCHAR(100) NOT NULL DEFAULT '',
                 account_label VARCHAR(255),
                 encrypted_secret TEXT NOT NULL,
+                encrypted_refresh_secret TEXT,
+                token_expiry TIMESTAMPTZ,
                 base_url TEXT,
                 config_json TEXT,
                 created_at TIMESTAMPTZ DEFAULT now(),
@@ -216,6 +218,8 @@ if os.getenv("MEMOLINK_SKIP_DB_BOOTSTRAP") != "1":
         _conn.execute(text("ALTER TABLE connector_accounts ADD COLUMN IF NOT EXISTS account_label VARCHAR(255)"))
         _conn.execute(text("ALTER TABLE connector_accounts ADD COLUMN IF NOT EXISTS base_url TEXT"))
         _conn.execute(text("ALTER TABLE connector_accounts ADD COLUMN IF NOT EXISTS config_json TEXT"))
+        _conn.execute(text("ALTER TABLE connector_accounts ADD COLUMN IF NOT EXISTS encrypted_refresh_secret TEXT"))
+        _conn.execute(text("ALTER TABLE connector_accounts ADD COLUMN IF NOT EXISTS token_expiry TIMESTAMPTZ"))
         # Email records table
         _conn.execute(text("""
             CREATE TABLE IF NOT EXISTS email_records (

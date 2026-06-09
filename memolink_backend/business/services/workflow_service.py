@@ -100,6 +100,41 @@ Rules:
 - Limit to at most 8 actions total."""
 
 
+def _clean_json_text(raw: str) -> str:
+    cleaned = (raw or "").strip()
+    cleaned = re.sub(r"^```(?:json)?\s*", "", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\s*```$", "", cleaned)
+    return cleaned.strip()
+
+
+def _extract_first_json_value(raw: str):
+    cleaned = _clean_json_text(raw)
+    if not cleaned:
+        raise ValueError("Model returned an empty response.")
+
+    decoder = json.JSONDecoder()
+    first_starts = [idx for idx in (cleaned.find("{"), cleaned.find("[")) if idx != -1]
+    start_index = min(first_starts) if first_starts else 0
+    candidate = cleaned[start_index:]
+    try:
+        value, _ = decoder.raw_decode(candidate)
+        return value
+    except json.JSONDecodeError:
+        pass
+
+    # Fall back to fenced JSON embedded inside extra prose by scanning for
+    # the first decodable object/array boundary.
+    for idx, ch in enumerate(cleaned):
+        if ch not in "[{":
+            continue
+        try:
+            value, _ = decoder.raw_decode(cleaned[idx:])
+            return value
+        except json.JSONDecodeError:
+            continue
+    raise ValueError("Model did not return valid JSON.")
+
+
 class WorkflowService:
     def __init__(
         self,
@@ -167,10 +202,13 @@ class WorkflowService:
             ],
             max_tokens=400,
         )
-        raw = (resp.choices[0].message.content or "").strip()
-        raw = re.sub(r"^```(?:json)?\s*", "", raw)
-        raw = re.sub(r"\s*```$", "", raw)
-        data = json.loads(raw)
+        raw = resp.choices[0].message.content or ""
+        try:
+            data = _extract_first_json_value(raw)
+        except ValueError:
+            return []
+        if not isinstance(data, dict):
+            return []
         generic_queries = {
             "specific questions or topics of interest",
             "topic",
@@ -228,10 +266,10 @@ class WorkflowService:
             ],
             max_tokens=1500,
         )
-        raw = (resp.choices[0].message.content or "").strip()
-        raw = re.sub(r"^```(?:json)?\s*", "", raw)
-        raw = re.sub(r"\s*```$", "", raw)
-        data = json.loads(raw)
+        raw = resp.choices[0].message.content or ""
+        data = _extract_first_json_value(raw)
+        if not isinstance(data, dict):
+            raise ValueError("Workflow planner returned JSON in an unexpected shape.")
 
         understanding = data.get("understanding", "")
         actions = [

@@ -50,4 +50,11 @@ class Settings(BaseSettings):
     teams_tenant_id: str = ""
     teams_redirect_uri: str = "http://localhost:8000/api/teams/callback"
 
+    github_client_id: str = ""
+    github_client_secret: str = ""
+    github_redirect_uri: str = "http://localhost:8000/api/connectors/github/callback"
+    jira_client_id: str = ""
+    jira_client_secret: str = ""
+    jira_redirect_uri: str = "http://localhost:8000/api/connectors/jira/callback"
+
 settings = Settings()

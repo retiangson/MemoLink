@@ -2,6 +2,7 @@ import { useState, useRef } from "react";
 import { streamChat, uploadChat } from "../api/chatApi";
 import { streamCommand } from "../api/commandApi";
 import { createConversation, renameConversation } from "../api/conversationApi";
+import { buildDiscussionCommand } from "../constants/slashCommands";
 import { useTTS } from "./useTTS";
 import type { ChatStreamEvent, Conversation, Message } from "../types";
 import { TEMP_ID } from "../types";
@@ -111,7 +112,7 @@ export function useChat({ activeConversation, setActiveConversation, setConversa
         const stream = isSlashCommand
           ? streamCommand(trimmed, conversationId, workspaceId ?? null, model ?? null)
           : discussionMode
-            ? streamCommand(`/Discussion All : ${trimmed}`, conversationId, workspaceId ?? null, model ?? null)
+            ? streamCommand(buildDiscussionCommand(trimmed), conversationId, workspaceId ?? null, model ?? null)
             : streamChat(
                 conversationId,
                 trimmed,

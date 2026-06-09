@@ -19,14 +19,14 @@ CONNECTOR_CATALOG = [
     {
         "id": "github",
         "label": "GitHub",
-        "kind": "token",
-        "description": "Check issues, create tickets, update tickets, and start development branches from chat.",
+        "kind": "oauth",
+        "description": "Work with repos, branches, issues, pull requests, comments, merges, and development branches from chat.",
     },
     {
         "id": "jira",
         "label": "Jira",
-        "kind": "token",
-        "description": "Check tickets, create work items, update issues, and move them through workflow from chat.",
+        "kind": "oauth",
+        "description": "Check tickets, create work items, update issues, comment on them, and move them through workflow from chat.",
     },
 ]
 
@@ -64,23 +64,132 @@ class ConnectorsService:
             result.append(connector)
         return result
 
-    def save_github(self, *, user_id: int, token: str, owner: str, repo: str, base_url: str | None = None, branch: str | None = None):
+    def save_github_oauth(
+        self,
+        *,
+        user_id: int,
+        token: str,
+        account_label: str | None,
+        base_url: str | None = None,
+    ):
         return self._connector_repo.upsert(
             user_id=user_id,
             connector_type="github",
             secret=token,
             display_name="GitHub",
-            account_label=owner.strip() or None,
+            account_label=(account_label or "").strip() or None,
             base_url=(base_url or "").strip() or None,
-            config={
-                "owner": owner.strip(),
-                "repo": repo.strip(),
-                "default_branch": (branch or "").strip() or None,
-            },
+            config={},
+        )
+
+    def save_github_settings(
+        self,
+        *,
+        user_id: int,
+        owner: str | None = None,
+        repo: str | None = None,
+        base_url: str | None = None,
+        branch: str | None = None,
+    ):
+        existing = self._connector_repo.get_decrypted_config(user_id, "github")
+        if not existing:
+            raise ValueError("Connect GitHub before saving repository settings.")
+
+        prior_config = dict(existing.get("config") or {})
+        owner_value = None if owner is None else owner.strip()
+        repo_value = None if repo is None else repo.strip()
+        if owner_value is None and repo_value is None:
+            resolved_owner = str(prior_config.get("owner") or "")
+            resolved_repo = str(prior_config.get("repo") or "")
+        else:
+            if bool(owner_value) != bool(repo_value):
+                raise ValueError("GitHub owner and repository must be provided together.")
+            resolved_owner = owner_value or ""
+            resolved_repo = repo_value or ""
+        branch_value = prior_config.get("default_branch") if branch is None else ((branch or "").strip() or None)
+        base_url_value = existing.get("base_url") if base_url is None else ((base_url or "").strip() or None)
+        merged_config = {
+            "owner": resolved_owner,
+            "repo": resolved_repo,
+            "default_branch": branch_value,
+        }
+        return self._connector_repo.upsert(
+            user_id=user_id,
+            connector_type="github",
+            secret=existing["secret"],
+            display_name="GitHub",
+            account_label=existing.get("account_label"),
+            base_url=base_url_value,
+            config=merged_config,
         )
 
     def delete_github(self, user_id: int) -> bool:
         return self._connector_repo.delete_by_user_and_type(user_id, "github")
+
+    def save_jira_oauth(
+        self,
+        *,
+        user_id: int,
+        access_token: str,
+        refresh_token: str | None,
+        token_expiry,
+        site_name: str | None,
+        site_url: str,
+        cloud_id: str,
+    ):
+        return self._connector_repo.upsert(
+            user_id=user_id,
+            connector_type="jira",
+            secret=access_token,
+            display_name="Jira",
+            account_label=(site_name or "").strip() or None,
+            base_url=f"https://api.atlassian.com/ex/jira/{cloud_id.strip()}",
+            config={
+                "auth_type": "oauth",
+                "site_name": (site_name or "").strip() or None,
+                "site_url": site_url.strip().rstrip("/"),
+                "cloud_id": cloud_id.strip(),
+                "project_key": "",
+                "issue_type": "Task",
+            },
+            refresh_secret=(refresh_token or "").strip() or None,
+            token_expiry=token_expiry,
+        )
+
+    def save_jira_settings(
+        self,
+        *,
+        user_id: int,
+        project_key: str | None = None,
+        issue_type: str | None = None,
+    ):
+        existing = self._connector_repo.get_decrypted_config(user_id, "jira")
+        if not existing:
+            raise ValueError("Connect Jira before saving project settings.")
+
+        prior_config = dict(existing.get("config") or {})
+        resolved_project_key = str(prior_config.get("project_key") or "")
+        if project_key is not None:
+            resolved_project_key = project_key.strip()
+        resolved_issue_type = str(prior_config.get("issue_type") or "Task")
+        if issue_type is not None:
+            resolved_issue_type = issue_type.strip() or "Task"
+
+        merged_config = dict(prior_config)
+        merged_config["project_key"] = resolved_project_key
+        merged_config["issue_type"] = resolved_issue_type
+
+        return self._connector_repo.upsert(
+            user_id=user_id,
+            connector_type="jira",
+            secret=existing["secret"],
+            display_name="Jira",
+            account_label=existing.get("account_label"),
+            base_url=existing.get("base_url"),
+            config=merged_config,
+            refresh_secret=existing.get("refresh_secret"),
+            token_expiry=existing.get("token_expiry"),
+        )
 
     def save_jira(
         self,
@@ -100,8 +209,10 @@ class ConnectorsService:
             account_label=email.strip(),
             base_url=site_url.strip().rstrip("/"),
             config={
+                "auth_type": "token",
                 "project_key": project_key.strip(),
                 "issue_type": (issue_type or "").strip() or "Task",
+                "site_url": site_url.strip().rstrip("/"),
             },
         )
 

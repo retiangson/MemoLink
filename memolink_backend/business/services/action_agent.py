@@ -41,9 +41,10 @@ _ACTION_WEB_RE = re.compile(
     re.IGNORECASE,
 )
 _ACTION_CONNECTOR_RE = re.compile(
-    r"\b(?:github|jira)\b.*\b(?:issue|issues|ticket|tickets|branch|development|develop|repo|repository)\b"
+    r"\b(?:github|jira)\b.*\b(?:issue|issues|ticket|tickets|branch|development|develop|repo|repository|pr|pull request|merge|comment)\b"
     r"|\b(?:issue|issues|ticket|tickets)\b.*\b(?:github|jira)\b"
-    r"|\b(?:create|add|update|edit|check|show|list|open|close|move|transition|start)\b.*\b(?:ticket|tickets|issue|issues)\b"
+    r"|\b(?:pull request|pr)\b.*\b(?:github|repo|repository|branch)\b"
+    r"|\b(?:create|add|update|edit|check|show|list|open|close|move|transition|start|comment|merge)\b.*\b(?:ticket|tickets|issue|issues|pull request|pr|branch|repo|repository)\b"
     r"|\bstart development\b|\bcreate branch\b",
     re.IGNORECASE,
 )
@@ -133,13 +134,14 @@ AGENT_TOOLS = [
         "type": "function",
         "function": {
             "name": "github_ticket_action",
-            "description": "Check GitHub issues, create or update an issue, or start development by creating a branch for a repo issue.",
+            "description": "Work with GitHub repositories, branches, issues, pull requests, comments, and merge workflows.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "operation": {"type": "string", "enum": ["list", "get", "create", "update", "start_development"]},
+                    "operation": {"type": "string", "enum": ["repo", "list_branches", "list", "get", "create", "update", "comment", "list_comments", "list_pull_requests", "get_pull_request", "find_pull_request", "create_pull_request", "update_pull_request", "merge_pull_request", "start_development"]},
                     "repo": {"type": "string", "description": "Repository in owner/repo format. Optional if a default repo is configured."},
                     "issue_number": {"type": "integer", "description": "Issue number for get, update, or start_development"},
+                    "pull_number": {"type": "integer", "description": "Pull request number for get, update, comment, or merge operations"},
                     "query": {"type": "string", "description": "Search text for listing relevant issues"},
                     "title": {"type": "string", "description": "Issue title for create or update"},
                     "body": {"type": "string", "description": "Issue description or update body"},
@@ -148,6 +150,11 @@ AGENT_TOOLS = [
                     "assignees": {"type": "array", "items": {"type": "string"}},
                     "branch_name": {"type": "string", "description": "Branch name to create for start_development"},
                     "base_branch": {"type": "string", "description": "Optional source branch for start_development"},
+                    "head_branch": {"type": "string", "description": "Source branch for pull request creation or lookup"},
+                    "title_query": {"type": "string", "description": "Optional text for finding a pull request by title"},
+                    "draft": {"type": "boolean", "description": "Whether the pull request should be created as a draft"},
+                    "merge_method": {"type": "string", "enum": ["merge", "squash", "rebase"], "description": "GitHub merge method for merge_pull_request"},
+                    "comment": {"type": "string", "description": "Comment body to add to an issue or pull request"},
                 },
                 "required": ["operation"],
             },
@@ -157,11 +164,11 @@ AGENT_TOOLS = [
         "type": "function",
         "function": {
             "name": "jira_ticket_action",
-            "description": "Check Jira tickets, create a ticket, update it, or move it to a new workflow status.",
+            "description": "Check Jira tickets, create a ticket, update it, comment on it, or move it to a new workflow status.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "operation": {"type": "string", "enum": ["search", "get", "create", "update", "transition"]},
+                    "operation": {"type": "string", "enum": ["search", "get", "create", "update", "transition", "list_transitions", "comment", "list_comments"]},
                     "issue_key": {"type": "string", "description": "Jira issue key such as PROJ-123"},
                     "jql": {"type": "string", "description": "Optional Jira query when searching"},
                     "project_key": {"type": "string", "description": "Project key for create"},
@@ -169,6 +176,7 @@ AGENT_TOOLS = [
                     "description": {"type": "string", "description": "Issue description for create or update"},
                     "issue_type": {"type": "string", "description": "Issue type name for create, such as Task or Story"},
                     "status_name": {"type": "string", "description": "Target Jira workflow status for transition"},
+                    "comment": {"type": "string", "description": "Comment to add to the Jira issue"},
                 },
                 "required": ["operation"],
             },
@@ -189,8 +197,8 @@ _TOOL_LABELS = {
 _SYSTEM_PROMPT = (
     "You are MemoLink Action Agent, an AI assistant that can take focused actions on the user's behalf. "
     "Use tools only when the user is asking you to perform a concrete action such as searching notes, "
-    "creating or editing notes, adding reminders, searching the web for live information, or managing GitHub/Jira tickets when those connectors are configured. "
-    "If the user says 'ticket' without naming a system, prefer Jira for project-management tickets and GitHub for repository issues or branches based on the wording. "
+    "creating or editing notes, adding reminders, searching the web for live information, or managing GitHub/Jira work items when those connectors are configured. "
+    "If the user says 'ticket' without naming a system, prefer Jira for project-management tickets and GitHub for repository issues, pull requests, branches, and repo workflows based on the wording. "
     "Keep tool use efficient, avoid redundant actions, and give a concise final answer that states what you did."
 )
 
@@ -346,6 +354,10 @@ class ActionAgentRunner:
         if self.github is None:
             return "GitHub connector is not available."
         operation = args["operation"]
+        if operation == "repo":
+            return self.github.get_repo(user_id, args.get("repo"))
+        if operation == "list_branches":
+            return self.github.list_branches(user_id, args.get("repo"), query=args.get("query"))
         if operation == "list":
             return self.github.list_issues(
                 user_id,
@@ -375,6 +387,74 @@ class ActionAgentRunner:
                 labels=args.get("labels"),
                 assignees=args.get("assignees"),
             )
+        if operation == "comment":
+            target_number = args.get("pull_number") or args.get("issue_number")
+            if target_number is None:
+                return "A GitHub issue number or pull request number is required to add a comment."
+            comment_body = args.get("comment") or args.get("body")
+            if not comment_body:
+                return "A comment body is required to add a GitHub comment."
+            return self.github.comment_issue(
+                user_id,
+                args.get("repo"),
+                int(target_number),
+                comment_body,
+            )
+        if operation == "list_comments":
+            target_number = args.get("pull_number") or args.get("issue_number")
+            if target_number is None:
+                return "A GitHub issue number or pull request number is required to list comments."
+            return self.github.list_comments(user_id, args.get("repo"), int(target_number))
+        if operation == "list_pull_requests":
+            return self.github.list_pull_requests(
+                user_id,
+                args.get("repo"),
+                state=args.get("state") or "open",
+                base=args.get("base_branch"),
+                head=args.get("head_branch") or args.get("branch_name"),
+            )
+        if operation == "get_pull_request":
+            return self.github.get_pull_request(user_id, args.get("repo"), int(args["pull_number"]))
+        if operation == "find_pull_request":
+            return self.github.find_pull_request(
+                user_id,
+                args.get("repo"),
+                branch_name=args.get("head_branch") or args.get("branch_name"),
+                title_query=args.get("title_query") or args.get("title"),
+                state=args.get("state") or "open",
+            )
+        if operation == "create_pull_request":
+            head_branch = args.get("head_branch") or args.get("branch_name")
+            if not head_branch:
+                return "A head branch is required to create a GitHub pull request."
+            return self.github.create_pull_request(
+                user_id,
+                args.get("repo"),
+                args["title"],
+                head=head_branch,
+                base=args.get("base_branch"),
+                body=args.get("body"),
+                draft=args.get("draft"),
+            )
+        if operation == "update_pull_request":
+            return self.github.update_pull_request(
+                user_id,
+                args.get("repo"),
+                int(args["pull_number"]),
+                title=args.get("title"),
+                body=args.get("body"),
+                base=args.get("base_branch"),
+                state=args.get("state"),
+            )
+        if operation == "merge_pull_request":
+            return self.github.merge_pull_request(
+                user_id,
+                args.get("repo"),
+                int(args["pull_number"]),
+                merge_method=args.get("merge_method") or "merge",
+                commit_title=args.get("title"),
+                commit_message=args.get("body"),
+            )
         if operation == "start_development":
             return self.github.start_development(
                 user_id,
@@ -392,7 +472,7 @@ class ActionAgentRunner:
         if operation == "search":
             return self.jira.search_issues(user_id, jql=args.get("jql"))
         if operation == "get":
-            return self.jira.search_issues(user_id, issue_key=args["issue_key"])
+            return self.jira.get_issue(user_id, issue_key=args["issue_key"])
         if operation == "create":
             return self.jira.create_issue(
                 user_id,
@@ -413,6 +493,25 @@ class ActionAgentRunner:
                 user_id,
                 issue_key=args["issue_key"],
                 status_name=args["status_name"],
+            )
+        if operation == "list_transitions":
+            return self.jira.list_transitions(
+                user_id,
+                issue_key=args["issue_key"],
+            )
+        if operation == "comment":
+            comment_body = args.get("comment") or args.get("description")
+            if not comment_body:
+                return "A Jira comment is required to add a comment."
+            return self.jira.comment_issue(
+                user_id,
+                issue_key=args["issue_key"],
+                body=comment_body,
+            )
+        if operation == "list_comments":
+            return self.jira.list_comments(
+                user_id,
+                issue_key=args["issue_key"],
             )
         return f"Unknown Jira operation: {operation}"
 
