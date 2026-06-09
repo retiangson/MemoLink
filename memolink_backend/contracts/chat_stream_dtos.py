@@ -45,5 +45,17 @@ class ImageGeneratingEvent(ChatStreamEvent):
     type: Literal["image.generating"] = "image.generating"
 
 
+class ToolStartEvent(ChatStreamEvent):
+    type: Literal["tool.start"] = "tool.start"
+    label: str
+    tool_call: Optional[str] = None
+
+
+class ToolCompleteEvent(ChatStreamEvent):
+    type: Literal["tool.complete"] = "tool.complete"
+    ok: bool
+    result: Optional[str] = None
+
+
 def sse_event(event: ChatStreamEvent) -> str:
     return f"data: {json.dumps(event.model_dump(exclude_none=True))}\n\n"

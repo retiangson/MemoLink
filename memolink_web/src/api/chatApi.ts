@@ -83,37 +83,6 @@ export async function* streamChat(
   }
 }
 
-export async function* streamAgentChat(conversation_id: number, prompt: string, workspace_id?: number | null, model?: string | null): AsyncGenerator<ChatStreamEvent> {
-  const token = getToken();
-  const res = await fetch(`${API_BASE}/chat/agent/stream`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-    body: JSON.stringify({ conversation_id, prompt, workspace_id: workspace_id ?? null, model: model ?? null }),
-  });
-
-  if (!res.ok || !res.body) throw new Error(`Agent stream error: ${res.status}`);
-
-  const reader = res.body.getReader();
-  const decoder = new TextDecoder();
-  let buf = "";
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buf += decoder.decode(value, { stream: true });
-    const lines = buf.split("\n");
-    buf = lines.pop() ?? "";
-    for (const line of lines) {
-      if (line.startsWith("data: ")) {
-        yield normalizeChatStreamEvent(JSON.parse(line.slice(6)));
-      }
-    }
-  }
-}
-
 export async function uploadNotes(files: File[], workspace_id?: number | null): Promise<{ notes: any[]; failed: { filename: string; reason: string }[] }> {
   const formData = new FormData();
   files.forEach((f) => formData.append("files", f));

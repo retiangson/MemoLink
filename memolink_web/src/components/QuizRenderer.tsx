@@ -16,13 +16,14 @@ interface QuizData {
 
 interface Props {
   quiz: QuizData;
-  onSaveNote?: (title: string, content: string) => void;
+  onSaveNote?: (title: string, content: string) => Promise<void> | void;
 }
 
 export function QuizRenderer({ quiz, onSaveNote }: Props) {
   const [answers, setAnswers] = useState<Record<number, number[]>>({});
   const [submitted, setSubmitted] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   function toggle(qId: number, optIdx: number, type: "single" | "multi") {
     if (submitted) return;
@@ -89,11 +90,16 @@ export function QuizRenderer({ quiz, onSaveNote }: Props) {
     return lines.join("\n");
   }
 
-  function handleSave() {
-    if (!onSaveNote || saved) return;
+  async function handleSave() {
+    if (!onSaveNote || saved || isSaving) return;
     const title = `${quiz.title} - Results (${pct}%)`;
-    onSaveNote(title, buildMarkdown());
-    setSaved(true);
+    setIsSaving(true);
+    try {
+      await onSaveNote(title, buildMarkdown());
+      setSaved(true);
+    } finally {
+      setIsSaving(false);
+    }
   }
 
   return (
@@ -218,12 +224,12 @@ export function QuizRenderer({ quiz, onSaveNote }: Props) {
             </p>
             {onSaveNote && (
               <button
-                onClick={handleSave}
-                disabled={saved}
+                onClick={() => { void handleSave(); }}
+                disabled={saved || isSaving}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition ${
                   saved
                     ? "bg-emerald-500/15 border border-emerald-500/25 text-emerald-400 cursor-default"
-                    : "bg-[#1e1e2a] border border-[#2a2a38] text-gray-300 hover:border-indigo-500/40 hover:text-indigo-300"
+                    : "bg-[#1e1e2a] border border-[#2a2a38] text-gray-300 hover:border-indigo-500/40 hover:text-indigo-300 disabled:opacity-80 disabled:cursor-wait"
                 }`}
               >
                 {saved ? (
@@ -232,6 +238,14 @@ export function QuizRenderer({ quiz, onSaveNote }: Props) {
                       <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                     </svg>
                     Saved to Notes
+                  </>
+                ) : isSaving ? (
+                  <>
+                    <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                    </svg>
+                    Saving to Notes...
                   </>
                 ) : (
                   <>

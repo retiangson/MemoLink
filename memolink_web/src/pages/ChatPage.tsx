@@ -993,8 +993,6 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                 autoResize={chat.autoResize}
                 webSearch={chat.webSearch}
                 onToggleWebSearch={() => chat.setWebSearch((v) => !v)}
-                agentMode={chat.agentMode}
-                onToggleAgentMode={() => chat.setAgentMode((v) => !v)}
                 workflowMode={false}
                 onToggleWorkflowMode={() => {}}
                 discussionMode={chat.discussionMode}
@@ -1121,8 +1119,6 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                   autoResize={chat.autoResize}
                   webSearch={chat.webSearch}
                   onToggleWebSearch={() => chat.setWebSearch((v) => !v)}
-                  agentMode={chat.agentMode}
-                  onToggleAgentMode={() => chat.setAgentMode((v) => !v)}
                   workflowMode={false}
                   onToggleWorkflowMode={() => {}}
                   discussionMode={chat.discussionMode}

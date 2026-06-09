@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { streamChat, streamAgentChat, uploadChat } from "../api/chatApi";
+import { streamChat, uploadChat } from "../api/chatApi";
 import { streamCommand } from "../api/commandApi";
 import { createConversation, renameConversation } from "../api/conversationApi";
 import { useTTS } from "./useTTS";
@@ -39,7 +39,6 @@ export function useChat({ activeConversation, setActiveConversation, setConversa
   const tts = useTTS();
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [webSearch, setWebSearch] = usePersistedToggle("memolink_mode_web");
-  const [agentMode, setAgentMode] = usePersistedToggle("memolink_mode_agent");
   const [discussionMode, setDiscussionMode] = usePersistedToggle("memolink_mode_discussion");
   // Last user prompt — needed so searchOnline can re-send the same turn with web search enabled
   const lastUserPromptRef = useRef<string>("");
@@ -113,17 +112,15 @@ export function useChat({ activeConversation, setActiveConversation, setConversa
           ? streamCommand(trimmed, conversationId, workspaceId ?? null, model ?? null)
           : discussionMode
             ? streamCommand(`/Discussion All : ${trimmed}`, conversationId, workspaceId ?? null, model ?? null)
-            : agentMode
-              ? streamAgentChat(conversationId, trimmed, workspaceId, model)
-              : streamChat(
-                  conversationId,
-                  trimmed,
-                  5,
-                  workspaceId,
-                  model,
-                  effectiveWebSearch,
-                  options?.searchQueryOverride ?? null,
-                );
+            : streamChat(
+                conversationId,
+                trimmed,
+                5,
+                workspaceId,
+                model,
+                effectiveWebSearch,
+                options?.searchQueryOverride ?? null,
+              );
 
         for await (const rawEvent of stream) {
           const event = rawEvent as ChatStreamEvent;
@@ -291,7 +288,6 @@ export function useChat({ activeConversation, setActiveConversation, setConversa
     textareaRef, attachmentInputRef,
     autoResize, handleSend, searchOnline,
     webSearch, setWebSearch,
-    agentMode, setAgentMode,
     discussionMode, setDiscussionMode,
     tts,
   };

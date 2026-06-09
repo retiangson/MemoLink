@@ -1,22 +1,20 @@
 import base64
 import json
 import re
-import time
-from datetime import datetime, timezone
 from email.utils import parseaddr, parsedate_to_datetime
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 
 import httpx
 from openai import OpenAI
 
 from memolink_backend.core.config import settings
-from memolink_backend.core.encryption import encrypt_text, decrypt_text
 from memolink_backend.domain.repositories.email_account_repository import EmailAccountRepository
 from memolink_backend.domain.repositories.email_record_repository import EmailRecordRepository
 from memolink_backend.domain.repositories.note_repository import NoteRepository
+from memolink_backend.domain.repositories.reminder_repository import ReminderRepository
 from memolink_backend.business.services.embedding_service import EmbeddingService
-
-GMAIL_API = "https://www.googleapis.com/gmail/v1/users/me"
-GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
+from memolink_backend.business.services.gmail_connector import GmailConnector
 
 
 def _strip_html(html: str) -> str:
@@ -77,40 +75,6 @@ def _get_header(headers: list, name: str) -> str:
             return h["value"]
     return ""
 
-
-async def _refresh_token(refresh_token: str) -> tuple[str, datetime]:
-    async with httpx.AsyncClient() as client:
-        resp = await client.post(GOOGLE_TOKEN_URL, data={
-            "client_id": settings.google_client_id,
-            "client_secret": settings.google_client_secret,
-            "refresh_token": refresh_token,
-            "grant_type": "refresh_token",
-        })
-    data = resp.json()
-    access_token = data["access_token"]
-    expires_in = data.get("expires_in", 3600)
-    expiry = datetime.fromtimestamp(time.time() + expires_in, tz=timezone.utc)
-    return access_token, expiry
-
-
-async def _get_valid_token(account_repo: EmailAccountRepository, user_id: int) -> str:
-    tokens = account_repo.get_decrypted_tokens(user_id)
-    if not tokens:
-        raise ValueError("No email account connected")
-    expiry = tokens.get("token_expiry")
-    if expiry and datetime.now(tz=timezone.utc) >= expiry:
-        new_token, new_expiry = await _refresh_token(tokens["refresh_token"])
-        account_repo.upsert(
-            user_id=user_id,
-            email_address=tokens["email"],
-            access_token=new_token,
-            refresh_token=tokens["refresh_token"],
-            token_expiry=new_expiry,
-        )
-        return new_token
-    return tokens["access_token"]
-
-
 def _score_emails_with_gpt(emails: list[dict]) -> list[float]:
     if not emails:
         return []
@@ -146,46 +110,34 @@ class EmailService:
         self,
         account_repo: EmailAccountRepository,
         record_repo: EmailRecordRepository,
+        reminder_repo: ReminderRepository | None = None,
         note_repo: NoteRepository | None = None,
         embedding_service: EmbeddingService | None = None,
+        gmail_connector: GmailConnector | None = None,
     ):
         self.account_repo = account_repo
         self.record_repo = record_repo
+        self.reminder_repo = reminder_repo
         self.note_repo = note_repo
         self.embedding_service = embedding_service
+        self.gmail = gmail_connector or GmailConnector(account_repo)
 
     async def sync(self, user_id: int, max_results: int = 25) -> dict:
-        access_token = await _get_valid_token(self.account_repo, user_id)
-        headers = {"Authorization": f"Bearer {access_token}"}
-
-        async with httpx.AsyncClient() as client:
-            list_resp = await client.get(
-                f"{GMAIL_API}/messages",
-                headers=headers,
-                params={
-                    "maxResults": max_results,
-                    "q": "is:unread OR is:important -category:promotions -category:social",
-                },
-            )
-        if list_resp.status_code != 200:
-            raise ValueError(f"Gmail API error: {list_resp.status_code}")
-
-        message_ids = [m["id"] for m in list_resp.json().get("messages", [])]
+        message_ids = await self.gmail.list_messages(
+            user_id,
+            query="is:unread OR is:important -category:promotions -category:social",
+            max_results=max_results,
+        )
         new_ids = [mid for mid in message_ids if not self.record_repo.exists(user_id, mid)]
         if not new_ids:
             return {"synced": 0, "skipped": len(message_ids)}
 
         # Fetch full messages
         raw_emails = []
-        async with httpx.AsyncClient() as client:
-            for mid in new_ids:
-                resp = await client.get(
-                    f"{GMAIL_API}/messages/{mid}",
-                    headers=headers,
-                    params={"format": "full"},
-                )
-                if resp.status_code == 200:
-                    raw_emails.append((mid, resp.json()))
+        for mid in new_ids:
+            msg = await self.gmail.get_message(user_id, mid, format="full")
+            if msg:
+                raw_emails.append((mid, msg))
 
         # Parse emails
         parsed = []
@@ -281,45 +233,73 @@ class EmailService:
             "gmail_message_id": r.gmail_message_id,
         }
 
-    async def send_reply(self, user_id: int, record_id: int, body: str) -> bool:
-        from email.mime.text import MIMEText
-        from email.mime.multipart import MIMEMultipart
-        import base64 as _b64
-
-        r = self.record_repo.get_by_id(user_id, record_id)
-        if not r:
-            return False
-        access_token = await _get_valid_token(self.account_repo, user_id)
-
-        _is_html = bool(re.search(r"<(p|br|ul|ol|li|h[1-6]|strong|em|div)\b", body, re.I))
-        if _is_html:
-            _plain = re.sub(r"<br\s*/?>|</p>|</li>|</h[1-6]>", "\n", body, flags=re.I)
-            _plain = re.sub(r"<[^>]+>", "", _plain)
+    def _build_mime_message(
+        self,
+        *,
+        to: str,
+        subject: str,
+        body: str,
+        message_id: str | None = None,
+    ):
+        is_html = bool(re.search(r"<(p|br|ul|ol|li|h[1-6]|strong|em|div)\b", body, re.I))
+        if is_html:
+            plain = re.sub(r"<br\s*/?>|</p>|</li>|</h[1-6]>", "\n", body, flags=re.I)
+            plain = re.sub(r"<[^>]+>", "", plain)
             import html as _html_mod
-            _plain = _html_mod.unescape(_plain).strip()
+            plain = _html_mod.unescape(plain).strip()
             msg = MIMEMultipart("alternative")
-            msg.attach(MIMEText(_plain, "plain", "utf-8"))
+            msg.attach(MIMEText(plain, "plain", "utf-8"))
             msg.attach(MIMEText(body, "html", "utf-8"))
         else:
             msg = MIMEText(body, "plain", "utf-8")
 
-        msg["To"] = r.sender_email
-        msg["Subject"] = r.subject if r.subject.lower().startswith("re:") else f"Re: {r.subject}"
-        msg["In-Reply-To"] = r.gmail_message_id
-        msg["References"] = r.gmail_message_id
+        msg["To"] = to
+        msg["Subject"] = subject
+        if message_id:
+            msg["In-Reply-To"] = message_id
+            msg["References"] = message_id
+        return msg
 
-        raw = _b64.urlsafe_b64encode(msg.as_bytes()).decode()
-        payload: dict = {"raw": raw}
-        if r.gmail_thread_id:
-            payload["threadId"] = r.gmail_thread_id
+    async def send_draft(
+        self,
+        user_id: int,
+        *,
+        to: str,
+        subject: str,
+        body: str,
+        thread_id: str | None = None,
+        message_id: str | None = None,
+    ) -> dict:
+        msg = self._build_mime_message(
+            to=to,
+            subject=subject,
+            body=body,
+            message_id=message_id,
+        )
+        raw = base64.urlsafe_b64encode(msg.as_bytes()).decode()
+        return await self.gmail.send_message(
+            user_id,
+            raw_message=raw,
+            thread_id=thread_id or None,
+        )
 
-        async with httpx.AsyncClient() as client:
-            resp = await client.post(
-                f"{GMAIL_API}/messages/send",
-                headers={"Authorization": f"Bearer {access_token}"},
-                json=payload,
+    async def send_reply(self, user_id: int, record_id: int, body: str) -> bool:
+        r = self.record_repo.get_by_id(user_id, record_id)
+        if not r:
+            return False
+        reply_subject = r.subject if r.subject.lower().startswith("re:") else f"Re: {r.subject}"
+        try:
+            await self.send_draft(
+                user_id,
+                to=r.sender_email,
+                subject=reply_subject,
+                body=body,
+                thread_id=r.gmail_thread_id,
+                message_id=r.gmail_message_id,
             )
-        return resp.status_code == 200
+            return True
+        except Exception:
+            return False
 
     def build_note_content(self, user_id: int, record_id: int) -> dict | None:
         r = self.record_repo.get_by_id(user_id, record_id)
@@ -337,6 +317,23 @@ class EmailService:
             "title": r.subject,
             "content": "\n".join(line for line in content_lines if line),
         }
+
+    def create_note_from_email(self, user_id: int, record_id: int) -> dict | None:
+        if not self.note_repo:
+            raise ValueError("Note repository not configured")
+        note_data = self.build_note_content(user_id, record_id)
+        if not note_data:
+            return None
+        note = self.note_repo.create_note(user_id, note_data["title"], note_data["content"], "email")
+        if self.embedding_service:
+            try:
+                vec = self.embedding_service.embed_text(f"{note.title or ''} {note_data['content'][:1500]}")
+                self.note_repo.save_embedding(note.id, vec)
+            except Exception:
+                pass
+        self.note_repo.db.commit()
+        self.note_repo.db.refresh(note)
+        return {"note_id": note.id, "title": note.title}
 
     def extract_reminder(self, user_id: int, record_id: int) -> dict | None:
         r = self.record_repo.get_by_id(user_id, record_id)
@@ -374,6 +371,31 @@ class EmailService:
             pass
         return {"text": r.subject, "description": r.snippet, "due_date": None, "due_time": None}
 
+    def create_reminder_from_email(self, user_id: int, record_id: int) -> dict | None:
+        if not self.reminder_repo:
+            raise ValueError("Reminder repository not configured")
+        record = self.record_repo.get_by_id(user_id, record_id)
+        if not record:
+            return None
+        data = self.extract_reminder(user_id, record_id)
+        if not data:
+            return None
+        reminder = self.reminder_repo.create_reminder(
+            user_id=user_id,
+            text=data["text"],
+            description=data.get("description"),
+            reminder_type="ai",
+            due_date=data.get("due_date"),
+            due_time=data.get("due_time"),
+            email_record_id=record.id,
+        )
+        return {
+            "reminder_id": reminder.id,
+            "text": reminder.text,
+            "due_date": reminder.due_date,
+            "due_time": reminder.due_time,
+        }
+
     def _find_digest_note(self, user_id: int):
         """Return the existing Email Digest note for this user, or None."""
         if not self.note_repo:
@@ -398,243 +420,142 @@ class EmailService:
             f'<p>{body}</p>'
         )
 
+    def _save_email_record_if_new(
+        self,
+        *,
+        user_id: int,
+        gmail_message_id: str,
+        gmail_thread_id: str | None,
+        subject: str,
+        sender_name: str | None,
+        sender_email: str,
+        snippet: str,
+        body_text: str,
+        is_read: bool,
+        email_date,
+        importance_score: float = 3.0,
+    ) -> None:
+        if self.record_repo.exists(user_id, gmail_message_id):
+            return
+        record = self.record_repo.create(
+            user_id=user_id,
+            gmail_message_id=gmail_message_id,
+            gmail_thread_id=gmail_thread_id,
+            subject=subject,
+            sender_name=sender_name,
+            sender_email=sender_email,
+            snippet=snippet,
+            body_text=body_text,
+            importance_score=importance_score,
+            is_read=is_read,
+            email_date=email_date,
+        )
+        if self.embedding_service:
+            try:
+                vec = self.embedding_service.embed_text(
+                    f"{subject} {sender_email} {snippet} {body_text[:1000]}"
+                )
+                self.record_repo.save_embedding(record.id, vec)
+            except Exception:
+                pass
+
+    def _build_live_search_result(self, user_id: int, gmail_message_id: str, msg: dict) -> dict:
+        hdrs = msg.get("payload", {}).get("headers", [])
+        subject = _get_header(hdrs, "Subject") or "(no subject)"
+        from_raw = _get_header(hdrs, "From")
+        sender_name, sender_email = parseaddr(from_raw)
+        date_raw = _get_header(hdrs, "Date")
+        try:
+            email_date = parsedate_to_datetime(date_raw) if date_raw else None
+        except Exception:
+            email_date = None
+        snippet = msg.get("snippet", "")
+        body = _extract_body(msg.get("payload", {}))[:3000]
+        thread_id = msg.get("threadId")
+        is_read = "UNREAD" not in msg.get("labelIds", [])
+        attachments = _extract_attachments(msg.get("payload", {}))
+
+        try:
+            self._save_email_record_if_new(
+                user_id=user_id,
+                gmail_message_id=gmail_message_id,
+                gmail_thread_id=thread_id,
+                subject=subject,
+                sender_name=sender_name or None,
+                sender_email=sender_email,
+                snippet=snippet,
+                body_text=body,
+                importance_score=3.0,
+                is_read=is_read,
+                email_date=email_date,
+            )
+        except Exception:
+            pass
+
+        return {
+            "id": gmail_message_id,
+            "subject": subject,
+            "sender": f"{sender_name} <{sender_email}>" if sender_name else sender_email,
+            "date": email_date.strftime("%d %b %Y") if email_date else "",
+            "body": body,
+            "snippet": snippet,
+            "thread_id": thread_id,
+            "attachments": attachments,
+        }
+
     def live_search_sync(self, user_id: int, query: str, top_k: int = 3) -> list[dict]:
         """Synchronous Gmail search using httpx.Client — safe to call from any thread or sync context."""
-        import httpx as _httpx
         import logging as _log
         _logger = _log.getLogger(__name__)
-
-        # Fetch token from DB
         try:
-            tokens = self.account_repo.get_decrypted_tokens(user_id)
+            message_ids = self.gmail.list_messages_sync(user_id, query=query, max_results=top_k * 2)
         except Exception as exc:
-            _logger.warning(f"[live_search] user={user_id} get_decrypted_tokens raised: {exc}")
+            _logger.warning(f"[live_search] user={user_id} q={query!r} list failed: {exc}")
+            return []
+        if not message_ids:
             return []
 
-        if not tokens:
-            _logger.warning(f"[live_search] user={user_id} no tokens in DB")
-            return []
-
-        access_token = tokens.get("access_token", "")
-        expiry = tokens.get("token_expiry")
-        _logger.warning(
-            f"[live_search] user={user_id} q={query!r} "
-            f"token_len={len(access_token)} expired={bool(expiry and expiry <= datetime.now(tz=timezone.utc))}"
-        )
-
-        # Refresh if expired
-        if expiry and expiry <= datetime.now(tz=timezone.utc):
-            try:
-                resp = _httpx.post(GOOGLE_TOKEN_URL, data={
-                    "client_id": settings.google_client_id,
-                    "client_secret": settings.google_client_secret,
-                    "refresh_token": tokens.get("refresh_token", ""),
-                    "grant_type": "refresh_token",
-                }, timeout=10.0)
-                _logger.warning(f"[live_search] refresh status={resp.status_code} body={resp.text[:200]}")
-                if resp.status_code == 200:
-                    data = resp.json()
-                    access_token = data["access_token"]
-                    try:
-                        new_expiry = datetime.fromtimestamp(
-                            time.time() + data.get("expires_in", 3600), tz=timezone.utc
-                        )
-                        self.account_repo.upsert(
-                            user_id=user_id,
-                            email_address=tokens.get("email", ""),
-                            access_token=access_token,
-                            refresh_token=tokens.get("refresh_token", ""),
-                            token_expiry=new_expiry,
-                        )
-                    except Exception:
-                        pass
-                else:
-                    _logger.warning(f"[live_search] refresh failed — trying existing token anyway")
-            except Exception as exc:
-                _logger.warning(f"[live_search] refresh exception: {exc}")
-                return []
-
-        if not access_token:
-            _logger.warning(f"[live_search] user={user_id} access_token empty after refresh attempt")
-            return []
-
-        headers = {"Authorization": f"Bearer {access_token}"}
         results: list[dict] = []
-
-        try:
-            with _httpx.Client(timeout=15.0) as client:
-                list_resp = client.get(
-                    f"{GMAIL_API}/messages",
-                    headers=headers,
-                    params={"maxResults": top_k * 2, "q": query},
-                )
-                import logging as _log
-                _log.getLogger(__name__).warning(
-                    f"[live_search] user={user_id} q={query!r} "
-                    f"status={list_resp.status_code} "
-                    f"body={list_resp.text[:300]}"
-                )
-                if list_resp.status_code != 200:
-                    return []
-
-                message_ids = [m["id"] for m in list_resp.json().get("messages", [])][:top_k * 2]
-                if not message_ids:
-                    return []
-
-                for mid in message_ids:
-                    resp = client.get(
-                        f"{GMAIL_API}/messages/{mid}",
-                        headers=headers,
-                        params={"format": "full"},
-                    )
-                    if resp.status_code != 200:
-                        continue
-                    msg = resp.json()
-                    hdrs = msg.get("payload", {}).get("headers", [])
-                    subject = _get_header(hdrs, "Subject") or "(no subject)"
-                    from_raw = _get_header(hdrs, "From")
-                    sender_name, sender_email = parseaddr(from_raw)
-                    date_raw = _get_header(hdrs, "Date")
-                    try:
-                        email_date = parsedate_to_datetime(date_raw) if date_raw else None
-                    except Exception:
-                        email_date = None
-                    body = _extract_body(msg.get("payload", {}))[:3000]
-                    attachments = _extract_attachments(msg.get("payload", {}))
-
-                    # Save to email_records for future searches
-                    if not self.record_repo.exists(user_id, mid):
-                        try:
-                            record = self.record_repo.create(
-                                user_id=user_id,
-                                gmail_message_id=mid,
-                                gmail_thread_id=msg.get("threadId"),
-                                subject=subject,
-                                sender_name=sender_name or None,
-                                sender_email=sender_email,
-                                snippet=msg.get("snippet", ""),
-                                body_text=body,
-                                importance_score=3.0,
-                                is_read="UNREAD" not in msg.get("labelIds", []),
-                                email_date=email_date,
-                            )
-                            if self.embedding_service:
-                                try:
-                                    vec = self.embedding_service.embed_text(
-                                        f"{subject} {sender_email} {msg.get('snippet', '')} {body[:1000]}"
-                                    )
-                                    self.record_repo.save_embedding(record.id, vec)
-                                except Exception:
-                                    pass
-                        except Exception:
-                            pass
-
-                    results.append({
-                        "id": mid,
-                        "subject": subject,
-                        "sender": f"{sender_name} <{sender_email}>" if sender_name else sender_email,
-                        "date": email_date.strftime("%d %b %Y") if email_date else "",
-                        "body": body,
-                        "snippet": msg.get("snippet", ""),
-                        "thread_id": msg.get("threadId"),
-                        "attachments": attachments,
-                    })
-                    if len(results) >= top_k:
-                        break
-        except Exception:
-            return []
+        for mid in message_ids:
+            try:
+                msg = self.gmail.get_message_sync(user_id, mid, format="full")
+            except Exception as exc:
+                _logger.warning(f"[live_search] user={user_id} message={mid} fetch failed: {exc}")
+                continue
+            if not msg:
+                continue
+            results.append(self._build_live_search_result(user_id, mid, msg))
+            if len(results) >= top_k:
+                break
 
         return results
+
+    async def download_attachment(self, user_id: int, gmail_message_id: str, attachment_id: str) -> bytes:
+        return await self.gmail.download_attachment(
+            user_id,
+            gmail_message_id=gmail_message_id,
+            attachment_id=attachment_id,
+        )
 
     async def live_search(self, user_id: int, query: str, top_k: int = 3) -> list[dict]:
         """Search Gmail directly with a free-text query — no sync required.
         Returns the top matching emails as plain dicts ready for chat context.
         Also saves new results to email_records so they're available next time."""
         try:
-            access_token = await _get_valid_token(self.account_repo, user_id)
+            message_ids = await self.gmail.list_messages(user_id, query=query, max_results=top_k * 2)
         except Exception:
             return []
-
-        headers = {"Authorization": f"Bearer {access_token}"}
-
-        async with httpx.AsyncClient() as client:
-            list_resp = await client.get(
-                f"{GMAIL_API}/messages",
-                headers=headers,
-                params={"maxResults": top_k * 2, "q": query},
-            )
-        if list_resp.status_code != 200:
-            return []
-
-        message_ids = [m["id"] for m in list_resp.json().get("messages", [])][:top_k * 2]
         if not message_ids:
             return []
 
         results = []
-        async with httpx.AsyncClient() as client:
-            for mid in message_ids:
-                resp = await client.get(
-                    f"{GMAIL_API}/messages/{mid}",
-                    headers=headers,
-                    params={"format": "full"},
-                )
-                if resp.status_code != 200:
-                    continue
-                msg = resp.json()
-                hdrs = msg.get("payload", {}).get("headers", [])
-                subject = _get_header(hdrs, "Subject") or "(no subject)"
-                from_raw = _get_header(hdrs, "From")
-                sender_name, sender_email = parseaddr(from_raw)
-                date_raw = _get_header(hdrs, "Date")
-                try:
-                    email_date = parsedate_to_datetime(date_raw) if date_raw else None
-                except Exception:
-                    email_date = None
-                snippet = msg.get("snippet", "")
-                body = _extract_body(msg.get("payload", {}))[:3000]
-                thread_id = msg.get("threadId")
-                is_read = "UNREAD" not in msg.get("labelIds", [])
-                attachments = _extract_attachments(msg.get("payload", {}))
-
-                # Save to email_records if not already there, so it's searchable later
-                if not self.record_repo.exists(user_id, mid):
-                    try:
-                        record = self.record_repo.create(
-                            user_id=user_id,
-                            gmail_message_id=mid,
-                            gmail_thread_id=thread_id,
-                            subject=subject,
-                            sender_name=sender_name or None,
-                            sender_email=sender_email,
-                            snippet=snippet,
-                            body_text=body,
-                            importance_score=3.0,
-                            is_read=is_read,
-                            email_date=email_date,
-                        )
-                        if self.embedding_service:
-                            try:
-                                vec = self.embedding_service.embed_text(
-                                    f"{subject} {sender_email} {snippet} {body[:1000]}"
-                                )
-                                self.record_repo.save_embedding(record.id, vec)
-                            except Exception:
-                                pass
-                    except Exception:
-                        pass
-
-                results.append({
-                    "id": mid,
-                    "subject": subject,
-                    "sender": f"{sender_name} <{sender_email}>" if sender_name else sender_email,
-                    "date": email_date.strftime("%d %b %Y") if email_date else "",
-                    "body": body,
-                    "snippet": snippet,
-                    "thread_id": thread_id,
-                    "attachments": attachments,
-                })
-                if len(results) >= top_k:
-                    break
+        for mid in message_ids:
+            msg = await self.gmail.get_message(user_id, mid, format="full")
+            if not msg:
+                continue
+            results.append(self._build_live_search_result(user_id, mid, msg))
+            if len(results) >= top_k:
+                break
 
         return results
 
@@ -658,8 +579,6 @@ class EmailService:
         workspace_id = None  # Email items are always global - visible across all workspaces
         """Sync emails, append important ones to the Email Digest note, create reminders for deadlines."""
         from memolink_backend.domain.models.note import Note
-        from memolink_backend.domain.models.reminder import Reminder
-        from memolink_backend.contracts.note_dtos import NoteCreateDTO
 
         # 1 - sync new emails from Gmail
         sync_result = await self.sync(user_id)
@@ -716,22 +635,18 @@ class EmailService:
         # Create reminders for emails where GPT detects a deadline
         for r in important:
             data = self.extract_reminder(user_id, r.id)
-            if data and data.get("due_date"):
-                reminder = Reminder(
+            if data and data.get("due_date") and self.reminder_repo:
+                self.reminder_repo.create_reminder(
                     user_id=user_id,
                     workspace_id=workspace_id,
                     text=data["text"],
                     description=data.get("description"),
-                    type="ai",
-                    done=False,
+                    reminder_type="ai",
                     due_date=data["due_date"],
                     due_time=data.get("due_time"),
                     email_record_id=r.id,
                 )
-                db.add(reminder)
                 reminders_created += 1
-        if reminders_created:
-            db.commit()
 
         return {
             "synced": sync_result.get("synced", 0),

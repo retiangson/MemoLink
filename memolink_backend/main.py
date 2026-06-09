@@ -146,7 +146,7 @@ if os.getenv("MEMOLINK_SKIP_DB_BOOTSTRAP") != "1":
         """))
         # Seed default flags (skip if already exist)
         for _k, _v in [
-            ("web_search_enabled", "true"), ("agent_mode_enabled", "true"),
+            ("web_search_enabled", "true"),
             ("model_selection_enabled", "true"), ("image_generation_enabled", "true"),
             ("translation_enabled", "true"), ("file_upload_enabled", "true"),
             ("research_mode_enabled", "true"),
@@ -155,7 +155,7 @@ if os.getenv("MEMOLINK_SKIP_DB_BOOTSTRAP") != "1":
             ("custom_api_keys_enabled", "true"), ("video_import_enabled", "true"),
             ("email_enabled", "true"),
             ("default_model", "gpt-4o-mini"), ("default_language", "English"),
-            ("web_search_min_level", "regular"), ("agent_mode_min_level", "regular"),
+            ("web_search_min_level", "regular"),
             ("model_selection_min_level", "regular"), ("image_generation_min_level", "regular"),
             ("translation_min_level", "regular"), ("file_upload_min_level", "regular"),
             ("research_mode_min_level", "regular"), ("model_attribution_min_level", "regular"),
@@ -163,6 +163,7 @@ if os.getenv("MEMOLINK_SKIP_DB_BOOTSTRAP") != "1":
             ("custom_api_keys_min_level", "regular"), ("video_import_min_level", "regular"),
         ]:
             _conn.execute(text("INSERT INTO feature_flags (key, value) VALUES (:k, :v) ON CONFLICT (key) DO NOTHING"), {"k": _k, "v": _v})
+        _conn.execute(text("DELETE FROM feature_flags WHERE key IN ('agent_mode_enabled', 'agent_mode_min_level')"))
         # Translation cache table
         _conn.execute(text("""
             CREATE TABLE IF NOT EXISTS translation_cache (

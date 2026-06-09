@@ -172,6 +172,7 @@
   <span class="nav-logo">&#x2B21; MemoLink</span>
   <div class="nav-links">
     <a href="Overview.html" class="active">Overview</a>
+    <a href="Smart Response Engine.html">Smart Engine</a>
     <a href="Requirements Analysis.html">Requirements</a>
     <a href="Database Design.html">Database</a>
     <a href="API Endpoint Design.html">API</a>
@@ -231,6 +232,13 @@
     <span class="pill">Flashcards &amp; Quiz</span>
     <span class="pill">Smart Actions</span>
     <span class="pill">Text-to-Speech</span>
+    <span class="pill">Context Engine</span>
+    <span class="pill">Typed SSE Events</span>
+    <span class="pill">Long Academic Drafts</span>
+    <span class="pill">CORE + arXiv Search</span>
+    <span class="pill">Cited Paper Auto-Save</span>
+    <span class="pill">Conversation-Aware Web Search</span>
+    <span class="pill">Email Draft from Context</span>
   </div>
 </div>
 
@@ -357,8 +365,8 @@
       </div>
       <div class="card">
         <div class="card-icon">&#x1F9EA;</div>
-        <h3>Agent Mode</h3>
-        <p>An "Agent" toggle in ChatInput switches to <code>streamAgentChat()</code>, which calls <code>POST /api/chat/agent/stream</code>. The SSE stream emits <code>tool_call</code> status chips and <code>tool_result</code> completion events before the final answer tokens, enabling multi-step agentic reasoning.</p>
+        <h3>Automatic Smart Actions</h3>
+        <p>Regular chat is now the only entry point. When a request clearly needs tool use - such as saving a note, creating a reminder, searching the web, or drafting from Gmail context - MemoLink routes the turn through an internal action agent automatically and streams typed tool events before the final answer.</p>
       </div>
       <div class="card">
         <div class="card-icon">&#x1F6E1;&#xFE0F;</div>
@@ -368,7 +376,7 @@
       <div class="card">
         <div class="card-icon">&#x1F3F3;&#xFE0F;</div>
         <h3>Feature Flags</h3>
-        <p>System-wide flags stored in the <code>feature_flags</code> table: web search, agent mode, model selection, image generation, translation, file upload, research mode, TTS, slash commands, custom API keys, video import, email integration, AI memory graph (<code>memograph_enabled</code>), proactive insights (<code>proactive_insights_enabled</code>), answer confidence (<code>confidence_enabled</code>), AutoPilot routing (<code>autopilot_enabled</code>), meeting/lecture timeline (<code>timeline_enabled</code>), AI study mode (<code>study_mode_enabled</code>), smart actions / workflow agent (<code>workflow_enabled</code>), default model, and default language. Each feature also has a <code>*_min_level</code> flag (<code>regular</code> / <code>plus</code> / <code>pro</code>) that controls the minimum access tier required. Admins configure both toggles and minimum levels via the Admin Panel; the frontend fetches them on login and hides disabled controls accordingly.</p>
+        <p>System-wide flags stored in the <code>feature_flags</code> table include web search, model selection, image generation, translation, file upload, research mode, TTS, slash commands, custom API keys, video import, email integration, AI memory graph (<code>memograph_enabled</code>), proactive insights (<code>proactive_insights_enabled</code>), answer confidence (<code>confidence_enabled</code>), AutoPilot routing (<code>autopilot_enabled</code>), meeting/lecture timeline (<code>timeline_enabled</code>), AI study mode (<code>study_mode_enabled</code>), smart actions / workflow agent (<code>workflow_enabled</code>), default model, and default language. Each feature also has a <code>*_min_level</code> flag (<code>regular</code> / <code>plus</code> / <code>pro</code>) that controls the minimum access tier required. Admins configure both toggles and minimum levels via the Admin Panel; the frontend fetches them on login and hides disabled controls accordingly.</p>
       </div>
       <div class="card">
         <div class="card-icon">&#x1F3C5;</div>
@@ -438,7 +446,7 @@
       <div class="card">
         <div class="card-icon">&#x1F4E7;</div>
         <h3>Gmail Email Integration</h3>
-        <p>Connect Gmail via OAuth 2.0 in Settings → Email. MemoLink fetches unread and important emails, batch-scores importance with GPT (1-5), and saves those scoring ≥ 3. Auto-process appends new emails to a global <strong>Email Digest</strong> note and creates reminders for emails with detected deadlines - both are global (visible across all workspaces). A <strong>Sync from Email</strong> button in the Reminders panel triggers a fresh sync on demand. Email-sourced reminders link back to the original email. Reply to any email in-app: choose a tone (Formal / Friendly / Brief), generate 3 RAG-grounded AI draft suggestions, edit, and send - reply threads correctly in Gmail via <code>In-Reply-To</code> + <code>threadId</code>. <strong>Email Draft from Chat:</strong> say "send [recipient] the [note name]" (optionally "make it nice" / "summarize it") - MemoLink uses AI intent extraction to identify the recipient, matching note, and style hint; builds the draft from the note content (AI rewrites only when a style instruction is given); and presents a <strong>Draft Email</strong> review card with editable To/Subject, a formatted body preview, a full TipTap Edit mode, and a Send button. Sent state is tracked in localStorage to prevent double-sending. Gmail receives a <code>multipart/alternative</code> MIME message (HTML + plain-text fallback) so emails render correctly in all mail clients.</p>
+        <p>Connect Gmail via OAuth 2.0 in Settings → Email. MemoLink fetches unread and important emails, batch-scores importance with GPT (1-5), and saves those scoring ≥ 3. Auto-process appends new emails to a global <strong>Email Digest</strong> note and creates reminders for emails with detected deadlines - both are global (visible across all workspaces). A <strong>Sync from Email</strong> button in the Reminders panel triggers a fresh sync on demand. Email-sourced reminders link back to the original email. Reply to any email in-app: choose a tone (Formal / Friendly / Brief), generate 3 RAG-grounded AI draft suggestions, edit, and send - reply threads correctly in Gmail via <code>In-Reply-To</code> + <code>threadId</code>. <strong>Email Draft from Chat:</strong> say "send [recipient] the [note name]" (optionally "make it nice" / "summarize it") - MemoLink uses AI intent extraction to identify the recipient, matching note, and style hint; builds the draft from the note content (AI rewrites only when a style instruction is given); and presents a <strong>Draft Email</strong> review card with editable To/Subject, a formatted body preview, a full TipTap Edit mode, and a Send button. Sent state is tracked in localStorage to prevent double-sending. Gmail receives a <code>multipart/alternative</code> MIME message (HTML + plain-text fallback) so emails render correctly in all mail clients. Internally, Gmail token refresh, draft send, attachment download, and email-to-note / email-to-reminder actions are now routed through a dedicated connector and service layer instead of controller-owned HTTP logic.</p>
       </div>
       <div class="card">
         <div class="card-icon">&#x1F9E0;</div>
@@ -580,8 +588,8 @@
         </tr>
         <tr>
           <td><strong>Email Integration</strong></td>
-          <td><code>business/services/email_service</code></td>
-          <td>Gmail OAuth 2.0 connect/disconnect; sync inbox (importance-scored by GPT); auto-process appends to Email Digest note + extracts reminders; RAG-grounded reply suggestions; in-app MIME send with <code>In-Reply-To</code> + <code>threadId</code> threading; tokens encrypted with Fernet. <strong>Email Draft from Chat:</strong> AI intent extraction (recipient, note, style) → note-content draft → Draft Email review card (TipTap edit, send) → <code>multipart/alternative</code> Gmail send</td>
+          <td><code>business/services/email_service</code> + <code>business/services/gmail_connector</code></td>
+          <td>Gmail OAuth 2.0 connect/disconnect; sync inbox (importance-scored by GPT); auto-process appends to Email Digest note + extracts reminders; RAG-grounded reply suggestions; in-app MIME send with <code>In-Reply-To</code> + <code>threadId</code> threading; tokens encrypted with Fernet. The dedicated Gmail connector owns token refresh, fetch, send, and attachment download, while the email service orchestrates note creation, reminder creation, digest updates, and chat-driven draft flows. <strong>Email Draft from Chat:</strong> AI intent extraction (recipient, note, style) → note-content draft → Draft Email review card (TipTap edit, send) → <code>multipart/alternative</code> Gmail send</td>
           <td><span class="tag tag-ai">Gmail API</span><span class="tag tag-ai">OpenAI</span></td>
         </tr>
         <tr>
@@ -858,6 +866,79 @@
         <h3>Core Evaluated Scope</h3>
         <p>The core evaluated scope is knowledge capture, contextual retrieval, task support, multilingual usefulness, and evaluation analytics. Gmail, graph memory, proactive insights, smart actions, text-to-speech, and custom API keys remain supporting or optional features rather than the centre of the evaluated capstone scope.</p>
       </div>
+    </div>
+  </section>
+
+  <hr class="divider" />
+
+  <section>
+    <div class="section-label">Recent Updates</div>
+    <h2>June 2026 Platform Refresh</h2>
+    <p>
+      The last two development sessions focused on making MemoLink behave less like a collection
+      of isolated prompts and more like a coherent AI companion system. The main changes were made
+      in the chat orchestration, academic writing path, streaming contract, action UX, and
+      connector handling.
+    </p>
+
+    <div class="card-grid card-grid-2" style="margin-top:1.6rem;">
+      <div class="card">
+        <h3>Smart Response Engine</h3>
+        <p>
+          Chat now follows a cleaner internal flow: request analysis, mode routing, context-engine
+          preparation, one unified primary prompt, answer generation, and optional quality review.
+          This replaced stacked prompt fragments that were causing shallow or inconsistent replies.
+        </p>
+      </div>
+      <div class="card">
+        <h3>Long Academic Draft Pipeline</h3>
+        <p>
+          Large paper requests are detected explicitly and drafted as a dedicated long-form path
+          rather than a normal chat answer. The system now plans sections, streams progress, and
+          applies an academic quality pass before the final draft is returned.
+        </p>
+      </div>
+      <div class="card">
+        <h3>Academic Source Fusion</h3>
+        <p>
+          Research retrieval now combines Semantic Scholar, CORE, arXiv, and OpenAlex fallback.
+          Results are deduplicated, CORE full text is reused as richer citation context, and cited
+          papers can be saved automatically into notes for future grounded retrieval.
+        </p>
+      </div>
+      <div class="card">
+        <h3>Typed Streaming Events</h3>
+        <p>
+          The backend and frontend now share a typed stream-event contract for message deltas,
+          replacements, completion metadata, quiz events, note events, tool status, and workflow
+          actions. This removed fragile raw-payload guessing in the client.
+        </p>
+      </div>
+      <div class="card">
+        <h3>Conversation-Aware Web Search</h3>
+        <p>
+          The “Search online?” suggestion no longer retries with a vague follow-up like
+          “latest news”. MemoLink now carries forward the actual topic from the recent conversation
+          and uses that as the real search query.
+        </p>
+      </div>
+      <div class="card">
+        <h3>Email and Action UX</h3>
+        <p>
+          Email draft generation now preserves conversational context across follow-up turns, and
+          action buttons show local loading where it matters: send button, translate, save-to-note,
+          and quiz-result note saves. This keeps status feedback tied to the action that caused it.
+        </p>
+      </div>
+    </div>
+
+    <div class="deploy-box" style="margin-top:1.6rem;">
+      <p style="color:var(--text);font-size:.92rem;">
+        <strong>Implementation note:</strong> the Smart Response Engine architecture is now documented
+        separately so the product overview does not have to carry every orchestration detail.
+        See <a href="Smart Response Engine.html" style="color:var(--accent-lt);text-decoration:none;">Smart Response Engine.html</a>
+        for the end-to-end workflow diagram and mode-routing explanation.
+      </p>
     </div>
   </section>
 

@@ -1,5 +1,5 @@
 from typing import Optional, List
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class NoteCreateDTO(BaseModel):
@@ -11,15 +11,14 @@ class NoteCreateDTO(BaseModel):
 
 
 class NoteResponseDTO(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     user_id: int
     title: Optional[str]
     content: str
     source: Optional[str]
     workspace_id: Optional[int] = None
-
-    class Config:
-        from_attributes = True
 
 
 class NoteGetDTO(BaseModel):

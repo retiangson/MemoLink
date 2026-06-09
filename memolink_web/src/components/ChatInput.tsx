@@ -18,15 +18,12 @@ interface ChatInputProps {
   autoResize: () => void;
   webSearch: boolean;
   onToggleWebSearch: () => void;
-  agentMode: boolean;
-  onToggleAgentMode: () => void;
   workflowMode: boolean;
   onToggleWorkflowMode: () => void;
   discussionMode: boolean;
   onToggleDiscussionMode: () => void;
   flags?: {
     web_search_enabled: boolean;
-    agent_mode_enabled: boolean;
     file_upload_enabled: boolean;
     research_mode_enabled: boolean;
     slash_commands_enabled: boolean;
@@ -40,7 +37,7 @@ const ALL_SUPPORT = new Set(["improve","enhance","summarize","quiz","discussion"
 export function ChatInput({
   input, setInput, loading, pendingFiles, setPendingFiles,
   textareaRef, attachmentInputRef, onSend, autoResize,
-  webSearch, onToggleWebSearch, agentMode, onToggleAgentMode, workflowMode, onToggleWorkflowMode,
+  webSearch, onToggleWebSearch, workflowMode, onToggleWorkflowMode,
   discussionMode, onToggleDiscussionMode,
   flags, notes = [],
 }: ChatInputProps) {
@@ -101,7 +98,8 @@ export function ChatInput({
   // Auto-resize whenever input changes (e.g. after voice transcription)
   useEffect(() => { autoResize(); }, [input]);
 
-  const canSend = !loading && (input.trim().length > 0 || pendingFiles.length > 0);
+  const canSend = input.trim().length > 0 || pendingFiles.length > 0;
+  const isBusy = loading;
   const isActive = recording.isRecording || recording.isTranscribing;
 
   function handleMicClick() {
@@ -342,29 +340,6 @@ export function ChatInput({
                 </div>
               )}
 
-              {/* Agent mode toggle */}
-              {(!flags || flags.agent_mode_enabled) && (
-                <div className="relative group">
-                  <button
-                    onClick={onToggleAgentMode}
-                    className={`flex items-center gap-1.5 px-2.5 h-8 rounded-xl text-xs font-medium transition ${
-                      agentMode
-                        ? "bg-violet-500/15 border border-violet-500/40 text-violet-400 hover:bg-violet-500/25"
-                        : "text-gray-500 hover:text-gray-200 hover:bg-[#252533]"
-                    }`}
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 shrink-0" fill="currentColor" viewBox="0 0 16 16">
-                      <path d="M6 12.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 0 1h-3a.5.5 0 0 1-.5-.5M3 8.062C3 6.76 4.235 5.765 5.53 5.886a26.6 26.6 0 0 0 4.94 0C11.765 5.765 13 6.76 13 8.062v1.157a.93.93 0 0 1-.765.935c-.845.147-2.34.346-4.235.346s-3.39-.2-4.235-.346A.93.93 0 0 1 3 9.219zm4.542-.827a.25.25 0 0 0-.217.068l-.92.9a25 25 0 0 1-1.871-.183.25.25 0 0 0-.068.495c.55.076 1.232.149 2.02.193a.25.25 0 0 0 .189-.071l.754-.736.847 1.71a.25.25 0 0 0 .404.062l.932-.97a25 25 0 0 0 1.922-.188.25.25 0 0 0-.068-.495c-.538.074-1.207.145-1.98.189a.25.25 0 0 0-.166.076l-.754.785-.842-1.7a.25.25 0 0 0-.182-.134"/>
-                      <path d="M8 1.783C7.015.936 5.587.81 4.287.94c-1.514.153-3.042.672-3.994 1.105A.5.5 0 0 0 0 2.5v11a.5.5 0 0 0 .707.455c.882-.4 2.303-.881 3.68-1.02 1.409-.142 2.59.087 3.223.877a.5.5 0 0 0 .78 0c.633-.79 1.814-1.019 3.222-.877 1.378.139 2.8.62 3.681 1.02A.5.5 0 0 0 16 13.5v-11a.5.5 0 0 0-.293-.455c-.952-.433-2.48-.952-3.994-1.105C10.413.809 8.985.936 8 1.783"/>
-                    </svg>
-                    {agentMode && <span>Agent</span>}
-                  </button>
-                  <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-1.5 py-0.5 text-[10px] text-white bg-[#1e1e2a] border border-[#2a2a38] rounded whitespace-nowrap hidden group-hover:block pointer-events-none z-50">
-                    {agentMode ? "Agent mode on" : "Agent mode"}
-                  </span>
-                </div>
-              )}
-
               {/* Discussion mode toggle */}
               <div className="relative group">
                 <button
@@ -436,17 +411,18 @@ export function ChatInput({
               {/* Send button */}
               <div className="relative group">
                 <button
-                  onClick={onSend}
+                  type="button"
+                  onClick={() => { void onSend(); }}
                   disabled={!canSend}
                   className={`w-8 h-8 rounded-xl flex items-center justify-center transition ${
-                    loading
+                    isBusy
                       ? "bg-indigo-600 text-white shadow-md shadow-indigo-900/40"
                       : canSend
                       ? "bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-900/40"
                       : "bg-[#252533] text-gray-600 cursor-not-allowed"
                   }`}
                 >
-                  {loading ? (
+                  {isBusy ? (
                     <span className="inline-block w-4 h-4 rounded-full border-2 border-white/25 border-t-white animate-spin" />
                   ) : (
                     <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
@@ -455,7 +431,7 @@ export function ChatInput({
                   )}
                 </button>
                 <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-1.5 py-0.5 text-[10px] text-white bg-[#1e1e2a] border border-[#2a2a38] rounded whitespace-nowrap hidden group-hover:block pointer-events-none z-50">
-                  {loading ? "Working..." : "Send"}
+                  {isBusy ? "Working..." : "Send"}
                 </span>
               </div>
             </div>

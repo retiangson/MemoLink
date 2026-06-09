@@ -22,7 +22,6 @@ export interface AdminUser {
 
 export type FeatureFlags = {
   web_search_enabled: boolean;
-  agent_mode_enabled: boolean;
   model_selection_enabled: boolean;
   image_generation_enabled: boolean;
   translation_enabled: boolean;
@@ -47,7 +46,6 @@ export type FeatureFlags = {
   default_model: string;
   default_language: string;
   web_search_min_level: AccessLevel;
-  agent_mode_min_level: AccessLevel;
   model_selection_min_level: AccessLevel;
   image_generation_min_level: AccessLevel;
   translation_min_level: AccessLevel;
@@ -63,7 +61,6 @@ export type FeatureFlags = {
 export function parseFlags(raw: Record<string, string>): FeatureFlags {
   return {
     web_search_enabled: raw.web_search_enabled !== "false",
-    agent_mode_enabled: raw.agent_mode_enabled !== "false",
     model_selection_enabled: raw.model_selection_enabled !== "false",
     image_generation_enabled: raw.image_generation_enabled !== "false",
     translation_enabled: raw.translation_enabled !== "false",
@@ -88,7 +85,6 @@ export function parseFlags(raw: Record<string, string>): FeatureFlags {
     default_model: raw.default_model ?? "gpt-4o-mini",
     default_language: raw.default_language ?? "English",
     web_search_min_level: (raw.web_search_min_level ?? "regular") as AccessLevel,
-    agent_mode_min_level: (raw.agent_mode_min_level ?? "regular") as AccessLevel,
     model_selection_min_level: (raw.model_selection_min_level ?? "regular") as AccessLevel,
     image_generation_min_level: (raw.image_generation_min_level ?? "regular") as AccessLevel,
     translation_min_level: (raw.translation_min_level ?? "regular") as AccessLevel,
@@ -132,7 +128,6 @@ export async function fetchAdminFeatures(): Promise<FeatureFlags> {
 export async function updateAdminFeatures(flags: FeatureFlags): Promise<FeatureFlags> {
   const raw: Record<string, string> = {
     web_search_enabled: String(flags.web_search_enabled),
-    agent_mode_enabled: String(flags.agent_mode_enabled),
     model_selection_enabled: String(flags.model_selection_enabled),
     image_generation_enabled: String(flags.image_generation_enabled),
     translation_enabled: String(flags.translation_enabled),
@@ -157,7 +152,6 @@ export async function updateAdminFeatures(flags: FeatureFlags): Promise<FeatureF
     default_model: flags.default_model,
     default_language: flags.default_language,
     web_search_min_level: flags.web_search_min_level,
-    agent_mode_min_level: flags.agent_mode_min_level,
     model_selection_min_level: flags.model_selection_min_level,
     image_generation_min_level: flags.image_generation_min_level,
     translation_min_level: flags.translation_min_level,
