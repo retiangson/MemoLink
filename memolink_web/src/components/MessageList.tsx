@@ -2,18 +2,6 @@ import React from "react";
 import ChatBubble from "./ChatBubble";
 import type { Conversation, Message } from "../types";
 
-function ThinkingSpinner() {
-  return (
-    <div className="flex items-center gap-3 px-5 py-4 max-w-full sm:max-w-[740px]">
-      <div className="relative w-7 h-7 shrink-0">
-        <div className="absolute inset-0 rounded-full border-[3px] border-indigo-500/20 border-t-indigo-400 animate-spin" />
-        <div className="absolute inset-[4px] rounded-full border-2 border-purple-500/20 border-t-purple-400 animate-[spin_1.4s_linear_infinite_reverse]" />
-      </div>
-      <span className="text-sm text-indigo-300/70 animate-pulse">Thinking…</span>
-    </div>
-  );
-}
-
 interface MessageListProps {
   messages: Message[];
   loading: boolean;
@@ -22,12 +10,12 @@ interface MessageListProps {
   messagesContainerRef: React.RefObject<HTMLDivElement | null>;
   bottomRef: React.RefObject<HTMLDivElement | null>;
   onLoadOlder: () => void;
-  onAddToNotes: (content: string) => void;
+  onAddToNotes: (content: string) => Promise<void> | void;
   onDeleteMessage: (id: number, content: string, index: number) => void;
   onDropFiles: (files: File[]) => void;
   onApplyNoteEdit: (content: string, noteId: number | null) => void;
   onOpenNote?: (noteId: number) => void;
-  onSaveNote?: (title: string, content: string) => void;
+  onSaveNote?: (title: string, content: string) => Promise<void> | void;
   hasOpenNote: boolean;
   translationEnabled?: boolean;
   modelAttributionEnabled?: boolean;
@@ -97,7 +85,6 @@ export function MessageList({
             />
           );
         })}
-        {loading && <ThinkingSpinner />}
         <div ref={bottomRef} />
       </div>
     </div>

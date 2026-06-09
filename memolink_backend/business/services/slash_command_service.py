@@ -724,7 +724,13 @@ Base questions ONLY on the provided notes. Do not invent facts not in the notes.
 
         # ── Step 3: academic papers ──────────────────────────────────────────
         yield _sse({"t": "*Finding academic sources…*\n\n"})
-        papers = search_papers(writing_prompt[:150], limit=5, api_key=settings.semantic_scholar_api_key)
+        papers = search_papers(
+            writing_prompt[:150],
+            limit=5,
+            api_key=settings.semantic_scholar_api_key,
+            core_api_key=settings.core_api_key,
+            include_arxiv=True,
+        )
         paper_context = format_papers_context(papers)
 
         # Assemble silent context block for all writers

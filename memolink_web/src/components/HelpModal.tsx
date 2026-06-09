@@ -43,10 +43,10 @@ const CONTENT: Record<string, React.ReactNode> = {
       <div className="grid grid-cols-2 gap-3">
         {[
           { label: "Workspaces", desc: "Separate contexts for different subjects or projects" },
-          { label: "AI Chat", desc: "Grounded answers from your own notes and connected context" },
+          { label: "AI Chat", desc: "Grounded answers routed through MemoLink's Smart Response Engine" },
           { label: "Smart Notes", desc: "Rich editor with voice, images, and formatting" },
           { label: "File & Video", desc: "Import PDFs, DOCX, PPTX, YouTube, and recordings" },
-          { label: "AI Tools", desc: "Web search, agent mode, research, image generation" },
+          { label: "AI Tools", desc: "Web search, smart actions, research, image generation, and long academic drafting" },
           { label: "Reminders", desc: "Auto-detected from notes or set manually" },
           { label: "Slash Commands", desc: "14 commands - /Improve, /Quiz, /Discuss and more" },
           { label: "Gmail Email", desc: "Connect Gmail, auto-sync important emails to notes and reminders, reply in-app" },
@@ -87,13 +87,14 @@ const CONTENT: Record<string, React.ReactNode> = {
 
   chat: (
     <div className="space-y-3 text-sm text-gray-400 leading-relaxed">
-      <p>MemoLink grounds answers in the notes and context available in your current workspace. Sources are cited below the reply so you can see where an answer came from.</p>
+      <p>MemoLink grounds answers in the notes and context available in your current workspace. Internally, the Smart Response Engine analyses the request, routes it to the right mode, and builds the context before the AI answers.</p>
       <ul className="space-y-2">
         {[
           "Start a new conversation from the sidebar. Conversations are scoped to the active workspace.",
           "Responses stream token-by-token so you can start reading before the reply is complete.",
           "Each AI reply shows a \"replied by [model]\" attribution badge (if enabled by admin).",
-          "Save any AI reply as a note with the ⊕ button - it becomes searchable in future chats.",
+          "Save any AI reply as a note with the bookmark button - it becomes searchable in future chats.",
+          "When MemoLink suggests a follow-up action like saving a note, creating a reminder, or searching online, your choice and the result are saved back into the conversation.",
           "Delete individual messages with the trash icon.",
           "Rename a conversation by clicking its title in the sidebar.",
           "Deleted conversations go to the Recycle Bin and can be restored.",
@@ -162,12 +163,12 @@ const CONTENT: Record<string, React.ReactNode> = {
           desc: "Toggle the globe icon in the chat input to inject live Brave Search results as context before the AI responds. Useful for questions about recent events beyond your notes.",
         },
         {
-          title: "Agent Mode",
-          desc: "Enable the Agent toggle for complex multi-step questions. The AI reasons through sub-tasks using tools, showing tool-call chips as it works, then delivers a final answer.",
+          title: "Smart Actions",
+          desc: "MemoLink now routes note actions, reminder creation, and live-search tasks through an internal action agent automatically. When tool use is needed, you will see tool-call chips as it works before the final answer arrives.",
         },
         {
           title: "Research Mode",
-          desc: "The Research toggle runs a dedicated multi-source pipeline - web search + your notes - and returns a cited, structured answer. Requires Plus or higher access level (configurable by admin).",
+          desc: "The Research toggle runs a dedicated multi-source pipeline - your notes, live web results, and academic papers - and returns a cited, structured answer. Requires Plus or higher access level (configurable by admin).",
         },
         {
           title: "Image Generation",
@@ -176,6 +177,10 @@ const CONTENT: Record<string, React.ReactNode> = {
         {
           title: "Translation",
           desc: "Click the translate button on any AI message. Uses a Gemini quality-loop: initial translation → back-translate → similarity score (0–100) → up to 3 refinements if the score is below 85.",
+        },
+        {
+          title: "Academic Writing",
+          desc: "Large assessment or report requests are routed into a long-form academic draft path. MemoLink plans sections, streams progress, retrieves academic papers, and can save cited papers back into notes for future retrieval.",
         },
       ].map((t) => (
         <div key={t.title}>
@@ -740,6 +745,7 @@ const CONTENT: Record<string, React.ReactNode> = {
           "Use specific, descriptive workspace names (e.g. \"COMP301 Capstone\") for cleaner AI context isolation.",
           "If an AI answer misses something, upload the relevant document and ask again - retrieval improves instantly.",
           "Research Mode works best for broad questions; use regular chat for quick note look-ups.",
+          "If MemoLink offers a \"Search online?\" button, it now uses the actual topic from your recent conversation instead of searching a vague phrase like \"latest news\" on its own.",
           "The default model set by the admin applies when model selection is disabled - check Settings to see what's available to you.",
           "Reminders → Suggest scans only the active workspace - switch workspaces to suggest from different note sets.",
           "Paste a YouTube video URL in the Upload Notes panel to instantly transcribe and import it.",
@@ -760,6 +766,7 @@ const CONTENT: Record<string, React.ReactNode> = {
           "The Answer Confidence badge tells you how grounded each AI reply is. UNSUPPORTED means the topic isn't in your notes - try uploading a relevant document first.",
           "AutoPilot automatically routes coding questions to DeepSeek Coder - just mention any language name (Python, Go, Rust, SQL…) in your message.",
           "AutoPilot routes research and analysis questions to GPT-4o. For quick factual questions it stays on the default fast model. The violet ⚡ chip shows when a routing decision was made.",
+          "For large reports or assessments, ask directly for the complete final draft and include the required word count or rubric. MemoLink now has a dedicated long-form academic path instead of treating these like normal short chat replies.",
           "Open the Timeline tab on any lecture or meeting transcript note to get chapters, action items, and key moments with timestamps - no manual note-taking needed.",
           "The Jump → button in the Timeline tab finds the exact phrase in the transcript and scrolls the editor to it - useful for long recordings where scrolling manually would take too long.",
           "Timeline results are cached - clicking Regenerate re-runs the AI analysis after you've edited or improved the transcript note.",

@@ -1,4 +1,4 @@
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -7,6 +7,8 @@ load_dotenv(BACKEND_ROOT / ".env")
 
 
 class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=".env")
+
     app_name: str = "MemoLink API"
 
     database_url: str
@@ -18,6 +20,7 @@ class Settings(BaseSettings):
     deepgram_api_key: str = ""
     brave_search_api_key: str = ""
     semantic_scholar_api_key: str = ""
+    core_api_key: str = ""
 
     jwt_secret_key: str
     jwt_algorithm: str = "HS256"
@@ -46,9 +49,5 @@ class Settings(BaseSettings):
     teams_client_secret: str = ""
     teams_tenant_id: str = ""
     teams_redirect_uri: str = "http://localhost:8000/api/teams/callback"
-
-    class Config:
-        env_file = ".env"
-
 
 settings = Settings()

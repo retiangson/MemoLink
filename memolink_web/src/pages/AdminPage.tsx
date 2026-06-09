@@ -20,7 +20,6 @@ const _LEVEL_ORDER: Record<string, number> = { regular: 0, plus: 1, pro: 2 };
 
 const LEVEL_FEATURES: { minKey: keyof FeatureFlags; label: string }[] = [
   { minKey: "web_search_min_level",       label: "Web Search" },
-  { minKey: "agent_mode_min_level",       label: "Agent Mode" },
   { minKey: "research_mode_min_level",    label: "Research Mode" },
   { minKey: "image_generation_min_level", label: "Image Generation" },
   { minKey: "model_selection_min_level",  label: "Model Selection" },
@@ -477,7 +476,6 @@ export function AdminPage({ onClose, currentUserId, onResetWalkthrough }: Props)
                 <div className="space-y-3">
                   {([
                     { key: "web_search_enabled", label: "Web Search", desc: "Allow users to enable web search in chat" },
-                    { key: "agent_mode_enabled", label: "Agent Mode", desc: "Allow users to enable AI agent mode" },
                     { key: "research_mode_enabled", label: "Research Mode", desc: "Allow users to run deep multi-source research analysis" },
                     { key: "model_attribution_enabled", label: "Model Attribution", desc: "Show 'replied by [model]' label on each AI message" },
                     { key: "model_selection_enabled", label: "Model Selection", desc: "Allow users to choose the AI model" },

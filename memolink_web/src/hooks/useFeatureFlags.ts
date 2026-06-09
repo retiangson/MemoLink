@@ -3,7 +3,6 @@ import { fetchFeatureFlags, type FeatureFlags } from "../api/adminApi";
 
 const DEFAULT_FLAGS: FeatureFlags = {
   web_search_enabled: true,
-  agent_mode_enabled: true,
   model_selection_enabled: true,
   image_generation_enabled: true,
   translation_enabled: true,
@@ -28,7 +27,6 @@ const DEFAULT_FLAGS: FeatureFlags = {
   default_model: "gpt-4o-mini",
   default_language: "English",
   web_search_min_level: "regular",
-  agent_mode_min_level: "regular",
   model_selection_min_level: "regular",
   image_generation_min_level: "regular",
   translation_min_level: "regular",

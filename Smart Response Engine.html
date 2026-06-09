@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MemoLink - Smart Response Engine</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --accent:    #6366f1;
+      --accent-lt: #818cf8;
+      --bg:        #0f0f13;
+      --surface:   #16161d;
+      --card:      #1e1e2a;
+      --border:    #2a2a38;
+      --text:      #e2e8f0;
+      --muted:     #94a3b8;
+      --green:     #22c55e;
+      --cyan:      #22d3ee;
+      --amber:     #f59e0b;
+      --rose:      #fb7185;
+    }
+
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.7;
+      min-height: 100vh;
+    }
+
+    nav {
+      position: sticky; top: 0; z-index: 100;
+      background: rgba(15,15,19,.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 2rem;
+      display: flex; align-items: center; gap: 1rem; height: 56px;
+    }
+    .nav-logo { font-weight: 700; font-size: 1.15rem; color: var(--accent-lt); letter-spacing: -.5px; }
+    .nav-links { display: flex; gap: .25rem; margin-left: auto; }
+    .nav-links a {
+      color: var(--muted); text-decoration: none; font-size: .85rem;
+      padding: .35rem .75rem; border-radius: 6px; transition: all .2s;
+    }
+    .nav-links a:hover { color: var(--text); background: var(--card); }
+    .nav-links a.active { color: var(--accent-lt); background: rgba(99,102,241,.12); }
+
+    .hero {
+      padding: 4.8rem 2rem 3rem;
+      max-width: 980px; margin: 0 auto; text-align: center;
+    }
+    .badge {
+      display: inline-flex; align-items: center; gap: .5rem;
+      background: rgba(99,102,241,.12); border: 1px solid rgba(99,102,241,.3);
+      color: var(--accent-lt); font-size: .78rem; font-weight: 600;
+      padding: .3rem .9rem; border-radius: 999px; margin-bottom: 1.4rem;
+      letter-spacing: .04em; text-transform: uppercase;
+    }
+    .hero h1 {
+      font-size: clamp(2rem, 4.5vw, 3.1rem);
+      font-weight: 800; line-height: 1.12; letter-spacing: -.03em;
+      background: linear-gradient(135deg, #e2e8f0 30%, var(--accent-lt));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .hero p {
+      margin-top: 1rem; max-width: 720px; margin-left: auto; margin-right: auto;
+      color: var(--muted); font-size: 1rem;
+    }
+    .pill-row { display: flex; flex-wrap: wrap; gap: .6rem; justify-content: center; margin-top: 1.5rem; }
+    .pill {
+      background: var(--card); border: 1px solid var(--border);
+      color: var(--text); font-size: .8rem; font-weight: 500;
+      padding: .3rem .85rem; border-radius: 999px;
+    }
+
+    .container { max-width: 1080px; margin: 0 auto; padding: 0 2rem 4rem; }
+    section { margin-top: 3.2rem; }
+    .section-label {
+      font-size: .72rem; font-weight: 700; letter-spacing: .12em;
+      text-transform: uppercase; color: var(--accent-lt); margin-bottom: .6rem;
+    }
+    h2 { font-size: 1.5rem; font-weight: 700; letter-spacing: -.02em; color: var(--text); }
+    h3 { font-size: 1.02rem; font-weight: 600; color: var(--text); margin-bottom: .45rem; }
+    p { color: var(--muted); font-size: .95rem; margin-top: .5rem; }
+    .divider { border: none; border-top: 1px solid var(--border); margin: 2.5rem 0; }
+
+    .card-grid { display: grid; gap: 1.1rem; margin-top: 1.5rem; }
+    .card-grid-2 { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+    .card-grid-3 { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+    .card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 12px; padding: 1.35rem 1.45rem;
+      transition: border-color .2s, transform .2s;
+    }
+    .card:hover { border-color: var(--accent); transform: translateY(-2px); }
+
+    .diagram {
+      margin-top: 1.6rem;
+      display: grid;
+      gap: 1rem;
+    }
+    .lane {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 1rem 1rem 1.1rem;
+    }
+    .lane-title {
+      font-size: .78rem;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: var(--accent-lt);
+      font-weight: 700;
+      margin-bottom: .85rem;
+    }
+    .lane-steps {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .55rem;
+      align-items: center;
+    }
+    .step {
+      background: var(--card);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: .6rem .9rem;
+      border-radius: 10px;
+      font-size: .84rem;
+      font-weight: 500;
+      min-height: 48px;
+      display: inline-flex;
+      align-items: center;
+    }
+    .arrow { color: var(--muted); font-size: 1rem; padding: 0 .1rem; }
+
+    .highlight-box {
+      background: linear-gradient(135deg, rgba(99,102,241,.10), rgba(129,140,248,.04));
+      border: 1px solid rgba(99,102,241,.25);
+      border-radius: 14px;
+      padding: 1.4rem 1.6rem;
+      margin-top: 1.4rem;
+    }
+    .highlight-box p { color: var(--text); }
+
+    .list {
+      margin-top: .8rem;
+      padding-left: 1.2rem;
+      color: var(--muted);
+      font-size: .92rem;
+      line-height: 1.85;
+    }
+    .list li { margin-top: .2rem; }
+
+    .tag {
+      display: inline-block;
+      font-size: .72rem;
+      font-weight: 600;
+      padding: .18rem .55rem;
+      border-radius: 5px;
+      margin-right: .35rem;
+      margin-bottom: .35rem;
+    }
+    .tag-route { background: rgba(99,102,241,.12); color: var(--accent-lt); }
+    .tag-research { background: rgba(34,211,238,.12); color: var(--cyan); }
+    .tag-persist { background: rgba(34,197,94,.12); color: var(--green); }
+    .tag-ui { background: rgba(251,113,133,.12); color: var(--rose); }
+    .tag-guard { background: rgba(245,158,11,.12); color: var(--amber); }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 1.3rem;
+      font-size: .88rem;
+    }
+    th {
+      text-align: left;
+      padding: .7rem .95rem;
+      border-bottom: 1px solid var(--border);
+      color: var(--muted);
+      font-weight: 600;
+      font-size: .77rem;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+    }
+    td {
+      padding: .8rem .95rem;
+      border-bottom: 1px solid var(--border);
+      color: var(--muted);
+      vertical-align: top;
+    }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { color: var(--text); background: rgba(255,255,255,.02); }
+
+    footer {
+      text-align: center; padding: 2rem 1rem;
+      border-top: 1px solid var(--border);
+      color: var(--muted); font-size: .82rem;
+    }
+  </style>
+</head>
+<body>
+
+<nav>
+  <span class="nav-logo">&#x2B21; MemoLink</span>
+  <div class="nav-links">
+    <a href="Overview.html">Overview</a>
+    <a href="Smart Response Engine.html" class="active">Smart Engine</a>
+    <a href="Requirements Analysis.html">Requirements</a>
+    <a href="Database Design.html">Database</a>
+    <a href="API Endpoint Design.html">API</a>
+    <a href="Deployment.html">Deployment</a>
+  </div>
+</nav>
+
+<div class="hero">
+  <div class="badge">Architecture Update - June 2026</div>
+  <h1>Smart Response Engine</h1>
+  <p>
+    MemoLink now routes requests through a clearer orchestration layer instead of stacking prompt
+    fragments and hoping the model does the right thing. This page documents the current workflow,
+    the recent upgrades, and how context, research, persistence, and streaming fit together.
+  </p>
+  <div class="pill-row">
+    <span class="pill">Request Analysis</span>
+    <span class="pill">Context Engine</span>
+    <span class="pill">Unified Prompt</span>
+    <span class="pill">Long Academic Drafts</span>
+    <span class="pill">Typed SSE Events</span>
+    <span class="pill">Parallel Academic Search</span>
+    <span class="pill">Action Persistence</span>
+  </div>
+</div>
+
+<div class="container">
+
+  <section>
+    <div class="section-label">Purpose</div>
+    <h2>Why This Layer Exists</h2>
+    <p>
+      MemoLink serves very different user intents: casual chat, academic writing, email drafting,
+      note-grounded retrieval, workflow actions, and live web search. A single static prompt is not
+      a robust control surface for that range. The Smart Response Engine exists to make internal
+      decisions explicit: what mode the request belongs to, what context should be loaded, which
+      retrieval path to use, what output budget is appropriate, and what metadata should be saved
+      when the answer is finished.
+    </p>
+    <div class="highlight-box">
+      <p>
+        The current design goal is not “more prompt text.” It is <strong>better orchestration</strong>:
+        route correctly, gather the right evidence, generate with one coherent primary prompt, and
+        persist outcomes so the next turn is stronger.
+      </p>
+    </div>
+  </section>
+
+  <hr class="divider" />
+
+  <section>
+    <div class="section-label">Workflow Diagram</div>
+    <h2>End-to-End Request Flow</h2>
+
+    <div class="diagram">
+      <div class="lane">
+        <div class="lane-title">1. Input and Routing</div>
+        <div class="lane-steps">
+          <div class="step">User sends message or files</div>
+          <span class="arrow">&rarr;</span>
+          <div class="step">Conversation state loaded</div>
+          <span class="arrow">&rarr;</span>
+          <div class="step">Request analyser classifies intent</div>
+          <span class="arrow">&rarr;</span>
+          <div class="step">Mode selected<br/>general chat / academic writer / others</div>
+        </div>
+      </div>
+
+      <div class="lane">
+        <div class="lane-title">2. Context Preparation</div>
+        <div class="lane-steps">
+          <div class="step">Context engine builds primary prompt</div>
+          <span class="arrow">&rarr;</span>
+          <div class="step">Relevant notes injected</div>
+          <span class="arrow">&rarr;</span>
+          <div class="step">Optional web-search context added</div>
+          <span class="arrow">&rarr;</span>
+          <div class="step">Academic mode adds papers and source context</div>
+        </div>
+      </div>
+
+      <div class="lane">
+        <div class="lane-title">3. Generation Path</div>
+        <div class="lane-steps">
+          <div class="step">Standard chat stream</div>
+          <span class="arrow">&or;</span>
+          <div class="step">Long academic draft planner</div>
+          <span class="arrow">&or;</span>
+          <div class="step">File-upload synthesis path</div>
+          <span class="arrow">&rarr;</span>
+          <div class="step">Answer tokens and status events stream to UI</div>
+        </div>
+      </div>
+
+      <div class="lane">
+        <div class="lane-title">4. Post-Generation Review and Persistence</div>
+        <div class="lane-steps">
+          <div class="step">Optional answer quality pass</div>
+          <span class="arrow">&rarr;</span>
+          <div class="step">Confidence and routing metadata attached</div>
+          <span class="arrow">&rarr;</span>
+          <div class="step">Assistant message saved to conversation</div>
+          <span class="arrow">&rarr;</span>
+          <div class="step">Academic citations, notes, and actions persisted where applicable</div>
+        </div>
+      </div>
+
+      <div class="lane">
+        <div class="lane-title">5. UI Feedback Layer</div>
+        <div class="lane-steps">
+          <div class="step">Send button reflects active work</div>
+          <span class="arrow">&rarr;</span>
+          <div class="step">Translate / save-to-note buttons show local action loading</div>
+          <span class="arrow">&rarr;</span>
+          <div class="step">Workflow actions append chat messages back into the conversation</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <hr class="divider" />
+
+  <section>
+    <div class="section-label">What Changed</div>
+    <h2>Key Upgrades from the Last Two Sessions</h2>
+    <div class="card-grid card-grid-2">
+      <div class="card">
+        <h3>Unified Prompt Entry</h3>
+        <p>
+          After routing, MemoLink now builds one primary system prompt for the selected mode instead
+          of layering separate mode, date, and optimized-task prompts as competing instructions.
+        </p>
+        <div style="margin-top:.8rem;">
+          <span class="tag tag-route">Routing</span>
+          <span class="tag tag-guard">Prompt hygiene</span>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Context Engine Layer</h3>
+        <p>
+          Mode-specific context preparation now lives in a dedicated context-engine layer, so
+          academic paper retrieval and prompt assembly are not buried as inline special cases.
+        </p>
+        <div style="margin-top:.8rem;">
+          <span class="tag tag-route">Context engine</span>
+          <span class="tag tag-guard">Separation of concerns</span>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Long Academic Draft Path</h3>
+        <p>
+          Full-paper requests are detected and routed into a dedicated drafting workflow with
+          planning, broader retrieval, section-based generation, and a final academic quality pass.
+        </p>
+        <div style="margin-top:.8rem;">
+          <span class="tag tag-research">Academic writing</span>
+          <span class="tag tag-ui">Progress streaming</span>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Parallel Academic Search</h3>
+        <p>
+          Academic retrieval now queries Semantic Scholar or OpenAlex fallback, CORE, and arXiv in
+          parallel, then merges results in deterministic priority order. This cuts latency without
+          making the output order unstable.
+        </p>
+        <div style="margin-top:.8rem;">
+          <span class="tag tag-research">Semantic Scholar</span>
+          <span class="tag tag-research">CORE</span>
+          <span class="tag tag-research">arXiv</span>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Cited Paper Auto-Save</h3>
+        <p>
+          When a draft actually cites retrieved papers, MemoLink can save those papers as notes with
+          authors, year, DOI, abstract, and CORE full-text excerpt so future RAG retrieval is
+          grounded in both user notes and captured literature.
+        </p>
+        <div style="margin-top:.8rem;">
+          <span class="tag tag-persist">Note creation</span>
+          <span class="tag tag-persist">Embeddings</span>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Conversation-Aware Search and Email</h3>
+        <p>
+          Search-online retries now preserve the actual topic from recent turns, and email draft
+          generation can recover context from follow-up turns such as sending only an email address
+          after an earlier draft request.
+        </p>
+        <div style="margin-top:.8rem;">
+          <span class="tag tag-route">Conversation context</span>
+          <span class="tag tag-ui">Action continuity</span>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Connector Cleanup</h3>
+        <p>
+          Gmail transport concerns were split out into a dedicated connector so token refresh,
+          message fetch, send, and attachment download now live behind one adapter boundary.
+          The email service keeps orchestration responsibility for reminders, note creation,
+          digest updates, and chat-driven draft flows.
+        </p>
+        <div style="margin-top:.8rem;">
+          <span class="tag tag-route">Connector boundary</span>
+          <span class="tag tag-persist">Reminder persistence</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <hr class="divider" />
+
+  <section>
+    <div class="section-label">Academic Flow</div>
+    <h2>Academic Writing Path in Detail</h2>
+    <p>
+      The academic path is the most demanding branch because it must balance user notes, uploaded
+      requirements, external literature, structure constraints, and large output budgets. It is now
+      handled as a first-class workflow instead of a dressed-up normal chat call.
+    </p>
+    <table>
+      <thead>
+        <tr>
+          <th>Stage</th>
+          <th>What Happens</th>
+          <th>Why It Matters</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Analysis</td>
+          <td>Detect full paper / rubric / minimum word-count style requests.</td>
+          <td>Prevents large assignments from falling back to a shallow one-shot answer.</td>
+        </tr>
+        <tr>
+          <td>Context Pack</td>
+          <td>User notes, brief/rubric notes, uploaded file text, and academic paper context are assembled.</td>
+          <td>Keeps the draft tied to the real assessment and available evidence.</td>
+        </tr>
+        <tr>
+          <td>Literature Retrieval</td>
+          <td>Semantic Scholar, CORE, and arXiv feed the external paper pool; OpenAlex is used as fallback.</td>
+          <td>Provides real papers instead of generic filler references.</td>
+        </tr>
+        <tr>
+          <td>Drafting</td>
+          <td>The long-form pipeline plans sections, streams status updates, and drafts the paper body.</td>
+          <td>Improves completeness and makes large jobs feel active instead of frozen.</td>
+        </tr>
+        <tr>
+          <td>Quality Check</td>
+          <td>Academic answers can go through a mode-specific review pass before final storage.</td>
+          <td>Reduces under-length, weakly structured, or rubric-misaligned output.</td>
+        </tr>
+        <tr>
+          <td>Persistence</td>
+          <td>Cited papers are saved as notes when truly used; the final assistant draft is saved to the conversation.</td>
+          <td>Strengthens future retrieval and keeps the conversation auditable.</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <hr class="divider" />
+
+  <section>
+    <div class="section-label">Streaming and UI</div>
+    <h2>How the Frontend Now Reflects Agent Work</h2>
+    <div class="card-grid card-grid-3">
+      <div class="card">
+        <h3>Typed SSE Events</h3>
+        <p>
+          Message deltas, replacement updates, completion metadata, tool status, quizzes, note
+          events, and workflow events now share a typed contract instead of raw ad hoc payloads.
+        </p>
+      </div>
+      <div class="card">
+        <h3>Button-Level Loading</h3>
+        <p>
+          Loading indicators now sit on the action that caused them: send, translate, save-to-note,
+          and quiz-result save. This avoids duplicated chat-level spinners that made the UI noisy.
+        </p>
+      </div>
+      <div class="card">
+        <h3>Workflow Conversations</h3>
+        <p>
+          When a workflow action runs, the user confirmation and the assistant result can be saved
+          back into the conversation so action side effects remain visible in chat history.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <hr class="divider" />
+
+  <section>
+    <div class="section-label">Known Next Steps</div>
+    <h2>What Still Needs Further Refactoring</h2>
+    <ul class="list">
+      <li><strong>chat_service.py is still too large.</strong> Routing is cleaner now, but orchestration for long academic drafts, file-upload synthesis, and quality review should be extracted further.</li>
+      <li><strong>Context compression is not implemented yet.</strong> Hermes has a mature middle-turn compression model; MemoLink would benefit from a focused version later.</li>
+      <li><strong>Hybrid retrieval can improve again.</strong> The current note path is stronger than before, but a clearer BM25 + vector + graph weighting strategy would make retrieval more explainable.</li>
+      <li><strong>More architecture docs can be split out.</strong> Teams, email, workflow actions, and evaluation analytics each deserve their own deeper design page if the documentation set continues to grow.</li>
+    </ul>
+  </section>
+
+</div>
+
+<footer>MemoLink Smart Response Engine Documentation - 2026</footer>
+</body>
+</html>

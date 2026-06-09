@@ -16,13 +16,18 @@ MemoLink lets you capture notes and documents, then ask an AI questions grounded
 - Multi-turn conversations with persistent history
 - Save AI responses back as notes
 - Attach files directly in chat
+- Smart Response Engine - request analysis, mode routing, unified prompt building, and answer quality checks
 - Markdown + LaTeX rendering in the editor and chat
 - AI image generation via DALL-E 3 (`/image <prompt>` or natural language triggers) with fallback chain
-- Multi-model chat - choose between GPT-4o, GPT-4o Mini, GPT-4 Turbo, GPT-3.5 Turbo, Gemini 2.0 Flash, Gemini 2.0 Flash Lite, Gemini 1.5 Flash 8B, or Gemini 1.5 Pro
+- Multi-model chat - choose between GPT-4o, GPT-4o Mini, GPT-4 Turbo, GPT-3.5 Turbo, Gemini 2.5 Flash, Gemini 2.5 Flash Lite, Gemini 2.5 Pro, DeepSeek V3, DeepSeek R1, or DeepSeek Coder
 - Model attribution on every chat message and translation bubble
-- Translation quality loop with accuracy scoring (Gemini 2.0 Flash Lite + back-translation refinement)
-- Web search integration - toggle Brave Search context per message
-- Agent mode - agentic tool-use chat via `POST /api/chat/agent/stream`
+- Translation quality loop with accuracy scoring (Gemini 2.5 Flash Lite + back-translation refinement)
+- Web search integration - toggle Brave Search context per message, with conversation-aware retry queries
+- Automatic smart actions - regular chat now routes note, reminder, web-search, and other tool-worthy requests through an internal action agent when needed
+- Long-form academic draft pipeline with section planning, streamed progress, and external paper retrieval
+- Academic paper search across Semantic Scholar, CORE, arXiv, and OpenAlex fallback
+- Auto-save cited papers as notes for future grounded retrieval
+- Typed SSE stream events for messages, tools, quizzes, note actions, and workflow actions
 - Forgot password / reset password via signed JWT email link
 - Image insertion in the note editor (upload, drag-drop, clipboard paste)
 - Rich file format preservation for bulk upload (headings, bold, lists, tables, embedded images)
@@ -70,10 +75,11 @@ MemoLink/
 | ORM | SQLAlchemy 2.0 |
 | Database | PostgreSQL (Supabase) + pgvector |
 | AI - Chat | OpenAI GPT-4o-mini (default); GPT-4o, GPT-4 Turbo, GPT-3.5 Turbo also selectable |
-| AI - Multi-Model | Gemini 2.0 Flash, Gemini 2.0 Flash Lite, Gemini 1.5 Flash 8B, Gemini 1.5 Pro (via OpenAI-compatible endpoint) |
+| AI - Multi-Model | Gemini 2.5 Flash, Gemini 2.5 Flash Lite, Gemini 2.5 Pro, DeepSeek V3, DeepSeek R1, DeepSeek Coder |
 | AI - Image Generation | gpt-image-2 → gpt-image-1 → DALL-E 3 → DALL-E 2 → Pollinations.ai (fallback chain) |
 | AI - Embeddings | text-embedding-3-small (1 536 dims) |
-| AI - Translation | Gemini 2.0 Flash Lite with quality-loop refinement |
+| AI - Translation | Gemini 2.5 Flash Lite with quality-loop refinement |
+| AI - Academic Search | Semantic Scholar + CORE + arXiv + OpenAlex fallback |
 | Web Search | Brave Search API |
 | Password hashing | passlib bcrypt |
 | Email (SMTP) | Optional - feedback notifications + password reset |
@@ -97,19 +103,39 @@ Request → Controller (api/) → Service (business/) → Repository (domain/) �
 - Repositories contain all SQL/ORM queries.
 - DTOs (`contracts/`) are separate from ORM models.
 
+Recent refactors also introduced a clearer orchestration layer for LLM work:
+
+```
+User input
+    → Request analysis
+    → Mode routing
+    → Context engine preparation
+    → Unified primary prompt
+    → Generation / streaming
+    → Optional quality pass
+    → Persistence of messages, actions, and cited papers
+```
+
+This keeps prompt logic, retrieval logic, and persistence concerns more separated than the earlier stacked-prompt approach.
+
 ---
 
 ## RAG Pipeline
 
 ```
 User prompt
+    → Smart Response Engine analyses intent
+    → Context engine selects the right retrieval strategy
     → Embed via text-embedding-3-small
     → pgvector cosine similarity search (top-K notes, workspace-scoped)
     → Build context: system prompt + retrieved note chunks
     → [Optional] Brave Search web results injected as additional context
+    → [Academic mode] External paper context from Semantic Scholar / CORE / arXiv / OpenAlex
     → Selected model (GPT or Gemini) generates answer
     → Return answer + source citations
 ```
+
+For large academic requests, MemoLink switches to a dedicated long-form draft path that plans sections, streams status updates, and can save cited papers back into notes.
 
 ---
 
@@ -120,9 +146,10 @@ The Settings modal lets each user select their preferred chat model at any time:
 | Provider | Models |
 |---|---|
 | OpenAI | GPT-4o Mini (default), GPT-4o, GPT-4 Turbo, GPT-3.5 Turbo |
-| Google Gemini | Gemini 2.0 Flash, Gemini 2.0 Flash Lite, Gemini 1.5 Flash 8B, Gemini 1.5 Pro |
+| Google Gemini | Gemini 2.5 Flash, Gemini 2.5 Flash Lite, Gemini 2.5 Pro |
+| DeepSeek | DeepSeek V3, DeepSeek R1, DeepSeek Coder |
 
-Gemini models are accessed via an OpenAI-compatible endpoint using `GEMINI_API_KEY`. When Gemini hits a rate limit during chat, the system silently falls back to GPT and logs a warning - the user sees no error. Every chat message displays a "replied by [Model Name]" attribution badge.
+Gemini and DeepSeek models are accessed via OpenAI-compatible endpoints using `GEMINI_API_KEY` and `DEEPSEEK_API_KEY`. When a provider hits a rate limit or temporary failure, the system can fall back to another available model. Every chat message displays a "replied by [Model Name]" attribution badge.
 
 ---
 
@@ -172,7 +199,10 @@ python -m uvicorn memolink_backend.main:app --reload
 | Variable | Purpose |
 |---|---|
 | `GEMINI_API_KEY` | Enables Gemini model selection and translation quality loop |
+| `DEEPSEEK_API_KEY` | Enables DeepSeek model selection |
 | `BRAVE_SEARCH_API_KEY` | Enables per-message web search context |
+| `SEMANTIC_SCHOLAR_API_KEY` | Enables higher-quality academic paper metadata retrieval |
+| `CORE_API_KEY` | Enables CORE full-text academic paper retrieval |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM` | Enables forgot-password email delivery and feedback notifications |
 | `FRONTEND_URL` | Reset-password link base URL in emails |
 
@@ -202,7 +232,7 @@ npm run build
 The first registered user is automatically promoted to admin on startup. Admins access the **Admin Panel** - a full-screen overlay in the user menu - with three tabs:
 
 - **Feedback** - view, filter by type/status, and update bug reports and suggestions submitted by users
-- **Feature Flags** - toggle individual features on/off (web search, agent mode, model selection, image generation, translation, file upload) and set defaults (`default_model`, `default_language`)
+- **Feature Flags** - toggle individual features on/off (web search, model selection, image generation, translation, file upload, workflow actions, and more) and set defaults (`default_model`, `default_language`)
 - **Users** - list all users, promote or demote admin status
 
 JWT tokens include an `is_admin` claim. Admin-only endpoints use the `get_current_admin` dependency and return 403 if the caller is not an admin.
@@ -245,7 +275,7 @@ MemoLink requires PostgreSQL with the **pgvector** extension. Supabase provides 
 | Translation quality | Single LLM pass | Gemini quality loop with accuracy score |
 | File upload fidelity | Plain text extraction | Rich HTML: headings, bold, lists, tables, images |
 | Web search | Not available | Brave Search API per-message toggle |
-| Agent mode | Not available | Tool-use agentic stream endpoint |
+| Smart actions | Not available | Unified chat entry with internal action-agent routing and typed tool events |
 | Note editor images | Not available | Upload, drag-drop, clipboard paste |
 | Admin panel | Not available | Feature flags, user management, feedback triage |
 | Bug reporting | Not available | In-app form + DB storage + SMTP notification |
@@ -259,9 +289,12 @@ MemoLink requires PostgreSQL with the **pgvector** extension. Supabase provides 
 Open any of the standalone HTML files in a browser - no server needed:
 
 - [`Overview.html`](Overview.html) - Project overview and architecture
+- [`Smart Response Engine.html`](Smart%20Response%20Engine.html) - LLM orchestration workflow, routing, and academic/research pipeline
 - [`Requirements Analysis.html`](Requirements%20Analysis.html) - FR, NFR, use cases, user stories
 - [`Database Design.html`](Database%20Design.html) - ERD, table schemas, indexes
 - [`API Endpoint Design.html`](API%20Endpoint%20Design.html) - All endpoints with request/response schemas
+
+Recent documentation updates also cover the Gmail connector cleanup: token refresh, draft sending, attachment download, email-to-note, and email-to-reminder flows now run through a dedicated connector/service boundary instead of controller-owned Gmail logic.
 
 ---
 

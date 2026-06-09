@@ -9,7 +9,6 @@ router = APIRouter(prefix="/features", tags=["features"])
 
 DEFAULT_FLAGS: Dict[str, str] = {
     "web_search_enabled": "true",
-    "agent_mode_enabled": "true",
     "model_selection_enabled": "true",
     "image_generation_enabled": "true",
     "translation_enabled": "true",
@@ -25,7 +24,6 @@ DEFAULT_FLAGS: Dict[str, str] = {
     "default_model": "gpt-4o-mini",
     "default_language": "English",
     "web_search_min_level": "regular",
-    "agent_mode_min_level": "regular",
     "model_selection_min_level": "regular",
     "image_generation_min_level": "regular",
     "translation_min_level": "regular",
@@ -38,7 +36,7 @@ DEFAULT_FLAGS: Dict[str, str] = {
 }
 
 _LEVEL_GATED = [
-    "web_search", "agent_mode", "model_selection",
+    "web_search", "model_selection",
     "image_generation", "translation", "file_upload", "research_mode",
     "tts", "slash_commands", "custom_api_keys", "video_import",
 ]
@@ -49,7 +47,8 @@ def get_features(user: UserInfo = Depends(get_current_user_info), db: Session = 
     rows = db.execute(text("SELECT key, value FROM feature_flags")).fetchall()
     flags = dict(DEFAULT_FLAGS)
     for key, value in rows:
-        flags[key] = value
+        if key in DEFAULT_FLAGS:
+            flags[key] = value
 
     # Admins always get every feature regardless of level
     if not user.is_admin:

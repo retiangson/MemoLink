@@ -152,6 +152,7 @@
   <span class="nav-logo">&#x2B21; MemoLink</span>
   <div class="nav-links">
     <a href="Overview.html">Overview</a>
+    <a href="Smart Response Engine.html">Smart Engine</a>
     <a href="Requirements Analysis.html">Requirements</a>
     <a href="Database Design.html">Database</a>
     <a href="API Endpoint Design.html" class="active">API</a>
@@ -191,7 +192,6 @@
         <tr><td><span class="method m-post">POST</span></td><td><code>/chat</code></td><td>Submit a prompt - returns AI answer + citations (supports <code>model</code>, <code>web_search</code>)</td><td>Chat</td></tr>
         <tr><td><span class="method m-post">POST</span></td><td><code>/chat/stream</code></td><td>Streaming AI response via SSE - supports model selection, web search, image generation</td><td>Chat</td></tr>
         <tr><td><span class="method m-post">POST</span></td><td><code>/chat/upload</code></td><td>Upload files + prompt in one request</td><td>Chat</td></tr>
-        <tr><td><span class="method m-post">POST</span></td><td><code>/chat/agent/stream</code></td><td>Agentic chat with tool-call SSE events</td><td>Chat</td></tr>
         <tr><td><span class="method m-post">POST</span></td><td><code>/suggest</code></td><td>Generate AI reminder suggestions from notes</td><td>Suggest</td></tr>
         <tr><td><span class="method m-get">GET</span></td><td><code>/reminders</code></td><td>List reminders for a user</td><td>Reminders</td></tr>
         <tr><td><span class="method m-post">POST</span></td><td><code>/reminders</code></td><td>Create a manual reminder</td><td>Reminders</td></tr>
@@ -743,6 +743,7 @@
             Same RAG pipeline as <code>/chat</code> but returns <code>Content-Type: text/event-stream</code>.
             The selected model is called with <code>stream=True</code>. Each token is forwarded immediately.
             Supports optional web search context injection (<code>web_search: true</code>) and multi-model selection via the <code>model</code> field.
+            When a turn needs tool use, this same endpoint now emits typed tool events before the final answer; there is no separate public agent-mode endpoint anymore.
             When an image-generation intent is detected, yields "Generating your image..." first, then the base64 image tag.
             nginx must have <code>proxy_buffering off</code> and <code>X-Accel-Buffering: no</code> - both are set in <code>nginx.conf</code>.
             The frontend displays a blinking cursor while streaming; the cursor disappears when <code>done</code> is received.
@@ -807,47 +808,6 @@
   ],
   <span class="json-key">"message_id"</span>: <span class="json-num">104</span>
 }</pre>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- AGENT STREAM -->
-      <div class="ep-card open" id="ep-chat-agent">
-        <div class="ep-header" onclick="toggle('ep-chat-agent')">
-          <span class="method m-post">POST</span>
-          <span class="ep-path">/api/v1/chat/agent/stream</span>
-          <span class="ep-summary">Agentic chat with tool-call SSE events</span>
-          <span class="ep-toggle">&#x25BC;</span>
-        </div>
-        <div class="ep-body">
-          <p class="ep-desc">
-            Agentic variant of the streaming chat endpoint. Bypasses the standard RAG pipeline and uses tool-use capabilities. The SSE stream emits three event types in sequence:
-            (1) <code>{"tool_call": "&lt;name&gt;", "label": "&lt;display text&gt;"}</code> - rendered as status chips while a tool is executing;
-            (2) <code>{"tool_result": "&lt;result&gt;", "ok": true}</code> - signals tool completion;
-            (3) regular <code>{"t": "&lt;token&gt;"}</code> events for the final answer.
-            The frontend "Agent" toggle switches <code>streamChat()</code> to <code>streamAgentChat()</code> which targets this endpoint.
-          </p>
-          <div class="schema-row">
-            <div class="schema-box">
-              <div class="schema-box-title">Request Body - AgentChatDTO</div>
-              <pre>{
-  <span class="json-key">"conversation_id"</span>: <span class="json-num">7</span>,
-  <span class="json-key">"prompt"</span>:          <span class="json-str">"Search and summarise the latest on RAG."</span>,
-  <span class="json-key">"workspace_id"</span>:   <span class="json-num">1</span>,
-  <span class="json-key">"model"</span>:           <span class="json-str">"gpt-4o-mini"</span>
-}</pre>
-            </div>
-            <div class="schema-box">
-              <div class="schema-box-title">SSE Event Stream</div>
-              <pre><span class="json-type">Content-Type: text/event-stream</span>
-
-<span class="json-str">data: {"tool_call":"web_search","label":"Searching the web..."}</span>
-<span class="json-str">data: {"tool_result":"...","ok":true}</span>
-<span class="json-str">data: {"t":"Here"}</span>
-<span class="json-str">data: {"t":" is"}</span>
-<span class="json-type">... token events ...</span>
-<span class="json-str">data: {"done":true,"id":110,"model":"gpt-4o-mini"}</span></pre>
             </div>
           </div>
         </div>
@@ -1783,7 +1743,6 @@
               <div class="schema-box-title">Response 200 - FeatureFlagsResponse</div>
               <pre>{
   <span class="json-key">"web_search_enabled"</span>:         <span class="json-str">"true"</span>,
-  <span class="json-key">"agent_mode_enabled"</span>:         <span class="json-str">"true"</span>,
   <span class="json-key">"model_selection_enabled"</span>:    <span class="json-str">"true"</span>,
   <span class="json-key">"image_generation_enabled"</span>:   <span class="json-str">"true"</span>,
   <span class="json-key">"translation_enabled"</span>:        <span class="json-str">"true"</span>,
@@ -1792,7 +1751,6 @@
   <span class="json-key">"default_model"</span>:              <span class="json-str">"gpt-4o-mini"</span>,
   <span class="json-key">"default_language"</span>:           <span class="json-str">"English"</span>,
   <span class="json-key">"web_search_min_level"</span>:        <span class="json-str">"regular"</span>,
-  <span class="json-key">"agent_mode_min_level"</span>:        <span class="json-str">"regular"</span>,
   <span class="json-key">"model_selection_min_level"</span>:   <span class="json-str">"regular"</span>,
   <span class="json-key">"image_generation_min_level"</span>:  <span class="json-str">"regular"</span>,
   <span class="json-key">"translation_min_level"</span>:       <span class="json-str">"regular"</span>,

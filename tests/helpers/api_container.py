@@ -6,6 +6,7 @@ from memolink_backend.business.services.system_log_service import SystemLogServi
 from memolink_backend.business.services.embedding_service import EmbeddingService
 from memolink_backend.domain.repositories.conversation_repository import ConversationRepository
 from memolink_backend.domain.repositories.note_repository import NoteRepository
+from memolink_backend.domain.repositories.reminder_repository import ReminderRepository
 from memolink_backend.domain.repositories.system_log_repository import SystemLogRepository
 from memolink_backend.domain.repositories.user_repository import UserRepository
 
@@ -37,6 +38,7 @@ class ApiRequestContainer:
             db=self._db,
             conv_repo=ConversationRepository(self._db),
             note_repo=NoteRepository(self._db),
+            reminder_repo=ReminderRepository(self._db),
             embedding_service=EmbeddingService(),
         )
 

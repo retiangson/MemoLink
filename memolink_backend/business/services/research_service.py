@@ -181,7 +181,13 @@ class ResearchService:
         note_titles = [b.split("\n")[0].lstrip("[NOTE ").split(":")[1].rstrip("]").strip()
                        for b in note_blocks if "\n" in b]
         acad_query = _academic_query(prompt, note_titles)
-        papers = search_papers(acad_query, limit=5, api_key=settings.semantic_scholar_api_key)
+        papers = search_papers(
+            acad_query,
+            limit=5,
+            api_key=settings.semantic_scholar_api_key,
+            core_api_key=settings.core_api_key,
+            include_arxiv=True,
+        )
         paper_context = format_papers_context(papers)
         yield self._step_done()
 

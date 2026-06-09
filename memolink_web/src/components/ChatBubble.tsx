@@ -149,11 +149,11 @@ interface Props {
   content: string;
   model?: string;
   streaming?: boolean;
-  onAdd?: (text: string) => void;
+  onAdd?: (text: string) => Promise<void> | void;
   onDelete?: () => void;
   onApplyEdit?: (content: string, noteId: number | null) => void;
   onOpenNote?: (noteId: number) => void;
-  onSaveNote?: (title: string, content: string) => void;
+  onSaveNote?: (title: string, content: string) => Promise<void> | void;
   hasOpenNote?: boolean;
   translationEnabled?: boolean;
   modelAttributionEnabled?: boolean;
@@ -197,29 +197,6 @@ function parseNoteEdit(content: string): {
   };
 }
 
-function ImageGeneratingSpinner() {
-  return (
-    <div className="flex flex-col items-center gap-3 py-4 px-6">
-      <div className="relative w-14 h-14">
-        {/* Outer spinning ring */}
-        <div className="absolute inset-0 rounded-full border-4 border-indigo-500/20 border-t-indigo-400 animate-spin" />
-        {/* Inner pulsing ring */}
-        <div className="absolute inset-[6px] rounded-full border-2 border-purple-500/30 border-t-purple-400 animate-[spin_1.5s_linear_infinite_reverse]" />
-        {/* Center icon */}
-        <div className="absolute inset-0 flex items-center justify-center">
-          <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-indigo-300 animate-pulse" fill="currentColor" viewBox="0 0 16 16">
-            <path d="M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0M4.5 7.5a.5.5 0 0 0 0 1h5.793l-2.147 2.146a.5.5 0 0 0 .708.708l3-3a.5.5 0 0 0 0-.708l-3-3a.5.5 0 1 0-.708.708L10.293 7.5z"/>
-          </svg>
-        </div>
-      </div>
-      <div className="flex flex-col items-center gap-1">
-        <span className="text-sm font-medium text-indigo-300 animate-pulse">Generating image…</span>
-        <span className="text-xs text-gray-500">This may take a few seconds</span>
-      </div>
-    </div>
-  );
-}
-
 export default function ChatBubble({ role, content, model, streaming, onAdd, onDelete, onApplyEdit, onOpenNote, onSaveNote, hasOpenNote, translationEnabled = true, modelAttributionEnabled = true, confidence, confidenceReason, confidenceEnabled = true, routingReason, autopilotEnabled = true, workflowContext, workflowActions, onWorkflowActionDone, onWorkflowConversationMessages, messageId, evaluationActive, evalRating, onRetry, suggestWebSearch, onSearchOnline }: Props) {
   const isUser = role === "user";
   const [copied, setCopied] = useState(false);
@@ -232,6 +209,8 @@ export default function ChatBubble({ role, content, model, streaming, onAdd, onD
   const [translationCached, setTranslationCached] = useState(false);
   const [editApplied, setEditApplied] = useState(false);
   const [editPreviewOpen, setEditPreviewOpen] = useState(false);
+  const [isSavingNote, setIsSavingNote] = useState(false);
+  const [noteSaved, setNoteSaved] = useState(false);
 
   const isImageGenerating = content === "__IMAGE_GENERATING__";
   const isImprovingNote = content.startsWith("__IMPROVING_NOTE__:");
@@ -288,6 +267,19 @@ export default function ChatBubble({ role, content, model, streaming, onAdd, onD
     setEditApplied(true);
   }
 
+  async function handleSaveToNotes() {
+    if (!onAdd || isSavingNote) return;
+    setIsSavingNote(true);
+    setNoteSaved(false);
+    try {
+      await onAdd(translation ?? content);
+      setNoteSaved(true);
+      setTimeout(() => setNoteSaved(false), 1500);
+    } finally {
+      setIsSavingNote(false);
+    }
+  }
+
   const translateButton = (
     <div className="relative group">
       {showLangPicker && (
@@ -311,7 +303,8 @@ export default function ChatBubble({ role, content, model, streaming, onAdd, onD
       </span>
       <button
         onClick={() => setShowLangPicker((v) => !v)}
-        className="flex items-center justify-center w-7 h-7 rounded-md hover:text-indigo-300 hover:bg-white/10"
+        disabled={isTranslating}
+        className="flex items-center justify-center w-7 h-7 rounded-md hover:text-indigo-300 hover:bg-white/10 disabled:opacity-80 disabled:cursor-wait"
       >
         {isTranslating ? (
           <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -346,25 +339,17 @@ export default function ChatBubble({ role, content, model, streaming, onAdd, onD
         ) : isQuiz && quizData ? (
           <QuizRenderer quiz={quizData} onSaveNote={onSaveNote} />
         ) : isCmdRunning ? (
-          <div className="flex items-center gap-3 py-1">
-            <div className="relative w-5 h-5 shrink-0">
-              <div className="absolute inset-0 rounded-full border-[2.5px] border-indigo-500/20 border-t-indigo-400 animate-spin" />
-              <div className="absolute inset-[3px] rounded-full border border-purple-500/20 border-t-purple-400 animate-[spin_1.4s_linear_infinite_reverse]" />
-            </div>
+          <div className="py-1">
             <MarkdownRenderer>{cmdRunningMsg}</MarkdownRenderer>
           </div>
         ) : isImprovingNote ? (
-          <div className="flex items-center gap-3 py-1">
-            <div className="relative w-6 h-6 shrink-0">
-              <div className="absolute inset-0 rounded-full border-[2.5px] border-indigo-500/20 border-t-indigo-400 animate-spin" />
-              <div className="absolute inset-[3px] rounded-full border-2 border-purple-500/20 border-t-purple-400 animate-[spin_1.4s_linear_infinite_reverse]" />
-            </div>
-            <span className="text-sm text-indigo-300/80 animate-pulse">
-              Improving <span className="font-medium text-indigo-300">{improvingNoteTitle}</span>…
-            </span>
+          <div className="py-1 text-sm text-indigo-300/80">
+            Improving <span className="font-medium text-indigo-300">{improvingNoteTitle}</span>…
           </div>
         ) : isImageGenerating ? (
-          <ImageGeneratingSpinner />
+          <div className="py-1 text-sm text-indigo-300/80">
+            Generating image…
+          </div>
         ) : (
           <>
             {pre && (
@@ -458,18 +443,6 @@ export default function ChatBubble({ role, content, model, streaming, onAdd, onD
         {post && <div className="mt-3"><ContentWithNoteLinks content={post} onOpenNote={onOpenNote} /></div>}
       </div>
 
-      {/* Loading bubble - shown while waiting for first translation */}
-      {isTranslating && !translation && (
-        <div className={`max-w-full sm:max-w-[740px] px-5 py-4 rounded-2xl backdrop-blur-sm shadow-sm flex items-center gap-3
-          ${isUser ? "bg-[#2F2F3F]/80 text-gray-400" : "text-gray-400"}`}>
-          <svg className="w-4 h-4 animate-spin shrink-0 text-indigo-400" fill="none" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
-          </svg>
-          <span className="text-sm text-indigo-400/80">Translating to {translatedTo}…</span>
-        </div>
-      )}
-
       {/* Translation bubble */}
       {translation && (
         <div
@@ -546,13 +519,28 @@ export default function ChatBubble({ role, content, model, streaming, onAdd, onD
           </div>
           {onAdd && (
             <div className="relative group">
-              <button onClick={() => onAdd(translation ?? content)} className="flex items-center justify-center w-7 h-7 rounded-md hover:text-indigo-300 hover:bg-white/10">
-                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M17 3H7a2 2 0 00-2 2v16l7-3 7 3V5a2 2 0 00-2-2z" />
-                </svg>
+              <button
+                onClick={() => { void handleSaveToNotes(); }}
+                disabled={isSavingNote}
+                className="flex items-center justify-center w-7 h-7 rounded-md hover:text-indigo-300 hover:bg-white/10 disabled:opacity-80 disabled:cursor-wait"
+              >
+                {isSavingNote ? (
+                  <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                  </svg>
+                ) : noteSaved ? (
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                ) : (
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M17 3H7a2 2 0 00-2 2v16l7-3 7 3V5a2 2 0 00-2-2z" />
+                  </svg>
+                )}
               </button>
               <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-1.5 py-0.5 text-[10px] text-white bg-[#1e1e2a] border border-[#2a2a38] rounded whitespace-nowrap hidden group-hover:block pointer-events-none z-50">
-                Save to notes
+                {isSavingNote ? "Saving to notes..." : noteSaved ? "Saved to notes" : "Save to notes"}
               </span>
             </div>
           )}

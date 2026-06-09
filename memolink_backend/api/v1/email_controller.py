@@ -1,4 +1,3 @@
-import base64
 import hashlib
 import hmac
 import json
@@ -14,8 +13,6 @@ from fastapi.responses import RedirectResponse, Response
 
 from memolink_backend.core.config import settings
 from memolink_backend.core.security import get_current_user, verify_token
-from memolink_backend.contracts.note_dtos import NoteCreateDTO
-from memolink_backend.domain.models.reminder import Reminder
 from memolink_backend.di.request_container import RequestContainer, get_request_container
 
 router = APIRouter(prefix="/email", tags=["email"])
@@ -211,17 +208,10 @@ def email_to_note(
     user_id: int = Depends(get_current_user),
     c: RequestContainer = Depends(get_request_container),
 ):
-    note_data = c.email().build_note_content(user_id, email_id)
-    if not note_data:
+    note_result = c.email().create_note_from_email(user_id, email_id)
+    if not note_result:
         raise HTTPException(status_code=404, detail="Email not found")
-    dto = NoteCreateDTO(
-        user_id=user_id,
-        title=note_data["title"],
-        content=note_data["content"],
-        source="email",
-    )
-    note = c.notes().create_note(dto)
-    return {"note_id": note.id, "title": note.title}
+    return note_result
 
 
 @router.post("/emails/{email_id}/send-reply")
@@ -258,28 +248,10 @@ def email_to_reminder(
     user_id: int = Depends(get_current_user),
     c: RequestContainer = Depends(get_request_container),
 ):
-    data = c.email().extract_reminder(user_id, email_id)
-    if not data:
+    reminder_result = c.email().create_reminder_from_email(user_id, email_id)
+    if not reminder_result:
         raise HTTPException(status_code=404, detail="Email not found")
-    db = c.domain.get_db()
-    reminder = Reminder(
-        user_id=user_id,
-        text=data["text"],
-        description=data.get("description"),
-        type="ai",
-        done=False,
-        due_date=data.get("due_date"),
-        due_time=data.get("due_time"),
-    )
-    db.add(reminder)
-    db.commit()
-    db.refresh(reminder)
-    return {
-        "reminder_id": reminder.id,
-        "text": reminder.text,
-        "due_date": reminder.due_date,
-        "due_time": reminder.due_time,
-    }
+    return reminder_result
 
 
 @router.post("/send-draft")
@@ -289,9 +261,6 @@ async def send_draft(
     c: RequestContainer = Depends(get_request_container),
 ):
     """Send a confirmed email draft via Gmail. Called only after explicit user approval."""
-    from email.mime.text import MIMEText
-    import base64 as _b64
-
     to = payload.get("to", "")
     subject = payload.get("subject", "")
     body = payload.get("body", "")
@@ -300,68 +269,20 @@ async def send_draft(
 
     if not to or not body:
         raise HTTPException(status_code=400, detail="to and body are required")
-
-    account_repo = c.domain.get_email_account_repository()
-    tokens = account_repo.get_decrypted_tokens(user_id)
-    if not tokens:
-        raise HTTPException(status_code=403, detail="Gmail not connected")
-
-    access_token = tokens.get("access_token", "")
-    expiry = tokens.get("token_expiry")
-    if expiry and datetime.now(tz=timezone.utc) >= expiry:
-        async with httpx.AsyncClient() as client:
-            ref = await client.post(GOOGLE_TOKEN_URL, data={
-                "client_id": settings.google_client_id,
-                "client_secret": settings.google_client_secret,
-                "refresh_token": tokens.get("refresh_token", ""),
-                "grant_type": "refresh_token",
-            })
-        if ref.status_code == 200:
-            access_token = ref.json().get("access_token", access_token)
-
-    from email.mime.multipart import MIMEMultipart
-    import re as _re
-
-    _is_html = bool(_re.search(r"<(p|br|ul|ol|li|h[1-6]|strong|em|div)\b", body, _re.I))
-
-    if _is_html:
-        # Strip tags to produce a plain-text fallback
-        _plain = _re.sub(r"<br\s*/?>|</p>|</li>|</h[1-6]>", "\n", body, flags=_re.I)
-        _plain = _re.sub(r"<[^>]+>", "", _plain)
-        import html as _html_mod
-        _plain = _html_mod.unescape(_plain)
-        _plain = _re.sub(r"\n{3,}", "\n\n", _plain).strip()
-
-        msg = MIMEMultipart("alternative")
-        msg["To"] = to
-        msg["Subject"] = subject
-        msg.attach(MIMEText(_plain, "plain", "utf-8"))
-        msg.attach(MIMEText(body, "html", "utf-8"))
-    else:
-        msg = MIMEText(body, "plain", "utf-8")
-        msg["To"] = to
-        msg["Subject"] = subject
-
-    if message_id:
-        msg["In-Reply-To"] = message_id
-        msg["References"] = message_id
-
-    raw = _b64.urlsafe_b64encode(msg.as_bytes()).decode()
-    gmail_payload: dict = {"raw": raw}
-    if thread_id:
-        gmail_payload["threadId"] = thread_id
-
-    async with httpx.AsyncClient() as client:
-        resp = await client.post(
-            "https://www.googleapis.com/gmail/v1/users/me/messages/send",
-            headers={"Authorization": f"Bearer {access_token}"},
-            json=gmail_payload,
+    try:
+        sent = await c.email().send_draft(
+            user_id,
+            to=to,
+            subject=subject,
+            body=body,
+            thread_id=thread_id,
+            message_id=message_id,
         )
-
-    if resp.status_code not in (200, 201):
-        raise HTTPException(status_code=502, detail=f"Gmail send failed: {resp.text[:200]}")
-
-    return {"ok": True, "gmail_message_id": resp.json().get("id")}
+    except ValueError as exc:
+        detail = str(exc)
+        status_code = 403 if "connected" in detail.lower() else 502
+        raise HTTPException(status_code=status_code, detail=detail)
+    return {"ok": True, "gmail_message_id": sent.get("id")}
 
 
 @router.get("/attachment/{gmail_message_id}/{attachment_id}")
@@ -383,42 +304,12 @@ async def download_attachment(
     else:
         raise HTTPException(status_code=401, detail="Not authenticated")
 
-    account_repo = c.domain.get_email_account_repository()
-    tokens = account_repo.get_decrypted_tokens(resolved_uid)
-    if not tokens:
-        raise HTTPException(status_code=403, detail="Gmail not connected")
-
-    access_token = tokens.get("access_token", "")
-    expiry = tokens.get("token_expiry")
-
-    # Refresh token if expired
-    if expiry and datetime.now(tz=timezone.utc) >= expiry:
-        async with httpx.AsyncClient() as client:
-            ref = await client.post("https://oauth2.googleapis.com/token", data={
-                "client_id": settings.google_client_id,
-                "client_secret": settings.google_client_secret,
-                "refresh_token": tokens.get("refresh_token", ""),
-                "grant_type": "refresh_token",
-            })
-        if ref.status_code == 200:
-            access_token = ref.json().get("access_token", access_token)
-
-    headers = {"Authorization": f"Bearer {access_token}"}
-
-    async with httpx.AsyncClient() as client:
-        resp = await client.get(
-            f"https://www.googleapis.com/gmail/v1/users/me/messages/{gmail_message_id}/attachments/{attachment_id}",
-            headers=headers,
-        )
-
-    if resp.status_code != 200:
-        raise HTTPException(
-            status_code=502,
-            detail=f"Gmail API returned {resp.status_code}: {resp.text[:200]}"
-        )
-
-    data = resp.json().get("data", "")
-    file_bytes = base64.urlsafe_b64decode(data + "==")
+    try:
+        file_bytes = await c.email().download_attachment(resolved_uid, gmail_message_id, attachment_id)
+    except ValueError as exc:
+        detail = str(exc)
+        status_code = 403 if "connected" in detail.lower() else 502
+        raise HTTPException(status_code=status_code, detail=detail)
 
     # Guess content type from filename extension
     import mimetypes

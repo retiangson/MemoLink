@@ -2,7 +2,7 @@ from typing import List, Iterator, Optional
 from fastapi import UploadFile
 from sqlalchemy.orm import Session
 from openai import OpenAI, RateLimitError, APIStatusError
-from datetime import date
+from datetime import date, timedelta
 import json
 import logging
 import re
@@ -31,13 +31,21 @@ def _strip_base64_images(text: str) -> str:
     return text
 from memolink_backend.domain.repositories.conversation_repository import ConversationRepository
 from memolink_backend.domain.repositories.note_repository import NoteRepository
+from memolink_backend.domain.repositories.reminder_repository import ReminderRepository
 from memolink_backend.domain.interfaces.i_conversation_repository import IConversationRepository
 from memolink_backend.domain.interfaces.i_note_repository import INoteRepository
 from memolink_backend.business.services.embedding_service import EmbeddingService
 from memolink_backend.business.interfaces.i_chat_service import IChatService
+from memolink_backend.business.services.action_agent import ActionAgentRunner, decide_action_agent
 from memolink_backend.utils.file_extractor import extract_text_local
 from memolink_backend.utils.web_search import brave_search
-from memolink_backend.utils.academic_search import search_papers, format_papers_context
+from memolink_backend.utils.academic_search import (
+    extract_cited_papers,
+    format_paper_as_note,
+    format_papers_context,
+    paper_title_key,
+    search_papers,
+)
 from memolink_backend.contracts.chat_dtos import ChatResponseDTO, ChatAnswerSource, ChatRequestDTO, ChatAttachmentDTO
 from memolink_backend.contracts.chat_stream_dtos import (
     ImageGeneratingEvent,
@@ -166,6 +174,29 @@ _GENERIC_WEB_SEARCH_STOPWORDS = {
 _WEB_SEARCH_FRESHNESS_CUES = (
     "latest", "recent", "current", "today", "now", "news", "real time", "realtime", "live",
 )
+_DIRECT_REMINDER_RE = re.compile(
+    r"\b(?:create|set|add)\s+(?:me\s+)?(?:an?\s+)?reminder\b|\bremind me\b",
+    re.IGNORECASE,
+)
+_DIRECT_REMINDER_PREFIX_RE = re.compile(
+    r"^\s*(?:can|could|would|will)\s+you\s+|^\s*please\s+",
+    re.IGNORECASE,
+)
+_DIRECT_REMINDER_LEAD_RE = re.compile(
+    r"^\s*(?:create|set|add)\s+(?:me\s+)?(?:an?\s+)?reminder(?:\s+for\s+me)?(?:\s+to)?[\s,:-]*",
+    re.IGNORECASE,
+)
+_REMIND_ME_LEAD_RE = re.compile(
+    r"^\s*remind\s+me(?:\s+to)?[\s,:-]*",
+    re.IGNORECASE,
+)
+_ISO_DATE_RE = re.compile(r"\b(\d{4}-\d{2}-\d{2})\b")
+_TIME_12H_RE = re.compile(r"\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b", re.IGNORECASE)
+_TIME_24H_RE = re.compile(r"\b([01]?\d|2[0-3]):([0-5]\d)\b")
+_RELATIVE_DATE_MARKERS = {
+    "today": lambda today: today,
+    "tomorrow": lambda today: today + timedelta(days=1),
+}
 
 
 def _is_generic_web_search_request(text: str) -> bool:
@@ -210,6 +241,96 @@ def _derive_web_search_query(user_text: str, message_history: list[dict]) -> str
         return query[:200]
 
     return current[:200]
+
+
+def _is_direct_reminder_request(text: str) -> bool:
+    return bool(_DIRECT_REMINDER_RE.search(text or ""))
+
+
+def _normalize_reminder_time(text: str) -> str | None:
+    if not text:
+        return None
+
+    match_12h = _TIME_12H_RE.search(text)
+    if match_12h:
+        hour = int(match_12h.group(1))
+        minute = int(match_12h.group(2) or "00")
+        meridiem = match_12h.group(3).lower()
+        if meridiem == "pm" and hour != 12:
+            hour += 12
+        if meridiem == "am" and hour == 12:
+            hour = 0
+        return f"{hour:02d}:{minute:02d}"
+
+    match_24h = _TIME_24H_RE.search(text)
+    if match_24h:
+        return f"{int(match_24h.group(1)):02d}:{int(match_24h.group(2)):02d}"
+
+    return None
+
+
+def _normalize_reminder_date(text: str, *, today: date) -> str | None:
+    if not text:
+        return None
+
+    iso_match = _ISO_DATE_RE.search(text)
+    if iso_match:
+        return iso_match.group(1)
+
+    lower = text.lower()
+    for marker, resolver in _RELATIVE_DATE_MARKERS.items():
+        if re.search(rf"\b{marker}\b", lower):
+            return resolver(today).isoformat()
+    return None
+
+
+def _clean_reminder_title(text: str) -> str:
+    title = text.strip()
+    title = _DIRECT_REMINDER_PREFIX_RE.sub("", title)
+    title = _DIRECT_REMINDER_LEAD_RE.sub("", title)
+    title = _REMIND_ME_LEAD_RE.sub("", title)
+    title = re.sub(r"\b(?:for|on)\s+\d{4}-\d{2}-\d{2}\b", " ", title, flags=re.IGNORECASE)
+    title = re.sub(r"\b(?:today|tomorrow)\b", " ", title, flags=re.IGNORECASE)
+    title = re.sub(r"\bat\s+(?:[01]?\d|2[0-3]):[0-5]\d\b", " ", title, flags=re.IGNORECASE)
+    title = re.sub(r"\bat\s+\d{1,2}(?::\d{2})?\s*(?:am|pm)\b", " ", title, flags=re.IGNORECASE)
+    title = re.sub(_ISO_DATE_RE, " ", title)
+    title = re.sub(_TIME_24H_RE, " ", title)
+    title = re.sub(_TIME_12H_RE, " ", title)
+    title = re.sub(r"\b(?:i have|i need|there is|there's|to)\b", " ", title, flags=re.IGNORECASE)
+    title = re.sub(r"[.,!?]+$", "", title).strip(" ,:-")
+    title = re.sub(r"\s{2,}", " ", title).strip()
+    if not title:
+        return ""
+    return title[0].upper() + title[1:]
+
+
+def _extract_direct_reminder_request(text: str, *, today: date) -> dict | None:
+    if not _is_direct_reminder_request(text):
+        return None
+
+    due_date = _normalize_reminder_date(text, today=today)
+    due_time = _normalize_reminder_time(text)
+    title = _clean_reminder_title(text)
+    if not title:
+        return None
+
+    description = title if title.lower() != text.strip().lower() else None
+    return {
+        "text": title,
+        "description": description,
+        "due_date": due_date,
+        "due_time": due_time,
+    }
+
+
+def _format_direct_reminder_confirmation(title: str, due_date: str | None, due_time: str | None) -> str:
+    due_parts = []
+    if due_date:
+        due_parts.append(f"for {due_date}")
+    if due_time:
+        due_parts.append(f"at {due_time}")
+    due_text = f" {' '.join(due_parts)}" if due_parts else ""
+    return f"Successfully added the reminder **{title}**{due_text}."
 
 
 def _parse_confidence(text: str) -> tuple[str, str | None, str | None]:
@@ -495,6 +616,8 @@ class ChatService(IChatService):
         embedding_service: Optional[EmbeddingService] = None,
         conv_repo: Optional[IConversationRepository] = None,
         note_repo: Optional[INoteRepository] = None,
+        reminder_repo=None,
+        action_agent=None,
         log_service=None,
         user_api_key_repo=None,
         graph_repo=None,
@@ -510,6 +633,20 @@ class ChatService(IChatService):
                 raise ValueError("Either repos or db must be provided.")
             self.repo_conv = ConversationRepository(db)
             self.repo_notes = NoteRepository(db)
+        if reminder_repo is not None:
+            self._reminders = reminder_repo
+        else:
+            self._reminders = ReminderRepository(db) if db is not None else None
+        self._action_agent = action_agent or (
+            ActionAgentRunner(
+                conv_repo=self.repo_conv,
+                note_repo=self.repo_notes,
+                reminder_repo=self._reminders,
+                embedding_service=embedding_service,
+            )
+            if self._reminders is not None
+            else None
+        )
 
         self.embedding = embedding_service or EmbeddingService()
         self._log = log_service
@@ -534,6 +671,53 @@ class ChatService(IChatService):
             return self._user_api_key_repo.get_all_decrypted(user_id)
         except Exception:
             return {}
+
+    def _maybe_create_direct_reminder(
+        self,
+        *,
+        dto: ChatRequestDTO,
+        conversation_id: int,
+        user_text: str,
+    ) -> ChatResponseDTO | None:
+        if self._reminders is None:
+            return None
+
+        reminder_payload = _extract_direct_reminder_request(user_text, today=date.today())
+        if reminder_payload is None:
+            return None
+
+        reminder = self._reminders.create_reminder(
+            user_id=dto.user_id,
+            text=reminder_payload["text"],
+            workspace_id=getattr(dto, "workspace_id", None),
+            description=reminder_payload["description"],
+            reminder_type="ai",
+            due_date=reminder_payload["due_date"],
+            due_time=reminder_payload["due_time"],
+        )
+        response = _format_direct_reminder_confirmation(
+            reminder.text,
+            reminder.due_date,
+            reminder.due_time,
+        )
+        assistant_msg = self.repo_conv.add_message(
+            conversation_id,
+            "assistant",
+            response,
+            model="memolink",
+        )
+        return ChatResponseDTO(
+            answer=response,
+            sources=[],
+            message_id=assistant_msg.id,
+            routing_reason="Direct: reminder_create",
+        )
+
+    def _should_use_action_agent(self, user_text: str, smart_analysis: dict | None) -> str | None:
+        if self._action_agent is None:
+            return None
+        decision = decide_action_agent(user_text, smart_analysis)
+        return decision.reason if decision.should_handle else None
 
     def _run_completion_chain(
         self,
@@ -777,7 +961,13 @@ class ChatService(IChatService):
         seen_titles: set[str] = set()
         for query in paper_queries[:2]:
             try:
-                batch = search_papers(query[:150], limit=6, api_key=settings.semantic_scholar_api_key)
+                batch = search_papers(
+                    query[:150],
+                    limit=6,
+                    api_key=settings.semantic_scholar_api_key,
+                    core_api_key=settings.core_api_key,
+                    include_arxiv=True,
+                )
                 for paper in batch:
                     key = (paper.get("title") or "").lower()[:80]
                     if key and key not in seen_titles:
@@ -863,7 +1053,8 @@ class ChatService(IChatService):
             model=used_model,
             note_context=combined_context,
         )
-        yield {"type": "result", "content": improved or draft, "model": used_model}
+        final_draft = improved or draft
+        yield {"type": "result", "content": final_draft, "model": used_model, "papers": papers}
 
     def _generate_long_academic_draft(
         self,
@@ -876,6 +1067,7 @@ class ChatService(IChatService):
     ) -> tuple[str, str]:
         final_content = ""
         used_model = model
+        result_papers: list[dict] = []
         for item in self._iter_long_academic_draft(
             prompt=prompt,
             user_id=user_id,
@@ -887,7 +1079,55 @@ class ChatService(IChatService):
             if item.get("type") == "result":
                 final_content = str(item.get("content") or "")
                 used_model = str(item.get("model") or model)
+                result_papers = item.get("papers") or []
+        if result_papers and user_id:
+            try:
+                self._save_cited_papers_as_notes(final_content, result_papers, user_id, workspace_id)
+            except Exception:
+                pass
         return (final_content, used_model)
+
+    def _save_cited_papers_as_notes(
+        self,
+        draft: str,
+        papers: list[dict],
+        user_id: int,
+        workspace_id: int | None,
+    ) -> int:
+        """Save papers that were actually cited in the draft as notes. Returns count saved."""
+        cited = extract_cited_papers(draft, papers)
+        if not cited:
+            return 0
+        existing_titles = {
+            paper_title_key(n.title)
+            for n in self.repo_notes.get_for_user(user_id, workspace_id)
+        }
+        saved = 0
+        for paper in cited:
+            title = (paper.get("title") or "").strip()
+            title_key = paper_title_key(title)
+            if not title or title_key in existing_titles:
+                continue
+            content = format_paper_as_note(paper)
+            try:
+                note = self.repo_notes.create_note(
+                    user_id=user_id,
+                    title=title,
+                    content=content,
+                    source="academic_search",
+                    workspace_id=workspace_id,
+                )
+                # Embed the note for future RAG retrieval
+                try:
+                    vec = self.embedding.embed_text(f"{title}\n{paper.get('abstract', '')}")
+                    self.repo_notes.save_embedding(note.id, vec)
+                except Exception:
+                    pass
+                existing_titles.add(title_key)
+                saved += 1
+            except Exception as exc:
+                logger.warning("Failed to save cited paper as note: %s", exc)
+        return saved
 
     def _build_chat_context(self, dto: ChatRequestDTO):
         """Prepare conversation id, OpenAI messages list, and sources for a chat request."""
@@ -1570,6 +1810,14 @@ class ChatService(IChatService):
             assistant_msg = self.repo_conv.add_message(conversation_id, "assistant", email_draft_prefill)
             return ChatResponseDTO(answer=email_draft_prefill, sources=[], message_id=assistant_msg.id)
 
+        direct_reminder = self._maybe_create_direct_reminder(
+            dto=dto,
+            conversation_id=conversation_id,
+            user_text=user_text,
+        )
+        if direct_reminder:
+            return direct_reminder
+
         if _is_image_request(user_text):
             prompt = _extract_image_prompt(user_text)
             try:
@@ -1580,23 +1828,35 @@ class ChatService(IChatService):
             assistant_msg = self.repo_conv.add_message(conversation_id, "assistant", answer, model=img_model)
             return ChatResponseDTO(answer=answer, sources=[], message_id=assistant_msg.id)
 
+        _smart_analysis: dict | None = None
         if getattr(dto, "smart_mode", True):
             try:
-                smart_analysis = smart_engine.analyse_request(user_text, _get_client(model, user_keys), model)
-                _context_engine = smart_engine.build_context_engine(smart_analysis.get("mode", "general_chat"))
+                _smart_analysis = smart_engine.analyse_request(user_text, _get_client(model, user_keys), model)
+                _context_engine = smart_engine.build_context_engine(_smart_analysis.get("mode", "general_chat"))
                 _prepared_context = _context_engine.prepare(
                     messages=messages,
                     user_text=user_text,
-                    smart_analysis=smart_analysis,
+                    smart_analysis=_smart_analysis,
                     today=date.today(),
                 )
                 messages = _prepared_context.messages
-                if self._is_long_academic_request(user_text, smart_analysis):
+                action_agent_reason = self._should_use_action_agent(user_text, _smart_analysis)
+                if action_agent_reason:
+                    return self._action_agent.ask(
+                        conversation_id=conversation_id,
+                        prompt=user_text,
+                        user_id=dto.user_id,
+                        workspace_id=ws_filter,
+                        model=model,
+                        persist_user_message=False,
+                        routing_reason=action_agent_reason,
+                    )
+                if self._is_long_academic_request(user_text, _smart_analysis):
                     answer, used_model = self._generate_long_academic_draft(
                         prompt=user_text,
                         user_id=dto.user_id,
                         workspace_id=ws_filter,
-                        smart_analysis=smart_analysis,
+                        smart_analysis=_smart_analysis,
                         model=model,
                         user_keys=user_keys,
                     )
@@ -1619,6 +1879,18 @@ class ChatService(IChatService):
                     )
             except Exception as exc:
                 logger.warning("Long academic draft path failed in ask(); falling back: %s", exc)
+
+        action_agent_reason = self._should_use_action_agent(user_text, _smart_analysis)
+        if action_agent_reason:
+            return self._action_agent.ask(
+                conversation_id=conversation_id,
+                prompt=user_text,
+                user_id=dto.user_id,
+                workspace_id=ws_filter,
+                model=model,
+                persist_user_message=False,
+                routing_reason=action_agent_reason,
+            )
 
         # Proactive size guard — re-route oversized requests off low-TPM OpenAI models.
         _rm, _large_reason = _reroute_large_request(model, _estimate_tokens(messages), settings.gemini_api_key, settings.openai_chat_model)
@@ -1695,6 +1967,22 @@ class ChatService(IChatService):
             yield sse_event(MessageCompleteEvent(message_id=assistant_msg.id, model="memolink"))
             return
 
+        direct_reminder = self._maybe_create_direct_reminder(
+            dto=dto,
+            conversation_id=conversation_id,
+            user_text=user_text,
+        )
+        if direct_reminder:
+            yield sse_event(MessageReplaceEvent(content=direct_reminder.answer))
+            yield sse_event(
+                MessageCompleteEvent(
+                    message_id=direct_reminder.message_id,
+                    model="memolink",
+                    routing_reason=direct_reminder.routing_reason,
+                )
+            )
+            return
+
         note_name = _extract_improve_note_name(user_text)
         if note_name:
             yield from self._handle_improve_note_stream(dto, note_name, conversation_id)
@@ -1721,6 +2009,7 @@ class ChatService(IChatService):
         _smart_analysis: dict | None = None
         _smart_mode_name = "general_chat"
         _extra_completion_kwargs: dict = {}
+        _fetched_papers: list[dict] = []
 
         if getattr(dto, "smart_mode", True):
             try:
@@ -1744,6 +2033,7 @@ class ChatService(IChatService):
                     today=date.today(),
                 )
                 messages = _prepared_context.messages
+                _fetched_papers = _prepared_context.papers
 
                 # Apply mode-specific temperature and max_tokens
                 mode_settings = _prepared_context.mode_settings
@@ -1759,10 +2049,24 @@ class ChatService(IChatService):
             except Exception as _se:
                 logger.debug("Smart engine integration failed (non-fatal): %s", _se)
 
+        action_agent_reason = self._should_use_action_agent(user_text, _smart_analysis)
+        if action_agent_reason:
+            yield from self._action_agent.ask_stream(
+                conversation_id=conversation_id,
+                prompt=user_text,
+                user_id=dto.user_id,
+                workspace_id=ws_filter,
+                model=model,
+                persist_user_message=False,
+                routing_reason=action_agent_reason,
+            )
+            return
+
         if _smart_analysis is not None and self._is_long_academic_request(user_text, _smart_analysis):
             try:
                 long_answer = ""
                 used_model = model
+                _long_papers: list[dict] = []
                 for item in self._iter_long_academic_draft(
                     prompt=user_text,
                     user_id=dto.user_id,
@@ -1776,6 +2080,12 @@ class ChatService(IChatService):
                     elif item.get("type") == "result":
                         long_answer = str(item.get("content") or "")
                         used_model = str(item.get("model") or model)
+                        _long_papers = item.get("papers") or []
+                if _long_papers and dto.user_id:
+                    try:
+                        self._save_cited_papers_as_notes(long_answer, _long_papers, dto.user_id, ws_filter)
+                    except Exception:
+                        pass
                 clean_answer, conf_level, conf_reason = _parse_confidence(long_answer)
                 final_conf = conf_level or pre_conf_level
                 final_reason = conf_reason or pre_conf_reason
@@ -1890,6 +2200,13 @@ class ChatService(IChatService):
                                  {"mode": _smart_mode_name}, dto.user_id)
             except Exception as _qe:
                 logger.debug("Smart quality check failed (non-fatal): %s", _qe)
+
+        # Auto-save cited academic papers as notes (academic mode, non-long path)
+        if _smart_mode_name == "academic_writer" and _fetched_papers and dto.user_id:
+            try:
+                self._save_cited_papers_as_notes(full_answer, _fetched_papers, dto.user_id, ws_filter)
+            except Exception:
+                pass
 
         clean_answer, conf_level, conf_reason = _parse_confidence(full_answer)
         final_conf = conf_level or pre_conf_level
@@ -2054,6 +2371,7 @@ class ChatService(IChatService):
         # ── 4b. Academic paper search (academic_writer only) ──────────────────
         # Derives queries from note titles (topic-aware) and hardcoded RAG/AI defaults.
         _paper_system_block: str = ""
+        _all_papers: list[dict] = []
         if _smart_mode == "academic_writer":
             try:
                 # Derive queries from note titles — they reflect the actual research topic
@@ -2066,10 +2384,15 @@ class ChatService(IChatService):
                         if len(_ntitle) > 8 and not _ntitle.lower().endswith((".pdf", ".docx")):
                             _title_queries.append(_ntitle[:80])
                 _acad_queries = smart_engine.build_dynamic_academic_queries(prompt, _smart_analysis, _title_queries[:4])
-                _all_papers: list[dict] = []
                 _seen_titles: set[str] = set()
                 for _q in _acad_queries[:3]:
-                    _batch = search_papers(_q[:150], limit=5, api_key=settings.semantic_scholar_api_key)
+                    _batch = search_papers(
+                        _q[:150],
+                        limit=5,
+                        api_key=settings.semantic_scholar_api_key,
+                        core_api_key=settings.core_api_key,
+                        include_arxiv=True,
+                    )
                     for _p in _batch:
                         _t = (_p.get("title") or "").lower()[:60]
                         if _t and _t not in _seen_titles:
@@ -2206,7 +2529,14 @@ class ChatService(IChatService):
             except Exception:
                 pass
 
-        # ── 9. Save and return ────────────────────────────────────────────────
+        # ── 9. Auto-save cited papers as notes (academic mode) ───────────────
+        if _smart_mode == "academic_writer" and _all_papers and user_id:
+            try:
+                self._save_cited_papers_as_notes(answer, _all_papers, user_id, None)
+            except Exception:
+                pass
+
+        # ── 10. Save and return ────────────────────────────────────────────────
         clean_answer, _, _ = _parse_confidence(answer)
         assistant_msg = self.repo_conv.add_message(conversation_id, "assistant", clean_answer, model=used_model)
         return ChatResponseDTO(answer=clean_answer, sources=[], attachments=attachments, message_id=assistant_msg.id)

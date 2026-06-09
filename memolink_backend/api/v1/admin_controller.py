@@ -12,7 +12,6 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_FLAGS: Dict[str, str] = {
     "web_search_enabled": "true",
-    "agent_mode_enabled": "true",
     "model_selection_enabled": "true",
     "image_generation_enabled": "true",
     "translation_enabled": "true",
@@ -38,7 +37,6 @@ DEFAULT_FLAGS: Dict[str, str] = {
     "default_language": "English",
     # Minimum access level required per feature
     "web_search_min_level": "regular",
-    "agent_mode_min_level": "regular",
     "model_selection_min_level": "regular",
     "image_generation_min_level": "regular",
     "translation_min_level": "regular",
@@ -151,7 +149,8 @@ def _get_flags(db: Session) -> Dict[str, str]:
     rows = db.execute(text("SELECT key, value FROM feature_flags")).fetchall()
     flags = dict(DEFAULT_FLAGS)
     for key, value in rows:
-        flags[key] = value
+        if key in DEFAULT_FLAGS:
+            flags[key] = value
     return flags
 
 
@@ -167,6 +166,8 @@ class FlagsUpdate(BaseModel):
 @router.put("/features")
 def update_features(body: FlagsUpdate, admin_id: int = Depends(get_current_admin), db: Session = Depends(get_db)):
     for key, value in body.flags.items():
+        if key not in DEFAULT_FLAGS:
+            continue
         db.execute(
             text("INSERT INTO feature_flags (key, value, updated_at) VALUES (:k, :v, now()) ON CONFLICT (key) DO UPDATE SET value = :v, updated_at = now()"),
             {"k": key, "v": value},

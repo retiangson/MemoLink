@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
 from typing import Any
 
@@ -20,6 +20,7 @@ class PreparedContext:
     mode_settings: dict[str, Any]
     primary_prompt: str
     paper_context: str = ""
+    papers: list[dict[str, Any]] = field(default_factory=list)
 
 
 class ContextEngine:
@@ -47,7 +48,7 @@ class ContextEngine:
         else:
             prepared_messages.insert(0, {"role": "system", "content": primary_prompt})
 
-        paper_context = self._build_paper_context(
+        paper_context, papers = self._build_paper_context(
             user_text=user_text,
             smart_analysis=smart_analysis,
             messages=prepared_messages,
@@ -68,6 +69,7 @@ class ContextEngine:
             mode_settings=get_mode_settings(self.mode_name),
             primary_prompt=primary_prompt,
             paper_context=paper_context,
+            papers=papers,
         )
 
     def _build_paper_context(
@@ -76,8 +78,8 @@ class ContextEngine:
         user_text: str,
         smart_analysis: dict | None,
         messages: list[dict[str, Any]],
-    ) -> str:
-        return ""
+    ) -> tuple[str, list[dict[str, Any]]]:
+        return "", []
 
 
 class AcademicWriterContextEngine(ContextEngine):
@@ -89,7 +91,7 @@ class AcademicWriterContextEngine(ContextEngine):
         user_text: str,
         smart_analysis: dict | None,
         messages: list[dict[str, Any]],
-    ) -> str:
+    ) -> tuple[str, list[dict[str, Any]]]:
         note_titles: list[str] = []
         for message in messages:
             content = message.get("content", "")
@@ -106,7 +108,13 @@ class AcademicWriterContextEngine(ContextEngine):
         seen_titles: set[str] = set()
         for query in queries[:2]:
             try:
-                batch = search_papers(query[:150], limit=6, api_key=settings.semantic_scholar_api_key)
+                batch = search_papers(
+                    query[:150],
+                    limit=6,
+                    api_key=settings.semantic_scholar_api_key,
+                    core_api_key=settings.core_api_key,
+                    include_arxiv=True,
+                )
             except Exception:
                 continue
             for paper in batch:
@@ -116,13 +124,14 @@ class AcademicWriterContextEngine(ContextEngine):
                     papers.append(paper)
 
         if not papers:
-            return ""
-        return (
+            return "", []
+        context = (
             "--- ACADEMIC SOURCES ---\n"
             "Real published papers retrieved for this research topic. "
             "Read each abstract before citing it and only use papers that are directly relevant.\n\n"
             + format_papers_context(papers[:10])
         )
+        return context, papers[:10]
 
 
 def build_context_engine(mode_name: str) -> ContextEngine:
