@@ -707,7 +707,13 @@ Base questions ONLY on the provided notes. Do not invent facts not in the notes.
             if all_notes:
                 try:
                     qvec = self.embedding.embed_text(writing_prompt)
-                    top_notes = self.note_repo.search_hybrid(writing_prompt, qvec, top_k=8, workspace_id=dto.workspace_id)
+                    top_notes = self.note_repo.search_hybrid(
+                        writing_prompt,
+                        qvec,
+                        top_k=8,
+                        workspace_id=dto.workspace_id,
+                        user_id=dto.user_id,
+                    )
                 except Exception:
                     top_notes = all_notes[:8]
                 blocks = []

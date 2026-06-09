@@ -49,6 +49,10 @@ export function MessageList({
         {messages.map((msg, idx) => {
           const isLast = idx === messages.length - 1;
           const isStreamingMsg = streaming && isLast && msg.role === "assistant";
+          const isPendingAssistantMsg =
+            msg.role === "assistant" &&
+            isLast &&
+            (isStreamingMsg || (loading && msg.content === "__THINKING__"));
           // Only offer the evaluation rating once the AI has fully finished this
           // reply — never while it's still thinking (loading) or streaming.
           const ratingReady = evaluationActive && !(isLast && (loading || streaming));
@@ -59,11 +63,11 @@ export function MessageList({
               content={msg.content}
               model={msg.model}
               streaming={isStreamingMsg}
-              onAdd={!isStreamingMsg && msg.role === "assistant" ? (text) => onAddToNotes(text) : undefined}
-              onDelete={!isStreamingMsg ? () => onDeleteMessage(msg.id, msg.content, idx) : undefined}
-              onApplyEdit={!isStreamingMsg && msg.role === "assistant" ? onApplyNoteEdit : undefined}
-              onOpenNote={!isStreamingMsg && msg.role === "assistant" ? onOpenNote : undefined}
-              onSaveNote={!isStreamingMsg && msg.role === "assistant" ? onSaveNote : undefined}
+              onAdd={!isPendingAssistantMsg && msg.role === "assistant" ? (text) => onAddToNotes(text) : undefined}
+              onDelete={!isPendingAssistantMsg ? () => onDeleteMessage(msg.id, msg.content, idx) : undefined}
+              onApplyEdit={!isPendingAssistantMsg && msg.role === "assistant" ? onApplyNoteEdit : undefined}
+              onOpenNote={!isPendingAssistantMsg && msg.role === "assistant" ? onOpenNote : undefined}
+              onSaveNote={!isPendingAssistantMsg && msg.role === "assistant" ? onSaveNote : undefined}
               hasOpenNote={hasOpenNote}
               translationEnabled={translationEnabled}
               modelAttributionEnabled={modelAttributionEnabled}
@@ -79,9 +83,9 @@ export function MessageList({
               messageId={msg.id}
               evaluationActive={ratingReady}
               evalRating={evalRatings?.[String(msg.id)]}
-              onRetry={!isStreamingMsg && onRetry ? () => onRetry(idx) : undefined}
-              suggestWebSearch={!isStreamingMsg && msg.role === "assistant" && isLast ? msg.suggest_web_search : undefined}
-              onSearchOnline={!isStreamingMsg && msg.role === "assistant" && isLast && onSearchOnline ? () => onSearchOnline(msg.search_query_suggestion) : undefined}
+              onRetry={!isPendingAssistantMsg && onRetry ? () => onRetry(idx) : undefined}
+              suggestWebSearch={!isPendingAssistantMsg && msg.role === "assistant" && isLast ? msg.suggest_web_search : undefined}
+              onSearchOnline={!isPendingAssistantMsg && msg.role === "assistant" && isLast && onSearchOnline ? () => onSearchOnline(msg.search_query_suggestion) : undefined}
             />
           );
         })}

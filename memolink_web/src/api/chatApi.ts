@@ -90,11 +90,43 @@ export async function uploadNotes(files: File[], workspace_id?: number | null): 
   return (await api.post("/notes/bulk", formData, { headers: { "Content-Type": "multipart/form-data" } })).data;
 }
 
-export async function transcribeAudio(blob: Blob, filename: string, language = ""): Promise<{ text: string }> {
+export interface TranscribeAudioOptions {
+  language?: string;
+  mode?: "default" | "lecture";
+  backend?: "auto" | "whisper" | "deepgram";
+  promptContext?: string;
+}
+
+export interface TranscribeAudioResponse {
+  text: string;
+  cleaned_text?: string;
+  service_used?: string;
+  fallback_used?: boolean;
+  mode?: string;
+  backend_requested?: string;
+}
+
+export interface LectureFinalizeResponse {
+  cleaned_transcript: string;
+  summary: string;
+  action_items: string[];
+  key_topics: string[];
+  title_suggestion: string;
+}
+
+export async function transcribeAudio(blob: Blob, filename: string, options: string | TranscribeAudioOptions = ""): Promise<TranscribeAudioResponse> {
   const formData = new FormData();
   formData.append("file", blob, filename);
-  if (language) formData.append("language", language);
+  const normalized = typeof options === "string" ? { language: options } : options;
+  if (normalized.language) formData.append("language", normalized.language);
+  if (normalized.mode) formData.append("mode", normalized.mode);
+  if (normalized.backend) formData.append("backend", normalized.backend);
+  if (normalized.promptContext) formData.append("prompt_context", normalized.promptContext);
   return (await api.post("/transcribe", formData)).data;
+}
+
+export async function finalizeLectureTranscript(transcriptText: string, language = ""): Promise<LectureFinalizeResponse> {
+  return (await api.post("/transcribe/lecture/finalize", { transcript_text: transcriptText, language })).data;
 }
 
 export async function generateSuggestions(

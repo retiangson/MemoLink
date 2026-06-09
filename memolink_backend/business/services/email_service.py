@@ -666,7 +666,12 @@ class EmailService:
             try:
                 query = f"{r.subject} {r.snippet or ''}"
                 vec = self.embedding_service.embed_text(query)
-                top_notes = self.note_repo.search_by_vector(vec, top_k=4)
+                top_notes = self.note_repo.search_hybrid(
+                    query,
+                    vec,
+                    top_k=4,
+                    user_id=user_id,
+                )
                 if top_notes:
                     import re as _re
                     _HTML = _re.compile(r"<[^>]+>")

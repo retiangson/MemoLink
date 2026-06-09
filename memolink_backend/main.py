@@ -52,6 +52,7 @@ from memolink_backend.api.v1 import (
     slash_command_controller,
     email_controller,
     teams_controller,
+    connectors_controller,
     memograph_controller,
     proactive_insight_controller,
     study_controller,
@@ -72,6 +73,7 @@ import memolink_backend.domain.models.workspace        # noqa: F401
 import memolink_backend.domain.models.system_log       # noqa: F401
 import memolink_backend.domain.models.translation_cache # noqa: F401
 import memolink_backend.domain.models.user_api_key      # noqa: F401
+import memolink_backend.domain.models.connector_account  # noqa: F401
 import memolink_backend.domain.models.email_account     # noqa: F401
 import memolink_backend.domain.models.email_record      # noqa: F401
 import memolink_backend.domain.models.email_embedding   # noqa: F401
@@ -196,6 +198,24 @@ if os.getenv("MEMOLINK_SKIP_DB_BOOTSTRAP") != "1":
         """))
         _conn.execute(text("ALTER TABLE user_api_keys ADD COLUMN IF NOT EXISTS base_url TEXT"))
         _conn.execute(text("ALTER TABLE user_api_keys ADD COLUMN IF NOT EXISTS model VARCHAR(100)"))
+        _conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS connector_accounts (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                connector_type VARCHAR(50) NOT NULL,
+                display_name VARCHAR(100) NOT NULL DEFAULT '',
+                account_label VARCHAR(255),
+                encrypted_secret TEXT NOT NULL,
+                base_url TEXT,
+                config_json TEXT,
+                created_at TIMESTAMPTZ DEFAULT now(),
+                updated_at TIMESTAMPTZ DEFAULT now(),
+                UNIQUE(user_id, connector_type)
+            )
+        """))
+        _conn.execute(text("ALTER TABLE connector_accounts ADD COLUMN IF NOT EXISTS account_label VARCHAR(255)"))
+        _conn.execute(text("ALTER TABLE connector_accounts ADD COLUMN IF NOT EXISTS base_url TEXT"))
+        _conn.execute(text("ALTER TABLE connector_accounts ADD COLUMN IF NOT EXISTS config_json TEXT"))
         # Email records table
         _conn.execute(text("""
             CREATE TABLE IF NOT EXISTS email_records (
@@ -710,6 +730,7 @@ app.include_router(user_settings_controller.router, prefix="/api")
 app.include_router(slash_command_controller.router, prefix="/api")
 app.include_router(email_controller.router, prefix="/api")
 app.include_router(teams_controller.router, prefix="/api")
+app.include_router(connectors_controller.router, prefix="/api")
 app.include_router(memograph_controller.router, prefix="/api")
 app.include_router(proactive_insight_controller.router, prefix="/api")
 app.include_router(study_controller.router, prefix="/api")

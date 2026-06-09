@@ -48,5 +48,23 @@ class FakeNoteRepository:
     def permanent_delete_note(self, note_id):
         return self.notes.pop(note_id, None) is not None
 
-    def search_by_vector(self, vector, top_k=5):
-        return list(self.notes.values())[:top_k]
+    def search_by_vector(self, vector, top_k=5, workspace_id=None, user_id=None):
+        notes = list(self.notes.values())
+        if user_id is not None:
+            notes = [n for n in notes if n.user_id == user_id]
+        if workspace_id is not None:
+            notes = [n for n in notes if n.workspace_id in (workspace_id, None)]
+        return notes[:top_k]
+
+    def search_hybrid(self, query_text, query_vector, top_k=10, workspace_id=None, user_id=None):
+        notes = self.search_by_vector(query_vector, top_k=top_k, workspace_id=workspace_id, user_id=user_id)
+        query_l = query_text.lower()
+        return sorted(
+            notes,
+            key=lambda note: (
+                query_l in (note.title or "").lower(),
+                query_l in (note.content or "").lower(),
+                note.id,
+            ),
+            reverse=True,
+        )[:top_k]

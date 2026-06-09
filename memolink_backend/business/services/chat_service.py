@@ -848,7 +848,13 @@ class ChatService(IChatService):
         for q in queries[:8]:
             try:
                 q_vec = self.embedding.embed_text(q)
-                hits = self.repo_notes.search_by_vector(q_vec, top_k=8, workspace_id=workspace_id)
+                hits = self.repo_notes.search_hybrid(
+                    q,
+                    q_vec,
+                    top_k=8,
+                    workspace_id=workspace_id,
+                    user_id=user_id,
+                )
                 for note in hits:
                     if note.id not in seen:
                         seen.add(note.id)
@@ -1169,7 +1175,13 @@ class ChatService(IChatService):
 
             try:
                 query_vec = self.embedding.embed_text(user_text)
-                top_notes = self.repo_notes.search_by_vector(query_vec, top_k=dto.top_k, workspace_id=ws_filter)
+                top_notes = self.repo_notes.search_hybrid(
+                    user_text,
+                    query_vec,
+                    top_k=dto.top_k,
+                    workspace_id=ws_filter,
+                    user_id=dto.user_id,
+                )
             except Exception:
                 top_notes = all_notes[:dto.top_k]
 
@@ -2352,7 +2364,13 @@ class ChatService(IChatService):
                     for q in retrieval_queries[:6]:  # max 6 queries
                         try:
                             q_vec = self.embedding.embed_text(q)
-                            hits = self.repo_notes.search_by_vector(q_vec, top_k=6)
+                            hits = self.repo_notes.search_hybrid(
+                                q,
+                                q_vec,
+                                top_k=6,
+                                workspace_id=dto.workspace_id,
+                                user_id=user_id,
+                            )
                             for n in hits:
                                 if n.id not in seen_ids:
                                     seen_ids.add(n.id)

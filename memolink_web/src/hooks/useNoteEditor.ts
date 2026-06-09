@@ -148,8 +148,14 @@ export function useNoteEditor() {
       (active.contentDraft ?? "") !== (active.note.content ?? "")
     : false;
 
-  function setNoteTitleDraft(v: string) {
-    setOpenNotes((prev) => prev.map((t, i) => i === activeIdxRef.current ? { ...t, titleDraft: v } : t));
+  function setNoteTitleDraft(v: string | ((prev: string) => string)) {
+    setOpenNotes((prev) =>
+      prev.map((t, i) => {
+        if (i !== activeIdxRef.current) return t;
+        const nextTitle = typeof v === "function" ? v(t.titleDraft) : v;
+        return { ...t, titleDraft: nextTitle };
+      }),
+    );
   }
 
   function setNoteContentDraft(v: string | ((prev: string) => string)) {

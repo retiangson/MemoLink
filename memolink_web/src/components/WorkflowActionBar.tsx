@@ -70,7 +70,10 @@ export function WorkflowActionBar({ actions, conversationId, workspaceId, model,
       setStates(s => ({ ...s, [action.id]: res.ok ? "done" : "error" }));
       setResults(r => ({ ...r, [action.id]: res.result }));
       onConversationMessages?.([res.user_message, res.assistant_message]);
-      if (res.ok) onActionDone?.(action.type);
+      if (res.ok) {
+        onActionDone?.(action.type);
+        if (action.type === "search_web") setDismissed(true);
+      }
     } catch {
       setStates(s => ({ ...s, [action.id]: "error" }));
     }

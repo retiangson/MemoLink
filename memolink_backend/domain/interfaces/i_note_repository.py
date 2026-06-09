@@ -13,4 +13,18 @@ class INoteRepository(Protocol):
     def delete_note(self, note_id: int) -> bool: ...
     def restore_note(self, note_id: int) -> bool: ...
     def permanent_delete_note(self, note_id: int) -> bool: ...
-    def search_by_vector(self, query_vector: list[float], top_k: int = 5) -> List[Note]: ...
+    def search_by_vector(
+        self,
+        query_vector: list[float],
+        top_k: int = 5,
+        workspace_id: int | None = None,
+        user_id: int | None = None,
+    ) -> List[Note]: ...
+    def search_hybrid(
+        self,
+        query_text: str,
+        query_vector: list[float],
+        top_k: int = 10,
+        workspace_id: int | None = None,
+        user_id: int | None = None,
+    ) -> List[Note]: ...

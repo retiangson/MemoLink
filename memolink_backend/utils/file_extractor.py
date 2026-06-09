@@ -462,12 +462,25 @@ _DEEPGRAM_MIME: dict[str, str] = {
 }
 
 
-def _transcribe_deepgram(file_bytes: bytes, filename: str, ext: str, language: str | None = None) -> str:
+def _transcribe_deepgram(
+    file_bytes: bytes,
+    filename: str,
+    ext: str,
+    language: str | None = None,
+    *,
+    mode: str = "default",
+) -> str:
     import httpx
     from memolink_backend.core.config import settings
 
     content_type = _DEEPGRAM_MIME.get(ext.lstrip("."), "audio/mpeg")
-    params: dict = {"model": "nova-2", "smart_format": "true"}
+    params: dict = {
+        "model": "nova-2",
+        "smart_format": "true",
+        "punctuate": "true",
+    }
+    if mode == "lecture":
+        params["paragraphs"] = "true"
     if language:
         params["language"] = language
 
@@ -486,7 +499,14 @@ def _transcribe_deepgram(file_bytes: bytes, filename: str, ext: str, language: s
     return data["results"]["channels"][0]["alternatives"][0]["transcript"]
 
 
-def _transcribe_whisper(file_bytes: bytes, filename: str, language: str | None = None) -> str:
+def _transcribe_whisper(
+    file_bytes: bytes,
+    filename: str,
+    language: str | None = None,
+    *,
+    prompt_context: str | None = None,
+    mode: str = "default",
+) -> str:
     from openai import OpenAI
     from memolink_backend.core.config import settings
 
@@ -497,36 +517,116 @@ def _transcribe_whisper(file_bytes: bytes, filename: str, language: str | None =
     kwargs: dict = {"model": "whisper-1", "file": buf}
     if language:
         kwargs["language"] = language
+    prompt_parts: list[str] = []
+    if mode == "lecture":
+        prompt_parts.append(
+            "This is a lecture or long-form lesson recording. Preserve technical terms, punctuation, section boundaries, and assignment-related wording."
+        )
+    if prompt_context:
+        prompt_parts.append(f"Recent transcript context:\n{prompt_context[-1200:]}")
+    if prompt_parts:
+        kwargs["prompt"] = "\n\n".join(prompt_parts)
     transcript = client.audio.transcriptions.create(**kwargs)
     return transcript.text
 
 
-def transcribe_audio(file_bytes: bytes, filename: str, ext: str, language: str | None = None) -> str:
-    """< 5 MB → Whisper; ≥ 5 MB → Deepgram (fallback: Whisper if ≤ 25 MB)."""
+def transcribe_audio_detailed(
+    file_bytes: bytes,
+    filename: str,
+    ext: str,
+    language: str | None = None,
+    *,
+    backend: str = "auto",
+    mode: str = "default",
+    prompt_context: str | None = None,
+) -> dict[str, object]:
+    """Return transcript plus provider metadata.
+
+    backends:
+      auto     -> < 5 MB whisper, else deepgram with whisper fallback
+      whisper  -> force Whisper/OpenAI
+      deepgram -> force Deepgram
+    """
     from memolink_backend.core.config import settings
 
     size = len(file_bytes)
+    fallback_used = False
+
+    def _ok(text: str, service_used: str) -> dict[str, object]:
+        return {
+            "text": text,
+            "service_used": service_used,
+            "fallback_used": fallback_used,
+        }
+
+    if backend == "whisper":
+        try:
+            return _ok(
+                _transcribe_whisper(file_bytes, filename, language, prompt_context=prompt_context, mode=mode),
+                "whisper",
+            )
+        except Exception as e:
+            detail = getattr(e, "body", None) or ""
+            return _ok(f"[Transcription error] {e}{f' - detail: {detail}' if detail else ''}", "whisper")
+
+    if backend == "deepgram":
+        if not settings.deepgram_api_key:
+            return _ok("[Transcription skipped] Deepgram is not configured.", "deepgram")
+        try:
+            return _ok(_transcribe_deepgram(file_bytes, filename, ext, language, mode=mode), "deepgram")
+        except Exception as e:
+            detail = getattr(e, "body", None) or ""
+            return _ok(f"[Transcription error] {e}{f' - detail: {detail}' if detail else ''}", "deepgram")
 
     if size < _DEEPGRAM_THRESHOLD:
         try:
-            return _transcribe_whisper(file_bytes, filename, language)
+            return _ok(
+                _transcribe_whisper(file_bytes, filename, language, prompt_context=prompt_context, mode=mode),
+                "whisper",
+            )
         except Exception as e:
             detail = getattr(e, "body", None) or ""
-            return f"[Transcription error] {e}{f' - detail: {detail}' if detail else ''}"
+            return _ok(f"[Transcription error] {e}{f' - detail: {detail}' if detail else ''}", "whisper")
 
     # ≥ 5 MB: try Deepgram first
     if settings.deepgram_api_key:
         try:
-            return _transcribe_deepgram(file_bytes, filename, ext, language)
+            return _ok(_transcribe_deepgram(file_bytes, filename, ext, language, mode=mode), "deepgram")
         except Exception:
-            pass  # fall through to Whisper fallback
+            fallback_used = True  # fall through to Whisper fallback
 
     # Whisper fallback (only if within its 25 MB cap)
     if size <= _WHISPER_MAX:
         try:
-            return _transcribe_whisper(file_bytes, filename, language)
+            return _ok(
+                _transcribe_whisper(file_bytes, filename, language, prompt_context=prompt_context, mode=mode),
+                "whisper",
+            )
         except Exception as e:
             detail = getattr(e, "body", None) or ""
-            return f"[Transcription error] {e}{f' - detail: {detail}' if detail else ''}"
+            return _ok(f"[Transcription error] {e}{f' - detail: {detail}' if detail else ''}", "whisper")
 
-    return "[Transcription skipped] File exceeds the 25 MB limit and Deepgram is not configured or failed."
+    return _ok("[Transcription skipped] File exceeds the 25 MB limit and Deepgram is not configured or failed.", "none")
+
+
+def transcribe_audio(
+    file_bytes: bytes,
+    filename: str,
+    ext: str,
+    language: str | None = None,
+    *,
+    backend: str = "auto",
+    mode: str = "default",
+    prompt_context: str | None = None,
+) -> str:
+    """Backward-compatible wrapper returning only the text transcript."""
+    result = transcribe_audio_detailed(
+        file_bytes,
+        filename,
+        ext,
+        language,
+        backend=backend,
+        mode=mode,
+        prompt_context=prompt_context,
+    )
+    return str(result["text"])

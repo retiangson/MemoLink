@@ -1,9 +1,16 @@
 from datetime import datetime, timezone
 from typing import List, Optional
 from sqlalchemy.orm import Session
-from sqlalchemy import text, func
+from sqlalchemy import text, func, or_
 from memolink_backend.domain.models.note import Note
 from memolink_backend.domain.models.embedding import Embedding
+
+_SEARCH_STOP_WORDS = {
+    "the", "a", "an", "is", "in", "of", "to", "and", "or", "for", "with", "on", "at", "by",
+    "from", "into", "your", "my", "our", "their", "this", "that", "these", "those", "about",
+    "please", "could", "would", "should", "have", "has", "had", "been", "being", "what",
+    "when", "where", "which", "who", "why", "how",
+}
 
 
 class NoteRepository:
@@ -122,6 +129,97 @@ class NoteRepository:
                     return n
         return None
 
+    @staticmethod
+    def _normalize_search_text(text_value: str | None) -> str:
+        if not text_value:
+            return ""
+        return " ".join("".join(ch.lower() if ch.isalnum() else " " for ch in text_value).split())
+
+    @classmethod
+    def _tokenize_search_terms(cls, query_text: str) -> list[str]:
+        normalized = cls._normalize_search_text(query_text)
+        if not normalized:
+            return []
+        seen: set[str] = set()
+        terms: list[str] = []
+        for token in normalized.split():
+            if len(token) < 3 or token in _SEARCH_STOP_WORDS or token in seen:
+                continue
+            seen.add(token)
+            terms.append(token)
+        return terms
+
+    def _base_note_query(self, workspace_id: int | None = None, user_id: int | None = None):
+        q = self.db.query(Note).filter(Note.deleted_at == None)
+        if user_id is not None:
+            q = q.filter(Note.user_id == user_id)
+        if workspace_id is not None:
+            q = q.filter(or_(Note.workspace_id == workspace_id, Note.workspace_id == None))
+        return q
+
+    @classmethod
+    def _keyword_rank(cls, note: Note, query_text: str, query_terms: list[str]) -> float:
+        normalized_query = cls._normalize_search_text(query_text)
+        title = cls._normalize_search_text(note.title)
+        content = cls._normalize_search_text(note.content)
+        combined = f"{title} {content}".strip()
+        if not combined:
+            return 0.0
+
+        title_hits = sum(1 for term in query_terms if term in title)
+        content_hits = sum(1 for term in query_terms if term in content)
+        exact_title_bonus = 4.0 if title == normalized_query and normalized_query else 0.0
+        title_phrase_bonus = 2.0 if normalized_query and normalized_query in title else 0.0
+        content_phrase_bonus = 1.0 if normalized_query and normalized_query in combined else 0.0
+
+        combined_terms = set(combined.split())
+        query_term_set = set(query_terms)
+        jaccard = 0.0
+        if query_term_set and combined_terms:
+            jaccard = len(query_term_set & combined_terms) / len(query_term_set | combined_terms)
+
+        coverage = (content_hits + title_hits) / max(len(query_terms), 1)
+        return (
+            exact_title_bonus
+            + title_phrase_bonus
+            + content_phrase_bonus
+            + (title_hits * 2.5)
+            + (content_hits * 1.25)
+            + (coverage * 2.0)
+            + jaccard
+        )
+
+    def search_by_keywords(
+        self,
+        query_text: str,
+        top_k: int = 10,
+        workspace_id: int | None = None,
+        user_id: int | None = None,
+    ) -> List[Note]:
+        query_terms = self._tokenize_search_terms(query_text)
+        normalized_query = self._normalize_search_text(query_text)
+        if not query_terms and not normalized_query:
+            return []
+
+        q = self._base_note_query(workspace_id=workspace_id, user_id=user_id)
+        if query_terms:
+            like_filters = [
+                or_(Note.title.ilike(f"%{term}%"), Note.content.ilike(f"%{term}%"))
+                for term in query_terms
+            ]
+            q = q.filter(or_(*like_filters))
+        elif normalized_query:
+            q = q.filter(or_(Note.title.ilike(f"%{normalized_query}%"), Note.content.ilike(f"%{normalized_query}%")))
+
+        candidate_limit = max(top_k * 6, 30)
+        candidates = q.order_by(Note.updated_at.desc().nullslast(), Note.id.desc()).limit(candidate_limit).all()
+        ranked = sorted(
+            candidates,
+            key=lambda note: self._keyword_rank(note, query_text, query_terms),
+            reverse=True,
+        )
+        return ranked[:top_k]
+
     def search_hybrid(
         self,
         query_text: str,
@@ -130,45 +228,73 @@ class NoteRepository:
         workspace_id: int | None = None,
         user_id: int | None = None,
     ) -> List[Note]:
-        """Vector search for top-30 candidates, then re-rank by keyword overlap."""
-        candidates = self.search_by_vector(query_vector, top_k=30, workspace_id=workspace_id)
-        if not candidates:
+        """Combine vector and keyword candidates with reciprocal-rank fusion plus lexical reranking."""
+        vector_hits = self.search_by_vector(
+            query_vector,
+            top_k=max(top_k * 4, 24),
+            workspace_id=workspace_id,
+            user_id=user_id,
+        )
+        keyword_hits = self.search_by_keywords(
+            query_text,
+            top_k=max(top_k * 4, 24),
+            workspace_id=workspace_id,
+            user_id=user_id,
+        )
+        if not vector_hits and not keyword_hits:
             return []
-        query_words = set(query_text.lower().split())
-        stop = {"the", "a", "an", "is", "in", "of", "to", "and", "or", "for", "with", "on", "at", "by"}
-        query_words -= stop
 
-        def kw_score(note: Note) -> float:
-            text = ((note.title or "") + " " + note.content).lower()
-            if not query_words:
-                return 0.0
-            return sum(1 for w in query_words if w in text) / len(query_words)
+        query_terms = self._tokenize_search_terms(query_text)
+        note_by_id: dict[int, Note] = {}
+        fused_scores: dict[int, float] = {}
 
-        ranked = sorted(candidates, key=kw_score, reverse=True)
-        return ranked[:top_k]
+        for rank, note in enumerate(vector_hits, start=1):
+            note_by_id[note.id] = note
+            fused_scores[note.id] = fused_scores.get(note.id, 0.0) + (1.0 / (60 + rank))
 
-    def search_by_vector(self, query_vector: list[float], top_k: int = 5, workspace_id: int | None = None) -> List[Note]:
+        for rank, note in enumerate(keyword_hits, start=1):
+            note_by_id[note.id] = note
+            fused_scores[note.id] = fused_scores.get(note.id, 0.0) + (1.35 / (60 + rank))
+            fused_scores[note.id] += self._keyword_rank(note, query_text, query_terms) * 0.08
+
+        ranked_ids = sorted(
+            fused_scores,
+            key=lambda note_id: (fused_scores[note_id], note_by_id[note_id].id),
+            reverse=True,
+        )
+        return [note_by_id[note_id] for note_id in ranked_ids[:top_k]]
+
+    def search_by_vector(
+        self,
+        query_vector: list[float],
+        top_k: int = 5,
+        workspace_id: int | None = None,
+        user_id: int | None = None,
+    ) -> List[Note]:
         embedding_str = "[" + ",".join(str(x) for x in query_vector) + "]"
-        if workspace_id is not None:
-            sql = text("""
-                SELECT n.id
-                FROM embeddings e
-                JOIN notes n ON n.id = e.note_id
-                WHERE n.deleted_at IS NULL AND n.workspace_id = :workspace_id
-                ORDER BY e.vector <-> vector(:embedding)
-                LIMIT :top_k
-            """)
-            rows = self.db.execute(sql, {"embedding": embedding_str, "top_k": top_k, "workspace_id": workspace_id}).fetchall()
-        else:
-            sql = text("""
-                SELECT n.id
-                FROM embeddings e
-                JOIN notes n ON n.id = e.note_id
-                WHERE n.deleted_at IS NULL
-                ORDER BY e.vector <-> vector(:embedding)
-                LIMIT :top_k
-            """)
-            rows = self.db.execute(sql, {"embedding": embedding_str, "top_k": top_k}).fetchall()
+        sql = text("""
+            SELECT n.id
+            FROM embeddings e
+            JOIN notes n ON n.id = e.note_id
+            WHERE n.deleted_at IS NULL
+              AND (:user_id IS NULL OR n.user_id = :user_id)
+              AND (
+                    :workspace_id IS NULL
+                    OR n.workspace_id = :workspace_id
+                    OR n.workspace_id IS NULL
+                  )
+            ORDER BY e.vector <-> vector(:embedding)
+            LIMIT :top_k
+        """)
+        rows = self.db.execute(
+            sql,
+            {
+                "embedding": embedding_str,
+                "top_k": top_k,
+                "workspace_id": workspace_id,
+                "user_id": user_id,
+            },
+        ).fetchall()
         note_ids = [r[0] for r in rows]
         if not note_ids:
             return []

@@ -95,7 +95,7 @@ export function useChat({ activeConversation, setActiveConversation, setConversa
         setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
       } else {
         // Text-only: stream the response token by token
-        const placeholderMsg: Message = { id: STREAMING_ID, role: "assistant", content: "" };
+        const placeholderMsg: Message = { id: STREAMING_ID, role: "assistant", content: "__THINKING__" };
         updated = { ...updated, messages: [...updated.messages, placeholderMsg] };
         setActiveConversation(updated);
 
