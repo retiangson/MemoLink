@@ -6,7 +6,7 @@ import { getEmailStatus, getEmailConnectUrl, disconnectEmail, autoProcessEmails,
 import type { EmailStatus, EmailRecord, AutoProcessResult } from "../api/emailApi";
 import { getTeamsStatus, getTeamsConnectUrl, disconnectTeams, listTeamsChats, getTeamsMessages, sendTeamsMessage, chatToNote } from "../api/teamsApi";
 import type { TeamsStatus, TeamsChat, TeamsMessage } from "../api/teamsApi";
-import { listConnectors, saveGitHubConnector, deleteGitHubConnector, saveJiraConnector, deleteJiraConnector } from "../api/connectorsApi";
+import { listConnectors, saveGitHubConnector, getGitHubConnectUrl, deleteGitHubConnector, saveJiraConnector, getJiraConnectUrl, deleteJiraConnector } from "../api/connectorsApi";
 import type { ConnectorSummary } from "../api/connectorsApi";
 import { EmailReplyPanel } from "./EmailReplyPanel";
 import { MODELS } from "../constants/models";
@@ -105,17 +105,25 @@ export function SettingsModal({
   const [connectors, setConnectors] = useState<ConnectorSummary[]>([]);
   const [connectorsLoading, setConnectorsLoading] = useState(false);
   const [connectorsError, setConnectorsError] = useState<string | null>(null);
+  const [githubConnecting, setGitHubConnecting] = useState(false);
+  const [githubConnectError, setGitHubConnectError] = useState<string | null>(null);
+  const [jiraConnecting, setJiraConnecting] = useState(false);
+  const [jiraConnectError, setJiraConnectError] = useState<string | null>(null);
   const [connectorSaving, setConnectorSaving] = useState<"github" | "jira" | null>(null);
   const [connectorRemoving, setConnectorRemoving] = useState<"github" | "jira" | null>(null);
   const [connectorResult, setConnectorResult] = useState<string | null>(null);
-  const [gitHubForm, setGitHubForm] = useState({ token: "", owner: "", repo: "", base_url: "", branch: "" });
-  const [jiraForm, setJiraForm] = useState({ site_url: "", email: "", token: "", project_key: "", issue_type: "Task" });
+  const [gitHubForm, setGitHubForm] = useState({ owner: "", repo: "", base_url: "", branch: "" });
+  const [jiraForm, setJiraForm] = useState({ project_key: "", issue_type: "Task" });
 
   useEffect(() => {
     if (show) {
       loadProviders(); loadEmailStatus(); loadTeamsStatus(); loadConnectors();
       const oauthErr = sessionStorage.getItem("email_oauth_error");
       if (oauthErr) { setEmailConnectError(oauthErr); sessionStorage.removeItem("email_oauth_error"); }
+      const githubOauthErr = sessionStorage.getItem("github_oauth_error");
+      if (githubOauthErr) { setGitHubConnectError(githubOauthErr); sessionStorage.removeItem("github_oauth_error"); }
+      const jiraOauthErr = sessionStorage.getItem("jira_oauth_error");
+      if (jiraOauthErr) { setJiraConnectError(jiraOauthErr); sessionStorage.removeItem("jira_oauth_error"); }
     }
   }, [show]);
 
@@ -210,10 +218,12 @@ export function SettingsModal({
       const github = rows.find((item) => item.id === "github");
       const jira = rows.find((item) => item.id === "jira");
       if (github?.config && typeof github.config === "object") {
+        const defaultRepo = String((github.config as any).default_repo ?? "");
+        const [defaultOwner, defaultRepoName] = defaultRepo.includes("/") ? defaultRepo.split("/", 2) : ["", ""];
         setGitHubForm((prev) => ({
           ...prev,
-          owner: String((github.config as any).account_label ?? prev.owner ?? ""),
-          repo: String((github.config as any).default_repo?.split("/")?.[1] ?? prev.repo ?? ""),
+          owner: defaultOwner || prev.owner || "",
+          repo: defaultRepoName || prev.repo || "",
           base_url: String((github.config as any).base_url ?? prev.base_url ?? ""),
           branch: String((github.config as any).default_branch ?? prev.branch ?? ""),
         }));
@@ -221,8 +231,6 @@ export function SettingsModal({
       if (jira?.config && typeof jira.config === "object") {
         setJiraForm((prev) => ({
           ...prev,
-          site_url: String((jira.config as any).base_url ?? prev.site_url ?? ""),
-          email: String((jira.config as any).account_label ?? prev.email ?? ""),
           project_key: String((jira.config as any).default_project_key ?? prev.project_key ?? ""),
           issue_type: String((jira.config as any).default_issue_type ?? prev.issue_type ?? "Task"),
         }));
@@ -234,20 +242,33 @@ export function SettingsModal({
     }
   }
 
+  async function handleConnectGitHub() {
+    setGitHubConnecting(true);
+    setGitHubConnectError(null);
+    setConnectorResult(null);
+    try {
+      const url = await getGitHubConnectUrl();
+      window.location.href = url;
+    } catch (err: any) {
+      setGitHubConnecting(false);
+      const detail = err?.response?.data?.detail ?? "Could not start GitHub connection. Check server configuration.";
+      setGitHubConnectError(detail);
+    }
+  }
+
   async function handleSaveGitHubConnector() {
-    if (!gitHubForm.token.trim() || !gitHubForm.owner.trim() || !gitHubForm.repo.trim()) {
-      setConnectorResult("GitHub token, owner, and repository are required.");
+    if (Boolean(gitHubForm.owner.trim()) !== Boolean(gitHubForm.repo.trim())) {
+      setConnectorResult("GitHub owner and repository must be provided together.");
       return;
     }
     setConnectorSaving("github");
     setConnectorResult(null);
     try {
       await saveGitHubConnector(gitHubForm);
-      setGitHubForm((prev) => ({ ...prev, token: "" }));
-      setConnectorResult("✓ GitHub connector saved.");
+      setConnectorResult("✓ GitHub repository defaults saved.");
       await loadConnectors();
     } catch (err: any) {
-      setConnectorResult(err?.response?.data?.detail ?? "Failed to save GitHub connector.");
+      setConnectorResult(err?.response?.data?.detail ?? "Failed to save GitHub repository defaults.");
     } finally {
       setConnectorSaving(null);
     }
@@ -256,45 +277,58 @@ export function SettingsModal({
   async function handleDeleteGitHubConnector() {
     setConnectorRemoving("github");
     setConnectorResult(null);
+    setGitHubConnectError(null);
     try {
       await deleteGitHubConnector();
-      setConnectorResult("✓ GitHub connector removed.");
+      setConnectorResult("✓ GitHub disconnected.");
+      setGitHubForm({ owner: "", repo: "", base_url: "", branch: "" });
       await loadConnectors();
     } catch (err: any) {
-      setConnectorResult(err?.response?.data?.detail ?? "Failed to remove GitHub connector.");
+      setConnectorResult(err?.response?.data?.detail ?? "Failed to disconnect GitHub.");
     } finally {
       setConnectorRemoving(null);
     }
   }
 
   async function handleSaveJiraConnector() {
-    if (!jiraForm.site_url.trim() || !jiraForm.email.trim() || !jiraForm.token.trim() || !jiraForm.project_key.trim()) {
-      setConnectorResult("Jira site URL, email, token, and project key are required.");
-      return;
-    }
     setConnectorSaving("jira");
     setConnectorResult(null);
     try {
       await saveJiraConnector(jiraForm);
-      setJiraForm((prev) => ({ ...prev, token: "" }));
-      setConnectorResult("✓ Jira connector saved.");
+      setConnectorResult("✓ Jira project defaults saved.");
       await loadConnectors();
     } catch (err: any) {
-      setConnectorResult(err?.response?.data?.detail ?? "Failed to save Jira connector.");
+      setConnectorResult(err?.response?.data?.detail ?? "Failed to save Jira project defaults.");
     } finally {
       setConnectorSaving(null);
+    }
+  }
+
+  async function handleConnectJira() {
+    setJiraConnecting(true);
+    setJiraConnectError(null);
+    setConnectorResult(null);
+    try {
+      const url = await getJiraConnectUrl();
+      window.location.href = url;
+    } catch (err: any) {
+      setJiraConnecting(false);
+      const detail = err?.response?.data?.detail ?? "Could not start Jira connection. Check server configuration.";
+      setJiraConnectError(detail);
     }
   }
 
   async function handleDeleteJiraConnector() {
     setConnectorRemoving("jira");
     setConnectorResult(null);
+    setJiraConnectError(null);
     try {
       await deleteJiraConnector();
-      setConnectorResult("✓ Jira connector removed.");
+      setConnectorResult("✓ Jira disconnected.");
+      setJiraForm({ project_key: "", issue_type: "Task" });
       await loadConnectors();
     } catch (err: any) {
-      setConnectorResult(err?.response?.data?.detail ?? "Failed to remove Jira connector.");
+      setConnectorResult(err?.response?.data?.detail ?? "Failed to disconnect Jira.");
     } finally {
       setConnectorRemoving(null);
     }
@@ -966,47 +1000,101 @@ export function SettingsModal({
 
                         {connector.id === "github" && (
                           <div className="space-y-3 pt-1">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                              <input className={inputCls} placeholder="Owner or org" value={gitHubForm.owner} onChange={(e) => setGitHubForm((prev) => ({ ...prev, owner: e.target.value }))} />
-                              <input className={inputCls} placeholder="Repository" value={gitHubForm.repo} onChange={(e) => setGitHubForm((prev) => ({ ...prev, repo: e.target.value }))} />
-                              <input className={inputCls} placeholder="GitHub token" value={gitHubForm.token} onChange={(e) => setGitHubForm((prev) => ({ ...prev, token: e.target.value }))} />
-                              <input className={inputCls} placeholder="Default branch (optional)" value={gitHubForm.branch} onChange={(e) => setGitHubForm((prev) => ({ ...prev, branch: e.target.value }))} />
-                              <input className="md:col-span-2 w-full bg-[#12121a] border border-[#2a2a38] rounded-xl px-3 py-2 text-sm text-gray-200 outline-none focus:border-indigo-500 transition" placeholder="GitHub API base URL (optional, for Enterprise)" value={gitHubForm.base_url} onChange={(e) => setGitHubForm((prev) => ({ ...prev, base_url: e.target.value }))} />
-                            </div>
-                            <div className="flex gap-2 flex-wrap">
-                              <button onClick={handleSaveGitHubConnector} disabled={connectorSaving === "github"} className={btnPrimary}>
-                                {connectorSaving === "github" ? "Saving…" : connector.connected ? "Update GitHub" : "Save GitHub"}
-                              </button>
-                              {connector.connected && (
-                                <button onClick={handleDeleteGitHubConnector} disabled={connectorRemoving === "github"} className={btnDanger}>
-                                  {connectorRemoving === "github" ? "Removing…" : "Remove"}
+                            {connector.connected ? (
+                              <>
+                                <div className="flex items-center justify-between gap-3 rounded-xl border border-[#2a2a38] bg-[#12121a] px-4 py-3">
+                                  <div>
+                                    <p className="text-sm font-medium text-gray-200">{connector.summary || "GitHub connected"}</p>
+                                    <p className="text-xs text-gray-500">Connected via GitHub OAuth. Set a default repo if you want chat actions to work without repeating owner/repo.</p>
+                                  </div>
+                                  <button onClick={handleDeleteGitHubConnector} disabled={connectorRemoving === "github"} className={btnDanger}>
+                                    {connectorRemoving === "github" ? "Disconnecting…" : "Disconnect"}
+                                  </button>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                  <input className={inputCls} placeholder="Default owner or org" value={gitHubForm.owner} onChange={(e) => setGitHubForm((prev) => ({ ...prev, owner: e.target.value }))} />
+                                  <input className={inputCls} placeholder="Default repository" value={gitHubForm.repo} onChange={(e) => setGitHubForm((prev) => ({ ...prev, repo: e.target.value }))} />
+                                  <input className={inputCls} placeholder="Default branch (optional)" value={gitHubForm.branch} onChange={(e) => setGitHubForm((prev) => ({ ...prev, branch: e.target.value }))} />
+                                  <input className={inputCls} placeholder="GitHub API base URL (optional)" value={gitHubForm.base_url} onChange={(e) => setGitHubForm((prev) => ({ ...prev, base_url: e.target.value }))} />
+                                </div>
+                                <div className="flex gap-2 flex-wrap">
+                                  <button onClick={handleSaveGitHubConnector} disabled={connectorSaving === "github"} className={btnPrimary}>
+                                    {connectorSaving === "github" ? "Saving…" : "Save Repo Defaults"}
+                                  </button>
+                                </div>
+                                <p className="text-[11px] text-gray-600">MemoLink can inspect repos, manage issues, create and update pull requests, merge them, comment on them, and create development branches from chat.</p>
+                              </>
+                            ) : (
+                              <div className="space-y-4">
+                                <p className="text-sm text-gray-400">Connect GitHub to manage issues, pull requests, comments, branches, and repo workflows directly from chat.</p>
+                                <div className="bg-[#12121a] border border-[#2a2a38] rounded-xl px-4 py-4 space-y-2.5">
+                                  {["Create and update issues and pull requests", "Comment on existing PRs or issues", "Create development branches from chat", "Set a default repo so chat actions stay concise"].map((f) => (
+                                    <div key={f} className="flex items-start gap-2 text-xs text-gray-400">
+                                      <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 mt-1 shrink-0" />
+                                      {f}
+                                    </div>
+                                  ))}
+                                </div>
+                                <button onClick={handleConnectGitHub} disabled={githubConnecting} className={btnPrimary}>
+                                  {githubConnecting ? "Redirecting…" : "Connect GitHub"}
                                 </button>
-                              )}
-                            </div>
-                            <p className="text-[11px] text-gray-600">MemoLink can check issues, create tickets, update them, and create a development branch from chat when this connector is configured.</p>
+                                {githubConnectError && (
+                                  <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-300 leading-relaxed">
+                                    {githubConnectError}
+                                  </div>
+                                )}
+                                <p className="text-[11px] text-gray-600">You'll be redirected to GitHub to authorise access. MemoLink stores the access token securely and never stores your password.</p>
+                              </div>
+                            )}
                           </div>
                         )}
 
                         {connector.id === "jira" && (
                           <div className="space-y-3 pt-1">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                              <input className={inputCls} placeholder="Jira site URL" value={jiraForm.site_url} onChange={(e) => setJiraForm((prev) => ({ ...prev, site_url: e.target.value }))} />
-                              <input className={inputCls} placeholder="Account email" value={jiraForm.email} onChange={(e) => setJiraForm((prev) => ({ ...prev, email: e.target.value }))} />
-                              <input className={inputCls} placeholder="API token" value={jiraForm.token} onChange={(e) => setJiraForm((prev) => ({ ...prev, token: e.target.value }))} />
-                              <input className={inputCls} placeholder="Default project key" value={jiraForm.project_key} onChange={(e) => setJiraForm((prev) => ({ ...prev, project_key: e.target.value }))} />
-                              <input className="md:col-span-2 w-full bg-[#12121a] border border-[#2a2a38] rounded-xl px-3 py-2 text-sm text-gray-200 outline-none focus:border-indigo-500 transition" placeholder="Default issue type" value={jiraForm.issue_type} onChange={(e) => setJiraForm((prev) => ({ ...prev, issue_type: e.target.value }))} />
-                            </div>
-                            <div className="flex gap-2 flex-wrap">
-                              <button onClick={handleSaveJiraConnector} disabled={connectorSaving === "jira"} className={btnPrimary}>
-                                {connectorSaving === "jira" ? "Saving…" : connector.connected ? "Update Jira" : "Save Jira"}
-                              </button>
-                              {connector.connected && (
-                                <button onClick={handleDeleteJiraConnector} disabled={connectorRemoving === "jira"} className={btnDanger}>
-                                  {connectorRemoving === "jira" ? "Removing…" : "Remove"}
+                            {connector.connected ? (
+                              <>
+                                <div className="flex items-center justify-between gap-3 rounded-xl border border-[#2a2a38] bg-[#12121a] px-4 py-3">
+                                  <div>
+                                    <p className="text-sm font-medium text-gray-200">{connector.summary || "Jira connected"}</p>
+                                    <p className="text-xs text-gray-500">Connected via Atlassian OAuth. Set a default project if you want chat actions to stay concise.</p>
+                                  </div>
+                                  <button onClick={handleDeleteJiraConnector} disabled={connectorRemoving === "jira"} className={btnDanger}>
+                                    {connectorRemoving === "jira" ? "Disconnecting…" : "Disconnect"}
+                                  </button>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                  <input className={inputCls} placeholder="Default project key" value={jiraForm.project_key} onChange={(e) => setJiraForm((prev) => ({ ...prev, project_key: e.target.value }))} />
+                                  <input className={inputCls} placeholder="Default issue type" value={jiraForm.issue_type} onChange={(e) => setJiraForm((prev) => ({ ...prev, issue_type: e.target.value }))} />
+                                </div>
+                                <div className="flex gap-2 flex-wrap">
+                                  <button onClick={handleSaveJiraConnector} disabled={connectorSaving === "jira"} className={btnPrimary}>
+                                    {connectorSaving === "jira" ? "Saving…" : "Save Project Defaults"}
+                                  </button>
+                                </div>
+                                <p className="text-[11px] text-gray-600">MemoLink can check tickets, create issues, update them, comment on them, inspect transitions, and move them into a new workflow status from chat.</p>
+                              </>
+                            ) : (
+                              <div className="space-y-4">
+                                <p className="text-sm text-gray-400">Connect Jira to create tickets, update them, move them into progress, inspect transitions, and comment on work items directly from chat.</p>
+                                <div className="bg-[#12121a] border border-[#2a2a38] rounded-xl px-4 py-4 space-y-2.5">
+                                  {["Create and update Jira issues from chat", "Move work into statuses like In Progress", "List transitions and comments on an issue", "Set a default project so prompts stay short"].map((f) => (
+                                    <div key={f} className="flex items-start gap-2 text-xs text-gray-400">
+                                      <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 mt-1 shrink-0" />
+                                      {f}
+                                    </div>
+                                  ))}
+                                </div>
+                                <button onClick={handleConnectJira} disabled={jiraConnecting} className={btnPrimary}>
+                                  {jiraConnecting ? "Redirecting…" : "Connect Jira"}
                                 </button>
-                              )}
-                            </div>
-                            <p className="text-[11px] text-gray-600">MemoLink can check tickets, create issues, update them, and move them into a new workflow status from chat when this connector is configured.</p>
+                                {jiraConnectError && (
+                                  <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-300 leading-relaxed">
+                                    {jiraConnectError}
+                                  </div>
+                                )}
+                                <p className="text-[11px] text-gray-600">You'll be redirected to Atlassian to authorise access. MemoLink stores the access token securely and refreshes it when needed.</p>
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>

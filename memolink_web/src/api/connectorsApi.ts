@@ -11,18 +11,14 @@ export interface ConnectorSummary {
 }
 
 export interface GitHubConnectorPayload {
-  token: string;
-  owner: string;
-  repo: string;
+  owner?: string;
+  repo?: string;
   base_url?: string;
   branch?: string;
 }
 
 export interface JiraConnectorPayload {
-  site_url: string;
-  email: string;
-  token: string;
-  project_key: string;
+  project_key?: string;
   issue_type?: string;
 }
 
@@ -34,12 +30,20 @@ export async function saveGitHubConnector(payload: GitHubConnectorPayload): Prom
   await api.put("/connectors/github", payload);
 }
 
+export async function getGitHubConnectUrl(): Promise<string> {
+  return (await api.get("/connectors/github/connect-url")).data.url;
+}
+
 export async function deleteGitHubConnector(): Promise<void> {
   await api.delete("/connectors/github");
 }
 
 export async function saveJiraConnector(payload: JiraConnectorPayload): Promise<void> {
   await api.put("/connectors/jira", payload);
+}
+
+export async function getJiraConnectUrl(): Promise<string> {
+  return (await api.get("/connectors/jira/connect-url")).data.url;
 }
 
 export async function deleteJiraConnector(): Promise<void> {

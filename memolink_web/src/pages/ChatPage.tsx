@@ -164,17 +164,31 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
   // Open Settings after OAuth redirects
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get("email_connected") === "1" || params.get("teams_connected") === "1") {
+    if (
+      params.get("email_connected") === "1" ||
+      params.get("teams_connected") === "1" ||
+      params.get("github_connected") === "1" ||
+      params.get("jira_connected") === "1"
+    ) {
       setShowSettings(true);
       if (params.get("teams_connected") === "1") setTeamsConnected(true);
       window.history.replaceState({}, "", window.location.pathname);
     }
     const emailErr = params.get("email_error");
-    if (emailErr) {
+    const githubErr = params.get("github_error");
+    const jiraErr = params.get("jira_error");
+    if (emailErr || githubErr || jiraErr) {
       setShowSettings(true);
       window.history.replaceState({}, "", window.location.pathname);
-      // emailConnectError is shown in SettingsModal — pass via sessionStorage so it survives the redirect
-      sessionStorage.setItem("email_oauth_error", decodeURIComponent(emailErr));
+      if (emailErr) {
+        sessionStorage.setItem("email_oauth_error", decodeURIComponent(emailErr));
+      }
+      if (githubErr) {
+        sessionStorage.setItem("github_oauth_error", decodeURIComponent(githubErr));
+      }
+      if (jiraErr) {
+        sessionStorage.setItem("jira_oauth_error", decodeURIComponent(jiraErr));
+      }
     }
   }, []);
 

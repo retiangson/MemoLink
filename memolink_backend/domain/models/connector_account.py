@@ -12,6 +12,8 @@ class ConnectorAccount(Base):
     display_name = Column(String(100), nullable=False, default="")
     account_label = Column(String(255), nullable=True)
     encrypted_secret = Column(Text, nullable=False)
+    encrypted_refresh_secret = Column(Text, nullable=True)
+    token_expiry = Column(DateTime(timezone=True), nullable=True)
     base_url = Column(Text, nullable=True)
     config_json = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
