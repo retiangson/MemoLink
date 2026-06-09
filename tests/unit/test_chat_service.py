@@ -68,6 +68,23 @@ def _extract_draft_subject(answer: str) -> str:
     return match.group(1)
 
 
+class RecordingHybridNoteRepository(FakeNoteRepository):
+    def __init__(self):
+        super().__init__()
+        self.hybrid_calls = []
+
+    def search_hybrid(self, query_text, query_vector, top_k=10, workspace_id=None, user_id=None):
+        self.hybrid_calls.append(
+            {
+                "query_text": query_text,
+                "top_k": top_k,
+                "workspace_id": workspace_id,
+                "user_id": user_id,
+            }
+        )
+        return self.get_for_user(user_id, workspace_id)[:top_k]
+
+
 def test_chat_service_returns_empty_prompt_message():
     service = ChatService(
         conv_repo=FakeConversationRepository(),
@@ -103,6 +120,33 @@ def test_chat_service_uses_notes_as_context_and_saves_assistant_message(monkeypa
     assert result.sources[0].note_id == note.id
     assert any("USER NOTES CONTEXT" in m["content"] for m in fake_chat.last_messages)
     assert list(conv_repo.messages.values())[-1].role == "assistant"
+
+
+def test_chat_service_large_workspace_uses_hybrid_note_search(monkeypatch, fake):
+    conv_repo = FakeConversationRepository()
+    note_repo = RecordingHybridNoteRepository()
+    for i in range(25):
+        note_repo.create_note(1, f"Launch note {i}", fake.paragraph(), "manual")
+
+    fake_chat = FakeOpenAIChat("Grounded answer")
+    monkeypatch.setattr(
+        chat_module,
+        "_get_client",
+        lambda model, user_keys=None: SimpleNamespace(chat=SimpleNamespace(completions=fake_chat)),
+    )
+    service = ChatService(
+        conv_repo=conv_repo,
+        note_repo=note_repo,
+        embedding_service=FakeEmbeddingService(),
+    )
+
+    result = service.ask(ChatRequestDTO(user_id=1, prompt="Find the launch checklist decisions", top_k=5))
+
+    assert result.answer == "Grounded answer"
+    assert note_repo.hybrid_calls
+    assert note_repo.hybrid_calls[0]["query_text"] == "Find the launch checklist decisions"
+    assert note_repo.hybrid_calls[0]["user_id"] == 1
+    assert note_repo.hybrid_calls[0]["top_k"] == 5
 
 
 def test_chat_service_creates_direct_reminder_from_plain_chat_request():

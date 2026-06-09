@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { RichNoteEditor, ttsHighlightKey } from "./RichNoteEditor";
 import { splitSentences } from "../hooks/useTTS";
+import { useRecording } from "../hooks/useRecording";
 import { exportNote, EXPORT_FORMATS } from "../utils/noteExport";
 import type { ExportFormat } from "../utils/noteExport";
 import { VideoImportModal } from "./VideoImportModal";
@@ -10,16 +11,12 @@ import { TTSPlayerBar } from "./TTSPlayerBar";
 interface NoteEditorViewProps {
   noteKey: string | number;
   noteTitleDraft: string;
-  setNoteTitleDraft: (v: string) => void;
+  setNoteTitleDraft: (v: string | ((prev: string) => string)) => void;
   noteContentDraft: string;
   setNoteContentDraft: (v: string | ((prev: string) => string)) => void;
   isNoteDirty: boolean;
   onSave: () => void;
   onDiscard: () => void;
-  isRecording: boolean;
-  isTranscribing: boolean;
-  onStartRecording: (source: "mic" | "computer", language: string) => void;
-  onStopRecording: () => void;
   onPlay?: (text: string) => void;
   ttsPlaying?: boolean;
   ttsPaused?: boolean;
@@ -64,7 +61,6 @@ export function NoteEditorView({
   noteTitleDraft, setNoteTitleDraft,
   noteContentDraft, setNoteContentDraft,
   isNoteDirty, onSave, onDiscard,
-  isRecording, isTranscribing, onStartRecording, onStopRecording,
   onPlay, ttsPlaying, ttsPaused, onTtsStop, onTtsPauseResume,
   onTtsBack, onTtsForward, ttsRate = 1.0, ttsVoices = [], ttsSelectedVoice = null,
   onTtsRateChange, onTtsVoiceChange,
@@ -75,11 +71,50 @@ export function NoteEditorView({
   const [showPicker, setShowPicker] = useState(false);
   const [showExport, setShowExport] = useState(false);
   const [showVideoImport, setShowVideoImport] = useState(false);
+  const [language, setLanguage] = useState("");
+  const [recordMode, setRecordMode] = useState<"default" | "lecture">("lecture");
+  const [recordBackend, setRecordBackend] = useState<"auto" | "whisper" | "deepgram">("auto");
+  const [autoStopOnSilence, setAutoStopOnSilence] = useState(false);
   const editorRef = useRef<any>(null);
   const speakStartDocPos = useRef(0);
   const speakDocText = useRef("");
   const speakDocTrimOffset = useRef(0);
   const speakDocSentenceOffset = useRef(0);
+
+  function escapeHtml(text: string) {
+    return text
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }
+
+  function appendCapturedParagraph(source: string, chunk: string) {
+    const paragraph = `<p>${escapeHtml(chunk)}</p>`;
+    return source ? `${source}${source.endsWith("\n") ? "" : "\n"}${paragraph}` : paragraph;
+  }
+
+  const recording = useRecording((text) => {
+    setNoteContentDraft((prev) => {
+      return appendCapturedParagraph(prev, text);
+    });
+  });
+
+  function stopRecording() {
+    recording.stopRecording();
+  }
+
+  function startRecording(source: "mic" | "computer") {
+    setShowPicker(false);
+    recording.startRecording(source, {
+      language,
+      mode: recordMode,
+      backend: recordBackend,
+      autoStopOnSilence: recordMode === "lecture" ? false : autoStopOnSilence,
+      silenceDurationMs: recordMode === "lecture" ? 2600 : 1500,
+    });
+  }
 
   function handlePlay() {
     if (!onPlay) return;
@@ -170,7 +205,6 @@ export function NoteEditorView({
     const to = (toChar ?? from) + 1;
     editor.view.dispatch(editor.view.state.tr.setMeta(ttsHighlightKey, { from, to }));
   }, [ttsSentenceIdx, ttsSentences, ttsWord]);
-  const [language, setLanguage] = useState("");
   const [exporting, setExporting] = useState<ExportFormat | null>(null);
   const [activeTab, setActiveTab] = useState<"editor" | "source" | "timeline">("editor");
   const [rawContent, setRawContent] = useState(noteContentDraft);
@@ -297,14 +331,22 @@ export function NoteEditorView({
       <div className="mt-3 flex items-center gap-2 shrink-0">
 
         {/* Record */}
-        {isRecording ? (
-          <button
-            onClick={onStopRecording}
-            className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs text-red-400 bg-red-400/10 border border-red-400/30 animate-pulse shrink-0"
-          >
-            <span className="w-2 h-2 rounded-full bg-red-500 inline-block" />
-            Stop
-          </button>
+        {recording.isRecording ? (
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={stopRecording}
+              className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs text-red-400 bg-red-400/10 border border-red-400/30 animate-pulse"
+            >
+              <span className="w-2 h-2 rounded-full bg-red-500 inline-block" />
+              Stop
+            </button>
+            <span className="w-10 h-1.5 rounded-full bg-[#2b2b38] overflow-hidden" aria-hidden="true">
+              <span
+                className="block h-full bg-red-400 transition-[width] duration-150"
+                style={{ width: `${Math.max(8, Math.min(100, recording.audioLevel * 100))}%` }}
+              />
+            </span>
+          </div>
         ) : (
           <div className="relative shrink-0">
             {showPicker && (
@@ -312,17 +354,64 @@ export function NoteEditorView({
                 <div className="fixed inset-0 z-[9]" onClick={() => setShowPicker(false)} />
                 <div className="absolute bottom-full left-0 mb-1 z-10 bg-[#1e1e2a] border border-[#2a2a38] rounded-xl shadow-xl overflow-hidden min-w-[160px]">
                   <button
-                    onClick={() => { setShowPicker(false); onStartRecording("mic", language); }}
+                    onClick={() => startRecording("mic")}
                     className="w-full text-left px-4 py-2.5 text-xs text-gray-300 hover:bg-[#2a2a38] flex items-center gap-2 transition"
                   >
                     🎤 Microphone
                   </button>
                   <button
-                    onClick={() => { setShowPicker(false); onStartRecording("computer", language); }}
+                    onClick={() => startRecording("computer")}
                     className="w-full text-left px-4 py-2.5 text-xs text-gray-300 hover:bg-[#2a2a38] flex items-center gap-2 transition"
                   >
                     🖥️ Computer Audio
                   </button>
+                  <div className="border-t border-[#2a2a38] px-3 py-2 space-y-2">
+                    <div>
+                      <label className="block text-[10px] text-gray-500 mb-1 uppercase tracking-wider">Capture Mode</label>
+                      <select
+                        value={recordMode}
+                        onChange={(e) => setRecordMode(e.target.value as "default" | "lecture")}
+                        onClick={(e) => e.stopPropagation()}
+                        className="w-full bg-[#0f0f13] border border-[#2a2a38] text-gray-300 text-xs rounded-lg px-2 py-1.5 focus:outline-none focus:border-indigo-500"
+                      >
+                        <option value="default">Quick Voice Note</option>
+                        <option value="lecture">Lecture Capture</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] text-gray-500 mb-1 uppercase tracking-wider">Backend</label>
+                      <select
+                        value={recordBackend}
+                        onChange={(e) => setRecordBackend(e.target.value as "auto" | "whisper" | "deepgram")}
+                        onClick={(e) => e.stopPropagation()}
+                        className="w-full bg-[#0f0f13] border border-[#2a2a38] text-gray-300 text-xs rounded-lg px-2 py-1.5 focus:outline-none focus:border-indigo-500"
+                      >
+                        <option value="auto">Auto</option>
+                        <option value="whisper">OpenAI Whisper</option>
+                        <option value="deepgram">Deepgram</option>
+                      </select>
+                    </div>
+                    <div>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); if (recordMode !== "lecture") setAutoStopOnSilence((v) => !v); }}
+                        className={`w-full flex items-center justify-between rounded-lg border px-2.5 py-2 text-xs transition ${
+                          recordMode === "lecture"
+                            ? "border-[#2a2a38] text-gray-600 cursor-not-allowed"
+                            : "border-[#2a2a38] text-gray-300 hover:border-indigo-500/40"
+                        }`}
+                      >
+                        <span>Auto-stop on silence</span>
+                        <span className={`relative w-9 h-5 rounded-full transition-colors ${autoStopOnSilence && recordMode !== "lecture" ? "bg-indigo-600" : "bg-[#303043]"}`}>
+                          <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform ${autoStopOnSilence && recordMode !== "lecture" ? "translate-x-4" : "translate-x-0"}`} />
+                        </span>
+                      </button>
+                      <p className="mt-1 text-[10px] leading-relaxed text-gray-500">
+                        {recordMode === "lecture"
+                          ? "Disabled for lecture capture so short pauses do not end the recording."
+                          : "Stops the recording after you pause, which is useful for short voice notes."}
+                      </p>
+                    </div>
+                  </div>
                   <div className="border-t border-[#2a2a38] px-3 py-2">
                     <label className="block text-[10px] text-gray-500 mb-1 uppercase tracking-wider">Language</label>
                     <select
@@ -348,6 +437,11 @@ export function NoteEditorView({
                 <path d="M12 1a4 4 0 0 1 4 4v6a4 4 0 0 1-8 0V5a4 4 0 0 1 4-4zm-6 10a6 6 0 0 0 12 0h2a8 8 0 0 1-7 7.93V21h2v2H9v-2h2v-2.07A8 8 0 0 1 4 11h2z" />
               </svg>
               Record
+              {recordMode === "lecture" && (
+                <span className="ml-0.5 px-1 py-0.5 rounded bg-emerald-600/30 text-emerald-300 text-[10px] uppercase">
+                  Lecture
+                </span>
+              )}
               {language && (
                 <span className="ml-0.5 px-1 py-0.5 rounded bg-indigo-600/30 text-indigo-300 text-[10px] uppercase">
                   {language}
@@ -441,9 +535,9 @@ export function NoteEditorView({
         )}
 
         <span className="flex-1 text-center text-xs truncate px-1 italic">
-          {isTranscribing
+          {recording.isTranscribing
             ? <span className="text-indigo-400 animate-pulse">Transcribing…</span>
-            : isRecording
+            : recording.isRecording
               ? <span className="text-red-400/80">● Recording…</span>
               : null}
         </span>

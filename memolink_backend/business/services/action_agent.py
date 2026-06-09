@@ -40,6 +40,13 @@ _ACTION_WEB_RE = re.compile(
     r"|\b(?:latest|recent|current)\b.*\b(?:news|updates)\b",
     re.IGNORECASE,
 )
+_ACTION_CONNECTOR_RE = re.compile(
+    r"\b(?:github|jira)\b.*\b(?:issue|issues|ticket|tickets|branch|development|develop|repo|repository)\b"
+    r"|\b(?:issue|issues|ticket|tickets)\b.*\b(?:github|jira)\b"
+    r"|\b(?:create|add|update|edit|check|show|list|open|close|move|transition|start)\b.*\b(?:ticket|tickets|issue|issues)\b"
+    r"|\bstart development\b|\bcreate branch\b",
+    re.IGNORECASE,
+)
 _EXPLICIT_TOOL_RE = re.compile(
     r"\b(?:use tools|take action|do it for me|handle it for me|perform the action)\b",
     re.IGNORECASE,
@@ -122,6 +129,51 @@ AGENT_TOOLS = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "github_ticket_action",
+            "description": "Check GitHub issues, create or update an issue, or start development by creating a branch for a repo issue.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "operation": {"type": "string", "enum": ["list", "get", "create", "update", "start_development"]},
+                    "repo": {"type": "string", "description": "Repository in owner/repo format. Optional if a default repo is configured."},
+                    "issue_number": {"type": "integer", "description": "Issue number for get, update, or start_development"},
+                    "query": {"type": "string", "description": "Search text for listing relevant issues"},
+                    "title": {"type": "string", "description": "Issue title for create or update"},
+                    "body": {"type": "string", "description": "Issue description or update body"},
+                    "state": {"type": "string", "enum": ["open", "closed"], "description": "Issue state for update or list"},
+                    "labels": {"type": "array", "items": {"type": "string"}},
+                    "assignees": {"type": "array", "items": {"type": "string"}},
+                    "branch_name": {"type": "string", "description": "Branch name to create for start_development"},
+                    "base_branch": {"type": "string", "description": "Optional source branch for start_development"},
+                },
+                "required": ["operation"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "jira_ticket_action",
+            "description": "Check Jira tickets, create a ticket, update it, or move it to a new workflow status.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "operation": {"type": "string", "enum": ["search", "get", "create", "update", "transition"]},
+                    "issue_key": {"type": "string", "description": "Jira issue key such as PROJ-123"},
+                    "jql": {"type": "string", "description": "Optional Jira query when searching"},
+                    "project_key": {"type": "string", "description": "Project key for create"},
+                    "summary": {"type": "string", "description": "Issue summary for create or update"},
+                    "description": {"type": "string", "description": "Issue description for create or update"},
+                    "issue_type": {"type": "string", "description": "Issue type name for create, such as Task or Story"},
+                    "status_name": {"type": "string", "description": "Target Jira workflow status for transition"},
+                },
+                "required": ["operation"],
+            },
+        },
+    },
 ]
 
 _TOOL_LABELS = {
@@ -130,12 +182,15 @@ _TOOL_LABELS = {
     "edit_note": "Editing note",
     "create_reminder": "Adding a reminder",
     "web_search": "Searching the web",
+    "github_ticket_action": "Working with GitHub",
+    "jira_ticket_action": "Working with Jira",
 }
 
 _SYSTEM_PROMPT = (
     "You are MemoLink Action Agent, an AI assistant that can take focused actions on the user's behalf. "
     "Use tools only when the user is asking you to perform a concrete action such as searching notes, "
-    "creating or editing notes, adding reminders, or searching the web for live information. "
+    "creating or editing notes, adding reminders, searching the web for live information, or managing GitHub/Jira tickets when those connectors are configured. "
+    "If the user says 'ticket' without naming a system, prefer Jira for project-management tickets and GitHub for repository issues or branches based on the wording. "
     "Keep tool use efficient, avoid redundant actions, and give a concise final answer that states what you did."
 )
 
@@ -154,9 +209,10 @@ def decide_action_agent(prompt: str, smart_analysis: dict | None = None) -> Acti
     note_action = bool(_ACTION_NOTE_RE.search(lower))
     reminder_action = bool(_ACTION_REMINDER_RE.search(lower))
     web_action = bool(_ACTION_WEB_RE.search(lower))
+    connector_action = bool(_ACTION_CONNECTOR_RE.search(lower))
     explicit_tool_request = bool(_EXPLICIT_TOOL_RE.search(lower))
 
-    if not any((note_action, reminder_action, web_action, explicit_tool_request)):
+    if not any((note_action, reminder_action, web_action, connector_action, explicit_tool_request)):
         return ActionAgentDecision(False)
 
     mode = (smart_analysis or {}).get("mode", "general_chat")
@@ -169,6 +225,8 @@ def decide_action_agent(prompt: str, smart_analysis: dict | None = None) -> Acti
         return ActionAgentDecision(True, "Smart: action_agent (reminder)")
     if web_action and ((smart_analysis or {}).get("needs_web") or "search" in lower or "look up" in lower):
         return ActionAgentDecision(True, "Smart: action_agent (web)")
+    if connector_action:
+        return ActionAgentDecision(True, "Smart: action_agent (connectors)")
     if explicit_tool_request:
         return ActionAgentDecision(True, "Smart: action_agent (explicit)")
 
@@ -182,12 +240,16 @@ class ActionAgentRunner:
         note_repo,
         reminder_repo,
         embedding_service: Optional[EmbeddingService] = None,
+        github_service=None,
+        jira_service=None,
     ):
         self.conv_repo = conv_repo
         self.note_repo = note_repo
         self.reminder_repo = reminder_repo
         self.embedding = embedding_service or EmbeddingService()
         self.client = OpenAI(api_key=settings.openai_api_key)
+        self.github = github_service
+        self.jira = jira_service
 
     def _resolve_model(self, model: Optional[str]) -> str:
         selected = model or settings.openai_chat_model
@@ -214,9 +276,15 @@ class ActionAgentRunner:
         try:
             vec = self.embedding.embed_text(query)
             try:
-                notes = self.note_repo.search_by_vector(vec, top_k=5, workspace_id=workspace_id)
+                notes = self.note_repo.search_hybrid(
+                    query,
+                    vec,
+                    top_k=5,
+                    workspace_id=workspace_id,
+                    user_id=user_id,
+                )
             except TypeError:
-                notes = self.note_repo.search_by_vector(vec, top_k=5)
+                notes = self.note_repo.search_by_vector(vec, top_k=5, workspace_id=workspace_id, user_id=user_id)
         except Exception:
             notes = self.note_repo.get_for_user(user_id, workspace_id)[:5]
         if not notes:
@@ -274,6 +342,80 @@ class ActionAgentRunner:
         result = brave_search(query)
         return result or "No web results found."
 
+    def _github_ticket_action(self, args: dict, user_id: int) -> str:
+        if self.github is None:
+            return "GitHub connector is not available."
+        operation = args["operation"]
+        if operation == "list":
+            return self.github.list_issues(
+                user_id,
+                args.get("repo"),
+                query=args.get("query"),
+                state=args.get("state") or "open",
+            )
+        if operation == "get":
+            return self.github.get_issue(user_id, args.get("repo"), int(args["issue_number"]))
+        if operation == "create":
+            return self.github.create_issue(
+                user_id,
+                args.get("repo"),
+                args["title"],
+                body=args.get("body"),
+                labels=args.get("labels"),
+                assignees=args.get("assignees"),
+            )
+        if operation == "update":
+            return self.github.update_issue(
+                user_id,
+                args.get("repo"),
+                int(args["issue_number"]),
+                title=args.get("title"),
+                body=args.get("body"),
+                state=args.get("state"),
+                labels=args.get("labels"),
+                assignees=args.get("assignees"),
+            )
+        if operation == "start_development":
+            return self.github.start_development(
+                user_id,
+                args.get("repo"),
+                issue_number=args.get("issue_number"),
+                branch_name=args.get("branch_name"),
+                base_branch=args.get("base_branch"),
+            )
+        return f"Unknown GitHub operation: {operation}"
+
+    def _jira_ticket_action(self, args: dict, user_id: int) -> str:
+        if self.jira is None:
+            return "Jira connector is not available."
+        operation = args["operation"]
+        if operation == "search":
+            return self.jira.search_issues(user_id, jql=args.get("jql"))
+        if operation == "get":
+            return self.jira.search_issues(user_id, issue_key=args["issue_key"])
+        if operation == "create":
+            return self.jira.create_issue(
+                user_id,
+                project_key=args.get("project_key"),
+                summary=args["summary"],
+                description=args.get("description"),
+                issue_type=args.get("issue_type"),
+            )
+        if operation == "update":
+            return self.jira.update_issue(
+                user_id,
+                issue_key=args["issue_key"],
+                summary=args.get("summary"),
+                description=args.get("description"),
+            )
+        if operation == "transition":
+            return self.jira.transition_issue(
+                user_id,
+                issue_key=args["issue_key"],
+                status_name=args["status_name"],
+            )
+        return f"Unknown Jira operation: {operation}"
+
     def _execute_tool(self, name: str, args: dict, user_id: int, workspace_id: Optional[int]) -> str:
         if name == "search_notes":
             return self._search_notes(args["query"], user_id, workspace_id)
@@ -292,6 +434,10 @@ class ActionAgentRunner:
             )
         if name == "web_search":
             return self._web_search(args["query"])
+        if name == "github_ticket_action":
+            return self._github_ticket_action(args, user_id)
+        if name == "jira_ticket_action":
+            return self._jira_ticket_action(args, user_id)
         return f"Unknown tool: {name}"
 
     def _run_tool_loop(
@@ -322,9 +468,15 @@ class ActionAgentRunner:
                 label = _TOOL_LABELS.get(name, name)
                 if stream_events:
                     events.append(sse_event(ToolStartEvent(label=label, tool_call=name)))
-                result = self._execute_tool(name, args, user_id, workspace_id)
+                try:
+                    result = self._execute_tool(name, args, user_id, workspace_id)
+                    ok = True
+                except Exception as exc:
+                    logger.warning("Action tool %s failed: %s", name, exc)
+                    result = str(exc)
+                    ok = False
                 if stream_events:
-                    events.append(sse_event(ToolCompleteEvent(ok=True, result=result)))
+                    events.append(sse_event(ToolCompleteEvent(ok=ok, result=result)))
                 messages.append(
                     {
                         "role": "tool",

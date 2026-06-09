@@ -2,7 +2,6 @@ import React, { useEffect, useRef, useState } from "react";
 import { saveUser, type User } from "../utils/auth";
 import { useNotes } from "../hooks/useNotes";
 import { useNoteEditor } from "../hooks/useNoteEditor";
-import { useRecording } from "../hooks/useRecording";
 import { useConversations } from "../hooks/useConversations";
 import { useChat } from "../hooks/useChat";
 import { addMessageToNoteAPI, deleteMessage } from "../api/conversationApi";
@@ -185,9 +184,6 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
   const suggestions = useSuggestions(activeWorkspaceId);
   const { permission: notifPermission, requestPermission: requestNotifPermission } = useReminderNotifications(suggestions.items);
   const editor = useNoteEditor();
-  const recording = useRecording((text) => {
-    editor.setNoteContentDraft((prev) => prev ? prev + `<p>${text}</p>` : `<p>${text}</p>`);
-  });
   const convs = useConversations(activeWorkspaceId);
 
   // Load the user's saved answer ratings so selections persist across reloads.
@@ -889,10 +885,6 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                 isNoteDirty={editor.isNoteDirty}
                 onSave={handleSaveNote}
                 onDiscard={editor.discardChanges}
-                isRecording={recording.isRecording}
-                isTranscribing={recording.isTranscribing}
-                onStartRecording={(src, lang) => recording.startRecording(src, lang)}
-                onStopRecording={recording.stopRecording}
                 onPlay={chat.tts.speak}
                 ttsPlaying={chat.tts.playing}
                 ttsPaused={chat.tts.paused}
@@ -1187,10 +1179,6 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                       isNoteDirty={editor.isNoteDirty}
                       onSave={handleSaveNote}
                       onDiscard={editor.discardChanges}
-                      isRecording={recording.isRecording}
-                      isTranscribing={recording.isTranscribing}
-                      onStartRecording={(src, lang) => recording.startRecording(src, lang)}
-                      onStopRecording={recording.stopRecording}
                       onPlay={chat.tts.speak}
                       ttsPlaying={chat.tts.playing}
                       ttsPaused={chat.tts.paused}

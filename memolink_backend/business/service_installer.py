@@ -16,7 +16,11 @@ class ServiceInstaller:
 
     def get_chat_service(self) -> IChatService:
         from memolink_backend.business.services.chat_service import ChatService
+        from memolink_backend.business.services.action_agent import ActionAgentRunner
+        from memolink_backend.business.services.github_connector import GitHubConnectorService
+        from memolink_backend.business.services.jira_connector import JiraConnectorService
         from memolink_backend.domain.repositories.graph_repository import GraphRepository
+        connector_repo = self._domain.get_connector_account_repository()
         return ChatService(
             conv_repo=self._domain.get_conversation_repository(),
             note_repo=self._domain.get_note_repository(),
@@ -29,6 +33,14 @@ class ServiceInstaller:
             email_record_repo=self._domain.get_email_record_repository(),
             email_service=self.get_email_service(),
             eval_service=self.get_evaluation_service(),
+            action_agent=ActionAgentRunner(
+                conv_repo=self._domain.get_conversation_repository(),
+                note_repo=self._domain.get_note_repository(),
+                reminder_repo=self._domain.get_reminder_repository(),
+                embedding_service=self._domain.get_embedding_service(),
+                github_service=GitHubConnectorService(connector_repo),
+                jira_service=JiraConnectorService(connector_repo),
+            ),
         )
 
     def get_note_service(self) -> INoteService:
@@ -77,6 +89,19 @@ class ServiceInstaller:
             log_service=self.get_system_log_service(),
         )
 
+    def get_connectors_service(self):
+        from memolink_backend.business.services.connectors_service import ConnectorsService
+        from memolink_backend.business.services.github_connector import GitHubConnectorService
+        from memolink_backend.business.services.jira_connector import JiraConnectorService
+        connector_repo = self._domain.get_connector_account_repository()
+        return ConnectorsService(
+            email_repo=self._domain.get_email_account_repository(),
+            teams_repo=self._domain.get_teams_account_repository(),
+            connector_repo=connector_repo,
+            github_service=GitHubConnectorService(connector_repo),
+            jira_service=JiraConnectorService(connector_repo),
+        )
+
     def get_proactive_insight_service(self):
         from memolink_backend.business.services.proactive_insight_service import ProactiveInsightService
         return ProactiveInsightService(
@@ -108,6 +133,10 @@ class ServiceInstaller:
             timeline_repo=TimelineRepository(self._domain.get_db()),
             note_repo=self._domain.get_note_repository(),
         )
+
+    def get_transcription_service(self):
+        from memolink_backend.business.services.transcription_service import TranscriptionService
+        return TranscriptionService()
 
     def get_evaluation_service(self):
         from memolink_backend.business.services.evaluation_service import EvaluationService

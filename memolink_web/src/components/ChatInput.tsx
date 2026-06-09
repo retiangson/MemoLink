@@ -42,6 +42,7 @@ export function ChatInput({
   flags, notes = [],
 }: ChatInputProps) {
   const [showLangPicker, setShowLangPicker] = useState(false);
+  const [autoStopOnSilence, setAutoStopOnSilence] = useState(true);
   const [slashPickerIndex, setSlashPickerIndex] = useState(0);
   const [notePickerIndex, setNotePickerIndex] = useState(0);
 
@@ -112,7 +113,11 @@ export function ChatInput({
 
   function startWithLang(lang: string) {
     setShowLangPicker(false);
-    recording.startRecording("mic", lang);
+    recording.startRecording("mic", {
+      language: lang,
+      autoStopOnSilence,
+      silenceDurationMs: 1400,
+    });
   }
 
   const LANG_OPTIONS = [
@@ -133,7 +138,7 @@ export function ChatInput({
       {showLangPicker && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setShowLangPicker(false)} />
-          <div className="fixed bottom-24 right-1/2 translate-x-1/2 z-50 bg-[#1e1e2a] border border-[#2a2a38] rounded-2xl shadow-2xl overflow-hidden w-52">
+          <div className="fixed bottom-24 right-1/2 translate-x-1/2 z-50 bg-[#1e1e2a] border border-[#2a2a38] rounded-2xl shadow-2xl overflow-hidden w-56">
             <p className="px-4 py-2.5 text-[11px] font-semibold text-gray-500 uppercase tracking-wider border-b border-[#2a2a38]">
               Select Language
             </p>
@@ -146,6 +151,20 @@ export function ChatInput({
                 {l.label}
               </button>
             ))}
+            <div className="border-t border-[#2a2a38] px-4 py-3">
+              <button
+                onClick={() => setAutoStopOnSilence((v) => !v)}
+                className="w-full flex items-center justify-between text-xs text-gray-300"
+              >
+                <span>Auto-stop on silence</span>
+                <span className={`relative w-9 h-5 rounded-full transition-colors ${autoStopOnSilence ? "bg-indigo-600" : "bg-[#303043]"}`}>
+                  <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform ${autoStopOnSilence ? "translate-x-4" : "translate-x-0"}`} />
+                </span>
+              </button>
+              <p className="mt-2 text-[10px] leading-relaxed text-gray-500">
+                Best for short voice replies. MemoLink stops after you pause instead of waiting for a second tap.
+              </p>
+            </div>
           </div>
         </>
       )}
@@ -383,28 +402,38 @@ export function ChatInput({
             <div className="flex items-center gap-2">
               {/* Mic button */}
               <div className="relative group">
-                <button
-                  onClick={handleMicClick}
-                  disabled={recording.isTranscribing || loading}
-                  className={`w-8 h-8 rounded-xl flex items-center justify-center transition ${
-                    recording.isRecording
-                      ? "bg-red-500/20 text-red-400 hover:bg-red-500/30"
-                      : "text-gray-500 hover:text-gray-200 hover:bg-[#252533]"
-                  } disabled:opacity-40`}
-                >
-                  {recording.isRecording ? (
-                    <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 16 16">
-                      <path d="M3.5 3.5h9v9h-9z" />
-                    </svg>
-                  ) : (
-                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="currentColor" viewBox="0 0 16 16">
-                      <path d="M3.5 6.5A.5.5 0 0 1 4 7v1a4 4 0 0 0 8 0V7a.5.5 0 0 1 1 0v1a5 5 0 0 1-4.5 4.975V15h3a.5.5 0 0 1 0 1h-7a.5.5 0 0 1 0-1h3v-2.025A5 5 0 0 1 3 8V7a.5.5 0 0 1 .5-.5" />
-                      <path d="M10 8a2 2 0 1 1-4 0V3a2 2 0 1 1 4 0z" />
-                    </svg>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={handleMicClick}
+                    disabled={recording.isTranscribing || loading}
+                    className={`w-8 h-8 rounded-xl flex items-center justify-center transition ${
+                      recording.isRecording
+                        ? "bg-red-500/20 text-red-400 hover:bg-red-500/30"
+                        : "text-gray-500 hover:text-gray-200 hover:bg-[#252533]"
+                    } disabled:opacity-40`}
+                  >
+                    {recording.isRecording ? (
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 16 16">
+                        <path d="M3.5 3.5h9v9h-9z" />
+                      </svg>
+                    ) : (
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="currentColor" viewBox="0 0 16 16">
+                        <path d="M3.5 6.5A.5.5 0 0 1 4 7v1a4 4 0 0 0 8 0V7a.5.5 0 0 1 1 0v1a5 5 0 0 1-4.5 4.975V15h3a.5.5 0 0 1 0 1h-7a.5.5 0 0 1 0-1h3v-2.025A5 5 0 0 1 3 8V7a.5.5 0 0 1 .5-.5" />
+                        <path d="M10 8a2 2 0 1 1-4 0V3a2 2 0 1 1 4 0z" />
+                      </svg>
+                    )}
+                  </button>
+                  {recording.isRecording && (
+                    <span className="w-8 h-1.5 rounded-full bg-[#2b2b38] overflow-hidden" aria-hidden="true">
+                      <span
+                        className="block h-full bg-red-400 transition-[width] duration-150"
+                        style={{ width: `${Math.max(10, Math.min(100, recording.audioLevel * 100))}%` }}
+                      />
+                    </span>
                   )}
-                </button>
+                </div>
                 <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-1.5 py-0.5 text-[10px] text-white bg-[#1e1e2a] border border-[#2a2a38] rounded whitespace-nowrap hidden group-hover:block pointer-events-none z-50">
-                  {recording.isRecording ? "Stop recording" : "Voice input"}
+                  {recording.isRecording ? (autoStopOnSilence ? "Recording - auto-stop on pause" : "Stop recording") : "Voice input"}
                 </span>
               </div>
 

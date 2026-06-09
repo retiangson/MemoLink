@@ -160,7 +160,13 @@ class ResearchService:
         if all_notes:
             try:
                 query_vec = self.embedding.embed_text(prompt)
-                top_notes = self.repo_notes.search_hybrid(prompt, query_vec, top_k=10, workspace_id=workspace_id)
+                top_notes = self.repo_notes.search_hybrid(
+                    prompt,
+                    query_vec,
+                    top_k=10,
+                    workspace_id=workspace_id,
+                    user_id=user_id,
+                )
             except Exception:
                 top_notes = all_notes[:10]
 

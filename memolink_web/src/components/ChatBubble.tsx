@@ -212,6 +212,7 @@ export default function ChatBubble({ role, content, model, streaming, onAdd, onD
   const [isSavingNote, setIsSavingNote] = useState(false);
   const [noteSaved, setNoteSaved] = useState(false);
 
+  const isThinking = content === "__THINKING__";
   const isImageGenerating = content === "__IMAGE_GENERATING__";
   const isImprovingNote = content.startsWith("__IMPROVING_NOTE__:");
   const improvingNoteTitle = isImprovingNote ? content.slice("__IMPROVING_NOTE__:".length) : "";
@@ -221,8 +222,9 @@ export default function ChatBubble({ role, content, model, streaming, onAdd, onD
   const workflowPlanData = isWorkflowPlan ? (() => { try { return JSON.parse(content.slice("__WORKFLOW_PLAN__:".length)); } catch { return null; } })() : null;
   const isCmdRunning = content.startsWith("__CMD_RUNNING__:");
   const cmdRunningMsg = isCmdRunning ? content.slice("__CMD_RUNNING__:".length) : "";
-  const { pre, edit, noteId, post } = (isImageGenerating || isImprovingNote || isQuiz || isWorkflowPlan || isCmdRunning) ? { pre: "", edit: null, noteId: null, post: "" } : parseNoteEdit(content);
+  const { pre, edit, noteId, post } = (isThinking || isImageGenerating || isImprovingNote || isQuiz || isWorkflowPlan || isCmdRunning) ? { pre: "", edit: null, noteId: null, post: "" } : parseNoteEdit(content);
   const { before: draftBefore, drafts: emailDrafts, after: draftAfter } = parseEmailDrafts(pre || content);
+  const hasAssistantContent = !isThinking && content.trim().length > 0;
 
   async function handleCopy() {
     const textToCopy = translation ?? content;
@@ -338,6 +340,15 @@ export default function ChatBubble({ role, content, model, streaming, onAdd, onD
           />
         ) : isQuiz && quizData ? (
           <QuizRenderer quiz={quizData} onSaveNote={onSaveNote} />
+        ) : isThinking ? (
+          <div className="py-1 text-sm text-indigo-300/80 flex items-center gap-2">
+            <span>Thinking</span>
+            <span className="inline-flex items-end gap-0.5" aria-hidden="true">
+              <span className="w-1 h-1 rounded-full bg-indigo-400 animate-[pulse_1.2s_ease-in-out_infinite]" />
+              <span className="w-1 h-1 rounded-full bg-indigo-400 animate-[pulse_1.2s_ease-in-out_0.2s_infinite]" />
+              <span className="w-1 h-1 rounded-full bg-indigo-400 animate-[pulse_1.2s_ease-in-out_0.4s_infinite]" />
+            </span>
+          </div>
         ) : isCmdRunning ? (
           <div className="py-1">
             <MarkdownRenderer>{cmdRunningMsg}</MarkdownRenderer>
@@ -497,7 +508,7 @@ export default function ChatBubble({ role, content, model, streaming, onAdd, onD
       )}
 
       {/* Action bar - always at the bottom of whatever is last */}
-      {!isUser && (
+      {!isUser && hasAssistantContent && (
         <div className="flex flex-col gap-0.5 pl-3">
         <div className="flex items-center gap-1 text-xs text-gray-500 opacity-60 hover:opacity-100 transition">
           {translationEnabled && translateButton}
@@ -569,7 +580,7 @@ export default function ChatBubble({ role, content, model, streaming, onAdd, onD
             </div>
           )}
         </div>
-        {!streaming && (
+        {!streaming && hasAssistantContent && (
           <div className="flex items-center gap-3 flex-wrap">
             {modelAttributionEnabled && model && (
               <div className="flex items-center gap-1.5 text-[10px] text-gray-700 select-none">

@@ -38,6 +38,9 @@ class RequestContainer:
     def teams(self):
         return self.services.get_teams_service()
 
+    def connectors(self):
+        return self.services.get_connectors_service()
+
     def insights(self):
         return self.services.get_proactive_insight_service()
 
@@ -52,6 +55,9 @@ class RequestContainer:
 
     def timeline(self):
         return self.services.get_timeline_service()
+
+    def transcription(self):
+        return self.services.get_transcription_service()
 
     def survey(self):
         return self.services.get_survey_service()

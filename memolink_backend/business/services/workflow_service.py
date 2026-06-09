@@ -513,7 +513,13 @@ class WorkflowService:
     def _read_notes(self, query: str, user_id: int, workspace_id: Optional[int]) -> str:
         try:
             vec = self._embed.embed_text(query)
-            notes = self._notes.search_by_vector(vec, top_k=6, workspace_id=workspace_id)
+            notes = self._notes.search_hybrid(
+                query,
+                vec,
+                top_k=6,
+                workspace_id=workspace_id,
+                user_id=user_id,
+            )
         except Exception:
             notes = self._notes.get_for_user(user_id, workspace_id)[:6]
         if not notes:
