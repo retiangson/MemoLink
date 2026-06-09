@@ -1,6 +1,7 @@
 import json
 import re
 import logging
+import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Iterator, Optional
@@ -133,6 +134,181 @@ class SlashCommandService:
 
     def _requires_instruction(self, cmd: str) -> str:
         return f'`/{cmd}` requires an instruction after ` : `. Example: `/{cmd.capitalize()} "My Note" : your instruction`'
+
+    def _discussion_prompt_help(self) -> str:
+        return (
+            '`/Discussion` needs either a note name or a question.\n\n'
+            'Examples:\n'
+            '- `/Discussion "My Note" how should this be improved?`\n'
+            '- `/Discussion All : compare the strongest ideas across my notes`\n'
+            '- `/Discussion how should I approach this topic?`'
+        )
+
+    def _discussion_model_chain(self, model: str, user_keys: dict[str, dict] | None = None) -> list[str]:
+        primary = _canonical_model(model)
+        chain = [primary]
+        keys = user_keys or {}
+
+        def _append_if_available(candidate: str):
+            candidate = _canonical_model(candidate)
+            if candidate in chain:
+                return
+            if candidate in keys:
+                chain.append(candidate)
+                return
+            if candidate.startswith("gemini-") and settings.gemini_api_key:
+                chain.append(candidate)
+                return
+            if candidate.startswith("deepseek-") and settings.deepseek_api_key:
+                chain.append(candidate)
+
+        if primary.startswith("gemini-"):
+            _append_if_available("gemini-2.5-flash-lite")
+            _append_if_available("gemini-2.5-flash")
+            _append_if_available("gemini-2.5-pro")
+        elif primary == "deepseek-reasoner":
+            _append_if_available("deepseek-chat")
+
+        return chain
+
+    def _is_transient_provider_error(self, exc: Exception) -> bool:
+        msg = str(exc).lower()
+        transient_markers = (
+            "429",
+            "500",
+            "502",
+            "503",
+            "504",
+            "rate limit",
+            "temporarily unavailable",
+            "high demand",
+            "timeout",
+            "timed out",
+            "unavailable",
+            "try again later",
+        )
+        return any(marker in msg for marker in transient_markers)
+
+    def _friendly_discussion_provider_message(self, name: str, exc: Exception) -> str:
+        if self._is_transient_provider_error(exc):
+            return f"{name} is temporarily unavailable due to provider load, so this turn was skipped."
+        return f"{name} is currently unavailable, so this turn was skipped."
+
+    def _discussion_completion(
+        self,
+        *,
+        name: str,
+        model: str,
+        messages: list[dict],
+        user_keys: dict[str, dict],
+        user_id: int | None,
+    ) -> str:
+        last_exc: Exception | None = None
+        chain = self._discussion_model_chain(model, user_keys)
+        for attempt in chain:
+            max_tries = 2
+            for try_index in range(max_tries):
+                try:
+                    completion = _get_client(attempt, user_keys).chat.completions.create(
+                        model=attempt,
+                        messages=messages,
+                    )
+                    if attempt != _canonical_model(model):
+                        logger.warning(
+                            "Discussion participant %s fell back from %s to %s",
+                            name,
+                            model,
+                            attempt,
+                        )
+                    return completion.choices[0].message.content or ""
+                except Exception as exc:
+                    last_exc = exc
+                    transient = self._is_transient_provider_error(exc)
+                    logger.warning(
+                        "Discussion participant %s failed on %s (try %s/%s): %s",
+                        name,
+                        attempt,
+                        try_index + 1,
+                        max_tries,
+                        exc,
+                    )
+                    if transient and try_index + 1 < max_tries:
+                        time.sleep(0.35)
+                        continue
+                    break
+        if last_exc:
+            raise last_exc
+        raise RuntimeError(f"{name} could not produce a discussion response.")
+
+    def _discussion_note_context(
+        self,
+        *,
+        user_id: int,
+        workspace_id: int | None,
+        question: str,
+        top_k: int = 5,
+    ) -> tuple[str, str, list[str]]:
+        notes = []
+        stop_terms = {
+            "a", "an", "and", "are", "as", "at", "be", "best", "but", "by",
+            "can", "do", "for", "from", "how", "i", "if", "in", "is", "it",
+            "me", "my", "of", "on", "or", "our", "should", "the", "this",
+            "to", "we", "what", "when", "where", "which", "who", "why",
+            "with", "you", "your",
+        }
+        query_terms = {
+            term
+            for term in re.findall(r"[a-z0-9]+", question.lower())
+            if term not in stop_terms and (len(term) >= 4 or term in {"ai", "db", "ui", "ux", "api", "sql"})
+        }
+
+        def _has_term_overlap(note_text: str) -> bool:
+            note_terms = set(re.findall(r"[a-z0-9]+", note_text.lower()))
+            for q_term in query_terms:
+                for n_term in note_terms:
+                    if q_term == n_term:
+                        return True
+                    if min(len(q_term), len(n_term)) >= 4 and (
+                        q_term.startswith(n_term)
+                        or n_term.startswith(q_term)
+                    ):
+                        return True
+            return False
+
+        if question.strip():
+            try:
+                query_vector = self.embedding.embed_text(question)
+                notes = self.note_repo.search_hybrid(
+                    question,
+                    query_vector,
+                    top_k=top_k,
+                    workspace_id=workspace_id,
+                    user_id=user_id,
+                )
+            except Exception:
+                notes = []
+
+        if notes and query_terms:
+            overlap_filtered = []
+            for note in notes:
+                haystack = f"{note.title or ''} {note.content or ''}"
+                if _has_term_overlap(haystack):
+                    overlap_filtered.append(note)
+            if overlap_filtered:
+                notes = overlap_filtered
+            else:
+                notes = []
+
+        if not notes:
+            return "", "General Discussion", []
+
+        note_titles = [(n.title or "Untitled").strip() or "Untitled" for n in notes]
+        context = "\n\n---\n\n".join(
+            f"## {title}\n{re.sub(r'<[^>]+>', ' ', note.content).strip()[:2500]}"
+            for title, note in zip(note_titles, notes)
+        )
+        topic = note_titles[0] if len(note_titles) == 1 else "Relevant Notes"
+        return context, topic, note_titles
 
     # ── entry point ───────────────────────────────────────────────────────────
 
@@ -547,26 +723,45 @@ Base questions ONLY on the provided notes. Do not invent facts not in the notes.
     # ── /Discussion ───────────────────────────────────────────────────────────
 
     def _cmd_discussion(self, p: ParsedCommand, dto: SlashCommandRequestDTO, model: str) -> Iterator[str]:
+        question = (p.instruction or "").strip()
+        context = ""
+        topic = ""
+        note_titles: list[str] = []
+
         if p.is_all:
             notes = self.note_repo.get_for_user(dto.user_id, dto.workspace_id)
             if not notes:
                 yield _sse({"t": "No notes found in this workspace."})
                 return
+            note_titles = [(n.title or "Untitled").strip() or "Untitled" for n in notes[:8]]
             context = "\n\n---\n\n".join(
-                f"## {n.title or 'Untitled'}\n{re.sub(r'<[^>]+>', ' ', n.content).strip()[:2000]}"
-                for n in notes[:8]
+                f"## {title}\n{re.sub(r'<[^>]+>', ' ', note.content).strip()[:2000]}"
+                for title, note in zip(note_titles, notes[:8])
             )
             topic = "All Notes"
         else:
-            if not p.target:
-                yield _sse({"t": self._requires_target("discussion")})
-                return
-            note = self.note_repo.find_by_title_for_user(dto.user_id, p.target, dto.workspace_id)
-            if not note:
-                yield _sse({"t": self._not_found(p.target)})
-                return
-            context = re.sub(r"<[^>]+>", " ", note.content).strip()[:6000]
-            topic = note.title
+            note = None
+            if p.target:
+                note = self.note_repo.find_by_title_for_user(dto.user_id, p.target, dto.workspace_id)
+
+            if note:
+                context = re.sub(r"<[^>]+>", " ", note.content).strip()[:6000]
+                topic = note.title
+                if not question:
+                    question = "How can this note be improved? Suggest concrete, specific improvements."
+            else:
+                fallback_question = (p.target or "").strip()
+                if fallback_question and not question:
+                    question = fallback_question
+                if not question:
+                    yield _sse({"t": self._discussion_prompt_help()})
+                    return
+                context, topic, note_titles = self._discussion_note_context(
+                    user_id=dto.user_id,
+                    workspace_id=dto.workspace_id,
+                    question=question,
+                    top_k=5,
+                )
 
         # Server-configured participants
         discussion_models: list[tuple[str, str]] = [
@@ -598,21 +793,27 @@ Base questions ONLY on the provided notes. Do not invent facts not in the notes.
             yield _sse({"t": "No discussion models are configured."})
             return
 
-        # The discussion goal is whatever the user asked after the note name,
-        # e.g.  /Discussion "Chat Snippet" how do we improve this?
-        question = (p.instruction or "How can this note be improved? Suggest concrete, specific improvements.").strip()
+        if not question:
+            question = "How can this note be improved? Suggest concrete, specific improvements."
 
         base_sys = (
-            "You are {name}, collaborating with other AI models to reach ONE agreed answer to the user's request "
-            "about a note. Read the note and the discussion so far, then contribute concretely - build on or "
-            "respectfully challenge the others' points and move the group toward consensus. Keep your contribution "
-            "to 3-5 sentences. End your message with a tag on its own line: write [AGREE] if you fully support the "
-            "current best approach with no further changes, or [REFINE] if you still want changes."
-            f"\n\nUser's request: {question}\n\nNote ({topic}):\n{context}"
+            "You are {name}, an expert collaborator discussing the user's request with other expert AI models. "
+            "Read the provided note context and the discussion so far. Contribute concrete reasoning, challenge weak assumptions, "
+            "compare tradeoffs, and propose specific improvements or alternatives when useful. "
+            "Write like you are speaking to the other experts, not delivering a generic standalone essay. "
+            "Keep your contribution to 3-5 strong sentences. Refer to earlier points when helpful. "
+            "It is good to disagree when there is a real tradeoff, but keep the discussion constructive and evidence-based. "
+            "Do not repeat the same point unless you are refining it. End your message with a tag on its own line: "
+            "write [AGREE] if you fully support the current best approach with no further changes, or [REFINE] if you "
+            "still want changes."
+            f"\n\nUser's request: {question}\n\nContext ({topic}):\n{context}"
         )
 
         yield _sse({"t": f"## Discussion: {topic}\n\n"})
         yield _sse({"t": f"*Goal:* {question}\n\n"})
+        yield _sse({"t": f"*Participants:* {', '.join(name for name, _ in discussion_models)}\n\n"})
+        if note_titles:
+            yield _sse({"t": f"*Using notes:* {', '.join(note_titles[:5])}\n\n"})
 
         MAX_ROUNDS = 4
         # With multiple models, require at least one round where everyone has seen
@@ -622,33 +823,43 @@ Base questions ONLY on the provided notes. Do not invent facts not in the notes.
         transcript = ""
         agreed = False
         round_num = 0
+        substantive_turns = 0
         while round_num < MAX_ROUNDS and not agreed:
             round_num += 1
-            yield _sse({"t": f"### Round {round_num}\n\n"})
             round_agrees: list[bool] = []
             for name, disc_model in discussion_models:
                 yield _sse({"t": f"**{name}:** "})
                 user_msg = (
                     f"Discussion so far:\n{transcript[-8000:] or '(no one has spoken yet - you are first)'}\n\n"
-                    f"Contribute your view as {name} (round {round_num})."
+                    f"Contribute next as {name}. Respond naturally to the discussion so far, and add the most useful next point."
                 )
                 try:
-                    resp = _get_client(disc_model, user_keys).chat.completions.create(
+                    resp = self._discussion_completion(
+                        name=name,
                         model=disc_model,
+                        user_keys=user_keys,
+                        user_id=dto.user_id,
                         messages=[
-                            {"role": "system", "content": base_sys.format(name=name)},
+                            {"role": "system", "content": base_sys.replace("{name}", name)},
                             {"role": "user", "content": user_msg},
                         ],
-                    ).choices[0].message.content or ""
+                    )
                 except Exception as exc:
-                    resp = f"*(unavailable: {exc})* [AGREE]"
+                    logger.warning("Discussion participant %s (%s) unavailable: %s", name, disc_model, exc)
+                    round_agrees.append(False)
+                    yield _sse({"t": f"*{self._friendly_discussion_provider_message(name, exc)}*\n\n"})
+                    continue
                 up = resp.upper()
                 agrees = "[AGREE]" in up and "[REFINE]" not in up
                 round_agrees.append(agrees)
                 clean = re.sub(r"\[(AGREE|REFINE)\]", "", resp, flags=re.IGNORECASE).strip()
-                stance = "✅ agrees" if agrees else "✎ wants changes"
-                yield _sse({"t": f"{clean}\n\n_{stance}_\n\n"})
+                if clean:
+                    substantive_turns += 1
+                yield _sse({"t": f"{clean}\n\n"})
                 transcript += f"\n{name}: {clean}\n"
+            if substantive_turns == 0:
+                yield _sse({"t": "Discussion models are currently unavailable for this request.\n\n"})
+                return
             if round_agrees and all(round_agrees) and round_num >= min_rounds:
                 agreed = True
 
@@ -662,7 +873,8 @@ Base questions ONLY on the provided notes. Do not invent facts not in the notes.
         synth_prompt = (
             f"User's request: {question}\n\nNote: {topic}\n\nFull discussion:\n{transcript[-12000:]}\n\n"
             "Write the final conclusion that directly answers the user's request, synthesising the strongest "
-            "agreed points into a clear, actionable recommendation. Use concise Markdown bullet points. "
+            "agreed points into a clear, actionable recommendation. Include the most important tradeoffs or disagreements "
+            "if they materially affect the recommendation. Use concise Markdown bullet points. "
             "Do not include any [AGREE] or [REFINE] tags."
         )
         try:
