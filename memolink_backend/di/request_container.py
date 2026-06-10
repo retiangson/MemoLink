@@ -68,6 +68,9 @@ class RequestContainer:
     def evaluation_report(self):
         return self.services.get_evaluation_report_service()
 
+    def core_memory(self):
+        return self.services.get_core_memory_service()
+
 
 def get_request_container(db: Session = Depends(get_db)) -> RequestContainer:
     return RequestContainer(db)

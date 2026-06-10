@@ -43,6 +43,7 @@ export type FeatureFlags = {
   evaluation_survey_enabled: boolean;
   evaluation_analytics_enabled: boolean;
   evaluation_admin_export_enabled: boolean;
+  core_memory_notes_enabled: boolean;
   default_model: string;
   default_language: string;
   web_search_min_level: AccessLevel;
@@ -82,6 +83,7 @@ export function parseFlags(raw: Record<string, string>): FeatureFlags {
     evaluation_survey_enabled: raw.evaluation_survey_enabled !== "false",
     evaluation_analytics_enabled: raw.evaluation_analytics_enabled !== "false",
     evaluation_admin_export_enabled: raw.evaluation_admin_export_enabled !== "false",
+    core_memory_notes_enabled: raw.core_memory_notes_enabled !== "false",
     default_model: raw.default_model ?? "gpt-4o-mini",
     default_language: raw.default_language ?? "English",
     web_search_min_level: (raw.web_search_min_level ?? "regular") as AccessLevel,

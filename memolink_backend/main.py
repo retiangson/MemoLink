@@ -60,6 +60,7 @@ from memolink_backend.api.v1 import (
     workflow_controller,
     survey_controller,
     evaluation_controller,
+    core_memory_controller,
 )
 
 # Register all models so SQLAlchemy sees them
@@ -579,6 +580,22 @@ if os.getenv("MEMOLINK_SKIP_DB_BOOTSTRAP") != "1":
         """))
         for _fk in ("evaluation_analytics_enabled", "evaluation_admin_export_enabled"):
             _conn.execute(text("INSERT INTO feature_flags (key, value) VALUES (:k, 'true') ON CONFLICT (key) DO NOTHING"), {"k": _fk})
+        # Core Memory columns
+        _conn.execute(text("ALTER TABLE notes ADD COLUMN IF NOT EXISTS is_core_memory BOOLEAN DEFAULT FALSE"))
+        _conn.execute(text("ALTER TABLE notes ADD COLUMN IF NOT EXISTS is_encrypted BOOLEAN DEFAULT FALSE"))
+        _conn.execute(text("ALTER TABLE notes ADD COLUMN IF NOT EXISTS memory_type VARCHAR(50)"))
+        _conn.execute(text("ALTER TABLE notes ADD COLUMN IF NOT EXISTS sensitivity_level VARCHAR(20)"))
+        _conn.execute(text("ALTER TABLE notes ADD COLUMN IF NOT EXISTS encrypted_content TEXT"))
+        _conn.execute(text("ALTER TABLE notes ADD COLUMN IF NOT EXISTS masked_content TEXT"))
+        _conn.execute(text("ALTER TABLE notes ADD COLUMN IF NOT EXISTS searchable_content TEXT"))
+        _conn.execute(text("ALTER TABLE notes ADD COLUMN IF NOT EXISTS memory_source VARCHAR(30)"))
+        _conn.execute(text("ALTER TABLE notes ADD COLUMN IF NOT EXISTS memory_confidence FLOAT"))
+        _conn.execute(text("ALTER TABLE notes ADD COLUMN IF NOT EXISTS memory_last_used_at TIMESTAMPTZ"))
+        _conn.execute(text("ALTER TABLE notes ADD COLUMN IF NOT EXISTS memory_locked BOOLEAN DEFAULT TRUE"))
+        _conn.execute(text("ALTER TABLE notes ADD COLUMN IF NOT EXISTS memory_created_by VARCHAR(100)"))
+        _conn.execute(text("ALTER TABLE notes ADD COLUMN IF NOT EXISTS memory_updated_at TIMESTAMPTZ"))
+        _conn.execute(text("CREATE INDEX IF NOT EXISTS ix_notes_is_core_memory ON notes(is_core_memory)"))
+        _conn.execute(text("INSERT INTO feature_flags (key, value) VALUES ('core_memory_notes_enabled', 'true') ON CONFLICT (key) DO NOTHING"))
         # Auto-promote first user as admin if none exists
         _conn.execute(text("""
             UPDATE users SET is_admin = TRUE
@@ -742,6 +759,7 @@ app.include_router(timeline_controller.router, prefix="/api")
 app.include_router(workflow_controller.router, prefix="/api")
 app.include_router(survey_controller.router, prefix="/api")
 app.include_router(evaluation_controller.router, prefix="/api")
+app.include_router(core_memory_controller.router, prefix="/api")
 
 # AWS Lambda handler - only active when running inside Lambda
 if os.getenv("AWS_LAMBDA_FUNCTION_NAME"):

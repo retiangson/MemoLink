@@ -34,6 +34,7 @@ class Settings(BaseSettings):
     frontend_url: str = "http://localhost:5173"
 
     encryption_key: str = ""
+    core_memory_encryption_key: str = ""
 
     google_client_id: str = ""
     google_client_secret: str = ""

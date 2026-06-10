@@ -21,6 +21,7 @@ DEFAULT_FLAGS: Dict[str, str] = {
     "evaluation_survey_enabled": "true",
     "evaluation_analytics_enabled": "true",
     "evaluation_admin_export_enabled": "true",
+    "core_memory_notes_enabled": "true",
     "default_model": "gpt-4o-mini",
     "default_language": "English",
     "web_search_min_level": "regular",
