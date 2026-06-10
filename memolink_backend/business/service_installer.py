@@ -33,6 +33,7 @@ class ServiceInstaller:
             email_record_repo=self._domain.get_email_record_repository(),
             email_service=self.get_email_service(),
             eval_service=self.get_evaluation_service(),
+            core_memory_service=self.get_core_memory_service(),
             action_agent=ActionAgentRunner(
                 conv_repo=self._domain.get_conversation_repository(),
                 note_repo=self._domain.get_note_repository(),
@@ -171,4 +172,12 @@ class ServiceInstaller:
             db=self._domain.get_db(),
             log_service=self.get_system_log_service(),
             user_api_key_repo=self._domain.get_user_api_key_repository(),
+        )
+
+    def get_core_memory_service(self):
+        from memolink_backend.business.services.core_memory_service import CoreMemoryService
+        return CoreMemoryService(
+            note_repo=self._domain.get_note_repository(),
+            user_repo=self._domain.get_user_repository(),
+            embedding_service=self._domain.get_embedding_service(),
         )

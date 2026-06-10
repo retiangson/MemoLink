@@ -1,3 +1,4 @@
+from dataclasses import dataclass, field
 from typing import List, Iterator, Optional
 from fastapi import UploadFile
 from sqlalchemy.orm import Session
@@ -37,6 +38,7 @@ from memolink_backend.domain.interfaces.i_note_repository import INoteRepository
 from memolink_backend.business.services.embedding_service import EmbeddingService
 from memolink_backend.business.interfaces.i_chat_service import IChatService
 from memolink_backend.business.services.action_agent import ActionAgentRunner, decide_action_agent
+from memolink_backend.business.services.core_memory_service import CoreMemoryService
 from memolink_backend.utils.file_extractor import extract_text_local
 from memolink_backend.utils.web_search import brave_search
 from memolink_backend.utils.academic_search import (
@@ -190,6 +192,11 @@ _REMIND_ME_LEAD_RE = re.compile(
     r"^\s*remind\s+me(?:\s+to)?[\s,:-]*",
     re.IGNORECASE,
 )
+_MEMORY_PROMPT_COMMENT_RE = re.compile(r"<!--MEMORY_PROMPT:(\{.*?\})-->", re.DOTALL)
+_SAVE_TO_CORE_RE = re.compile(
+    r"\b(?:save|remember|store|keep)\s+(?:that|this|it)\s+(?:to|in)?\s*(?:your\s+)?(?:core|core memory|memory)\b",
+    re.IGNORECASE,
+)
 _ISO_DATE_RE = re.compile(r"\b(\d{4}-\d{2}-\d{2})\b")
 _TIME_12H_RE = re.compile(r"\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b", re.IGNORECASE)
 _TIME_24H_RE = re.compile(r"\b([01]?\d|2[0-3]):([0-5]\d)\b")
@@ -197,6 +204,25 @@ _RELATIVE_DATE_MARKERS = {
     "today": lambda today: today,
     "tomorrow": lambda today: today + timedelta(days=1),
 }
+
+
+@dataclass
+class _ChatRoutePlan:
+    conversation_id: int
+    messages: list[dict]
+    sources: list[ChatAnswerSource]
+    pre_conf_level: str | None
+    pre_conf_reason: str | None
+    routing_reason: str | None
+    workspace_filter: int | None
+    decision: str = "llm_chat"
+    direct_response: ChatResponseDTO | None = None
+    note_name: str | None = None
+    image_prompt: str | None = None
+    smart_analysis: dict | None = None
+    smart_mode_name: str = "general_chat"
+    extra_completion_kwargs: dict = field(default_factory=dict)
+    fetched_papers: list[dict] = field(default_factory=list)
 
 
 def _is_generic_web_search_request(text: str) -> bool:
@@ -385,6 +411,10 @@ _MAKE_NOTE_NAME_BETTER_RE = re.compile(
     r"\bmake\s+(?:my\s+|the\s+)?note\s+(.+?)\s+(?:better|nicer|cleaner|clearer|improved|prettier|more readable|well[- ]?formatted)[\s\.?!]*$",
     re.IGNORECASE,
 )
+_GENERAL_IMPROVE_WRITING_RE = re.compile(
+    r"^\s*(?:can|could|would|will)\s+you\s+make\s+this\s+better\b|^\s*(?:please\s+)?(?:improve|rewrite|polish|edit|clean[\s-]?up|fix|format)\s+(?:this|the following)\b",
+    re.IGNORECASE,
+)
 
 
 def _extract_improve_note_name(text: str) -> str | None:
@@ -394,6 +424,10 @@ def _extract_improve_note_name(text: str) -> str | None:
         if m:
             return m.group(1).strip().strip('"\'')
     return None
+
+
+def _looks_like_general_writing_improve_request(text: str) -> bool:
+    return bool(_GENERAL_IMPROVE_WRITING_RE.search(text or ""))
 
 
 # High-capability OpenAI models with a low tokens-per-minute (TPM) cap on lower
@@ -624,6 +658,7 @@ class ChatService(IChatService):
         eval_service=None,
         email_record_repo=None,
         email_service=None,
+        core_memory_service=None,
     ):
         if conv_repo is not None and note_repo is not None:
             self.repo_conv: IConversationRepository = conv_repo
@@ -655,6 +690,11 @@ class ChatService(IChatService):
         self._email_record_repo = email_record_repo
         self._email_service = email_service
         self._eval = eval_service
+        self._core_memory = core_memory_service or CoreMemoryService(
+            note_repo=self.repo_notes,
+            user_repo=None,
+            embedding_service=self.embedding,
+        )
 
     def _syslog(self, level: str, message: str, details: dict, user_id: int | None = None):
         if self._log is None:
@@ -671,6 +711,169 @@ class ChatService(IChatService):
             return self._user_api_key_repo.get_all_decrypted(user_id)
         except Exception:
             return {}
+
+    def _persist_direct_response(
+        self,
+        conversation_id: int,
+        answer: str,
+        *,
+        routing_reason: str | None,
+        model: str = "memolink",
+        sources: list[ChatAnswerSource] | None = None,
+    ) -> ChatResponseDTO:
+        assistant_msg = self.repo_conv.add_message(conversation_id, "assistant", answer, model=model)
+        return ChatResponseDTO(
+            answer=answer,
+            sources=sources or [],
+            message_id=assistant_msg.id,
+            routing_reason=routing_reason,
+        )
+
+    def _build_route_plan(
+        self,
+        *,
+        dto: ChatRequestDTO,
+        user_text: str,
+        model: str,
+        user_keys: dict,
+        conversation_id: int,
+        messages: list[dict],
+        sources: list[ChatAnswerSource],
+        pre_conf_level: str | None,
+        pre_conf_reason: str | None,
+        routing_reason: str | None,
+        email_draft_prefill: str | None,
+    ) -> _ChatRoutePlan:
+        plan = _ChatRoutePlan(
+            conversation_id=conversation_id,
+            messages=messages,
+            sources=sources,
+            pre_conf_level=pre_conf_level,
+            pre_conf_reason=pre_conf_reason,
+            routing_reason=routing_reason,
+            workspace_filter=None if getattr(dto, "cross_workspace", False) else getattr(dto, "workspace_id", None),
+        )
+
+        clarification_question: str | None = None
+        if getattr(dto, "smart_mode", True):
+            try:
+                analyser_client = _get_client(model, user_keys)
+                plan.smart_analysis = smart_engine.analyse_request(user_text, analyser_client, model)
+                plan.smart_mode_name = plan.smart_analysis.get("mode", "general_chat")
+                if plan.smart_analysis.get("needs_clarification") and plan.smart_analysis.get("clarifying_question"):
+                    clarification_question = str(plan.smart_analysis["clarifying_question"])
+                else:
+                    context_engine = smart_engine.build_context_engine(plan.smart_mode_name)
+                    prepared_context = context_engine.prepare(
+                        messages=plan.messages,
+                        user_text=user_text,
+                        smart_analysis=plan.smart_analysis,
+                        today=date.today(),
+                    )
+                    plan.messages = prepared_context.messages
+                    plan.fetched_papers = prepared_context.papers
+                    plan.extra_completion_kwargs = {
+                        "temperature": prepared_context.mode_settings["temperature"],
+                        "max_tokens": prepared_context.mode_settings["max_tokens"],
+                    }
+                    plan.routing_reason = plan.routing_reason or f"Smart: {plan.smart_mode_name}"
+                    self._syslog(
+                        "info",
+                        f"Smart engine: mode={plan.smart_mode_name} intent={plan.smart_analysis.get('intent', '')}",
+                        {"mode": plan.smart_mode_name, "needs_retrieval": plan.smart_analysis.get("needs_retrieval")},
+                        dto.user_id,
+                    )
+            except Exception as exc:
+                logger.debug("Smart engine integration failed (non-fatal): %s", exc)
+                plan.smart_analysis = None
+                plan.smart_mode_name = "general_chat"
+                plan.extra_completion_kwargs = {}
+                plan.fetched_papers = []
+
+        if email_draft_prefill:
+            plan.decision = "direct_response"
+            plan.direct_response = self._persist_direct_response(
+                conversation_id,
+                email_draft_prefill,
+                routing_reason="Direct: email_draft",
+            )
+            return plan
+
+        prompted_memory = self._maybe_capture_prompted_memory_answer(
+            dto=dto,
+            conversation_id=conversation_id,
+            user_text=user_text,
+        )
+        if prompted_memory:
+            plan.decision = "direct_response"
+            plan.direct_response = prompted_memory
+            return plan
+
+        saved_from_context = self._extract_memory_from_recent_exchange(
+            dto=dto,
+            conversation_id=conversation_id,
+            user_text=user_text,
+        )
+        if saved_from_context:
+            plan.decision = "direct_response"
+            plan.direct_response = saved_from_context
+            return plan
+
+        direct_reminder = self._maybe_create_direct_reminder(
+            dto=dto,
+            conversation_id=conversation_id,
+            user_text=user_text,
+        )
+        if direct_reminder:
+            plan.decision = "direct_response"
+            plan.direct_response = direct_reminder
+            return plan
+
+        core_memory_answer = self._maybe_answer_from_core_memory(
+            dto=dto,
+            conversation_id=conversation_id,
+            user_text=user_text,
+        )
+        if core_memory_answer:
+            plan.decision = "direct_response"
+            plan.direct_response = core_memory_answer
+            return plan
+
+        note_name = _extract_improve_note_name(user_text)
+        if note_name:
+            plan.decision = "note_improve"
+            plan.note_name = note_name
+            plan.routing_reason = "Direct: note_improve"
+            return plan
+
+        if _is_image_request(user_text):
+            plan.decision = "image"
+            plan.image_prompt = _extract_image_prompt(user_text)
+            plan.routing_reason = "Direct: image_generation"
+            return plan
+
+        if clarification_question is not None:
+            plan.decision = "direct_response"
+            plan.direct_response = self._persist_direct_response(
+                conversation_id,
+                clarification_question,
+                routing_reason="Smart: clarification",
+                model=model,
+            )
+            return plan
+
+        action_agent_reason = self._should_use_action_agent(user_text, plan.smart_analysis)
+        if action_agent_reason:
+            plan.decision = "action_agent"
+            plan.routing_reason = action_agent_reason
+            return plan
+
+        if plan.smart_analysis is not None and self._is_long_academic_request(user_text, plan.smart_analysis):
+            plan.decision = "long_academic"
+            plan.routing_reason = plan.routing_reason or "Smart: academic_writer"
+            return plan
+
+        return plan
 
     def _maybe_create_direct_reminder(
         self,
@@ -718,6 +921,193 @@ class ChatService(IChatService):
             return None
         decision = decide_action_agent(user_text, smart_analysis)
         return decision.reason if decision.should_handle else None
+
+    def _maybe_answer_from_core_memory(
+        self,
+        *,
+        dto: ChatRequestDTO,
+        conversation_id: int,
+        user_text: str,
+    ) -> ChatResponseDTO | None:
+        if not dto.user_id or self._core_memory is None:
+            return None
+        workspace_id = None if getattr(dto, "cross_workspace", False) else getattr(dto, "workspace_id", None)
+        memory = self._core_memory.find_relevant_memory(dto.user_id, workspace_id, user_text)
+        if memory is None:
+            spec = self._core_memory.infer_missing_memory(user_text)
+            if spec is None:
+                return None
+            answer = spec["prompt_question"] + "\n" + self._core_memory.memory_prompt_marker(spec)
+            assistant_msg = self.repo_conv.add_message(conversation_id, "assistant", answer, model="memolink")
+            return ChatResponseDTO(
+                answer=answer,
+                sources=[],
+                message_id=assistant_msg.id,
+                routing_reason="Direct: core_memory_prompt_missing",
+            )
+
+        masked_value = getattr(memory, "masked_content", None) or getattr(memory, "title", None) or "the matching Core Memory entry"
+        if getattr(memory, "is_encrypted", False):
+            unlock_token = getattr(dto, "core_memory_unlock_token", None)
+            if not unlock_token:
+                answer = (
+                    f"I found a matching Core Memory entry for **{memory.title or 'that item'}**, but it is locked. "
+                    f"I can only show the masked value right now: **{masked_value}**.\n\n"
+                    "Please unlock Core Memory and ask again if you want the full value revealed."
+                )
+                assistant_msg = self.repo_conv.add_message(conversation_id, "assistant", answer, model="memolink")
+                return ChatResponseDTO(
+                    answer=answer,
+                    sources=[ChatAnswerSource(note_id=memory.id, title=memory.title, snippet=masked_value[:200])],
+                    message_id=assistant_msg.id,
+                    routing_reason="Direct: core_memory_locked",
+                )
+            try:
+                plaintext = self._core_memory.reveal_memory(dto.user_id, memory.id, unlock_token)
+            except HTTPException:
+                answer = (
+                    f"I found a matching Core Memory entry for **{memory.title or 'that item'}**, but the vault token is missing or expired. "
+                    f"Masked value: **{masked_value}**.\n\nPlease unlock Core Memory again, then ask once more."
+                )
+                assistant_msg = self.repo_conv.add_message(conversation_id, "assistant", answer, model="memolink")
+                return ChatResponseDTO(
+                    answer=answer,
+                    sources=[ChatAnswerSource(note_id=memory.id, title=memory.title, snippet=masked_value[:200])],
+                    message_id=assistant_msg.id,
+                    routing_reason="Direct: core_memory_unlock_required",
+                )
+
+            live_answer = self._core_memory.format_memory_answer(
+                query_text=user_text,
+                note=memory,
+                revealed_value=plaintext,
+            )
+            persisted_answer = (
+                f"I revealed your **{memory.title or 'Core Memory'}** after vault verification. "
+                f"Masked value kept in history: **{masked_value}**."
+            )
+            assistant_msg = self.repo_conv.add_message(conversation_id, "assistant", persisted_answer, model="memolink")
+            return ChatResponseDTO(
+                answer=live_answer,
+                sources=[ChatAnswerSource(note_id=memory.id, title=memory.title, snippet=masked_value[:200])],
+                    message_id=assistant_msg.id,
+                    routing_reason="Direct: core_memory_reveal",
+                )
+
+        answer = self._core_memory.format_memory_answer(
+            query_text=user_text,
+            note=memory,
+        )
+        assistant_msg = self.repo_conv.add_message(conversation_id, "assistant", answer, model="memolink")
+        return ChatResponseDTO(
+            answer=answer,
+            sources=[ChatAnswerSource(note_id=memory.id, title=memory.title, snippet=masked_value[:200])],
+            message_id=assistant_msg.id,
+            routing_reason="Direct: core_memory_answer",
+        )
+
+    def _extract_pending_memory_spec(self, conversation_id: int, current_user_text: str) -> dict | None:
+        recent = self.repo_conv.get_messages_paginated(conversation_id, limit=6, before_id=None)
+        if len(recent) < 2:
+            return None
+        latest = recent[0]
+        if latest.role != "user":
+            return None
+        if current_user_text.strip() != (latest.content or "").strip():
+            return None
+        if "?" in current_user_text and len(current_user_text.strip()) > 12:
+            return None
+
+        previous = recent[1]
+        if previous.role != "assistant":
+            return None
+        match = _MEMORY_PROMPT_COMMENT_RE.search(previous.content or "")
+        if not match:
+            return None
+        try:
+            return json.loads(match.group(1))
+        except Exception:
+            return None
+
+    def _maybe_capture_prompted_memory_answer(
+        self,
+        *,
+        dto: ChatRequestDTO,
+        conversation_id: int,
+        user_text: str,
+    ) -> ChatResponseDTO | None:
+        if not dto.user_id or self._core_memory is None:
+            return None
+        spec = self._extract_pending_memory_spec(conversation_id, user_text)
+        if spec is None:
+            return None
+        workspace_id = None if getattr(dto, "cross_workspace", False) else getattr(dto, "workspace_id", None)
+        stored = self._core_memory.store_prompted_memory_answer(
+            user_id=dto.user_id,
+            workspace_id=workspace_id,
+            spec=spec,
+            answer_text=user_text,
+        )
+        if stored is None:
+            return None
+
+        answer = f"Okay, I'll remember that {stored['subject']} is {stored['display_value']}."
+        if stored["stored_plaintext"]:
+            answer = f"Okay, I'll remember that. I stored {stored['subject']} securely."
+        assistant_msg = self.repo_conv.add_message(conversation_id, "assistant", answer, model="memolink")
+        return ChatResponseDTO(
+            answer=answer,
+            sources=[ChatAnswerSource(note_id=stored["note"].id, title=stored["note"].title, snippet=str(stored["display_value"])[:200])],
+            message_id=assistant_msg.id,
+            routing_reason="Direct: core_memory_learned",
+        )
+
+    def _extract_memory_from_recent_exchange(
+        self,
+        *,
+        dto: ChatRequestDTO,
+        conversation_id: int,
+        user_text: str,
+    ) -> ChatResponseDTO | None:
+        if not dto.user_id or self._core_memory is None:
+            return None
+        if not _SAVE_TO_CORE_RE.search(user_text):
+            return None
+
+        recent = self.repo_conv.get_messages_paginated(conversation_id, limit=6, before_id=None)
+        if len(recent) < 3:
+            return None
+        latest = recent[0]
+        if latest.role != "user" or (latest.content or "").strip() != user_text.strip():
+            return None
+        previous_assistant = recent[1]
+        previous_user = recent[2]
+        if previous_assistant.role != "assistant" or previous_user.role != "user":
+            return None
+
+        spec = self._core_memory.infer_missing_memory(previous_user.content or "")
+        if spec is None:
+            return None
+        workspace_id = None if getattr(dto, "cross_workspace", False) else getattr(dto, "workspace_id", None)
+        stored = self._core_memory.save_memory_from_spec(
+            user_id=dto.user_id,
+            workspace_id=workspace_id,
+            spec=spec,
+            answer_text=previous_assistant.content or "",
+        )
+        if stored is None:
+            return None
+
+        answer = f"Okay, I saved {stored['subject']} to Core Memory."
+        if stored["stored_plaintext"]:
+            answer = f"Okay, I saved {stored['subject']} to Core Memory securely."
+        assistant_msg = self.repo_conv.add_message(conversation_id, "assistant", answer, model="memolink")
+        return ChatResponseDTO(
+            answer=answer,
+            sources=[ChatAnswerSource(note_id=stored["note"].id, title=stored["note"].title, snippet=str(stored["display_value"])[:200])],
+            message_id=assistant_msg.id,
+            routing_reason="Direct: core_memory_saved_from_context",
+        )
 
     def _run_completion_chain(
         self,
@@ -1246,8 +1636,25 @@ class ChatService(IChatService):
             _lower = (text or "").lower()
             return any(kw in _lower for kw in _compose_keywords) or any(re.search(pattern, _lower, re.I) for pattern in _compose_patterns)
 
+        def _has_email_reply_intent(text: str) -> bool:
+            _lower = (text or "").lower()
+            if _looks_like_general_writing_improve_request(text):
+                return False
+            _reply_patterns = (
+                r"^\s*(?:can|could|would|will)\s+you\s+(?:please\s+)?reply\b",
+                r"^\s*(?:can|could|would|will)\s+you\s+(?:please\s+)?respond\b",
+                r"^\s*(?:please\s+)?reply\s+to\b",
+                r"^\s*(?:please\s+)?respond\s+to\b",
+                r"^\s*(?:please\s+)?write\s+back\b",
+                r"^\s*(?:please\s+)?email\s+back\b",
+                r"^\s*(?:please\s+)?follow[- ]?up\b",
+                r"\bsend\s+a\s+reply\b",
+                r"\bdraft\s+(?:a\s+)?reply\b",
+            )
+            return any(re.search(pattern, _lower, re.I) for pattern in _reply_patterns)
+
         _asks_compose = _has_email_compose_intent(user_text)
-        _asks_reply = any(kw in _lower_user_text for kw in _reply_keywords)
+        _asks_reply = _has_email_reply_intent(user_text)
 
         _recent_conversation = message_history[-8:]
         _previous_conversation = message_history[:-1]
@@ -1299,7 +1706,9 @@ class ChatService(IChatService):
             (
                 (m.get("content", "") or "").strip()
                 for m in reversed(_previous_conversation)
-                if m.get("role") == "user" and (_has_email_compose_intent(m.get("content", "")) or any(kw in (m.get("content", "")).lower() for kw in _reply_keywords))
+                if m.get("role") == "user" and (
+                    _has_email_compose_intent(m.get("content", "")) or _has_email_reply_intent(m.get("content", ""))
+                )
             ),
             "",
         )
@@ -1685,19 +2094,17 @@ class ChatService(IChatService):
 
         return conversation_id, system_msgs + message_history, sources, pre_conf_level, pre_conf_reason, _email_draft_prefill, suggested_web_query
 
-    def _handle_improve_note_stream(self, dto: ChatRequestDTO, note_name: str, conversation_id: int) -> Iterator[str]:
+    def _improve_note_request(self, dto: ChatRequestDTO, note_name: str, conversation_id: int) -> ChatResponseDTO:
         workspace_id = getattr(dto, "workspace_id", None)
         note = self.repo_notes.find_by_title_for_user(dto.user_id, note_name, workspace_id)
 
         if not note:
             msg = f'I couldn\'t find a note matching **"{note_name}"**. Please check the title and try again.\n\nAvailable notes can be found in your sidebar.'
-            assistant_msg = self.repo_conv.add_message(conversation_id, "assistant", msg)
-            yield sse_event(MessageDeltaEvent(text=msg))
-            yield sse_event(MessageCompleteEvent(message_id=assistant_msg.id))
-            return
-
-        yield sse_event(NoteCloseEvent(note_id=note.id))
-        yield sse_event(NoteImprovingEvent(title=note.title))
+            return self._persist_direct_response(
+                conversation_id,
+                msg,
+                routing_reason="Direct: note_improve",
+            )
 
         _IMPROVE_SYSTEM = (
             "You are a document formatting expert. Improve the structure, formatting, and clarity of the given note. "
@@ -1776,10 +2183,11 @@ class ChatService(IChatService):
 
         if not improved_html:
             msg = "⚠ Failed to improve the note — all AI models are currently unavailable."
-            assistant_msg = self.repo_conv.add_message(conversation_id, "assistant", msg)
-            yield sse_event(MessageDeltaEvent(text=msg))
-            yield sse_event(MessageCompleteEvent(message_id=assistant_msg.id))
-            return
+            return self._persist_direct_response(
+                conversation_id,
+                msg,
+                routing_reason="Direct: note_improve",
+            )
 
         self.repo_notes.update_note(note.id, None, improved_html)
         self._syslog("info", f"Note '{note.title}' improved and auto-saved via chat", {"note_id": note.id, "title": note.title}, dto.user_id)
@@ -1793,8 +2201,29 @@ class ChatService(IChatService):
             "- Key terms and readability"
         )
         assistant_msg = self.repo_conv.add_message(conversation_id, "assistant", response)
-        yield sse_event(MessageReplaceEvent(content=response))
-        yield sse_event(MessageCompleteEvent(message_id=assistant_msg.id))
+        return ChatResponseDTO(
+            answer=response,
+            sources=[],
+            message_id=assistant_msg.id,
+            routing_reason="Direct: note_improve",
+        )
+
+    def _handle_improve_note_stream(self, dto: ChatRequestDTO, note_name: str, conversation_id: int) -> Iterator[str]:
+        workspace_id = getattr(dto, "workspace_id", None)
+        note = self.repo_notes.find_by_title_for_user(dto.user_id, note_name, workspace_id)
+        if note:
+            yield sse_event(NoteCloseEvent(note_id=note.id))
+            yield sse_event(NoteImprovingEvent(title=note.title))
+
+        result = self._improve_note_request(dto, note_name, conversation_id)
+        yield sse_event(MessageReplaceEvent(content=result.answer))
+        yield sse_event(
+            MessageCompleteEvent(
+                message_id=result.message_id,
+                model="memolink",
+                routing_reason=result.routing_reason,
+            )
+        )
 
     def ask(self, dto: ChatRequestDTO) -> ChatResponseDTO:
         user_text = (dto.prompt or "").strip()
@@ -1815,100 +2244,87 @@ class ChatService(IChatService):
         )
 
         conversation_id, messages, sources, pre_conf_level, pre_conf_reason, email_draft_prefill, suggested_web_query = self._build_chat_context(dto)
-        ws_filter = None if getattr(dto, "cross_workspace", False) else getattr(dto, "workspace_id", None)
-
-        # Email draft — return immediately without calling the LLM
-        if email_draft_prefill:
-            assistant_msg = self.repo_conv.add_message(conversation_id, "assistant", email_draft_prefill)
-            return ChatResponseDTO(answer=email_draft_prefill, sources=[], message_id=assistant_msg.id)
-
-        direct_reminder = self._maybe_create_direct_reminder(
+        plan = self._build_route_plan(
             dto=dto,
-            conversation_id=conversation_id,
             user_text=user_text,
+            model=model,
+            user_keys=user_keys,
+            conversation_id=conversation_id,
+            messages=messages,
+            sources=sources,
+            pre_conf_level=pre_conf_level,
+            pre_conf_reason=pre_conf_reason,
+            routing_reason=routing_reason,
+            email_draft_prefill=email_draft_prefill,
         )
-        if direct_reminder:
-            return direct_reminder
 
-        if _is_image_request(user_text):
-            prompt = _extract_image_prompt(user_text)
+        if plan.direct_response:
+            return plan.direct_response
+
+        if plan.decision == "note_improve" and plan.note_name:
+            return self._improve_note_request(dto, plan.note_name, plan.conversation_id)
+
+        if plan.decision == "image" and plan.image_prompt:
             try:
-                data_url, revised, img_model = _generate_image(prompt)
+                data_url, revised, img_model = _generate_image(plan.image_prompt)
                 answer = f"![Generated image]({data_url})\n\n*{revised}*"
             except Exception as exc:
+                img_model = "stable-diffusion"
                 answer = f"⚠ Image generation failed: {exc}"
-            assistant_msg = self.repo_conv.add_message(conversation_id, "assistant", answer, model=img_model)
-            return ChatResponseDTO(answer=answer, sources=[], message_id=assistant_msg.id)
+            assistant_msg = self.repo_conv.add_message(plan.conversation_id, "assistant", answer, model=img_model)
+            return ChatResponseDTO(
+                answer=answer,
+                sources=[],
+                message_id=assistant_msg.id,
+                routing_reason=plan.routing_reason,
+            )
 
-        _smart_analysis: dict | None = None
-        if getattr(dto, "smart_mode", True):
+        if plan.decision == "action_agent":
+            return self._action_agent.ask(
+                conversation_id=plan.conversation_id,
+                prompt=user_text,
+                user_id=dto.user_id,
+                workspace_id=plan.workspace_filter,
+                model=model,
+                persist_user_message=False,
+                routing_reason=plan.routing_reason,
+            )
+
+        if plan.decision == "long_academic" and plan.smart_analysis is not None:
             try:
-                _smart_analysis = smart_engine.analyse_request(user_text, _get_client(model, user_keys), model)
-                _context_engine = smart_engine.build_context_engine(_smart_analysis.get("mode", "general_chat"))
-                _prepared_context = _context_engine.prepare(
-                    messages=messages,
-                    user_text=user_text,
-                    smart_analysis=_smart_analysis,
-                    today=date.today(),
+                answer, used_model = self._generate_long_academic_draft(
+                    prompt=user_text,
+                    user_id=dto.user_id,
+                    workspace_id=plan.workspace_filter,
+                    smart_analysis=plan.smart_analysis,
+                    model=model,
+                    user_keys=user_keys,
                 )
-                messages = _prepared_context.messages
-                action_agent_reason = self._should_use_action_agent(user_text, _smart_analysis)
-                if action_agent_reason:
-                    return self._action_agent.ask(
-                        conversation_id=conversation_id,
-                        prompt=user_text,
-                        user_id=dto.user_id,
-                        workspace_id=ws_filter,
-                        model=model,
-                        persist_user_message=False,
-                        routing_reason=action_agent_reason,
-                    )
-                if self._is_long_academic_request(user_text, _smart_analysis):
-                    answer, used_model = self._generate_long_academic_draft(
-                        prompt=user_text,
-                        user_id=dto.user_id,
-                        workspace_id=ws_filter,
-                        smart_analysis=_smart_analysis,
-                        model=model,
-                        user_keys=user_keys,
-                    )
-                    clean_answer, conf_level, conf_reason = _parse_confidence(answer)
-                    final_conf = conf_level or pre_conf_level
-                    final_reason = conf_reason or pre_conf_reason
-                    assistant_msg = self.repo_conv.add_message(
-                        conversation_id,
-                        "assistant",
-                        clean_answer,
-                        model=used_model,
-                        confidence=final_conf,
-                        confidence_reason=final_reason,
-                    )
-                    return ChatResponseDTO(
-                        answer=clean_answer,
-                        sources=sources,
-                        message_id=assistant_msg.id,
-                        routing_reason=routing_reason or "Smart: academic_writer",
-                    )
+                clean_answer, conf_level, conf_reason = _parse_confidence(answer)
+                final_conf = conf_level or plan.pre_conf_level
+                final_reason = conf_reason or plan.pre_conf_reason
+                assistant_msg = self.repo_conv.add_message(
+                    plan.conversation_id,
+                    "assistant",
+                    clean_answer,
+                    model=used_model,
+                    confidence=final_conf,
+                    confidence_reason=final_reason,
+                )
+                return ChatResponseDTO(
+                    answer=clean_answer,
+                    sources=plan.sources,
+                    message_id=assistant_msg.id,
+                    routing_reason=plan.routing_reason,
+                )
             except Exception as exc:
                 logger.warning("Long academic draft path failed in ask(); falling back: %s", exc)
 
-        action_agent_reason = self._should_use_action_agent(user_text, _smart_analysis)
-        if action_agent_reason:
-            return self._action_agent.ask(
-                conversation_id=conversation_id,
-                prompt=user_text,
-                user_id=dto.user_id,
-                workspace_id=ws_filter,
-                model=model,
-                persist_user_message=False,
-                routing_reason=action_agent_reason,
-            )
-
         # Proactive size guard — re-route oversized requests off low-TPM OpenAI models.
-        _rm, _large_reason = _reroute_large_request(model, _estimate_tokens(messages), settings.gemini_api_key, settings.openai_chat_model)
+        _rm, _large_reason = _reroute_large_request(model, _estimate_tokens(plan.messages), settings.gemini_api_key, settings.openai_chat_model)
         if _large_reason:
             model = _rm
-            routing_reason = _large_reason
+            plan.routing_reason = _large_reason
 
         chain = _build_fallback_chain(model)
         used_model = model
@@ -1917,10 +2333,11 @@ class ChatService(IChatService):
 
         for attempt in chain:
             try:
+                _call_kwargs = {**_completion_kwargs(attempt), **plan.extra_completion_kwargs}
                 completion = _get_client(attempt, user_keys).chat.completions.create(
                     model=attempt,
-                    messages=messages,
-                    **_completion_kwargs(attempt),
+                    messages=plan.messages,
+                    **_call_kwargs,
                 )
                 answer = completion.choices[0].message.content
                 used_model = attempt
@@ -1940,10 +2357,10 @@ class ChatService(IChatService):
             answer = f"⚠ All available AI models are currently unavailable. Please try again later.\n\n*Last error: {last_error}*"
 
         clean_answer, conf_level, conf_reason = _parse_confidence(answer)
-        final_conf = conf_level or pre_conf_level
-        final_reason = conf_reason or pre_conf_reason
-        assistant_msg = self.repo_conv.add_message(conversation_id, "assistant", clean_answer, model=used_model, confidence=final_conf, confidence_reason=final_reason)
-        return ChatResponseDTO(answer=clean_answer, sources=sources, message_id=assistant_msg.id, routing_reason=routing_reason)
+        final_conf = conf_level or plan.pre_conf_level
+        final_reason = conf_reason or plan.pre_conf_reason
+        assistant_msg = self.repo_conv.add_message(plan.conversation_id, "assistant", clean_answer, model=used_model, confidence=final_conf, confidence_reason=final_reason)
+        return ChatResponseDTO(answer=clean_answer, sources=plan.sources, message_id=assistant_msg.id, routing_reason=plan.routing_reason)
 
     def ask_stream(self, dto: ChatRequestDTO) -> Iterator[str]:
         """Yield SSE-formatted chat stream events."""
@@ -1970,111 +2387,61 @@ class ChatService(IChatService):
         t_ctx = time.perf_counter()
         conversation_id, messages, sources, pre_conf_level, pre_conf_reason, email_draft_prefill, suggested_web_query = self._build_chat_context(dto)
         ctx_ms = int((time.perf_counter() - t_ctx) * 1000)
-        ws_filter = None if getattr(dto, "cross_workspace", False) else getattr(dto, "workspace_id", None)
-
-        # Email draft — bypass LLM entirely; emit the full draft as a single replace event
-        if email_draft_prefill:
-            assistant_msg = self.repo_conv.add_message(conversation_id, "assistant", email_draft_prefill)
-            yield sse_event(MessageReplaceEvent(content=email_draft_prefill))
-            yield sse_event(MessageCompleteEvent(message_id=assistant_msg.id, model="memolink"))
-            return
-
-        direct_reminder = self._maybe_create_direct_reminder(
+        plan = self._build_route_plan(
             dto=dto,
-            conversation_id=conversation_id,
             user_text=user_text,
+            model=model,
+            user_keys=user_keys,
+            conversation_id=conversation_id,
+            messages=messages,
+            sources=sources,
+            pre_conf_level=pre_conf_level,
+            pre_conf_reason=pre_conf_reason,
+            routing_reason=routing_reason,
+            email_draft_prefill=email_draft_prefill,
         )
-        if direct_reminder:
-            yield sse_event(MessageReplaceEvent(content=direct_reminder.answer))
+
+        if plan.direct_response:
+            yield sse_event(MessageReplaceEvent(content=plan.direct_response.answer))
             yield sse_event(
                 MessageCompleteEvent(
-                    message_id=direct_reminder.message_id,
+                    message_id=plan.direct_response.message_id,
                     model="memolink",
-                    routing_reason=direct_reminder.routing_reason,
+                    routing_reason=plan.direct_response.routing_reason,
                 )
             )
             return
 
-        note_name = _extract_improve_note_name(user_text)
-        if note_name:
-            yield from self._handle_improve_note_stream(dto, note_name, conversation_id)
+        if plan.decision == "note_improve" and plan.note_name:
+            yield from self._handle_improve_note_stream(dto, plan.note_name, plan.conversation_id)
             return
 
-        if _is_image_request(user_text):
+        if plan.decision == "image" and plan.image_prompt:
             yield sse_event(ImageGeneratingEvent())
-            prompt = _extract_image_prompt(user_text)
             img_model = "stable-diffusion"
             try:
-                data_url, revised, img_model = _generate_image(prompt)
+                data_url, revised, img_model = _generate_image(plan.image_prompt)
                 answer = f"![Generated image]({data_url})\n\n*{revised}*"
             except Exception as exc:
                 answer = f"⚠ Image generation failed: {exc}"
             yield sse_event(MessageReplaceEvent(content=answer))
-            assistant_msg = self.repo_conv.add_message(conversation_id, "assistant", answer, model=img_model)
-            yield sse_event(MessageCompleteEvent(message_id=assistant_msg.id, model=img_model))
+            assistant_msg = self.repo_conv.add_message(plan.conversation_id, "assistant", answer, model=img_model)
+            yield sse_event(MessageCompleteEvent(message_id=assistant_msg.id, model=img_model, routing_reason=plan.routing_reason))
             return
 
-        # ── Smart Response Engine ──────────────────────────────────────────────
-        # Runs a fast analysis pass (Call 1) to detect intent, choose a specialist
-        # prompt, and build an optimized internal task description.
-        # All failures are silently swallowed — chat always works without it.
-        _smart_analysis: dict | None = None
-        _smart_mode_name = "general_chat"
-        _extra_completion_kwargs: dict = {}
-        _fetched_papers: list[dict] = []
-
-        if getattr(dto, "smart_mode", True):
-            try:
-                _analyser_client = _get_client(model, user_keys)
-                _smart_analysis = smart_engine.analyse_request(user_text, _analyser_client, model)
-
-                # If the model wants clarification, return the question and stop
-                if _smart_analysis.get("needs_clarification") and _smart_analysis.get("clarifying_question"):
-                    _cq = _smart_analysis["clarifying_question"]
-                    _cq_msg = self.repo_conv.add_message(conversation_id, "assistant", _cq)
-                    yield sse_event(MessageReplaceEvent(content=_cq))
-                    yield sse_event(MessageCompleteEvent(message_id=_cq_msg.id, model=model))
-                    return
-
-                _smart_mode_name = _smart_analysis.get("mode", "general_chat")
-                _context_engine = smart_engine.build_context_engine(_smart_mode_name)
-                _prepared_context = _context_engine.prepare(
-                    messages=messages,
-                    user_text=user_text,
-                    smart_analysis=_smart_analysis,
-                    today=date.today(),
-                )
-                messages = _prepared_context.messages
-                _fetched_papers = _prepared_context.papers
-
-                # Apply mode-specific temperature and max_tokens
-                mode_settings = _prepared_context.mode_settings
-                _extra_completion_kwargs = {
-                    "temperature": mode_settings["temperature"],
-                    "max_tokens": mode_settings["max_tokens"],
-                }
-
-                routing_reason = routing_reason or f"Smart: {_smart_mode_name}"
-                self._syslog("info", f"Smart engine: mode={_smart_mode_name} intent={_smart_analysis.get('intent','')}",
-                             {"mode": _smart_mode_name, "needs_retrieval": _smart_analysis.get("needs_retrieval")}, dto.user_id)
-
-            except Exception as _se:
-                logger.debug("Smart engine integration failed (non-fatal): %s", _se)
-
-        action_agent_reason = self._should_use_action_agent(user_text, _smart_analysis)
-        if action_agent_reason:
+        if plan.decision == "action_agent":
             yield from self._action_agent.ask_stream(
-                conversation_id=conversation_id,
+                conversation_id=plan.conversation_id,
                 prompt=user_text,
                 user_id=dto.user_id,
-                workspace_id=ws_filter,
+                workspace_id=plan.workspace_filter,
                 model=model,
                 persist_user_message=False,
-                routing_reason=action_agent_reason,
+                routing_reason=plan.routing_reason,
             )
             return
 
-        if _smart_analysis is not None and self._is_long_academic_request(user_text, _smart_analysis):
+        if plan.decision == "long_academic" and plan.smart_analysis is not None:
             try:
                 long_answer = ""
                 used_model = model
@@ -2082,8 +2449,8 @@ class ChatService(IChatService):
                 for item in self._iter_long_academic_draft(
                     prompt=user_text,
                     user_id=dto.user_id,
-                    workspace_id=ws_filter,
-                    smart_analysis=_smart_analysis,
+                    workspace_id=plan.workspace_filter,
+                    smart_analysis=plan.smart_analysis,
                     model=model,
                     user_keys=user_keys,
                 ):
@@ -2099,10 +2466,10 @@ class ChatService(IChatService):
                     except Exception:
                         pass
                 clean_answer, conf_level, conf_reason = _parse_confidence(long_answer)
-                final_conf = conf_level or pre_conf_level
-                final_reason = conf_reason or pre_conf_reason
+                final_conf = conf_level or plan.pre_conf_level
+                final_reason = conf_reason or plan.pre_conf_reason
                 assistant_msg = self.repo_conv.add_message(
-                    conversation_id,
+                    plan.conversation_id,
                     "assistant",
                     clean_answer,
                     model=used_model,
@@ -2115,7 +2482,7 @@ class ChatService(IChatService):
                     model=used_model,
                     confidence=final_conf,
                     confidence_reason=final_reason,
-                    routing_reason=routing_reason or "Smart: academic_writer",
+                    routing_reason=plan.routing_reason,
                 ))
                 return
             except Exception as exc:
@@ -2123,13 +2490,13 @@ class ChatService(IChatService):
 
         # Proactive size guard: a large RAG context can 429 on low-TPM OpenAI
         # models before the fallback even runs — re-route to Gemini up front.
-        est_tokens = _estimate_tokens(messages)
+        est_tokens = _estimate_tokens(plan.messages)
         _rm, _large_reason = _reroute_large_request(model, est_tokens, settings.gemini_api_key, settings.openai_chat_model)
         if _large_reason:
             self._syslog("info", f"Re-routed {model} → {_rm} ({est_tokens} est. tokens) to avoid TPM limit",
                          {"from": model, "to": _rm, "est_tokens": est_tokens}, dto.user_id)
             model = _rm
-            routing_reason = _large_reason
+            plan.routing_reason = _large_reason
 
         chain = _build_fallback_chain(model)
         full_answer = ""
@@ -2143,10 +2510,10 @@ class ChatService(IChatService):
         for attempt in chain:
             try:
                 t_llm = time.perf_counter()
-                _call_kwargs = {**_completion_kwargs(attempt), **_extra_completion_kwargs}
+                _call_kwargs = {**_completion_kwargs(attempt), **plan.extra_completion_kwargs}
                 stream = _get_client(attempt, user_keys).chat.completions.create(
                     model=attempt,
-                    messages=messages,
+                    messages=plan.messages,
                     stream=True,
                     **_call_kwargs,
                 )
@@ -2182,15 +2549,15 @@ class ChatService(IChatService):
         # a `replace` event is sent so the UI swaps in the better version.
         if (
             succeeded
-            and _smart_analysis is not None
-            and _smart_mode_name in smart_engine.QUALITY_CHECK_MODES
+            and plan.smart_analysis is not None
+            and plan.smart_mode_name in smart_engine.QUALITY_CHECK_MODES
             and full_answer.strip()
         ):
             try:
                 _qc_client = _get_client(used_model, user_keys)
-                _checklist = _smart_analysis.get("quality_checks", [])
+                _checklist = plan.smart_analysis.get("quality_checks", [])
                 # Academic mode: enforce citation and quality checks
-                if _smart_mode_name == "academic_writer":
+                if plan.smart_mode_name == "academic_writer":
                     _forced = [
                         "No placeholder text or bracketed instructions remain in the output",
                         "No self-citations — '(StudentName, Year)' referring to this project are forbidden",
@@ -2200,30 +2567,30 @@ class ChatService(IChatService):
                     ]
                     _checklist = _forced + [c for c in _checklist if c not in _forced]
                 # Include both notes AND academic search papers in QC context
-                _note_ctx = next((m["content"] for m in messages if m.get("role") == "system" and "USER NOTES CONTEXT" in m.get("content", "")), "")
-                _paper_ctx = next((m["content"] for m in messages if m.get("role") == "system" and "ACADEMIC SOURCES" in m.get("content", "")), "")
+                _note_ctx = next((m["content"] for m in plan.messages if m.get("role") == "system" and "USER NOTES CONTEXT" in m.get("content", "")), "")
+                _paper_ctx = next((m["content"] for m in plan.messages if m.get("role") == "system" and "ACADEMIC SOURCES" in m.get("content", "")), "")
                 if _paper_ctx:
                     _note_ctx = _note_ctx + "\n\n" + _paper_ctx
                 _improved = smart_engine.quality_check(full_answer, _checklist, user_text, _qc_client, used_model, note_context=_note_ctx)
                 if _improved and _improved.strip() != full_answer.strip():
                     full_answer = _improved
                     yield sse_event(MessageReplaceEvent(content=_improved))
-                    self._syslog("info", f"Smart quality check improved answer (mode={_smart_mode_name})",
-                                 {"mode": _smart_mode_name}, dto.user_id)
+                    self._syslog("info", f"Smart quality check improved answer (mode={plan.smart_mode_name})",
+                                 {"mode": plan.smart_mode_name}, dto.user_id)
             except Exception as _qe:
                 logger.debug("Smart quality check failed (non-fatal): %s", _qe)
 
         # Auto-save cited academic papers as notes (academic mode, non-long path)
-        if _smart_mode_name == "academic_writer" and _fetched_papers and dto.user_id:
+        if plan.smart_mode_name == "academic_writer" and plan.fetched_papers and dto.user_id:
             try:
-                self._save_cited_papers_as_notes(full_answer, _fetched_papers, dto.user_id, ws_filter)
+                self._save_cited_papers_as_notes(full_answer, plan.fetched_papers, dto.user_id, plan.workspace_filter)
             except Exception:
                 pass
 
         clean_answer, conf_level, conf_reason = _parse_confidence(full_answer)
-        final_conf = conf_level or pre_conf_level
-        final_reason = conf_reason or pre_conf_reason
-        assistant_msg = self.repo_conv.add_message(conversation_id, "assistant", clean_answer, model=used_model, confidence=final_conf, confidence_reason=final_reason)
+        final_conf = conf_level or plan.pre_conf_level
+        final_reason = conf_reason or plan.pre_conf_reason
+        assistant_msg = self.repo_conv.add_message(plan.conversation_id, "assistant", clean_answer, model=used_model, confidence=final_conf, confidence_reason=final_reason)
 
         # Suggest web search when notes had no relevant content and user didn't already enable it
         _suggest_web = (
@@ -2236,7 +2603,7 @@ class ChatService(IChatService):
             model=used_model,
             confidence=final_conf,
             confidence_reason=final_reason,
-            routing_reason=routing_reason,
+            routing_reason=plan.routing_reason,
             suggest_web_search=_suggest_web,
             search_query_suggestion=suggested_web_query if _suggest_web else None,
         ))
@@ -2259,8 +2626,8 @@ class ChatService(IChatService):
                         "answer_length_words": len(clean_answer.split()),
                         "selected_model": dto.model or settings.openai_chat_model,
                         "actual_model_used": used_model,
-                        "autopilot_used": bool(routing_reason),
-                        "autopilot_reason": routing_reason,
+                        "autopilot_used": bool(plan.routing_reason),
+                        "autopilot_reason": plan.routing_reason,
                         "fallback_used": used_model != model,
                         "fallback_attempt_count": fallback_attempts,
                         "web_search_enabled": bool(getattr(dto, "web_search", False)),
@@ -2285,6 +2652,19 @@ class ChatService(IChatService):
                     self._eval.mark_task(dto.user_id, "check_citation", "Review the source citation", "rag_chat")
             except Exception:
                 pass  # analytics must never break chat
+
+        # Phase 2: AI-powered Core Memory detection (fire-and-forget, post-stream)
+        if dto.user_id and user_text:
+            try:
+                from memolink_backend.business.services.core_memory_service import CoreMemoryService
+                _cm_svc = CoreMemoryService(
+                    note_repo=self.repo_notes,
+                    user_repo=None,
+                    embedding_service=self.embedding,
+                )
+                _cm_svc.detect_and_store(dto.user_id, plan.workspace_filter, user_text)
+            except Exception:
+                pass
 
     async def handle_file_upload(
         self,

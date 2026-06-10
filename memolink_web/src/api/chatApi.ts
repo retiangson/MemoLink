@@ -1,6 +1,7 @@
 import { api, API_BASE } from "./client";
 import { getToken } from "../utils/auth";
 import type { ChatStreamEvent } from "../types";
+import { getVaultSession } from "./coreMemoryApi";
 
 function normalizeChatStreamEvent(raw: any): ChatStreamEvent {
   if (raw && typeof raw.type === "string") return raw as ChatStreamEvent;
@@ -32,7 +33,14 @@ function normalizeChatStreamEvent(raw: any): ChatStreamEvent {
 }
 
 export async function sendChat(conversation_id: number, prompt: string, top_k = 5, workspace_id?: number | null, model?: string | null) {
-  return (await api.post("/chat", { conversation_id, prompt, top_k, workspace_id: workspace_id ?? null, model: model ?? null })).data;
+  return (await api.post("/chat", {
+    conversation_id,
+    prompt,
+    top_k,
+    workspace_id: workspace_id ?? null,
+    model: model ?? null,
+    core_memory_unlock_token: getVaultSession()?.token ?? null,
+  })).data;
 }
 
 /** Async generator that yields parsed SSE events from /chat/stream. */
@@ -60,6 +68,7 @@ export async function* streamChat(
       model: model ?? null,
       web_search,
       search_query_override: search_query_override ?? null,
+      core_memory_unlock_token: getVaultSession()?.token ?? null,
     }),
   });
 

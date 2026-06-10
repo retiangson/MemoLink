@@ -13,6 +13,7 @@ class ChatRequestDTO(BaseModel):
     web_search: bool = False
     search_query_override: Optional[str] = None
     smart_mode: bool = True
+    core_memory_unlock_token: Optional[str] = None
 
 
 class ChatAnswerSource(BaseModel):

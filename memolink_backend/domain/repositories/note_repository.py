@@ -40,7 +40,11 @@ class NoteRepository:
 
     def get_for_user(self, user_id: int, workspace_id: int | None = None) -> List[Note]:
         from sqlalchemy import or_
-        q = self.db.query(Note).filter(Note.user_id == user_id, Note.deleted_at == None)
+        q = self.db.query(Note).filter(
+            Note.user_id == user_id,
+            Note.deleted_at == None,
+            or_(Note.is_core_memory == None, Note.is_core_memory == False),
+        )
         if workspace_id is not None:
             q = q.filter(or_(Note.workspace_id == workspace_id, Note.workspace_id == None))
         return q.order_by(Note.id.desc()).all()
@@ -150,7 +154,10 @@ class NoteRepository:
         return terms
 
     def _base_note_query(self, workspace_id: int | None = None, user_id: int | None = None):
-        q = self.db.query(Note).filter(Note.deleted_at == None)
+        q = self.db.query(Note).filter(
+            Note.deleted_at == None,
+            or_(Note.is_core_memory == None, Note.is_core_memory == False),
+        )
         if user_id is not None:
             q = q.filter(Note.user_id == user_id)
         if workspace_id is not None:
@@ -277,6 +284,7 @@ class NoteRepository:
             FROM embeddings e
             JOIN notes n ON n.id = e.note_id
             WHERE n.deleted_at IS NULL
+              AND (n.is_core_memory IS NULL OR n.is_core_memory = FALSE)
               AND (:user_id IS NULL OR n.user_id = :user_id)
               AND (
                     :workspace_id IS NULL
@@ -301,3 +309,105 @@ class NoteRepository:
         notes = self.db.query(Note).filter(Note.id.in_(note_ids)).all()
         note_map = {n.id: n for n in notes}
         return [note_map[nid] for nid in note_ids if nid in note_map]
+
+    # ── Core Memory ──────────────────────────────────────────────────────────
+
+    def get_core_memories(self, user_id: int, workspace_id: int | None = None) -> List[Note]:
+        q = (
+            self.db.query(Note)
+            .filter(Note.user_id == user_id, Note.is_core_memory == True, Note.deleted_at == None)
+        )
+        if workspace_id is not None:
+            q = q.filter(or_(Note.workspace_id == workspace_id, Note.workspace_id == None))
+        return q.order_by(Note.id.desc()).all()
+
+    def get_core_memory_by_id(self, note_id: int, user_id: int) -> Optional[Note]:
+        return (
+            self.db.query(Note)
+            .filter(Note.id == note_id, Note.user_id == user_id, Note.is_core_memory == True, Note.deleted_at == None)
+            .first()
+        )
+
+    def get_core_memory_by_title(self, user_id: int, title: str, workspace_id: int | None = None) -> Optional[Note]:
+        q = (
+            self.db.query(Note)
+            .filter(Note.user_id == user_id, Note.is_core_memory == True, Note.deleted_at == None,
+                    Note.title == title)
+        )
+        if workspace_id is not None:
+            q = q.filter(or_(Note.workspace_id == workspace_id, Note.workspace_id == None))
+        return q.first()
+
+    def create_core_memory(
+        self,
+        user_id: int,
+        title: str,
+        content: str,
+        memory_type: str,
+        sensitivity_level: str,
+        encrypted_content: str | None,
+        masked_content: str | None,
+        searchable_content: str | None,
+        memory_source: str,
+        memory_confidence: float | None,
+        memory_created_by: str | None,
+        workspace_id: int | None,
+    ) -> Note:
+        now = datetime.now(timezone.utc)
+        note = Note(
+            user_id=user_id,
+            title=title,
+            content=masked_content or title,
+            source="core_memory",
+            workspace_id=workspace_id,
+            is_core_memory=True,
+            is_encrypted=bool(encrypted_content),
+            memory_type=memory_type,
+            sensitivity_level=sensitivity_level,
+            encrypted_content=encrypted_content,
+            masked_content=masked_content,
+            searchable_content=searchable_content,
+            memory_source=memory_source,
+            memory_confidence=memory_confidence,
+            memory_locked=True,
+            memory_created_by=memory_created_by,
+            memory_updated_at=now,
+        )
+        self.db.add(note)
+        self.db.commit()
+        self.db.refresh(note)
+        return note
+
+    def update_core_memory(
+        self,
+        note_id: int,
+        title: str | None,
+        memory_type: str | None,
+        sensitivity_level: str | None,
+        masked_content: str | None,
+        searchable_content: str | None,
+    ) -> Optional[Note]:
+        note = self.get_by_id(note_id)
+        if not note or not note.is_core_memory:
+            return None
+        if title is not None:
+            note.title = title
+        if memory_type is not None:
+            note.memory_type = memory_type
+        if sensitivity_level is not None:
+            note.sensitivity_level = sensitivity_level
+        if masked_content is not None:
+            note.masked_content = masked_content
+            note.content = masked_content
+        if searchable_content is not None:
+            note.searchable_content = searchable_content
+        note.memory_updated_at = datetime.now(timezone.utc)
+        self.db.commit()
+        self.db.refresh(note)
+        return note
+
+    def touch_memory_last_used(self, note_id: int) -> None:
+        note = self.get_by_id(note_id)
+        if note and note.is_core_memory:
+            note.memory_last_used_at = datetime.now(timezone.utc)
+            self.db.commit()

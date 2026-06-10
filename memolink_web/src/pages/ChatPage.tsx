@@ -37,6 +37,7 @@ import { getTeamsStatus } from "../api/teamsApi";
 import { AdminPage } from "./AdminPage";
 import { suggestActions, type WorkflowAction } from "../api/workflowApi";
 import { OnboardingTour } from "../components/OnboardingTour";
+import { CoreMemoryView } from "../components/CoreMemoryView";
 
 type WorkspaceHook = ReturnType<typeof useWorkspace>;
 type LayoutMode = "stacked" | "columns" | "rows";
@@ -66,6 +67,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
   const [showHelp, setShowHelp] = useState(false);
   const [showMemoGraph, setShowMemoGraph] = useState(false);
   const [showStudyMode, setShowStudyMode] = useState(false);
+  const [showCoreMemory, setShowCoreMemory] = useState(false);
   const [showSurvey, setShowSurvey] = useState(false);
   const [workflowSuggestions, setWorkflowSuggestions] = useState<Record<number, WorkflowAction[]>>({});
   const prevStreamingRef = useRef(false);
@@ -806,6 +808,17 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                     </button>
                   )}
 
+                  {/* Core Memory */}
+                  {flags.core_memory_notes_enabled && (
+                    <button
+                      onClick={() => { setUserMenuOpen(false); setShowCoreMemory(true); }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-yellow-300 hover:bg-yellow-500/10 hover:text-yellow-200 transition"
+                    >
+                      <span className="text-base leading-none">🧠</span>
+                      Core Memory
+                    </button>
+                  )}
+
                   {/* Admin Panel - only shown to admins */}
                   {user.is_admin && (
                     <button
@@ -1308,6 +1321,13 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
         onClose={() => setShowSurvey(false)}
         workspaceId={activeWorkspaceId}
       />
+
+      {showCoreMemory && (
+        <CoreMemoryView
+          workspaceId={activeWorkspaceId}
+          onClose={() => setShowCoreMemory(false)}
+        />
+      )}
 
       {showWorkspaceManager && (
         <WorkspaceManagerModal

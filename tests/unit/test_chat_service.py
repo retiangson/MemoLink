@@ -2,10 +2,16 @@ from types import SimpleNamespace
 import base64
 import json
 import re
+from unittest.mock import MagicMock
+
+import bcrypt
 
 import memolink_backend.business.services.chat_service as chat_module
 from memolink_backend.business.services.chat_service import ChatService
+from memolink_backend.business.services.core_memory_service import CoreMemoryService
+from memolink_backend.business.services.core_memory_detector import CoreMemoryDetector
 from memolink_backend.contracts.chat_dtos import ChatRequestDTO
+from memolink_backend.contracts.core_memory_dtos import CoreMemoryCreateDTO
 from tests.fakes.conversation_repository import FakeConversationRepository
 from tests.fakes.embedding_service import FakeEmbeddingService
 from tests.fakes.note_repository import FakeNoteRepository
@@ -204,6 +210,244 @@ def test_chat_service_stream_creates_direct_reminder_from_plain_chat_request():
     assert reminder.due_time == "09:30"
 
 
+def test_chat_service_returns_locked_core_memory_without_plaintext():
+    conv_repo = FakeConversationRepository()
+    note_repo = FakeNoteRepository()
+    cm_service = CoreMemoryService(
+        note_repo=note_repo,
+        user_repo=None,
+        embedding_service=FakeEmbeddingService(),
+    )
+    cm_service.create_memory(
+        user_id=1,
+        dto=CoreMemoryCreateDTO(
+            title="BDO card number",
+            memory_type="card",
+            sensitivity_level="high",
+            plaintext_value="1234 5678 9012 3456",
+            masked_display="**** **** **** 3456",
+            searchable_metadata="BDO bank card ending in 3456",
+        ),
+    )
+
+    service = ChatService(
+        conv_repo=conv_repo,
+        note_repo=note_repo,
+        embedding_service=FakeEmbeddingService(),
+        core_memory_service=cm_service,
+    )
+
+    result = service.ask(ChatRequestDTO(user_id=1, prompt="What is my BDO card number?"))
+
+    assert result.routing_reason == "Direct: core_memory_locked"
+    assert "unlock" in result.answer.lower()
+    assert "1234 5678 9012 3456" not in result.answer
+    assert "3456" in result.answer
+
+
+def test_chat_service_reveals_core_memory_live_but_persists_masked_only():
+    conv_repo = FakeConversationRepository()
+    note_repo = FakeNoteRepository()
+    hashed = bcrypt.hashpw(b"password123", bcrypt.gensalt()).decode()
+    user_repo = MagicMock()
+    user_repo.get_by_id.return_value = SimpleNamespace(id=1, password=hashed)
+    cm_service = CoreMemoryService(
+        note_repo=note_repo,
+        user_repo=user_repo,
+        embedding_service=FakeEmbeddingService(),
+    )
+    created = cm_service.create_memory(
+        user_id=1,
+        dto=CoreMemoryCreateDTO(
+            title="BDO card number",
+            memory_type="card",
+            sensitivity_level="high",
+            plaintext_value="1234 5678 9012 3456",
+            masked_display="**** **** **** 3456",
+            searchable_metadata="BDO bank card ending in 3456",
+        ),
+    )
+    unlock = cm_service.unlock(1, "password123")
+
+    service = ChatService(
+        conv_repo=conv_repo,
+        note_repo=note_repo,
+        embedding_service=FakeEmbeddingService(),
+        core_memory_service=cm_service,
+    )
+
+    result = service.ask(
+        ChatRequestDTO(
+            user_id=1,
+            prompt="What is my BDO card number?",
+            core_memory_unlock_token=unlock.unlock_token,
+        )
+    )
+
+    assert result.routing_reason == "Direct: core_memory_reveal"
+    assert "1234 5678 9012 3456" in result.answer
+    persisted = list(conv_repo.messages.values())[-1].content
+    assert "1234 5678 9012 3456" not in persisted
+    assert "3456" in persisted
+    assert result.sources[0].note_id == created.id
+
+
+def test_chat_service_answers_name_subfield_from_core_memory_naturally():
+    conv_repo = FakeConversationRepository()
+    note_repo = FakeNoteRepository()
+    cm_service = CoreMemoryService(
+        note_repo=note_repo,
+        user_repo=None,
+        embedding_service=FakeEmbeddingService(),
+    )
+    cm_service.create_memory(
+        user_id=1,
+        dto=CoreMemoryCreateDTO(
+            title="User name",
+            memory_type="person",
+            sensitivity_level="low",
+            masked_display="Ronald Ephraim Tiangson",
+            searchable_metadata="name Ronald Ephraim Tiangson",
+        ),
+    )
+
+    service = ChatService(
+        conv_repo=conv_repo,
+        note_repo=note_repo,
+        embedding_service=FakeEmbeddingService(),
+        core_memory_service=cm_service,
+    )
+
+    result = service.ask(ChatRequestDTO(user_id=1, prompt="what is my first name?"))
+
+    assert result.routing_reason == "Direct: core_memory_answer"
+    assert result.answer == "Your first name is Ronald."
+
+
+def test_chat_service_answers_numeric_slice_from_core_memory_naturally():
+    conv_repo = FakeConversationRepository()
+    note_repo = FakeNoteRepository()
+    cm_service = CoreMemoryService(
+        note_repo=note_repo,
+        user_repo=None,
+        embedding_service=FakeEmbeddingService(),
+    )
+    cm_service.create_memory(
+        user_id=1,
+        dto=CoreMemoryCreateDTO(
+            title="Student ID",
+            memory_type="credential",
+            sensitivity_level="medium",
+            masked_display="123456789",
+            searchable_metadata="student id 123456789",
+        ),
+    )
+
+    service = ChatService(
+        conv_repo=conv_repo,
+        note_repo=note_repo,
+        embedding_service=FakeEmbeddingService(),
+        core_memory_service=cm_service,
+    )
+
+    result = service.ask(ChatRequestDTO(user_id=1, prompt="what are the first 3 digits of my student id?"))
+
+    assert result.routing_reason == "Direct: core_memory_answer"
+    assert result.answer == "The first 3 digits of your student id are 123."
+
+
+def test_chat_service_prompts_to_learn_missing_memory_then_saves_follow_up_answer():
+    conv_repo = FakeConversationRepository()
+    note_repo = FakeNoteRepository()
+    cm_service = CoreMemoryService(
+        note_repo=note_repo,
+        user_repo=None,
+        embedding_service=FakeEmbeddingService(),
+    )
+    service = ChatService(
+        conv_repo=conv_repo,
+        note_repo=note_repo,
+        embedding_service=FakeEmbeddingService(),
+        core_memory_service=cm_service,
+    )
+
+    first = service.ask(ChatRequestDTO(user_id=1, prompt="what is my favorite color?"))
+    conv_id = next(iter(conv_repo.conversations.values())).id
+    second = service.ask(ChatRequestDTO(user_id=1, conversation_id=conv_id, prompt="Blue"))
+    third = service.ask(ChatRequestDTO(user_id=1, conversation_id=conv_id, prompt="what is my favorite color?"))
+
+    assert first.routing_reason == "Direct: core_memory_prompt_missing"
+    assert "what is your favorite color" in first.answer.lower()
+    assert second.routing_reason == "Direct: core_memory_learned"
+    assert "remember that your favorite color is Blue".lower() in second.answer.lower()
+    assert third.routing_reason == "Direct: core_memory_answer"
+    assert third.answer == "Your favorite color is Blue."
+
+
+def test_chat_service_does_not_use_stale_memory_prompt_for_unrelated_follow_up():
+    conv_repo = FakeConversationRepository()
+    note_repo = FakeNoteRepository()
+    cm_service = CoreMemoryService(
+        note_repo=note_repo,
+        user_repo=None,
+        embedding_service=FakeEmbeddingService(),
+    )
+    service = ChatService(
+        conv_repo=conv_repo,
+        note_repo=note_repo,
+        embedding_service=FakeEmbeddingService(),
+        core_memory_service=cm_service,
+    )
+
+    first = service.ask(ChatRequestDTO(user_id=1, prompt="what is my favorite color?"))
+    conv_id = next(iter(conv_repo.conversations.values())).id
+    service.ask(ChatRequestDTO(user_id=1, conversation_id=conv_id, prompt="green"))
+    second = service.ask(ChatRequestDTO(user_id=1, conversation_id=conv_id, prompt="how about my favorite music?"))
+    third = service.ask(ChatRequestDTO(user_id=1, conversation_id=conv_id, prompt="Making love out of nothing at all, by Shyla Roxas"))
+    fourth = service.ask(ChatRequestDTO(user_id=1, conversation_id=conv_id, prompt="what is my favorite music?"))
+
+    assert first.routing_reason == "Direct: core_memory_prompt_missing"
+    assert second.routing_reason == "Direct: core_memory_prompt_missing"
+    assert "favorite music" in second.answer.lower()
+    assert third.routing_reason == "Direct: core_memory_learned"
+    assert "favorite music" in third.answer.lower()
+    assert fourth.routing_reason == "Direct: core_memory_answer"
+    assert "favorite music" in fourth.answer.lower()
+    assert "Shyla Roxas" in fourth.answer
+
+
+def test_chat_service_can_save_recent_answer_to_core_memory_from_context():
+    conv_repo = FakeConversationRepository()
+    note_repo = FakeNoteRepository()
+    cm_service = CoreMemoryService(
+        note_repo=note_repo,
+        user_repo=None,
+        embedding_service=FakeEmbeddingService(),
+    )
+    service = ChatService(
+        conv_repo=conv_repo,
+        note_repo=note_repo,
+        embedding_service=FakeEmbeddingService(),
+        core_memory_service=cm_service,
+    )
+
+    conv = conv_repo.create_conversation(1, "Student number")
+    conv_repo.add_message(conv.id, "user", "what is my student number?")
+    conv_repo.add_message(conv.id, "assistant", "Your student number is 123456789.")
+
+    result = service.ask(
+        ChatRequestDTO(user_id=1, conversation_id=conv.id, prompt="save that to your core")
+    )
+    follow_up = service.ask(
+        ChatRequestDTO(user_id=1, conversation_id=conv.id, prompt="what are the first 3 digits of my student number?")
+    )
+
+    assert result.routing_reason == "Direct: core_memory_saved_from_context"
+    assert "saved your student number to core memory".lower() in result.answer.lower()
+    assert follow_up.routing_reason == "Direct: core_memory_locked"
+    assert "matching core memory entry" in follow_up.answer.lower()
+
+
 def test_chat_service_auto_routes_note_action_requests_to_action_agent():
     action_agent = FakeActionAgent(answer="I searched your notes and created the note.")
     service = ChatService(
@@ -251,6 +495,60 @@ def test_chat_service_stream_auto_routes_web_action_requests_to_action_agent():
     assert payloads[1]["type"] == "message.complete"
     assert payloads[1]["routing_reason"] == "Smart: action_agent (web)"
     assert action_agent.stream_calls[0]["persist_user_message"] is False
+
+
+def test_chat_service_shared_route_returns_clarification_in_sync_and_stream(monkeypatch):
+    monkeypatch.setattr(
+        chat_module.smart_engine,
+        "analyse_request",
+        lambda *args, **kwargs: {
+            "mode": "general_chat",
+            "needs_clarification": True,
+            "clarifying_question": "Which deployment target do you want me to optimize for?",
+        },
+    )
+
+    service = ChatService(
+        conv_repo=FakeConversationRepository(),
+        note_repo=FakeNoteRepository(),
+        reminder_repo=FakeReminderRepository(),
+        embedding_service=FakeEmbeddingService(),
+    )
+
+    sync_result = service.ask(ChatRequestDTO(user_id=1, prompt="Help me deploy MemoLink"))
+    stream_events = list(service.ask_stream(ChatRequestDTO(user_id=1, prompt="Help me deploy MemoLink")))
+    stream_payloads = [json.loads(event.removeprefix("data: ").strip()) for event in stream_events]
+
+    assert sync_result.answer == "Which deployment target do you want me to optimize for?"
+    assert sync_result.routing_reason == "Smart: clarification"
+    assert stream_payloads[0]["type"] == "message.replace"
+    assert stream_payloads[0]["content"] == "Which deployment target do you want me to optimize for?"
+    assert stream_payloads[1]["routing_reason"] == "Smart: clarification"
+
+
+def test_chat_service_sync_can_improve_note_via_shared_route(monkeypatch):
+    conv_repo = FakeConversationRepository()
+    note_repo = FakeNoteRepository()
+    note_repo.create_note(1, "Architecture Plan", "<p>messy text</p>", "manual")
+    improver = FakeOpenAIChat("<h2>Architecture Plan</h2><p>Improved structure</p>")
+    monkeypatch.setattr(
+        chat_module,
+        "_get_client",
+        lambda model, user_keys=None: SimpleNamespace(chat=SimpleNamespace(completions=improver)),
+    )
+
+    service = ChatService(
+        conv_repo=conv_repo,
+        note_repo=note_repo,
+        reminder_repo=FakeReminderRepository(),
+        embedding_service=FakeEmbeddingService(),
+    )
+
+    result = service.ask(ChatRequestDTO(user_id=1, prompt="improve note: Architecture Plan"))
+
+    assert result.routing_reason == "Direct: note_improve"
+    assert "improved and saved" in result.answer.lower()
+    assert "<h2>Architecture Plan</h2>" in note_repo.get_by_id(1).content
 
 
 def test_action_agent_decision_does_not_hijack_regular_academic_prompt():
@@ -322,6 +620,34 @@ def test_chat_service_uses_prior_context_when_user_only_replies_with_email_addre
     assert '<email_draft to="rectiangson@gmail.com"' in result.answer
     assert _extract_draft_subject(result.answer) == "Research Paper Submission - MSE907 Assessment 2"
     assert "completed research paper content" in _extract_draft_body(result.answer)
+
+
+def test_general_make_this_better_prompt_does_not_trigger_email_reply_draft(monkeypatch):
+    conv_repo = FakeConversationRepository()
+    fake_chat = FakeOpenAIChat("Improved writing output")
+    monkeypatch.setattr(
+        chat_module,
+        "_get_client",
+        lambda model, user_keys=None: SimpleNamespace(chat=SimpleNamespace(completions=fake_chat)),
+    )
+    service = ChatService(
+        conv_repo=conv_repo,
+        note_repo=FakeNoteRepository(),
+        embedding_service=FakeEmbeddingService(),
+        email_service=FakeEmailService(),
+    )
+
+    prompt = (
+        "can you make this better :\n\n"
+        "Jun 1 - Infrastructure & Upload\n"
+        "...\n"
+        "Reply:\n"
+    )
+
+    result = service.ask(ChatRequestDTO(user_id=1, prompt=prompt))
+
+    assert "<email_draft" not in result.answer
+    assert result.answer == "Improved writing output"
 
 
 def test_derive_web_search_query_uses_previous_topic_for_generic_follow_up():
