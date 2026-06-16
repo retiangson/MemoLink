@@ -321,11 +321,11 @@ _SYSTEM_PROMPT = (
     "\n\nFor DEBUGGING and FIXING code:\n"
     "1. Use read_file to read the source file and understand the code.\n"
     "2. Use run_shell with timeout=5 to check for startup errors — if it times out with no stderr the script is working fine.\n"
-    "3. For scripts that run indefinitely (mouse movers, servers), use 'start /B python path' to launch in background instead of blocking.\n"
+    "3. For scripts that run indefinitely (mouse movers, servers), use 'start \"\" python path' (no /B) so a console window opens — the user can see output and close it to stop the script.\n"
     "4. Use patch_file to fix specific lines (preferred for small fixes) or write_file for full rewrites.\n"
     "5. Run it again with run_shell timeout=5 to confirm the fix works.\n"
     "\nFor running apps: ALWAYS call run_shell — never say you can't run local apps. "
-    "For long-running scripts, use 'start /B python path' so they run in background. "
+    "For long-running scripts, use 'start \"\" python path' (opens a visible console window the user can close to stop it). "
     "If the user says 'ticket' without naming a system, prefer Jira for project-management and GitHub for repo issues/PRs. "
     "Keep tool use efficient and give a concise final answer stating what you did."
 )
