@@ -49,7 +49,7 @@ export function RightPanel({
   const [selectedItem, setSelectedItem] = useState<SuggestionItem | null>(null);
   const [showNoteReminders, setShowNoteReminders] = useState(true);
   const [showEmailReminders, setShowEmailReminders] = useState(true);
-  const [activeEmailAccountId, setActiveEmailAccountId] = useState<number | null>(null);
+  const [collapsedAccountIds, setCollapsedAccountIds] = useState<Set<number>>(new Set());
   const [selectedEmail, setSelectedEmail] = useState<EmailRecord | null>(null);
   const [emailDeleteLoading, setEmailDeleteLoading] = useState<number | null>(null);
   const [showTeams, setShowTeams] = useState(true);
@@ -124,12 +124,62 @@ export function RightPanel({
   // Build a set of email_record_ids that already have reminders (for "Pinned" badge)
   const pinnedEmailIds = new Set(items.filter((i) => !!i.email_record_id).map((i) => i.email_record_id!));
 
-  // Filter email records for the currently active account tab
-  const visibleEmailRecords = activeEmailAccountId
-    ? emailRecords.filter((r) => r.email_account_id === activeEmailAccountId)
-    : emailRecords;
-
   const hasEmail = emailConnected || emailRecords.length > 0;
+
+  function toggleAccountCollapse(accountId: number) {
+    setCollapsedAccountIds((prev) => {
+      const next = new Set(prev);
+      next.has(accountId) ? next.delete(accountId) : next.add(accountId);
+      return next;
+    });
+  }
+
+  function renderEmailCard(email: EmailRecord) {
+    const isPinned = pinnedEmailIds.has(email.id);
+    const score = email.importance_score ?? 3;
+    const urgencyLabel = score >= 4.5 ? { t: "Urgent", cls: "text-red-400 bg-red-500/15" }
+      : score >= 3.5 ? { t: "Important", cls: "text-orange-400 bg-orange-500/15" }
+      : { t: "Notable", cls: "text-blue-400 bg-blue-500/10" };
+    const dateLabel = email.email_date
+      ? new Date(email.email_date).toLocaleDateString(undefined, { month: "short", day: "numeric" })
+      : "";
+    return (
+      <div
+        key={email.id}
+        className="group rounded-xl border bg-[#131320] border-[var(--ml-bg-hover)] hover:border-blue-500/30 transition overflow-hidden cursor-pointer"
+        onClick={() => setSelectedEmail(email)}
+      >
+        <div className="flex items-start gap-2 p-2.5">
+          <div className="flex-1 min-w-0">
+            <p className="text-[11px] font-medium text-gray-200 leading-snug break-words line-clamp-2">{email.subject}</p>
+            <p className="text-[10px] text-gray-500 truncate mt-0.5">{email.sender_name || email.sender_email}</p>
+          </div>
+          <button
+            title="Remove email"
+            disabled={emailDeleteLoading === email.id}
+            onClick={async (e) => {
+              e.stopPropagation();
+              if (!onDeleteEmailRecord) return;
+              setEmailDeleteLoading(email.id);
+              try { await onDeleteEmailRecord(email.id); } finally { setEmailDeleteLoading(null); }
+            }}
+            className="shrink-0 w-5 h-5 flex items-center justify-center text-gray-700 hover:text-red-400 transition opacity-0 group-hover:opacity-100 disabled:opacity-40 text-xs leading-none"
+          >
+            {emailDeleteLoading === email.id
+              ? <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
+              : "✕"}
+          </button>
+        </div>
+        <div className="flex items-center gap-1.5 px-2.5 pb-2 flex-wrap">
+          <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded ${urgencyLabel.cls}`}>{urgencyLabel.t}</span>
+          {dateLabel && <span className="text-[10px] text-gray-600">{dateLabel}</span>}
+          {isPinned && (
+            <span className="text-[9px] text-blue-400/70 px-1.5 py-0.5 rounded border border-blue-500/20 bg-blue-500/10 ml-auto">📌 Pinned</span>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   const renderCard = (item: SuggestionItem) => {
     const isToday   = !item.done && item.due_date === today;
@@ -267,7 +317,7 @@ export function RightPanel({
       {/* Scrollable body - everything between header and footer scrolls together */}
       <div className="flex-1 overflow-y-auto flex flex-col min-h-0">
 
-      {/* ── Section 1: Notes ── */}
+      {/* ── Section 1: General Reminders ── */}
       <div className="border-b border-[var(--ml-bg-panel)]">
         <button
           onClick={() => setShowNoteReminders((v) => !v)}
@@ -275,9 +325,10 @@ export function RightPanel({
         >
           <div className="flex items-center gap-2">
             <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 text-indigo-400 shrink-0" fill="currentColor" viewBox="0 0 16 16">
-              <path d="M2.5 1A1.5 1.5 0 0 0 1 2.5v11A1.5 1.5 0 0 0 2.5 15h6.086a1.5 1.5 0 0 0 1.06-.44l4.915-4.914A1.5 1.5 0 0 0 15 8.586V2.5A1.5 1.5 0 0 0 13.5 1zm6 8.5a1 1 0 0 1 1-1h4.396l-5.396 5.397z"/>
+              <path d="M14.5 3a.5.5 0 0 1 .5.5v9a.5.5 0 0 1-.5.5h-13a.5.5 0 0 1-.5-.5v-9a.5.5 0 0 1 .5-.5zm-13-1A1.5 1.5 0 0 0 0 3.5v9A1.5 1.5 0 0 0 1.5 14h13a1.5 1.5 0 0 0 1.5-1.5v-9A1.5 1.5 0 0 0 14.5 2z"/>
+              <path d="M7 5.5a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 0 1h-5a.5.5 0 0 1-.5-.5m-1.496-.854a.5.5 0 0 1 0 .708l-1.5 1.5a.5.5 0 0 1-.708 0l-.5-.5a.5.5 0 1 1 .708-.708l.146.147 1.146-1.147a.5.5 0 0 1 .708 0M7 9.5a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 0 1h-5a.5.5 0 0 1-.5-.5m-1.496-.854a.5.5 0 0 1 0 .708l-1.5 1.5a.5.5 0 0 1-.708 0l-.5-.5a.5.5 0 1 1 .708-.708l.146.147 1.146-1.147a.5.5 0 0 1 .708 0"/>
             </svg>
-            <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Notes</span>
+            <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">General Reminders</span>
             {noteItems.length > 0 && (
               <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-400">
                 {noteItems.length}
@@ -291,7 +342,6 @@ export function RightPanel({
 
         {showNoteReminders && (
           <div className="px-3 pb-3 flex flex-col gap-2">
-            {/* Generate from Notes */}
             <button
               onClick={onGenerate}
               disabled={isGenerating}
@@ -300,13 +350,18 @@ export function RightPanel({
               {isGenerating ? (
                 <><svg className="w-3 h-3 animate-spin shrink-0" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>Generating…</>
               ) : (
-                <><svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3 shrink-0" fill="currentColor" viewBox="0 0 16 16"><path d="M2 6a6 6 0 1 1 10.174 4.31c-.203.196-.359.4-.453.619l-.762 1.769A.5.5 0 0 1 10.5 13h-5a.5.5 0 0 1-.46-.302l-.761-1.77a2 2 0 0 0-.453-.618A5.98 5.98 0 0 1 2 6m3 8.5a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 0 1l-.224.447a1 1 0 0 1-.894.553H6.618a1 1 0 0 1-.894-.553L5.5 15a.5.5 0 0 1-.5-.5"/></svg>Generate from Notes</>
+                <>
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3 shrink-0" fill="currentColor" viewBox="0 0 16 16">
+                    <path d="M2 6a6 6 0 1 1 10.174 4.31c-.203.196-.359.4-.453.619l-.762 1.769A.5.5 0 0 1 10.5 13h-5a.5.5 0 0 1-.46-.302l-.761-1.77a2 2 0 0 0-.453-.618A5.98 5.98 0 0 1 2 6m3 8.5a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 0 1l-.224.447a1 1 0 0 1-.894.553H6.618a1 1 0 0 1-.894-.553L5.5 15a.5.5 0 0 1-.5-.5"/>
+                  </svg>
+                  Generate from Notes &amp; Chat
+                </>
               )}
             </button>
 
             {noteItems.length === 0 && !isGenerating && (
               <p className="text-[11px] text-gray-600 text-center pt-1">
-                No note reminders yet.
+                No reminders yet — generate from your notes or chat.
               </p>
             )}
             {noteItems.map(renderCard)}
@@ -340,32 +395,6 @@ export function RightPanel({
           {showEmailReminders && (
             <div className="px-3 pb-3 flex flex-col gap-2">
 
-              {/* Per-account tabs (only when multiple accounts) */}
-              {emailAccounts.length > 1 && (
-                <div className="flex gap-1 flex-wrap">
-                  <button
-                    onClick={() => setActiveEmailAccountId(null)}
-                    className={`px-2 py-0.5 rounded text-[10px] font-medium transition border ${
-                      activeEmailAccountId === null
-                        ? "bg-blue-600/20 border-blue-500/40 text-blue-300"
-                        : "bg-transparent border-[var(--ml-bg-hover)] text-gray-500 hover:text-gray-300"
-                    }`}
-                  >All</button>
-                  {emailAccounts.map((a) => (
-                    <button
-                      key={a.id}
-                      onClick={() => setActiveEmailAccountId(a.id)}
-                      className={`px-2 py-0.5 rounded text-[10px] font-medium transition border truncate max-w-[110px] ${
-                        activeEmailAccountId === a.id
-                          ? "bg-blue-600/20 border-blue-500/40 text-blue-300"
-                          : "bg-transparent border-[var(--ml-bg-hover)] text-gray-500 hover:text-gray-300"
-                      }`}
-                      title={a.email}
-                    >{a.email.split("@")[0]}</button>
-                  ))}
-                </div>
-              )}
-
               {/* Sync button */}
               {emailConnected && (
                 <>
@@ -388,68 +417,55 @@ export function RightPanel({
                 </>
               )}
 
-              {/* Email record cards */}
-              {visibleEmailRecords.length === 0 ? (
+              {/* Per-account collapsible sections */}
+              {emailAccounts.length === 0 ? (
                 <p className="text-[11px] text-gray-600 text-center pt-1">
                   {emailConnected ? "Sync to load emails." : "No emails yet."}
                 </p>
               ) : (
-                visibleEmailRecords.map((email) => {
-                  const isPinned = pinnedEmailIds.has(email.id);
-                  const score = email.importance_score ?? 3;
-                  const urgencyLabel = score >= 4.5 ? { t: "Urgent", cls: "text-red-400 bg-red-500/15" }
-                    : score >= 3.5 ? { t: "Important", cls: "text-orange-400 bg-orange-500/15" }
-                    : { t: "Notable", cls: "text-blue-400 bg-blue-500/10" };
-                  const dateLabel = email.email_date
-                    ? new Date(email.email_date).toLocaleDateString(undefined, { month: "short", day: "numeric" })
-                    : "";
-
+                emailAccounts.map((account) => {
+                  const isCollapsed = collapsedAccountIds.has(account.id);
+                  const accountEmails = emailRecords.filter(
+                    (r) => r.email_account_id === account.id ||
+                      (emailAccounts.length === 1 && r.email_account_id == null)
+                  );
                   return (
-                    <div
-                      key={email.id}
-                      className="group rounded-xl border bg-[#131320] border-[var(--ml-bg-hover)] hover:border-blue-500/30 transition overflow-hidden cursor-pointer"
-                      onClick={() => setSelectedEmail(email)}
-                    >
-                      {/* Card header */}
-                      <div className="flex items-start gap-2 p-2.5">
-                        <div className="flex-1 min-w-0">
-                          <p className="text-[11px] font-medium text-gray-200 leading-snug break-words line-clamp-2">
-                            {email.subject}
-                          </p>
-                          <p className="text-[10px] text-gray-500 truncate mt-0.5">
-                            {email.sender_name || email.sender_email}
-                          </p>
-                        </div>
-                        {/* Delete button */}
-                        <button
-                          title="Remove email"
-                          disabled={emailDeleteLoading === email.id}
-                          onClick={async (e) => {
-                            e.stopPropagation();
-                            if (!onDeleteEmailRecord) return;
-                            setEmailDeleteLoading(email.id);
-                            try { await onDeleteEmailRecord(email.id); } finally { setEmailDeleteLoading(null); }
-                          }}
-                          className="shrink-0 w-5 h-5 flex items-center justify-center text-gray-700 hover:text-red-400 transition opacity-0 group-hover:opacity-100 disabled:opacity-40 text-xs leading-none"
-                        >
-                          {emailDeleteLoading === email.id
-                            ? <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
-                            : "✕"}
-                        </button>
-                      </div>
-
-                      {/* Badges row */}
-                      <div className="flex items-center gap-1.5 px-2.5 pb-2 flex-wrap">
-                        <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded ${urgencyLabel.cls}`}>
-                          {urgencyLabel.t}
+                    <div key={account.id} className="rounded-xl border border-[var(--ml-bg-hover)] overflow-hidden">
+                      {/* Account header — collapse toggle */}
+                      <button
+                        onClick={() => toggleAccountCollapse(account.id)}
+                        className="w-full flex items-center gap-2 px-2.5 py-2 bg-[var(--ml-bg-surface)] hover:bg-[#1e1e2c] transition text-left"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3 text-blue-400 shrink-0" fill="currentColor" viewBox="0 0 16 16">
+                          <path d="M0 4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2zm2-1a1 1 0 0 0-1 1v.217l7 4.2 7-4.2V4a1 1 0 0 0-1-1zm13 2.383-4.708 2.825L15 11.105zm-.034 6.876-5.64-3.471L8 9.583l-1.326-.795-5.64 3.47A1 1 0 0 0 2 13h12a1 1 0 0 0 .966-.741M1 11.105l4.708-2.897L1 5.383z"/>
+                        </svg>
+                        <span className="flex-1 min-w-0 text-[11px] font-medium text-gray-300 truncate" title={account.email}>
+                          {account.email}
                         </span>
-                        {dateLabel && <span className="text-[10px] text-gray-600">{dateLabel}</span>}
-                        {isPinned && (
-                          <span className="text-[9px] text-blue-400/70 px-1.5 py-0.5 rounded border border-blue-500/20 bg-blue-500/10 ml-auto">
-                            📌 Pinned
+                        {accountEmails.length > 0 && (
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-blue-500/20 text-blue-400 shrink-0">
+                            {accountEmails.length}
                           </span>
                         )}
-                      </div>
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className={`w-3 h-3 text-gray-600 shrink-0 transition-transform ${isCollapsed ? "-rotate-90" : ""}`}
+                          fill="currentColor" viewBox="0 0 16 16"
+                        >
+                          <path d="M7.247 11.14 2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z"/>
+                        </svg>
+                      </button>
+
+                      {/* Account emails */}
+                      {!isCollapsed && (
+                        <div className="p-2 flex flex-col gap-1.5 border-t border-[var(--ml-bg-hover)]">
+                          {accountEmails.length === 0 ? (
+                            <p className="text-[11px] text-gray-600 text-center py-2">No emails synced yet.</p>
+                          ) : (
+                            accountEmails.map(renderEmailCard)
+                          )}
+                        </div>
+                      )}
                     </div>
                   );
                 })
