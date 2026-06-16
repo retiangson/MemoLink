@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+﻿import React, { useState } from "react";
 import { submitFeedback } from "../api/client";
 
 interface FeedbackModalProps {
@@ -36,11 +36,11 @@ export function FeedbackModal({ show, onClose }: FeedbackModalProps) {
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50" onClick={handleClose}>
       <div
-        className="bg-[#1a1a24] border border-[#2a2a38] rounded-2xl w-full max-w-[480px] mx-4 shadow-2xl text-white overflow-hidden"
+        className="bg-[#1a1a24] border border-[var(--ml-bg-hover)] rounded-2xl w-full max-w-[480px] mx-4 shadow-2xl text-white overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[#2a2a38]">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--ml-bg-hover)]">
           <div className="flex items-center gap-2.5">
             <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-indigo-400 shrink-0" fill="currentColor" viewBox="0 0 16 16">
               <path d="M14 1a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H4.414A2 2 0 0 0 3 11.586l-2 2V2a1 1 0 0 1 1-1zM2 0a2 2 0 0 0-2 2v12.793a.5.5 0 0 0 .854.353l2.853-2.853A1 1 0 0 1 4.414 12H14a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2z"/>
@@ -49,7 +49,7 @@ export function FeedbackModal({ show, onClose }: FeedbackModalProps) {
           </div>
           <button
             onClick={handleClose}
-            className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-500 hover:text-gray-200 hover:bg-[#2a2a38] transition"
+            className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-500 hover:text-gray-200 hover:bg-[var(--ml-bg-hover)] transition"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -77,14 +77,14 @@ export function FeedbackModal({ show, onClose }: FeedbackModalProps) {
           ) : (
             <form onSubmit={handleSubmit} className="space-y-3">
               {/* Type toggle */}
-              <div className="flex rounded-lg overflow-hidden border border-[#2a2a38]">
+              <div className="flex rounded-lg overflow-hidden border border-[var(--ml-bg-hover)]">
                 {(["bug", "suggestion"] as const).map((t) => (
                   <button
                     key={t}
                     type="button"
                     onClick={() => setFbType(t)}
                     className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium transition ${
-                      fbType === t ? "bg-indigo-600 text-white" : "bg-[#12121a] text-gray-500 hover:text-gray-300"
+                      fbType === t ? "bg-indigo-600 text-white" : "bg-[var(--ml-bg-surface)] text-gray-500 hover:text-gray-300"
                     }`}
                   >
                     {t === "bug" ? (
@@ -114,7 +114,7 @@ export function FeedbackModal({ show, onClose }: FeedbackModalProps) {
                 onChange={(e) => { setFbTitle(e.target.value); if (fbState === "error") setFbState("idle"); }}
                 placeholder={fbType === "bug" ? "Brief summary of the bug…" : "Brief summary of your suggestion…"}
                 maxLength={200}
-                className="w-full bg-[#12121a] border border-[#2a2a38] rounded-xl px-3 py-2.5 text-sm text-gray-300 placeholder-gray-600 focus:outline-none focus:border-indigo-500/60 transition"
+                className="w-full bg-[var(--ml-bg-surface)] border border-[var(--ml-bg-hover)] rounded-xl px-3 py-2.5 text-sm text-gray-300 placeholder-gray-600 focus:outline-none focus:border-indigo-500/60 transition"
               />
 
               {/* Description */}
@@ -123,7 +123,7 @@ export function FeedbackModal({ show, onClose }: FeedbackModalProps) {
                 onChange={(e) => { setFbMessage(e.target.value); if (fbState === "error") setFbState("idle"); }}
                 placeholder={fbType === "bug" ? "What happened? What did you expect instead? Steps to reproduce…" : "Describe your idea or feature request in detail…"}
                 rows={5}
-                className="w-full bg-[#12121a] border border-[#2a2a38] rounded-xl px-3 py-2.5 text-sm text-gray-300 placeholder-gray-600 resize-none focus:outline-none focus:border-indigo-500/60 transition"
+                className="w-full bg-[var(--ml-bg-surface)] border border-[var(--ml-bg-hover)] rounded-xl px-3 py-2.5 text-sm text-gray-300 placeholder-gray-600 resize-none focus:outline-none focus:border-indigo-500/60 transition"
               />
 
               {fbState === "error" && (

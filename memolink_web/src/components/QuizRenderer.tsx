@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+﻿import React, { useState } from "react";
 
 interface Question {
   id: number;
@@ -103,9 +103,9 @@ export function QuizRenderer({ quiz, onSaveNote }: Props) {
   }
 
   return (
-    <div className="mt-2 rounded-2xl border border-[#2a2a38] bg-[#12121a] overflow-hidden">
+    <div className="mt-2 rounded-2xl border border-[var(--ml-bg-hover)] bg-[var(--ml-bg-surface)] overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between px-5 py-3 border-b border-[#2a2a38] bg-[#1a1a24]">
+      <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--ml-bg-hover)] bg-[#1a1a24]">
         <div className="flex items-center gap-2">
           <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-indigo-400" fill="currentColor" viewBox="0 0 16 16">
             <path d="M8.211 2.047a.5.5 0 0 0-.422 0l-7.5 3.5a.5.5 0 0 0 .025.917l7.5 3a.5.5 0 0 0 .372 0L14 7.14V13a1 1 0 0 0 2 0V6a.5.5 0 0 0-.311-.463z"/>
@@ -118,7 +118,7 @@ export function QuizRenderer({ quiz, onSaveNote }: Props) {
 
       {/* Score bar */}
       {submitted && (
-        <div className={`flex items-center justify-between px-5 py-3 border-b border-[#2a2a38] ${
+        <div className={`flex items-center justify-between px-5 py-3 border-b border-[var(--ml-bg-hover)] ${
           pct >= 80 ? "bg-green-900/20" : pct >= 60 ? "bg-amber-900/20" : "bg-red-900/20"
         }`}>
           <div>
@@ -137,7 +137,7 @@ export function QuizRenderer({ quiz, onSaveNote }: Props) {
       )}
 
       {/* Questions */}
-      <div className="divide-y divide-[#2a2a38]">
+      <div className="divide-y divide-[var(--ml-bg-hover)]">
         {quiz.questions.map((q, qi) => {
           const selected = answers[q.id] ?? [];
           const isCorrect = submitted && (() => {
@@ -163,11 +163,11 @@ export function QuizRenderer({ quiz, onSaveNote }: Props) {
                 {q.options.map((opt, oi) => {
                   const isSelected = selected.includes(oi);
                   const isRight = q.correct.includes(oi);
-                  let optCls = "border-[#2a2a38] text-gray-400 hover:border-indigo-500/40 hover:text-gray-200";
+                  let optCls = "border-[var(--ml-bg-hover)] text-gray-400 hover:border-indigo-500/40 hover:text-gray-200";
                   if (submitted) {
                     if (isRight) optCls = "border-green-500/50 bg-green-500/10 text-green-300";
                     else if (isSelected && !isRight) optCls = "border-red-500/50 bg-red-500/10 text-red-300";
-                    else optCls = "border-[#2a2a38] text-gray-600";
+                    else optCls = "border-[var(--ml-bg-hover)] text-gray-600";
                   } else if (isSelected) {
                     optCls = "border-indigo-500/60 bg-indigo-500/10 text-indigo-300";
                   }
@@ -194,7 +194,7 @@ export function QuizRenderer({ quiz, onSaveNote }: Props) {
               </div>
 
               {submitted && q.explanation && (
-                <div className="mt-3 px-3 py-2 rounded-xl bg-[#1e1e2a] border border-[#2a2a38]">
+                <div className="mt-3 px-3 py-2 rounded-xl bg-[var(--ml-bg-panel)] border border-[var(--ml-bg-hover)]">
                   <p className="text-[11px] text-indigo-400 font-medium uppercase tracking-wider mb-1">Explanation</p>
                   <p className="text-xs text-gray-400 leading-relaxed">{q.explanation}</p>
                 </div>
@@ -205,7 +205,7 @@ export function QuizRenderer({ quiz, onSaveNote }: Props) {
       </div>
 
       {/* Footer */}
-      <div className="px-5 py-3 border-t border-[#2a2a38] flex items-center justify-between gap-3">
+      <div className="px-5 py-3 border-t border-[var(--ml-bg-hover)] flex items-center justify-between gap-3">
         {!submitted ? (
           <>
             <p className="text-xs text-gray-600">{Object.keys(answers).length}/{quiz.questions.length} answered</p>
@@ -229,7 +229,7 @@ export function QuizRenderer({ quiz, onSaveNote }: Props) {
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition ${
                   saved
                     ? "bg-emerald-500/15 border border-emerald-500/25 text-emerald-400 cursor-default"
-                    : "bg-[#1e1e2a] border border-[#2a2a38] text-gray-300 hover:border-indigo-500/40 hover:text-indigo-300 disabled:opacity-80 disabled:cursor-wait"
+                    : "bg-[var(--ml-bg-panel)] border border-[var(--ml-bg-hover)] text-gray-300 hover:border-indigo-500/40 hover:text-indigo-300 disabled:opacity-80 disabled:cursor-wait"
                 }`}
               >
                 {saved ? (

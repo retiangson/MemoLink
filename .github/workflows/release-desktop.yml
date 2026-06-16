@@ -1,0 +1,48 @@
+name: Release Desktop App
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Version tag (e.g. v1.0.1)"
+        required: true
+
+permissions:
+  contents: write  # needed to create GitHub Releases and upload assets
+
+jobs:
+  build-windows:
+    name: Build Windows Installer
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: memolink_web/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: memolink_web
+
+      - name: Build renderer + Electron main
+        run: npx vite build --config vite.electron.config.ts
+        working-directory: memolink_web
+        env:
+          # Bake the production API URL into the renderer at build time.
+          # Set VITE_API_BASE_URL in GitHub → Settings → Secrets → Actions.
+          VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
+
+      - name: Package and publish to GitHub Releases
+        run: npx electron-builder --win --publish always
+        working-directory: memolink_web
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

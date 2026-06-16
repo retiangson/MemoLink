@@ -1,4 +1,4 @@
-/**
+﻿/**
  * MemoGraphModal - Interactive AI Knowledge Graph Viewer
  *
  * Renders a full-screen, physics-based force-directed graph that shows how
@@ -568,7 +568,7 @@ export function MemoGraphModal({
     <div className="fixed inset-0 bg-black/80 z-50 flex flex-col">
       <div className="flex flex-col w-full h-full">
         {/* ── Header ── */}
-        <div className="flex items-center gap-3 px-5 py-3 border-b border-[#2a2a38] bg-[#12121a] shrink-0">
+        <div className="flex items-center gap-3 px-5 py-3 border-b border-[var(--ml-bg-hover)] bg-[var(--ml-bg-surface)] shrink-0">
           <div className="flex items-center gap-2">
             <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
               <circle cx="5" cy="12" r="2.5" /><circle cx="19" cy="5" r="2.5" /><circle cx="19" cy="19" r="2.5" />
@@ -579,7 +579,7 @@ export function MemoGraphModal({
             </svg>
             <h2 className="font-semibold text-white text-sm">MemoGraph</h2>
             {workspaceName && (
-              <span className="text-xs text-gray-500 border border-[#2a2a38] px-2 py-0.5 rounded-full">
+              <span className="text-xs text-gray-500 border border-[var(--ml-bg-hover)] px-2 py-0.5 rounded-full">
                 {workspaceName}
               </span>
             )}
@@ -626,7 +626,7 @@ export function MemoGraphModal({
                 <button
                   onClick={handleFit}
                   title="Fit all nodes into view"
-                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs text-gray-400 hover:text-white hover:bg-[#2a2a38] transition"
+                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs text-gray-400 hover:text-white hover:bg-[var(--ml-bg-hover)] transition"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5" />
@@ -644,7 +644,7 @@ export function MemoGraphModal({
 
             <button
               onClick={onClose}
-              className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-500 hover:text-gray-200 hover:bg-[#2a2a38] transition"
+              className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-500 hover:text-gray-200 hover:bg-[var(--ml-bg-hover)] transition"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -669,7 +669,7 @@ export function MemoGraphModal({
 
             {/* Loading overlay */}
             {(loading || building) && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#0d0d15]/80">
+              <div className="absolute inset-0 flex flex-col items-center justify-center bg-[var(--ml-bg-base)]/80">
                 <svg className="w-8 h-8 animate-spin text-indigo-400 mb-3" fill="none" viewBox="0 0 24 24">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
@@ -701,7 +701,7 @@ export function MemoGraphModal({
             {/* Tooltip */}
             {tooltip && (
               <div
-                className="absolute pointer-events-none bg-[#1e1e2a] border border-[#2a2a38] rounded-lg px-2.5 py-1.5 shadow-xl"
+                className="absolute pointer-events-none bg-[var(--ml-bg-panel)] border border-[var(--ml-bg-hover)] rounded-lg px-2.5 py-1.5 shadow-xl"
                 style={{ left: tooltip.x, top: tooltip.y, maxWidth: 220 }}
               >
                 <p className="text-[11px] font-semibold" style={{ color: nodeColor(tooltip.type) }}>
@@ -716,7 +716,7 @@ export function MemoGraphModal({
           </div>
 
           {/* ── Legend & filters ── */}
-          <div className="w-44 shrink-0 border-l border-[#2a2a38] bg-[#12121a] flex flex-col py-3 px-3 overflow-y-auto">
+          <div className="w-44 shrink-0 border-l border-[var(--ml-bg-hover)] bg-[var(--ml-bg-surface)] flex flex-col py-3 px-3 overflow-y-auto">
             <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wider mb-2">Node Types</p>
             <div className="space-y-1">
               {allTypes.map((type) => {
@@ -727,7 +727,7 @@ export function MemoGraphModal({
                     onClick={() => toggleType(type)}
                     className={`flex items-center gap-2 w-full px-2 py-1.5 rounded-lg text-xs transition ${
                       active ? "text-gray-300" : "text-gray-600 opacity-50"
-                    } hover:bg-[#1e1e2a]`}
+                    } hover:bg-[var(--ml-bg-panel)]`}
                   >
                     <span
                       className="w-2.5 h-2.5 rounded-full shrink-0 border"
@@ -742,7 +742,7 @@ export function MemoGraphModal({
               })}
             </div>
 
-            <div className="mt-auto pt-4 border-t border-[#2a2a38] space-y-2 text-[10px] text-gray-600">
+            <div className="mt-auto pt-4 border-t border-[var(--ml-bg-hover)] space-y-2 text-[10px] text-gray-600">
               <div className="flex items-center gap-1.5">
                 <svg className="w-3 h-3 shrink-0" fill="none" viewBox="0 0 16 16" stroke="currentColor" strokeWidth={1.5}>
                   <circle cx="4" cy="8" r="2.5"/><circle cx="12" cy="4" r="2.5"/><line x1="6.3" y1="7" x2="9.7" y2="5"/>

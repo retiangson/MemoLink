@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import { UploadNotes } from "./UploadNotes";
 import { WorkspaceSelector } from "./WorkspaceSelector";
 import type { Conversation, Note, Workspace } from "../types";
@@ -54,8 +54,8 @@ export function Sidebar({
     <>
       {/* Mobile backdrop */}
       <div className="fixed inset-0 bg-black/60 z-40 sm:hidden" onClick={onClose} />
-      <aside id="tour-sidebar" className="fixed inset-y-0 left-0 z-50 sm:relative sm:inset-auto w-[300px] h-full bg-[#0f0f13] border-r border-[#1e1e2a] flex flex-col flex-shrink-0">
-      <div className="px-4 py-3 border-b border-[#1e1e2a] flex justify-between items-center">
+      <aside id="tour-sidebar" className="fixed inset-y-0 left-0 z-50 sm:relative sm:inset-auto w-[300px] h-full bg-[var(--ml-bg-base)] border-r border-[var(--ml-bg-panel)] flex flex-col flex-shrink-0">
+      <div className="px-4 py-3 border-b border-[var(--ml-bg-panel)] flex justify-between items-center">
         <div className="flex items-center gap-2 min-w-0">
           <img
             src="/memolink-icon.png"
@@ -78,7 +78,7 @@ export function Sidebar({
         <button onClick={onClose} className="text-gray-500 hover:text-gray-300 text-sm shrink-0">✕</button>
       </div>
 
-      <div id="tour-workspace-selector" className="px-3 py-2.5 border-b border-[#1e1e2a]">
+      <div id="tour-workspace-selector" className="px-3 py-2.5 border-b border-[var(--ml-bg-panel)]">
         <WorkspaceSelector
           workspaces={workspaces}
           activeWorkspace={activeWorkspace}
@@ -87,11 +87,11 @@ export function Sidebar({
         />
       </div>
 
-      <div id="tour-upload-notes" className="px-3 py-3 border-b border-[#1e1e2a]">
+      <div id="tour-upload-notes" className="px-3 py-3 border-b border-[var(--ml-bg-panel)]">
         <UploadNotes setNotes={setNotes} workspaceId={activeWorkspace?.id} onUploaded={onNotesUploaded} />
       </div>
 
-      <div id="tour-notes-section" className="border-b border-[#1e1e2a]">
+      <div id="tour-notes-section" className="border-b border-[var(--ml-bg-panel)]">
         <button
           onClick={() => setShowNotes(!showNotes)}
           className="w-full px-4 py-2.5 flex justify-between items-center text-gray-400 text-xs font-semibold uppercase tracking-wider hover:text-gray-200 transition"
@@ -111,7 +111,7 @@ export function Sidebar({
             {notes.map((note) => (
               <div
                 key={note.id}
-                className="flex items-center justify-between rounded-lg px-2 py-1.5 hover:bg-[#1e1e2a] cursor-pointer group"
+                className="flex items-center justify-between rounded-lg px-2 py-1.5 hover:bg-[var(--ml-bg-panel)] cursor-pointer group"
                 onClick={() => onNoteClick(note)}
               >
                 <span className="truncate text-xs text-gray-300 flex-1">{note.title || "Untitled"}</span>
@@ -131,7 +131,7 @@ export function Sidebar({
       <div id="tour-chats-section" className="flex-1 flex flex-col overflow-hidden">
         <button
           onClick={() => setShowConversations(!showConversations)}
-          className="w-full px-4 py-2.5 flex justify-between items-center text-gray-400 text-xs font-semibold uppercase tracking-wider hover:text-gray-200 transition border-b border-[#1e1e2a]"
+          className="w-full px-4 py-2.5 flex justify-between items-center text-gray-400 text-xs font-semibold uppercase tracking-wider hover:text-gray-200 transition border-b border-[var(--ml-bg-panel)]"
         >
           <span>Chats</span>
           <span>{showConversations ? "▾" : "▸"}</span>
@@ -148,7 +148,7 @@ export function Sidebar({
               <div key={conv.id} className="relative">
                 <div
                   onClick={() => onConversationClick(conv)}
-                  className={`flex items-center justify-between rounded-lg px-2 py-1.5 cursor-pointer transition group ${activeConversation?.id === conv.id ? "bg-[#1e1e2a] text-white" : "text-gray-400 hover:bg-[#1a1a24] hover:text-white"}`}
+                  className={`flex items-center justify-between rounded-lg px-2 py-1.5 cursor-pointer transition group ${activeConversation?.id === conv.id ? "bg-[var(--ml-bg-panel)] text-white" : "text-gray-400 hover:bg-[#1a1a24] hover:text-white"}`}
                 >
                   <span className="truncate text-xs flex-1">{convLabel(conv)}</span>
                   <button
@@ -166,10 +166,10 @@ export function Sidebar({
       </div>
 
       {/* Recycle Bin */}
-      <div id="tour-recycle-bin" className="shrink-0 border-t border-[#1e1e2a] p-3">
+      <div id="tour-recycle-bin" className="shrink-0 border-t border-[var(--ml-bg-panel)] p-3">
         <button
           onClick={onOpenRecycleBin}
-          className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-500 hover:text-gray-300 hover:bg-[#1e1e2a] rounded-lg transition"
+          className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-500 hover:text-gray-300 hover:bg-[var(--ml-bg-panel)] rounded-lg transition"
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 shrink-0" fill="currentColor" viewBox="0 0 16 16">
             <path d="M11 1.5v1h3.5a.5.5 0 0 1 0 1h-.538l-.853 10.66A2 2 0 0 1 11.115 16h-6.23a2 2 0 0 1-1.994-1.84L2.038 3.5H1.5a.5.5 0 0 1 0-1H5v-1A1.5 1.5 0 0 1 6.5 0h3A1.5 1.5 0 0 1 11 1.5m-5 0v1h4v-1a.5.5 0 0 0-.5-.5h-3a.5.5 0 0 0-.5.5M4.5 5.029l.5 8.5a.5.5 0 1 0 .998-.06l-.5-8.5a.5.5 0 1 0-.998.06m6.53-.528a.5.5 0 0 0-.528.47l-.5 8.5a.5.5 0 0 0 .998.058l.5-8.5a.5.5 0 0 0-.47-.528M8 4.5a.5.5 0 0 0-.5.5v8.5a.5.5 0 0 0 1 0V5a.5.5 0 0 0-.5-.5"/>

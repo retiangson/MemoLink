@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+﻿import React, { useState } from "react";
 import { getReplySuggestions, sendEmailReply } from "../api/emailApi";
 
 interface EmailReplyPanelProps {
@@ -51,11 +51,11 @@ export function EmailReplyPanel({ emailRecordId, senderName, senderEmail, subjec
   const replySubject = subject.toLowerCase().startsWith("re:") ? subject : `Re: ${subject}`;
 
   return (
-    <div className="border border-[#2a2a38] rounded-xl overflow-hidden">
+    <div className="border border-[var(--ml-bg-hover)] rounded-xl overflow-hidden">
       {/* Toggle header */}
       <button
         onClick={() => setOpen(o => !o)}
-        className="w-full px-4 py-2.5 bg-[#12121a] flex items-center gap-2 hover:bg-[#1e1e2c] transition"
+        className="w-full px-4 py-2.5 bg-[var(--ml-bg-surface)] flex items-center gap-2 hover:bg-[#1e1e2c] transition"
       >
         <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 text-indigo-400 shrink-0" fill="currentColor" viewBox="0 0 16 16">
           <path d="M.05 3.555A2 2 0 0 1 2 2h12a2 2 0 0 1 1.95 1.555L8 8.414zM0 4.697v7.104l5.803-3.558zM6.761 8.83l-6.57 4.026A2 2 0 0 0 2 14h12a2 2 0 0 0 1.808-1.144l-6.57-4.026L8 9.586zm3.436-.586L16 11.801V4.697z"/>
@@ -73,7 +73,7 @@ export function EmailReplyPanel({ emailRecordId, senderName, senderEmail, subjec
         </svg>
       </button>
 
-      {open && <div className="p-3 space-y-2.5 border-t border-[#2a2a38]">
+      {open && <div className="p-3 space-y-2.5 border-t border-[var(--ml-bg-hover)]">
         {/* Suggestions picker */}
         {suggestions.length > 0 && (
           <div className="space-y-1.5">
@@ -85,7 +85,7 @@ export function EmailReplyPanel({ emailRecordId, senderName, senderEmail, subjec
                 className={`w-full text-left px-3 py-2 rounded-lg text-xs transition border ${
                   replyBody === s
                     ? "border-indigo-500/50 bg-indigo-500/10 text-gray-200"
-                    : "border-[#2a2a38] bg-[#0e0e16] text-gray-400 hover:border-indigo-500/30 hover:text-gray-300"
+                    : "border-[var(--ml-bg-hover)] bg-[#0e0e16] text-gray-400 hover:border-indigo-500/30 hover:text-gray-300"
                 }`}
               >
                 <span className="text-[10px] text-indigo-500 mr-1.5 font-semibold">
@@ -103,7 +103,7 @@ export function EmailReplyPanel({ emailRecordId, senderName, senderEmail, subjec
           onChange={e => setReplyBody(e.target.value)}
           rows={3}
           placeholder="Write your reply…"
-          className="w-full bg-[#0e0e16] border border-[#2a2a38] rounded-xl px-3 py-2.5 text-xs text-gray-200 placeholder-gray-700 outline-none focus:border-indigo-500 transition resize-none leading-relaxed"
+          className="w-full bg-[#0e0e16] border border-[var(--ml-bg-hover)] rounded-xl px-3 py-2.5 text-xs text-gray-200 placeholder-gray-700 outline-none focus:border-indigo-500 transition resize-none leading-relaxed"
         />
 
         {/* Result */}
@@ -118,7 +118,7 @@ export function EmailReplyPanel({ emailRecordId, senderName, senderEmail, subjec
           <button
             onClick={handleSuggest}
             disabled={suggesting || sending}
-            className="flex items-center gap-1.5 px-3 py-2 bg-[#12121a] border border-[#2a2a38] hover:border-indigo-500/30 text-gray-400 hover:text-indigo-300 rounded-lg text-xs transition disabled:opacity-40"
+            className="flex items-center gap-1.5 px-3 py-2 bg-[var(--ml-bg-surface)] border border-[var(--ml-bg-hover)] hover:border-indigo-500/30 text-gray-400 hover:text-indigo-300 rounded-lg text-xs transition disabled:opacity-40"
           >
             {suggesting ? (
               <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">

@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import type { Workspace, WorkspaceType } from "../types";
 
 const TYPE_ICONS: Record<WorkspaceType, string> = {
@@ -26,7 +26,7 @@ export function WorkspaceSelector({ workspaces, activeWorkspace, onSwitch, onMan
     <div className="relative">
       <button
         onClick={(e) => { e.stopPropagation(); setOpen((v) => !v); }}
-        className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-[#1a1a24] hover:bg-[#2a2a38] border border-[#2a2a38] transition text-left"
+        className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-[#1a1a24] hover:bg-[var(--ml-bg-hover)] border border-[var(--ml-bg-hover)] transition text-left"
       >
         <span className="text-base shrink-0">{icon}</span>
         <div className="flex-1 min-w-0">
@@ -45,14 +45,14 @@ export function WorkspaceSelector({ workspaces, activeWorkspace, onSwitch, onMan
 
       {open && (
         <div
-          className="absolute left-0 top-full mt-1 z-[9999] w-full bg-[#1e1e2a] border border-[#2a2a38] rounded-xl shadow-2xl py-1 overflow-hidden"
+          className="absolute left-0 top-full mt-1 z-[9999] w-full bg-[var(--ml-bg-panel)] border border-[var(--ml-bg-hover)] rounded-xl shadow-2xl py-1 overflow-hidden"
           onClick={(e) => e.stopPropagation()}
         >
           {workspaces.map((ws) => (
             <button
               key={ws.id}
               onClick={() => { onSwitch(ws); setOpen(false); }}
-              className={`w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-[#2a2a38] transition ${activeWorkspace?.id === ws.id ? "bg-indigo-600/10" : ""}`}
+              className={`w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-[var(--ml-bg-hover)] transition ${activeWorkspace?.id === ws.id ? "bg-indigo-600/10" : ""}`}
             >
               <span className="text-sm shrink-0">{TYPE_ICONS[ws.type as WorkspaceType] ?? "📁"}</span>
               <div className="flex-1 min-w-0">
@@ -71,10 +71,10 @@ export function WorkspaceSelector({ workspaces, activeWorkspace, onSwitch, onMan
               )}
             </button>
           ))}
-          <div className="border-t border-[#2a2a38] mt-1 pt-1">
+          <div className="border-t border-[var(--ml-bg-hover)] mt-1 pt-1">
             <button
               onClick={() => { onManage(); setOpen(false); }}
-              className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-500 hover:text-gray-300 hover:bg-[#2a2a38] transition"
+              className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-500 hover:text-gray-300 hover:bg-[var(--ml-bg-hover)] transition"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 16 16">
                 <path d="M8 4.754a3.246 3.246 0 1 0 0 6.492 3.246 3.246 0 0 0 0-6.492M5.754 8a2.246 2.246 0 1 1 4.492 0 2.246 2.246 0 0 1-4.492 0"/>

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+﻿import React, { useEffect, useState } from "react";
 import {
   listQuestions, createQuestion, updateQuestion, deleteQuestion, resetDefaultQuestions,
   getSurveyReport, downloadSurveyCsv,
@@ -25,7 +25,7 @@ export function AdminSurveyPanel() {
           <h2 className="text-lg font-semibold text-white">Evaluation Survey</h2>
           <p className="text-xs text-gray-500">Research data - stored separately from feedback / bug reports.</p>
         </div>
-        <div className="flex gap-1 bg-[#12121a] border border-[#2a2a38] rounded-xl p-1">
+        <div className="flex gap-1 bg-[var(--ml-bg-surface)] border border-[var(--ml-bg-hover)] rounded-xl p-1">
           {(["questions", "report"] as const).map(t => (
             <button
               key={t}
@@ -117,7 +117,7 @@ function QuestionsTab() {
       <div className="flex items-center justify-between mb-3">
         <p className="text-sm text-gray-400">{questions.length} question{questions.length !== 1 ? "s" : ""}</p>
         <div className="flex gap-2">
-          <button onClick={resetDefaults} className="px-3 py-1.5 rounded-lg text-xs text-gray-400 border border-[#2a2a38] hover:text-gray-200 transition">Reset defaults</button>
+          <button onClick={resetDefaults} className="px-3 py-1.5 rounded-lg text-xs text-gray-400 border border-[var(--ml-bg-hover)] hover:text-gray-200 transition">Reset defaults</button>
           <button onClick={startNew} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-indigo-600 hover:bg-indigo-500 text-white transition">+ Add question</button>
         </div>
       </div>
@@ -130,7 +130,7 @@ function QuestionsTab() {
               <h3 className="text-xs font-semibold text-indigo-300 uppercase tracking-wider mb-2">{sec.name}</h3>
               <div className="space-y-1.5">
                 {sec.items.map(q => (
-                  <div key={q.id} className="flex items-start gap-3 bg-[#12121a] border border-[#2a2a38] rounded-xl px-3 py-2.5">
+                  <div key={q.id} className="flex items-start gap-3 bg-[var(--ml-bg-surface)] border border-[var(--ml-bg-hover)] rounded-xl px-3 py-2.5">
                     <div className="flex-1 min-w-0">
                       <p className="text-[13px] text-gray-200">{q.question_text}</p>
                       <div className="flex items-center gap-2 mt-1 flex-wrap">
@@ -142,8 +142,8 @@ function QuestionsTab() {
                       </div>
                     </div>
                     <div className="flex gap-1 shrink-0">
-                      <button onClick={() => startEdit(q)} className="px-2 py-1 rounded-lg text-[11px] text-gray-400 border border-[#2a2a38] hover:text-indigo-300 transition">Edit</button>
-                      <button onClick={() => remove(q)} className="px-2 py-1 rounded-lg text-[11px] text-gray-500 border border-[#2a2a38] hover:text-red-400 transition">Delete</button>
+                      <button onClick={() => startEdit(q)} className="px-2 py-1 rounded-lg text-[11px] text-gray-400 border border-[var(--ml-bg-hover)] hover:text-indigo-300 transition">Edit</button>
+                      <button onClick={() => remove(q)} className="px-2 py-1 rounded-lg text-[11px] text-gray-500 border border-[var(--ml-bg-hover)] hover:text-red-400 transition">Delete</button>
                     </div>
                   </div>
                 ))}
@@ -178,7 +178,7 @@ function QuestionEditor({
 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4" onClick={onCancel}>
-      <div className="bg-[#1a1a24] border border-[#2a2a38] rounded-2xl w-[520px] max-w-full max-h-[88vh] overflow-y-auto p-5 shadow-2xl" onClick={e => e.stopPropagation()}>
+      <div className="bg-[#1a1a24] border border-[var(--ml-bg-hover)] rounded-2xl w-[520px] max-w-full max-h-[88vh] overflow-y-auto p-5 shadow-2xl" onClick={e => e.stopPropagation()}>
         <h3 className="text-base font-semibold text-white mb-4">{isNew ? "Add question" : "Edit question"}</h3>
         <div className="space-y-3">
           <Field label="Section">
@@ -218,7 +218,7 @@ function QuestionEditor({
           </div>
         </div>
         <div className="flex justify-end gap-2 mt-5">
-          <button onClick={onCancel} className="px-3 py-1.5 rounded-lg text-xs text-gray-400 border border-[#2a2a38] hover:text-gray-200 transition">Cancel</button>
+          <button onClick={onCancel} className="px-3 py-1.5 rounded-lg text-xs text-gray-400 border border-[var(--ml-bg-hover)] hover:text-gray-200 transition">Cancel</button>
           <button onClick={onSave} disabled={busy} className="px-4 py-1.5 rounded-lg text-xs font-medium bg-indigo-600 hover:bg-indigo-500 text-white disabled:opacity-40 transition">
             {busy ? "Saving…" : "Save"}
           </button>
@@ -228,7 +228,7 @@ function QuestionEditor({
   );
 }
 
-const inputCls = "w-full bg-[#12121a] border border-[#2a2a38] rounded-lg px-3 py-2 text-[13px] text-gray-200 placeholder-gray-600 focus:outline-none focus:border-indigo-500";
+const inputCls = "w-full bg-[var(--ml-bg-surface)] border border-[var(--ml-bg-hover)] rounded-lg px-3 py-2 text-[13px] text-gray-200 placeholder-gray-600 focus:outline-none focus:border-indigo-500";
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -273,7 +273,7 @@ function ReportTab() {
       </div>
 
       {report.total_responses === 0 && (
-        <div className="bg-[#12121a] border border-[#2a2a38] rounded-xl p-6 text-center text-sm text-gray-500">
+        <div className="bg-[var(--ml-bg-surface)] border border-[var(--ml-bg-hover)] rounded-xl p-6 text-center text-sm text-gray-500">
           No responses yet. Results and graphs will appear here once participants complete the survey.
         </div>
       )}
@@ -292,7 +292,7 @@ function QuestionReportCard({ q }: { q: QuestionReport }) {
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="bg-[#12121a] border border-[#2a2a38] rounded-xl p-4">
+    <div className="bg-[var(--ml-bg-surface)] border border-[var(--ml-bg-hover)] rounded-xl p-4">
       <div className="flex items-start justify-between gap-3 mb-3">
         <p className="text-[13px] text-gray-200">{q.question_text}</p>
         <div className="flex items-center gap-2 shrink-0">
@@ -333,7 +333,7 @@ function QuestionReportCard({ q }: { q: QuestionReport }) {
               {open && (
                 <div className="space-y-1.5 max-h-60 overflow-y-auto">
                   {q.text_answers.map((t, i) => (
-                    <p key={i} className="text-[12px] text-gray-400 bg-[#1a1a24] border border-[#2a2a38] rounded-lg px-2.5 py-1.5">“{t}”</p>
+                    <p key={i} className="text-[12px] text-gray-400 bg-[#1a1a24] border border-[var(--ml-bg-hover)] rounded-lg px-2.5 py-1.5">“{t}”</p>
                   ))}
                 </div>
               )}

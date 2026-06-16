@@ -20,6 +20,7 @@ from memolink_backend.contracts.chat_stream_dtos import (
 from memolink_backend.core.config import settings
 from memolink_backend.utils.web_search import brave_search
 from memolink_backend.utils.shell_executor import run_shell, format_shell_result
+from memolink_backend.utils.file_tools import read_file, write_file, patch_file, format_file_result
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +51,16 @@ _ACTION_CONNECTOR_RE = re.compile(
     r"|\bstart development\b|\bcreate branch\b",
     re.IGNORECASE,
 )
+_ACTION_FILE_RE = re.compile(
+    r"\b(?:read|open|show|view|look\s+at|check|inspect|print)\b.*\b(?:file|code|script|source)\b"
+    r"|\b(?:read|open|show|view|look\s+at|check|inspect)\b.*[A-Za-z]:\\[^\s]+"
+    r"|\b(?:read|open|show|view|look\s+at|check|inspect)\b.*\.(?:py|js|ts|tsx|jsx|html|css|json|txt|md|yaml|yml|sh|bat|ps1|sql|java|c|cpp|cs|go|rs)\b"
+    r"|\b(?:fix|debug|diagnose|repair|correct|patch|edit|update|modify|rewrite)\b.*\b(?:file|code|script|bug|error|issue|problem|crash)\b"
+    r"|\b(?:fix|debug|diagnose|repair|correct|patch|edit|update|modify)\b.*\.(?:py|js|ts|tsx|jsx|html|css|json|yaml|sh|bat|ps1|sql)\b"
+    r"|\b(?:write|create|save|generate)\b.*\b(?:file|script|code)\b.*\b(?:to|at|in)\b.*[A-Za-z]:\\",
+    re.IGNORECASE,
+)
+
 _ACTION_SHELL_RE = re.compile(
     r"\b(?:create|make|new)\b.*\b(?:folder|directory)\b"
     r"|\b(?:mkdir|mk\s+dir)\b"
@@ -202,6 +213,68 @@ AGENT_TOOLS = [
     {
         "type": "function",
         "function": {
+            "name": "read_file",
+            "description": (
+                "Read the contents of any text or source code file on the user's local PC. "
+                "Returns the file with line numbers so you can reference exact lines. "
+                "Use this before fixing bugs so you can see the actual code. "
+                "For large files, use offset and limit to read specific sections."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string", "description": "Absolute file path, e.g. C:\\RonPogi\\script.py"},
+                    "offset": {"type": "integer", "description": "First line to read (0-indexed, default 0)"},
+                    "limit": {"type": "integer", "description": "Max lines to read (default 1000)"},
+                },
+                "required": ["path"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "write_file",
+            "description": (
+                "Write (or overwrite) a file on the user's local PC with the given content. "
+                "Use this to create new files or save a fully rewritten version of a file. "
+                "For small targeted fixes, prefer patch_file instead — it's safer."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string", "description": "Absolute file path to write"},
+                    "content": {"type": "string", "description": "Full file content to write"},
+                    "allow_overwrite": {"type": "boolean", "description": "Set false to refuse if file already exists (default true)"},
+                },
+                "required": ["path", "content"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "patch_file",
+            "description": (
+                "Replace an exact snippet of text in a file with new text. "
+                "Much safer than write_file for small bug fixes — only the changed lines are touched. "
+                "old_string must match exactly (including indentation). "
+                "Fails if old_string is not found or appears more than once."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string", "description": "Absolute file path to patch"},
+                    "old_string": {"type": "string", "description": "Exact text to find and replace"},
+                    "new_string": {"type": "string", "description": "Replacement text"},
+                },
+                "required": ["path", "old_string", "new_string"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "run_shell",
             "description": (
                 "Execute any shell command directly on the user's local PC. "
@@ -217,6 +290,7 @@ AGENT_TOOLS = [
                 "type": "object",
                 "properties": {
                     "command": {"type": "string", "description": "The shell command to run, e.g. 'python C:\\script.py', 'start /B python C:\\script.py', 'notepad', 'mkdir C:\\folder'"},
+                    "timeout": {"type": "integer", "description": "Max seconds to wait for the command (default 8). Use 5 when checking for startup errors during debug — if it times out with no stderr the script launched OK. Use 'start /B' prefix instead for scripts that run indefinitely."},
                 },
                 "required": ["command"],
             },
@@ -233,18 +307,26 @@ _TOOL_LABELS = {
     "github_ticket_action": "Working with GitHub",
     "jira_ticket_action": "Working with Jira",
     "run_shell": "Running shell command",
+    "read_file": "Reading file",
+    "write_file": "Writing file",
+    "patch_file": "Patching file",
 }
 
 _SYSTEM_PROMPT = (
     "You are MemoLink Action Agent, an AI assistant that can take focused actions on the user's behalf. "
-    "You have REAL tool access — the run_shell tool executes actual commands on the user's local PC via subprocess. "
+    "You have REAL tool access — tools execute actual operations on the user's local PC. "
     "Always use tools when the user asks to: search or manage notes, add reminders, search the web, "
-    "manage GitHub/Jira tickets, or run/launch/open/execute any script, program, file, or application. "
-    "When the user asks to run a script or app (e.g. 'run C:\\script.py', 'open notepad', 'start mouse_mover.py'), "
-    "ALWAYS call run_shell with the appropriate command — never say you can't run local apps. "
-    "For long-running scripts or apps that don't exit, use 'start /B python path' so they run in background. "
-    "If the user says 'ticket' without naming a system, prefer Jira for project-management tickets and GitHub for repository issues/PRs. "
-    "Keep tool use efficient, avoid redundant actions, and give a concise final answer that states what you did."
+    "manage GitHub/Jira tickets, run/launch/open any app or script, or read/write/fix local files. "
+    "\n\nFor DEBUGGING and FIXING code:\n"
+    "1. Use read_file to read the source file and understand the code.\n"
+    "2. Use run_shell with timeout=5 to check for startup errors — if it times out with no stderr the script is working fine.\n"
+    "3. For scripts that run indefinitely (mouse movers, servers), use 'start /B python path' to launch in background instead of blocking.\n"
+    "4. Use patch_file to fix specific lines (preferred for small fixes) or write_file for full rewrites.\n"
+    "5. Run it again with run_shell timeout=5 to confirm the fix works.\n"
+    "\nFor running apps: ALWAYS call run_shell — never say you can't run local apps. "
+    "For long-running scripts, use 'start /B python path' so they run in background. "
+    "If the user says 'ticket' without naming a system, prefer Jira for project-management and GitHub for repo issues/PRs. "
+    "Keep tool use efficient and give a concise final answer stating what you did."
 )
 
 
@@ -264,9 +346,10 @@ def decide_action_agent(prompt: str, smart_analysis: dict | None = None) -> Acti
     web_action = bool(_ACTION_WEB_RE.search(lower))
     connector_action = bool(_ACTION_CONNECTOR_RE.search(lower))
     shell_action = bool(_ACTION_SHELL_RE.search(lower))
+    file_action = bool(_ACTION_FILE_RE.search(lower))
     explicit_tool_request = bool(_EXPLICIT_TOOL_RE.search(lower))
 
-    if not any((note_action, reminder_action, web_action, connector_action, shell_action, explicit_tool_request)):
+    if not any((note_action, reminder_action, web_action, connector_action, shell_action, file_action, explicit_tool_request)):
         return ActionAgentDecision(False)
 
     mode = (smart_analysis or {}).get("mode", "general_chat")
@@ -283,6 +366,8 @@ def decide_action_agent(prompt: str, smart_analysis: dict | None = None) -> Acti
         return ActionAgentDecision(True, "Smart: action_agent (connectors)")
     if shell_action:
         return ActionAgentDecision(True, "Smart: action_agent (shell)")
+    if file_action:
+        return ActionAgentDecision(True, "Smart: action_agent (file)")
     if explicit_tool_request:
         return ActionAgentDecision(True, "Smart: action_agent (explicit)")
 
@@ -303,10 +388,10 @@ class ActionAgentRunner:
         self.note_repo = note_repo
         self.reminder_repo = reminder_repo
         self.embedding = embedding_service or EmbeddingService()
-        self.client = OpenAI(api_key=settings.openai_api_key)
+        self.client = OpenAI(api_key=settings.openai_api_key, timeout=60.0)
         # DeepSeek client (OpenAI-compatible) used for shell/code actions when key is available
         self._deepseek_client: Optional[OpenAI] = (
-            OpenAI(api_key=settings.deepseek_api_key, base_url="https://api.deepseek.com")
+            OpenAI(api_key=settings.deepseek_api_key, base_url="https://api.deepseek.com", timeout=60.0)
             if settings.deepseek_api_key
             else None
         )
@@ -413,9 +498,21 @@ class ActionAgentRunner:
         result = brave_search(query)
         return result or "No web results found."
 
-    def _run_shell(self, command: str, user_id: Optional[int] = None) -> str:
-        result = run_shell(command, user_id=user_id)
+    def _run_shell(self, command: str, user_id: Optional[int] = None, timeout: Optional[int] = None) -> str:
+        result = run_shell(command, timeout=timeout or 8, user_id=user_id)
         return format_shell_result(result)
+
+    def _read_file(self, path: str, offset: int = 0, limit: Optional[int] = None) -> str:
+        result = read_file(path, offset=offset, limit=limit)
+        return format_file_result(result)
+
+    def _write_file(self, path: str, content: str, allow_overwrite: bool = True) -> str:
+        result = write_file(path, content, allow_overwrite=allow_overwrite)
+        return format_file_result(result)
+
+    def _patch_file(self, path: str, old_string: str, new_string: str) -> str:
+        result = patch_file(path, old_string, new_string)
+        return format_file_result(result)
 
     def _github_ticket_action(self, args: dict, user_id: int) -> str:
         if self.github is None:
@@ -601,7 +698,13 @@ class ActionAgentRunner:
         if name == "web_search":
             return self._web_search(args["query"])
         if name == "run_shell":
-            return self._run_shell(args["command"], user_id=user_id)
+            return self._run_shell(args["command"], user_id=user_id, timeout=args.get("timeout"))
+        if name == "read_file":
+            return self._read_file(args["path"], offset=args.get("offset", 0), limit=args.get("limit"))
+        if name == "write_file":
+            return self._write_file(args["path"], args["content"], allow_overwrite=args.get("allow_overwrite", True))
+        if name == "patch_file":
+            return self._patch_file(args["path"], args["old_string"], args["new_string"])
         if name == "github_ticket_action":
             return self._github_ticket_action(args, user_id)
         if name == "jira_ticket_action":
@@ -729,16 +832,41 @@ class ActionAgentRunner:
                 prompt=user_text,
                 persist_user_message=persist_user_message,
             )
-            messages, tool_events = self._run_tool_loop(
-                messages=messages,
-                client=chosen_client,
-                model=chosen_model,
-                user_id=user_id,
-                workspace_id=workspace_id,
-                stream_events=True,
-            )
-            for event in tool_events:
-                yield event
+
+            # Yield immediately so the frontend exits loading state before the first LLM call
+            yield sse_event(ToolStartEvent(label="Thinking", tool_call="reasoning"))
+            yield sse_event(ToolCompleteEvent(ok=True))
+
+            # Real-time tool loop — yield ToolStartEvent/ToolCompleteEvent as each
+            # tool runs so the frontend shows progress instead of a loading spinner.
+            for iteration in range(5):
+                response = chosen_client.chat.completions.create(
+                    model=chosen_model,
+                    messages=messages,
+                    tools=AGENT_TOOLS,
+                    tool_choice="required" if iteration == 0 else "auto",
+                )
+                choice = response.choices[0]
+                if choice.finish_reason != "tool_calls":
+                    messages.append(choice.message)
+                    break
+
+                messages.append(choice.message)
+                for tool_call in choice.message.tool_calls:
+                    name = tool_call.function.name
+                    args = json.loads(tool_call.function.arguments)
+                    label = _TOOL_LABELS.get(name, name)
+
+                    yield sse_event(ToolStartEvent(label=label, tool_call=name))
+                    try:
+                        result = self._execute_tool(name, args, user_id, workspace_id)
+                        ok = True
+                    except Exception as exc:
+                        logger.warning("Action tool %s failed: %s", name, exc)
+                        result = str(exc)
+                        ok = False
+                    yield sse_event(ToolCompleteEvent(ok=ok, result=result))
+                    messages.append({"role": "tool", "tool_call_id": tool_call.id, "content": result})
 
             stream = chosen_client.chat.completions.create(
                 model=chosen_model,

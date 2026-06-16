@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+﻿import React, { useEffect, useState } from "react";
 import {
   getEvaluationSummary, getEvaluationReport, downloadEvaluationCsv, downloadEvaluationJson,
   type EvaluationSummary,
@@ -51,7 +51,7 @@ function relabel(data: Record<string, number>): Record<string, number> {
 
 function Card({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
-    <div className="bg-[#12121a] border border-[#2a2a38] rounded-xl px-3 py-2.5">
+    <div className="bg-[var(--ml-bg-surface)] border border-[var(--ml-bg-hover)] rounded-xl px-3 py-2.5">
       <p className="text-[10px] text-gray-500 uppercase tracking-wider">{label}</p>
       <p className="text-lg font-semibold text-white mt-0.5">{value}</p>
       {hint && <p className="text-[10px] text-gray-600">{hint}</p>}
@@ -64,7 +64,7 @@ function BarChart({ title, data, suffix = "" }: { title: string; data: Record<st
   if (!entries.length) return null;
   const max = Math.max(1, ...entries.map(([, v]) => v));
   return (
-    <div className="bg-[#12121a] border border-[#2a2a38] rounded-xl p-4">
+    <div className="bg-[var(--ml-bg-surface)] border border-[var(--ml-bg-hover)] rounded-xl p-4">
       <p className="text-[13px] text-gray-200 mb-3">{title}</p>
       <div className="space-y-1.5">
         {entries.map(([k, v]) => (
@@ -122,7 +122,7 @@ export function AdminEvaluationPanel() {
             {busy === "report" ? "Generating…" : "Generate Report"}
           </button>
           <button onClick={() => dl("csv")} disabled={busy === "csv"} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-emerald-600/90 hover:bg-emerald-500 text-white disabled:opacity-40 transition">CSV (zip)</button>
-          <button onClick={() => dl("json")} disabled={busy === "json"} className="px-3 py-1.5 rounded-lg text-xs text-gray-300 border border-[#2a2a38] hover:text-white transition">JSON</button>
+          <button onClick={() => dl("json")} disabled={busy === "json"} className="px-3 py-1.5 rounded-lg text-xs text-gray-300 border border-[var(--ml-bg-hover)] hover:text-white transition">JSON</button>
         </div>
       </div>
 
@@ -160,7 +160,7 @@ export function AdminEvaluationPanel() {
           <BarChart title="Feature usage count" data={relabel(s.feature_usage)} />
         )}
         {s.ai_metric_count === 0 && s.total_sessions === 0 && (
-          <div className="bg-[#12121a] border border-[#2a2a38] rounded-xl p-6 text-center text-sm text-gray-500">
+          <div className="bg-[var(--ml-bg-surface)] border border-[var(--ml-bg-hover)] rounded-xl p-6 text-center text-sm text-gray-500">
             No evaluation data yet. Ask a participant to start an evaluation session from the profile menu.
           </div>
         )}
@@ -171,9 +171,9 @@ export function AdminEvaluationPanel() {
         <div className="mt-5">
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-sm font-semibold text-white">Generated report (paste into Assessment 2)</h3>
-            <button onClick={() => navigator.clipboard?.writeText(report)} className="px-2.5 py-1 rounded-lg text-[11px] text-gray-300 border border-[#2a2a38] hover:text-white transition">Copy</button>
+            <button onClick={() => navigator.clipboard?.writeText(report)} className="px-2.5 py-1 rounded-lg text-[11px] text-gray-300 border border-[var(--ml-bg-hover)] hover:text-white transition">Copy</button>
           </div>
-          <pre className="bg-[#0e0e15] border border-[#2a2a38] rounded-xl p-4 text-[11px] text-gray-300 whitespace-pre-wrap overflow-x-auto max-h-96 overflow-y-auto">{report}</pre>
+          <pre className="bg-[#0e0e15] border border-[var(--ml-bg-hover)] rounded-xl p-4 text-[11px] text-gray-300 whitespace-pre-wrap overflow-x-auto max-h-96 overflow-y-auto">{report}</pre>
         </div>
       )}
     </div>

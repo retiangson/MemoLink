@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+﻿import React, { useState, useEffect } from "react";
 import { changePassword } from "../api/client";
 import { getProviders, addProvider, updateProvider, deleteProvider } from "../api/settingsApi";
 import type { CustomProvider } from "../api/settingsApi";
@@ -548,21 +548,21 @@ export function SettingsModal({
     ...(workflowEnabled ? [{ id: "workflow" as Tab, label: "Workflow" }] : []),
   ];
 
-  const inputCls = "w-full bg-[#12121a] border border-[#2a2a38] rounded-xl px-3 py-2 text-sm text-gray-200 outline-none focus:border-indigo-500 transition";
+  const inputCls = "w-full bg-[var(--ml-bg-surface)] border border-[var(--ml-bg-hover)] rounded-xl px-3 py-2 text-sm text-gray-200 outline-none focus:border-indigo-500 transition";
   const btnPrimary = "px-3 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 rounded-xl text-sm font-medium transition whitespace-nowrap";
-  const btnGhost = "px-3 py-2 text-gray-400 hover:text-gray-200 hover:bg-[#2a2a38] rounded-xl text-sm font-medium transition whitespace-nowrap";
+  const btnGhost = "px-3 py-2 text-gray-400 hover:text-gray-200 hover:bg-[var(--ml-bg-hover)] rounded-xl text-sm font-medium transition whitespace-nowrap";
   const btnDanger = "px-3 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 disabled:opacity-50 rounded-xl text-sm font-medium transition whitespace-nowrap border border-red-500/20";
 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50" onClick={handleClose}>
       <div
-        className="bg-[#1a1a24] border border-[#2a2a38] rounded-2xl w-full max-w-[700px] mx-4 max-h-[90vh] overflow-y-auto shadow-2xl text-white"
+        className="bg-[#1a1a24] border border-[var(--ml-bg-hover)] rounded-2xl w-full max-w-[700px] mx-4 max-h-[90vh] overflow-y-auto shadow-2xl text-white"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[#2a2a38]">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--ml-bg-hover)]">
           <h2 className="font-semibold text-base">Settings</h2>
-          <button onClick={handleClose} className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-500 hover:text-gray-200 hover:bg-[#2a2a38] transition">
+          <button onClick={handleClose} className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-500 hover:text-gray-200 hover:bg-[var(--ml-bg-hover)] transition">
             <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
@@ -571,13 +571,13 @@ export function SettingsModal({
 
         <div className="flex">
           {/* Sidebar */}
-          <div className="w-36 border-r border-[#2a2a38] py-3 shrink-0">
+          <div className="w-36 border-r border-[var(--ml-bg-hover)] py-3 shrink-0">
             {tabs.map(({ id, label }) => (
               <button
                 key={id}
                 onClick={() => setTab(id)}
                 className={`w-full text-left px-4 py-2 text-sm transition ${
-                  tab === id ? "text-indigo-400 bg-indigo-500/10 font-medium" : "text-gray-400 hover:text-gray-200 hover:bg-[#2a2a38]"
+                  tab === id ? "text-indigo-400 bg-indigo-500/10 font-medium" : "text-gray-400 hover:text-gray-200 hover:bg-[var(--ml-bg-hover)]"
                 }`}
               >
                 {label}
@@ -605,11 +605,11 @@ export function SettingsModal({
                 </div>
                 <div>
                   <label className="block text-xs text-gray-500 mb-1 uppercase tracking-wider">Email</label>
-                  <div className="bg-[#12121a] border border-[#2a2a38] rounded-xl px-3 py-2.5 text-sm text-gray-300">{user.email}</div>
+                  <div className="bg-[var(--ml-bg-surface)] border border-[var(--ml-bg-hover)] rounded-xl px-3 py-2.5 text-sm text-gray-300">{user.email}</div>
                   <p className="text-xs text-gray-600 mt-1.5">Email cannot be changed.</p>
                 </div>
                 {onReplayTour && (
-                  <div className="pt-2 border-t border-[#2a2a38]">
+                  <div className="pt-2 border-t border-[var(--ml-bg-hover)]">
                     <label className="block text-xs text-gray-500 mb-2 uppercase tracking-wider">Onboarding</label>
                     <button
                       type="button"
@@ -669,7 +669,7 @@ export function SettingsModal({
                           className={`w-full flex items-center justify-between px-3 py-2 rounded-xl border text-left transition ${
                             selectedModel === m.id
                               ? "border-indigo-500 bg-indigo-500/10 text-indigo-300"
-                              : "border-[#2a2a38] bg-[#12121a] text-gray-300 hover:border-[#3a3a4a] hover:text-white"
+                              : "border-[var(--ml-bg-hover)] bg-[var(--ml-bg-surface)] text-gray-300 hover:border-[#3a3a4a] hover:text-white"
                           }`}
                         >
                           <div>
@@ -700,7 +700,7 @@ export function SettingsModal({
                           className={`w-full flex items-center justify-between px-3 py-2 rounded-xl border text-left transition ${
                             selectedModel === p.model
                               ? "border-indigo-500 bg-indigo-500/10 text-indigo-300"
-                              : "border-[#2a2a38] bg-[#12121a] text-gray-300 hover:border-[#3a3a4a] hover:text-white"
+                              : "border-[var(--ml-bg-hover)] bg-[var(--ml-bg-surface)] text-gray-300 hover:border-[#3a3a4a] hover:text-white"
                           }`}
                         >
                           <div>
@@ -745,7 +745,7 @@ export function SettingsModal({
 
                 {/* Add form */}
                 {showAddForm && (
-                  <form onSubmit={handleAddProvider} className="bg-[#12121a] border border-[#2a2a38] rounded-xl p-4 space-y-3">
+                  <form onSubmit={handleAddProvider} className="bg-[var(--ml-bg-surface)] border border-[var(--ml-bg-hover)] rounded-xl p-4 space-y-3">
                     <p className="text-xs font-medium text-gray-300 uppercase tracking-wider">New Provider</p>
                     {addError && <p className="text-xs text-red-400">{addError}</p>}
                     <div className="grid grid-cols-2 gap-3">
@@ -775,7 +775,7 @@ export function SettingsModal({
 
                 {/* Provider list */}
                 {providers.length === 0 && !showAddForm && !providersLoading && (
-                  <div className="bg-[#12121a] border border-dashed border-[#2a2a38] rounded-xl px-4 py-6 text-center">
+                  <div className="bg-[var(--ml-bg-surface)] border border-dashed border-[var(--ml-bg-hover)] rounded-xl px-4 py-6 text-center">
                     <p className="text-sm text-gray-500">No custom providers yet.</p>
                     <p className="text-xs text-gray-600 mt-1">Add any OpenAI-compatible API - Groq, Mistral, Ollama, Together, and more.</p>
                   </div>
@@ -783,7 +783,7 @@ export function SettingsModal({
 
                 <div className="space-y-2">
                   {providers.map((p) => (
-                    <div key={p.id} className="bg-[#12121a] border border-[#2a2a38] rounded-xl overflow-hidden">
+                    <div key={p.id} className="bg-[var(--ml-bg-surface)] border border-[var(--ml-bg-hover)] rounded-xl overflow-hidden">
                       {editingId === p.id ? (
                         <form onSubmit={handleUpdateProvider} className="p-4 space-y-3">
                           <p className="text-xs font-medium text-gray-300 uppercase tracking-wider">Edit Provider</p>
@@ -859,7 +859,7 @@ export function SettingsModal({
                         className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition ${
                           ttsRate === r
                             ? "bg-indigo-600 border-indigo-500 text-white"
-                            : "bg-[#12121a] border-[#2a2a38] text-gray-400 hover:border-indigo-500/40 hover:text-gray-200"
+                            : "bg-[var(--ml-bg-surface)] border-[var(--ml-bg-hover)] text-gray-400 hover:border-indigo-500/40 hover:text-gray-200"
                         }`}
                       >
                         {r}×
@@ -875,7 +875,7 @@ export function SettingsModal({
                   </label>
 
                   {ttsVoices.length === 0 ? (
-                    <p className="text-xs text-gray-600 bg-[#12121a] border border-[#2a2a38] rounded-xl px-3 py-3">
+                    <p className="text-xs text-gray-600 bg-[var(--ml-bg-surface)] border border-[var(--ml-bg-hover)] rounded-xl px-3 py-3">
                       No voices found. Ensure your browser and OS have text-to-speech voices installed.
                     </p>
                   ) : (
@@ -884,13 +884,13 @@ export function SettingsModal({
                         value={ttsSearch}
                         onChange={e => setTtsSearch(e.target.value)}
                         placeholder="Search by voice name or language…"
-                        className="w-full bg-[#12121a] border border-[#2a2a38] rounded-xl px-3 py-2 text-sm text-gray-300 placeholder-gray-600 focus:outline-none focus:border-indigo-500 mb-2"
+                        className="w-full bg-[var(--ml-bg-surface)] border border-[var(--ml-bg-hover)] rounded-xl px-3 py-2 text-sm text-gray-300 placeholder-gray-600 focus:outline-none focus:border-indigo-500 mb-2"
                       />
-                      <div className="max-h-60 overflow-y-auto rounded-xl border border-[#2a2a38] divide-y divide-[#2a2a38]">
+                      <div className="max-h-60 overflow-y-auto rounded-xl border border-[var(--ml-bg-hover)] divide-y divide-[var(--ml-bg-hover)]">
                         {/* Default option */}
                         <button
                           onClick={() => saveTtsVoice("")}
-                          className={`w-full flex items-center justify-between px-4 py-2.5 text-left hover:bg-[#2a2a38] transition ${!ttsVoiceName ? "bg-indigo-500/10" : ""}`}
+                          className={`w-full flex items-center justify-between px-4 py-2.5 text-left hover:bg-[var(--ml-bg-hover)] transition ${!ttsVoiceName ? "bg-indigo-500/10" : ""}`}
                         >
                           <div>
                             <p className={`text-sm ${!ttsVoiceName ? "text-indigo-300 font-medium" : "text-gray-300"}`}>Default (system)</p>
@@ -904,7 +904,7 @@ export function SettingsModal({
                             <button
                               key={i}
                               onClick={() => saveTtsVoice(v.name)}
-                              className={`w-full flex items-center justify-between gap-3 px-4 py-2.5 text-left hover:bg-[#2a2a38] transition ${ttsVoiceName === v.name ? "bg-indigo-500/10" : ""}`}
+                              className={`w-full flex items-center justify-between gap-3 px-4 py-2.5 text-left hover:bg-[var(--ml-bg-hover)] transition ${ttsVoiceName === v.name ? "bg-indigo-500/10" : ""}`}
                             >
                               <div className="min-w-0">
                                 <p className={`text-sm truncate ${ttsVoiceName === v.name ? "text-indigo-300 font-medium" : "text-gray-300"}`}>{v.name}</p>
@@ -918,7 +918,7 @@ export function SettingsModal({
                   )}
                 </div>
 
-                <div className="bg-[#12121a] border border-[#2a2a38] rounded-xl px-4 py-3">
+                <div className="bg-[var(--ml-bg-surface)] border border-[var(--ml-bg-hover)] rounded-xl px-4 py-3">
                   <p className="text-[11px] text-gray-500 leading-relaxed">
                     <span className="text-gray-400">Offline voices</span> work without internet and are faster. <span className="text-gray-400">Online voices</span> (if any) are streamed by the OS and may sound higher quality but require a connection. The voice list is provided by your operating system and cannot be extended through MemoLink.
                   </p>
@@ -954,7 +954,7 @@ export function SettingsModal({
                     {connectors
                       .filter((connector) => (connector.id !== "email" || emailEnabled) && (connector.id !== "teams" || teamsEnabled))
                       .map((connector) => (
-                      <div key={connector.id} className="border border-[#2a2a38] rounded-xl bg-[#12121a] px-4 py-4 space-y-3">
+                      <div key={connector.id} className="border border-[var(--ml-bg-hover)] rounded-xl bg-[var(--ml-bg-surface)] px-4 py-4 space-y-3">
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
                             <div className="flex items-center gap-2">
@@ -1002,7 +1002,7 @@ export function SettingsModal({
                           <div className="space-y-3 pt-1">
                             {connector.connected ? (
                               <>
-                                <div className="flex items-center justify-between gap-3 rounded-xl border border-[#2a2a38] bg-[#12121a] px-4 py-3">
+                                <div className="flex items-center justify-between gap-3 rounded-xl border border-[var(--ml-bg-hover)] bg-[var(--ml-bg-surface)] px-4 py-3">
                                   <div>
                                     <p className="text-sm font-medium text-gray-200">{connector.summary || "GitHub connected"}</p>
                                     <p className="text-xs text-gray-500">Connected via GitHub OAuth. Set a default repo if you want chat actions to work without repeating owner/repo.</p>
@@ -1027,7 +1027,7 @@ export function SettingsModal({
                             ) : (
                               <div className="space-y-4">
                                 <p className="text-sm text-gray-400">Connect GitHub to manage issues, pull requests, comments, branches, and repo workflows directly from chat.</p>
-                                <div className="bg-[#12121a] border border-[#2a2a38] rounded-xl px-4 py-4 space-y-2.5">
+                                <div className="bg-[var(--ml-bg-surface)] border border-[var(--ml-bg-hover)] rounded-xl px-4 py-4 space-y-2.5">
                                   {["Create and update issues and pull requests", "Comment on existing PRs or issues", "Create development branches from chat", "Set a default repo so chat actions stay concise"].map((f) => (
                                     <div key={f} className="flex items-start gap-2 text-xs text-gray-400">
                                       <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 mt-1 shrink-0" />
@@ -1053,7 +1053,7 @@ export function SettingsModal({
                           <div className="space-y-3 pt-1">
                             {connector.connected ? (
                               <>
-                                <div className="flex items-center justify-between gap-3 rounded-xl border border-[#2a2a38] bg-[#12121a] px-4 py-3">
+                                <div className="flex items-center justify-between gap-3 rounded-xl border border-[var(--ml-bg-hover)] bg-[var(--ml-bg-surface)] px-4 py-3">
                                   <div>
                                     <p className="text-sm font-medium text-gray-200">{connector.summary || "Jira connected"}</p>
                                     <p className="text-xs text-gray-500">Connected via Atlassian OAuth. Set a default project if you want chat actions to stay concise.</p>
@@ -1076,7 +1076,7 @@ export function SettingsModal({
                             ) : (
                               <div className="space-y-4">
                                 <p className="text-sm text-gray-400">Connect Jira to create tickets, update them, move them into progress, inspect transitions, and comment on work items directly from chat.</p>
-                                <div className="bg-[#12121a] border border-[#2a2a38] rounded-xl px-4 py-4 space-y-2.5">
+                                <div className="bg-[var(--ml-bg-surface)] border border-[var(--ml-bg-hover)] rounded-xl px-4 py-4 space-y-2.5">
                                   {["Create and update Jira issues from chat", "Move work into statuses like In Progress", "List transitions and comments on an issue", "Set a default project so prompts stay short"].map((f) => (
                                     <div key={f} className="flex items-start gap-2 text-xs text-gray-400">
                                       <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 mt-1 shrink-0" />
@@ -1137,8 +1137,8 @@ export function SettingsModal({
 
                     {/* Email detail view */}
                     {selectedEmail ? (
-                      <div className="bg-[#12121a] border border-[#2a2a38] rounded-xl overflow-hidden">
-                        <div className="flex items-center gap-2 px-4 py-3 border-b border-[#2a2a38]">
+                      <div className="bg-[var(--ml-bg-surface)] border border-[var(--ml-bg-hover)] rounded-xl overflow-hidden">
+                        <div className="flex items-center gap-2 px-4 py-3 border-b border-[var(--ml-bg-hover)]">
                           <button onClick={() => setSelectedEmail(null)} className="text-gray-500 hover:text-gray-300 transition">
                             ← Back
                           </button>
@@ -1200,7 +1200,7 @@ export function SettingsModal({
                       </div>
                     ) : (
                       /* Email list */
-                      <div className="border border-[#2a2a38] rounded-xl overflow-hidden">
+                      <div className="border border-[var(--ml-bg-hover)] rounded-xl overflow-hidden">
                         {emailsLoading ? (
                           <p className="text-xs text-gray-600 px-4 py-6 text-center">Loading…</p>
                         ) : emails.length === 0 ? (
@@ -1208,11 +1208,11 @@ export function SettingsModal({
                             No emails yet. Click <span className="text-gray-400">Sync Emails</span> to fetch important emails from Gmail.
                           </p>
                         ) : (
-                          <div className="divide-y divide-[#2a2a38] max-h-80 overflow-y-auto">
+                          <div className="divide-y divide-[var(--ml-bg-hover)] max-h-80 overflow-y-auto">
                             {emails.map(email => (
                               <div
                                 key={email.id}
-                                className="flex items-start gap-3 px-4 py-3 hover:bg-[#2a2a38]/50 cursor-pointer transition group"
+                                className="flex items-start gap-3 px-4 py-3 hover:bg-[var(--ml-bg-hover)] cursor-pointer transition group"
                                 onClick={() => { setSelectedEmail(email); setActionResult(null); }}
                               >
                                 {/* Importance badge */}
@@ -1250,7 +1250,7 @@ export function SettingsModal({
                 ) : (
                   <div className="space-y-4">
                     <p className="text-sm text-gray-400">Connect Gmail to sync important emails, convert them to notes, and get AI reply suggestions.</p>
-                    <div className="bg-[#12121a] border border-[#2a2a38] rounded-xl px-4 py-4 space-y-2.5">
+                    <div className="bg-[var(--ml-bg-surface)] border border-[var(--ml-bg-hover)] rounded-xl px-4 py-4 space-y-2.5">
                       {["Sync and filter important emails automatically", "Convert emails into notes with one click", "Create reminders from email deadlines", "Get AI-powered reply suggestions"].map(f => (
                         <div key={f} className="flex items-start gap-2 text-xs text-gray-400">
                           <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 mt-1 shrink-0" />
@@ -1303,8 +1303,8 @@ export function SettingsModal({
                     )}
 
                     {selectedChat ? (
-                      <div className="bg-[#12121a] border border-[#2a2a38] rounded-xl overflow-hidden">
-                        <div className="flex items-center justify-between px-4 py-2.5 border-b border-[#2a2a38]">
+                      <div className="bg-[var(--ml-bg-surface)] border border-[var(--ml-bg-hover)] rounded-xl overflow-hidden">
+                        <div className="flex items-center justify-between px-4 py-2.5 border-b border-[var(--ml-bg-hover)]">
                           <button onClick={() => { setSelectedChat(null); setTeamsSaveResult(null); }} className="text-xs text-gray-500 hover:text-gray-300 transition">← Back</button>
                           <span className="text-xs text-gray-300 font-medium truncate max-w-[180px]">{selectedChat.topic}</span>
                           <button onClick={handleChatToNote} className="text-xs text-indigo-400 hover:text-indigo-300 transition">Save to note</button>
@@ -1332,7 +1332,7 @@ export function SettingsModal({
                             onChange={(e) => setTeamsReply(e.target.value)}
                             onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSendTeamsReply(); } }}
                             placeholder="Reply…"
-                            className="flex-1 bg-[#0f0f13] border border-[#2a2a38] rounded-lg px-3 py-1.5 text-xs text-gray-200 outline-none focus:border-indigo-500"
+                            className="flex-1 bg-[var(--ml-bg-base)] border border-[var(--ml-bg-hover)] rounded-lg px-3 py-1.5 text-xs text-gray-200 outline-none focus:border-indigo-500"
                           />
                           <button onClick={handleSendTeamsReply} disabled={teamsSending || !teamsReply.trim()} className={btnPrimary}>
                             {teamsSending ? "…" : "Send"}
@@ -1353,7 +1353,7 @@ export function SettingsModal({
                           <button
                             key={chat.id}
                             onClick={() => handleOpenChat(chat)}
-                            className="w-full text-left px-3 py-2.5 bg-[#12121a] border border-[#2a2a38] rounded-xl hover:border-indigo-500/30 transition"
+                            className="w-full text-left px-3 py-2.5 bg-[var(--ml-bg-surface)] border border-[var(--ml-bg-hover)] rounded-xl hover:border-indigo-500/30 transition"
                           >
                             <p className="text-xs text-gray-200 font-medium truncate">{chat.topic}</p>
                             {chat.lastMessagePreview && (
@@ -1389,7 +1389,7 @@ export function SettingsModal({
                 </div>
 
                 {/* Main toggle */}
-                <div className="flex items-center justify-between px-4 py-3.5 bg-[#12121a] border border-[#2a2a38] rounded-xl">
+                <div className="flex items-center justify-between px-4 py-3.5 bg-[var(--ml-bg-surface)] border border-[var(--ml-bg-hover)] rounded-xl">
                   <div>
                     <p className="text-sm font-medium text-gray-200">Action suggestions</p>
                     <p className="text-xs text-gray-500 mt-0.5">Show action buttons below AI responses when relevant</p>
@@ -1414,7 +1414,7 @@ export function SettingsModal({
                       { icon: "📋", label: "Summarise Workspace", desc: "Summarise all notes into one document" },
                       { icon: "📄", label: "Report Outline", desc: "Create a structured outline from notes" },
                     ].map(({ icon, label, desc }) => (
-                      <div key={label} className="flex items-start gap-2.5 px-3 py-2.5 bg-[#12121a] border border-[#2a2a38] rounded-xl">
+                      <div key={label} className="flex items-start gap-2.5 px-3 py-2.5 bg-[var(--ml-bg-surface)] border border-[var(--ml-bg-hover)] rounded-xl">
                         <span className="text-base shrink-0 mt-0.5">{icon}</span>
                         <div>
                           <p className="text-xs font-medium text-gray-200">{label}</p>

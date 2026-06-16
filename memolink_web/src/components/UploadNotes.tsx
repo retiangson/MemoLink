@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+﻿import React, { useState, useRef } from "react";
 import { uploadNotes, presignUpload, uploadToS3, processFromS3 } from "../api/chatApi";
 import { API_BASE } from "../api/client";
 
@@ -164,7 +164,7 @@ export function UploadNotes({ setNotes, workspaceId, onUploaded }: Props) {
   return (
     <div className="flex flex-col gap-2">
       <div
-        className="border border-dashed border-[#3a3a4a] bg-[#16161d] rounded-lg p-4 text-center cursor-pointer hover:bg-[#1e1e2a] transition"
+        className="border border-dashed border-[#3a3a4a] bg-[var(--ml-bg-surface)] rounded-lg p-4 text-center cursor-pointer hover:bg-[var(--ml-bg-panel)] transition"
         onClick={() => fileInputRef.current?.click()}
         onDragOver={(e) => e.preventDefault()}
         onDrop={(e) => { e.preventDefault(); processFiles(Array.from(e.dataTransfer.files)); }}

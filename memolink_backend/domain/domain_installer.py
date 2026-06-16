@@ -16,6 +16,7 @@ from memolink_backend.domain.repositories.email_account_repository import EmailA
 from memolink_backend.domain.repositories.email_record_repository import EmailRecordRepository
 from memolink_backend.domain.repositories.reminder_repository import ReminderRepository
 from memolink_backend.domain.repositories.teams_account_repository import TeamsAccountRepository
+from memolink_backend.domain.repositories.desktop_command_repository import DesktopCommandRepository
 from memolink_backend.business.services.embedding_service import EmbeddingService
 
 
@@ -58,6 +59,9 @@ class DomainInstaller:
 
     def get_teams_account_repository(self) -> TeamsAccountRepository:
         return TeamsAccountRepository(self._db)
+
+    def get_desktop_command_repository(self) -> DesktopCommandRepository:
+        return DesktopCommandRepository(self._db)
 
     def get_reminder_repository(self) -> ReminderRepository:
         return ReminderRepository(self._db)

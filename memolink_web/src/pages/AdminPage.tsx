@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+﻿import React, { useState, useEffect, useCallback } from "react";
 import {
   fetchAdminFeedback, updateFeedbackStatus, fetchAdminUsers, updateUserRole, updateUserLevel,
   fetchAdminFeatures, updateAdminFeatures, fetchSystemLogs, clearSystemLogs,
@@ -221,7 +221,7 @@ export function AdminPage({ onClose, currentUserId, onResetWalkthrough }: Props)
   return (
     <div className="fixed inset-0 z-[100] bg-[#0d0d12] flex flex-col">
       {/* Top bar */}
-      <div className="flex items-center justify-between px-6 py-3 border-b border-[#1e1e2a] shrink-0">
+      <div className="flex items-center justify-between px-6 py-3 border-b border-[var(--ml-bg-panel)] shrink-0">
         <div className="flex items-center gap-3">
           <img src="/memolink-icon.png" alt="" className="h-7 w-7 rounded-md bg-white object-cover" />
           <span className="text-base font-semibold text-white">Admin Panel</span>
@@ -229,7 +229,7 @@ export function AdminPage({ onClose, currentUserId, onResetWalkthrough }: Props)
         </div>
         <button
           onClick={onClose}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-gray-400 hover:text-white hover:bg-[#1e1e2a] rounded-lg transition"
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-gray-400 hover:text-white hover:bg-[var(--ml-bg-panel)] rounded-lg transition"
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -240,7 +240,7 @@ export function AdminPage({ onClose, currentUserId, onResetWalkthrough }: Props)
 
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar nav */}
-        <nav className="w-52 shrink-0 border-r border-[#1e1e2a] flex flex-col py-4 px-3 gap-1">
+        <nav className="w-52 shrink-0 border-r border-[var(--ml-bg-panel)] flex flex-col py-4 px-3 gap-1">
           {([
             { key: "feedback", label: "Feedback", icon: <path d="M14 1a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H4.414A2 2 0 0 0 3 11.586l-2 2V2a1 1 0 0 1 1-1zM2 0a2 2 0 0 0-2 2v12.793a.5.5 0 0 0 .854.353l2.853-2.853A1 1 0 0 1 4.414 12H14a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2z"/> },
             { key: "features", label: "Feature Flags", icon: <path d="M3 2a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v13h1.5a.5.5 0 0 1 0 1h-13a.5.5 0 0 1 0-1H3V2zm1 13h1.5v-2a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 .5.5v2H10V2H4v13z"/> },
@@ -255,7 +255,7 @@ export function AdminPage({ onClose, currentUserId, onResetWalkthrough }: Props)
               className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm text-left transition ${
                 tab === key
                   ? "bg-indigo-600/20 text-indigo-300 font-medium"
-                  : "text-gray-500 hover:text-gray-200 hover:bg-[#1e1e2a]"
+                  : "text-gray-500 hover:text-gray-200 hover:bg-[var(--ml-bg-panel)]"
               }`}
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 shrink-0" fill="currentColor" viewBox="0 0 16 16">
@@ -288,7 +288,7 @@ export function AdminPage({ onClose, currentUserId, onResetWalkthrough }: Props)
                 <select
                   value={fbTypeFilter}
                   onChange={(e) => setFbTypeFilter(e.target.value)}
-                  className="bg-[#1a1a24] border border-[#2a2a38] rounded-lg px-2.5 py-1.5 text-xs text-gray-300 focus:outline-none focus:border-indigo-500/50"
+                  className="bg-[#1a1a24] border border-[var(--ml-bg-hover)] rounded-lg px-2.5 py-1.5 text-xs text-gray-300 focus:outline-none focus:border-indigo-500/50"
                 >
                   <option value="all">All types</option>
                   <option value="bug">Bug Reports</option>
@@ -297,7 +297,7 @@ export function AdminPage({ onClose, currentUserId, onResetWalkthrough }: Props)
               </div>
 
               {/* Status tab strip */}
-              <div className="flex gap-1 mb-4 bg-[#12121a] p-1 rounded-xl border border-[#2a2a38] w-fit">
+              <div className="flex gap-1 mb-4 bg-[var(--ml-bg-surface)] p-1 rounded-xl border border-[var(--ml-bg-hover)] w-fit">
                 {([
                   { key: "open",     label: "Open" },
                   { key: "read",     label: "Read" },
@@ -315,7 +315,7 @@ export function AdminPage({ onClose, currentUserId, onResetWalkthrough }: Props)
                             ? "bg-sky-500/20 text-sky-300"
                             : key === "resolved"
                               ? "bg-emerald-500/20 text-emerald-300"
-                              : "bg-[#2a2a38] text-gray-200"
+                              : "bg-[var(--ml-bg-hover)] text-gray-200"
                         : "text-gray-500 hover:text-gray-300"
                     }`}
                   >
@@ -344,7 +344,7 @@ export function AdminPage({ onClose, currentUserId, onResetWalkthrough }: Props)
                     <div
                       key={item.id}
                       onClick={() => setSelectedFb(item)}
-                      className="bg-[#1a1a24] border border-[#2a2a38] rounded-xl overflow-hidden cursor-pointer hover:border-indigo-500/30 hover:bg-[#1e1e2e] transition group"
+                      className="bg-[#1a1a24] border border-[var(--ml-bg-hover)] rounded-xl overflow-hidden cursor-pointer hover:border-indigo-500/30 hover:bg-[#1e1e2e] transition group"
                     >
                       <div className="flex items-start gap-3 px-4 py-3">
                         <div className="flex flex-col gap-1.5 shrink-0 mt-0.5">
@@ -382,11 +382,11 @@ export function AdminPage({ onClose, currentUserId, onResetWalkthrough }: Props)
                   onClick={() => setSelectedFb(null)}
                 >
                   <div
-                    className="bg-[#13131c] border border-[#2a2a38] rounded-2xl shadow-2xl w-full max-w-lg flex flex-col overflow-hidden"
+                    className="bg-[#13131c] border border-[var(--ml-bg-hover)] rounded-2xl shadow-2xl w-full max-w-lg flex flex-col overflow-hidden"
                     onClick={(e) => e.stopPropagation()}
                   >
                     {/* Modal header */}
-                    <div className="flex items-center justify-between px-5 py-4 border-b border-[#2a2a38]">
+                    <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--ml-bg-hover)]">
                       <div className="flex flex-col gap-1.5 min-w-0">
                         <div className="flex items-center gap-2">
                           <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium border shrink-0 ${TYPE_COLORS[selectedFb.type] ?? "bg-gray-500/10 text-gray-400"}`}>
@@ -400,7 +400,7 @@ export function AdminPage({ onClose, currentUserId, onResetWalkthrough }: Props)
                       </div>
                       <button
                         onClick={() => setSelectedFb(null)}
-                        className="text-gray-600 hover:text-white transition p-1 rounded-lg hover:bg-[#1e1e2a]"
+                        className="text-gray-600 hover:text-white transition p-1 rounded-lg hover:bg-[var(--ml-bg-panel)]"
                       >
                         <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                           <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -409,7 +409,7 @@ export function AdminPage({ onClose, currentUserId, onResetWalkthrough }: Props)
                     </div>
 
                     {/* Meta */}
-                    <div className="px-5 py-3 border-b border-[#1e1e2a] flex items-center gap-3 text-xs text-gray-500">
+                    <div className="px-5 py-3 border-b border-[var(--ml-bg-panel)] flex items-center gap-3 text-xs text-gray-500">
                       <span>{selectedFb.user_email ?? `User #${selectedFb.user_id}`}</span>
                       <span className="text-gray-700">·</span>
                       <span>{new Date(selectedFb.created_at).toLocaleString()}</span>
@@ -424,11 +424,11 @@ export function AdminPage({ onClose, currentUserId, onResetWalkthrough }: Props)
                     </div>
 
                     {/* Actions */}
-                    <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-[#2a2a38]">
+                    <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-[var(--ml-bg-hover)]">
                       {selectedFb.status !== "open" && (
                         <button
                           onClick={() => handleStatusChange(selectedFb.id, "open")}
-                          className="px-3 py-1.5 text-xs font-medium text-gray-400 hover:text-gray-200 hover:bg-[#252533] rounded-lg border border-[#2a2a38] transition"
+                          className="px-3 py-1.5 text-xs font-medium text-gray-400 hover:text-gray-200 hover:bg-[#252533] rounded-lg border border-[var(--ml-bg-hover)] transition"
                         >Reopen</button>
                       )}
                       {selectedFb.status === "open" && (
@@ -498,7 +498,7 @@ export function AdminPage({ onClose, currentUserId, onResetWalkthrough }: Props)
                     { key: "evaluation_analytics_enabled", label: "Evaluation Analytics", desc: "Collect quantitative evaluation telemetry (session/task timings, AI metrics, ratings). Disabling stops all collection" },
                     { key: "evaluation_admin_export_enabled", label: "Evaluation Export", desc: "Allow admins to export evaluation analytics as CSV/JSON" },
                   ] as { key: keyof FeatureFlags; label: string; desc: string }[]).map(({ key, label, desc }) => (
-                    <div key={key} className="flex items-center justify-between px-4 py-3.5 bg-[#1a1a24] border border-[#2a2a38] rounded-xl">
+                    <div key={key} className="flex items-center justify-between px-4 py-3.5 bg-[#1a1a24] border border-[var(--ml-bg-hover)] rounded-xl">
                       <div>
                         <p className="text-sm font-medium text-gray-200">{label}</p>
                         <p className="text-xs text-gray-500 mt-0.5">{desc}</p>
@@ -517,7 +517,7 @@ export function AdminPage({ onClose, currentUserId, onResetWalkthrough }: Props)
                   ))}
 
                   {/* Default model dropdown */}
-                  <div className="flex items-center justify-between px-4 py-3.5 bg-[#1a1a24] border border-[#2a2a38] rounded-xl">
+                  <div className="flex items-center justify-between px-4 py-3.5 bg-[#1a1a24] border border-[var(--ml-bg-hover)] rounded-xl">
                     <div>
                       <p className="text-sm font-medium text-gray-200">Default Model</p>
                       <p className="text-xs text-gray-500 mt-0.5">The model used when model selection is disabled, or as the default</p>
@@ -525,7 +525,7 @@ export function AdminPage({ onClose, currentUserId, onResetWalkthrough }: Props)
                     <select
                       value={flags.default_model}
                       onChange={(e) => setFlags((f) => f ? { ...f, default_model: e.target.value } : f)}
-                      className="bg-[#12121a] border border-[#2a2a38] rounded-lg px-2.5 py-1.5 text-xs text-gray-300 focus:outline-none focus:border-indigo-500/50 max-w-[200px]"
+                      className="bg-[var(--ml-bg-surface)] border border-[var(--ml-bg-hover)] rounded-lg px-2.5 py-1.5 text-xs text-gray-300 focus:outline-none focus:border-indigo-500/50 max-w-[200px]"
                     >
                       {MODELS.map((m) => (
                         <option key={m.id} value={m.id}>{m.label}</option>
@@ -534,7 +534,7 @@ export function AdminPage({ onClose, currentUserId, onResetWalkthrough }: Props)
                   </div>
 
                   {/* Default language dropdown */}
-                  <div className="flex items-center justify-between px-4 py-3.5 bg-[#1a1a24] border border-[#2a2a38] rounded-xl">
+                  <div className="flex items-center justify-between px-4 py-3.5 bg-[#1a1a24] border border-[var(--ml-bg-hover)] rounded-xl">
                     <div>
                       <p className="text-sm font-medium text-gray-200">Default Translation Language</p>
                       <p className="text-xs text-gray-500 mt-0.5">Pre-selected language in the translate picker</p>
@@ -542,7 +542,7 @@ export function AdminPage({ onClose, currentUserId, onResetWalkthrough }: Props)
                     <select
                       value={flags.default_language}
                       onChange={(e) => setFlags((f) => f ? { ...f, default_language: e.target.value } : f)}
-                      className="bg-[#12121a] border border-[#2a2a38] rounded-lg px-2.5 py-1.5 text-xs text-gray-300 focus:outline-none focus:border-indigo-500/50"
+                      className="bg-[var(--ml-bg-surface)] border border-[var(--ml-bg-hover)] rounded-lg px-2.5 py-1.5 text-xs text-gray-300 focus:outline-none focus:border-indigo-500/50"
                     >
                       {TRANSLATE_LANGUAGES.map((l) => (
                         <option key={l} value={l}>{l}</option>
@@ -557,7 +557,7 @@ export function AdminPage({ onClose, currentUserId, onResetWalkthrough }: Props)
                   <p className="text-xs text-gray-500 mb-4">Configure which features each tier can access. Pro always inherits everything enabled for Plus and Regular.</p>
 
                   {/* Level tab bar */}
-                  <div className="flex gap-1 mb-4 bg-[#12121a] p-1 rounded-xl w-fit border border-[#2a2a38]">
+                  <div className="flex gap-1 mb-4 bg-[var(--ml-bg-surface)] p-1 rounded-xl w-fit border border-[var(--ml-bg-hover)]">
                     {(["regular", "plus", "pro"] as const).map((lvl) => (
                       <button
                         key={lvl}
@@ -591,7 +591,7 @@ export function AdminPage({ onClose, currentUserId, onResetWalkthrough }: Props)
                         const minLevel = (flags[minKey] as string) ?? "regular";
                         const isOn = _LEVEL_ORDER[levelTab] >= _LEVEL_ORDER[minLevel];
                         return (
-                          <div key={minKey} className="flex items-center justify-between px-4 py-3 bg-[#1a1a24] border border-[#2a2a38] rounded-xl">
+                          <div key={minKey} className="flex items-center justify-between px-4 py-3 bg-[#1a1a24] border border-[var(--ml-bg-hover)] rounded-xl">
                             <div>
                               <p className="text-sm text-gray-300">{label}</p>
                               {!isOn && (
@@ -649,7 +649,7 @@ export function AdminPage({ onClose, currentUserId, onResetWalkthrough }: Props)
               ) : (
                 <div className="space-y-2">
                   {users.map((u) => (
-                    <div key={u.id} className="px-4 py-3 bg-[#1a1a24] border border-[#2a2a38] rounded-xl">
+                    <div key={u.id} className="px-4 py-3 bg-[#1a1a24] border border-[var(--ml-bg-hover)] rounded-xl">
                       <div className="flex items-center gap-4">
                       <div className="w-8 h-8 rounded-full bg-indigo-600/30 flex items-center justify-center text-indigo-300 text-xs font-bold shrink-0">
                         {u.email.slice(0, 2).toUpperCase()}
@@ -682,7 +682,7 @@ export function AdminPage({ onClose, currentUserId, onResetWalkthrough }: Props)
                               value={u.access_level}
                               disabled={levelChanging[u.id]}
                               onChange={(e) => handleLevelChange(u.id, e.target.value as AccessLevel)}
-                              className="bg-[#12121a] border border-[#2a2a38] rounded-lg px-2 py-1 text-[11px] text-gray-300 focus:outline-none focus:border-indigo-500/50 disabled:opacity-50"
+                              className="bg-[var(--ml-bg-surface)] border border-[var(--ml-bg-hover)] rounded-lg px-2 py-1 text-[11px] text-gray-300 focus:outline-none focus:border-indigo-500/50 disabled:opacity-50"
                             >
                               <option value="regular">Regular</option>
                               <option value="plus">Plus</option>
@@ -710,7 +710,7 @@ export function AdminPage({ onClose, currentUserId, onResetWalkthrough }: Props)
                         const p = evalParts[u.id];
                         const pct = p ? Math.min(100, Math.round((p.consumed_seconds / Math.max(1, p.budget_seconds)) * 100)) : 0;
                         return (
-                          <div className="mt-2.5 pt-2.5 border-t border-[#2a2a38] flex items-center gap-3 flex-wrap">
+                          <div className="mt-2.5 pt-2.5 border-t border-[var(--ml-bg-hover)] flex items-center gap-3 flex-wrap">
                             <span className="text-[10px] uppercase tracking-wider text-cyan-400/70 shrink-0">Evaluation</span>
                             {p ? (
                               <>
@@ -718,7 +718,7 @@ export function AdminPage({ onClose, currentUserId, onResetWalkthrough }: Props)
                                   Consumed <span className="text-gray-200 font-mono">{fmtMMSS(p.consumed_seconds)}</span> / {fmtMMSS(p.budget_seconds)}
                                   {p.exhausted && <span className="ml-1.5 text-amber-400">· window ended</span>}
                                 </span>
-                                <div className="w-24 h-1.5 bg-[#12121a] rounded overflow-hidden">
+                                <div className="w-24 h-1.5 bg-[var(--ml-bg-surface)] rounded overflow-hidden">
                                   <div className={`h-full ${p.exhausted ? "bg-amber-500" : "bg-cyan-500/70"}`} style={{ width: `${pct}%` }} />
                                 </div>
                               </>
@@ -731,7 +731,7 @@ export function AdminPage({ onClose, currentUserId, onResetWalkthrough }: Props)
                                 value={budgetInput[u.id] ?? ""}
                                 onChange={(e) => setBudgetInput((b) => ({ ...b, [u.id]: e.target.value }))}
                                 placeholder={String(p?.budget_seconds ? Math.round(p.budget_seconds / 60) : evalDefaultMins)}
-                                className="w-14 bg-[#12121a] border border-[#2a2a38] rounded-lg px-2 py-1 text-[11px] text-gray-200 focus:outline-none focus:border-cyan-500/50"
+                                className="w-14 bg-[var(--ml-bg-surface)] border border-[var(--ml-bg-hover)] rounded-lg px-2 py-1 text-[11px] text-gray-200 focus:outline-none focus:border-cyan-500/50"
                               />
                               <span className="text-[10px] text-gray-600">min</span>
                               <button onClick={() => applyUserBudget(u.id)} className="px-2 py-1 text-[11px] rounded-lg text-cyan-300 border border-cyan-500/30 hover:bg-cyan-500/10 transition">Set</button>
@@ -780,7 +780,7 @@ export function AdminPage({ onClose, currentUserId, onResetWalkthrough }: Props)
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => loadLogs(logsPage)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-gray-400 hover:text-gray-200 hover:bg-[#1e1e2a] border border-[#2a2a38] rounded-lg transition"
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-gray-400 hover:text-gray-200 hover:bg-[var(--ml-bg-panel)] border border-[var(--ml-bg-hover)] rounded-lg transition"
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -802,7 +802,7 @@ export function AdminPage({ onClose, currentUserId, onResetWalkthrough }: Props)
                   <select
                     value={logsLevelFilter}
                     onChange={(e) => setLogsLevelFilter(e.target.value)}
-                    className="bg-[#1a1a24] border border-[#2a2a38] rounded-lg px-2.5 py-1.5 text-xs text-gray-300 focus:outline-none focus:border-indigo-500/50"
+                    className="bg-[#1a1a24] border border-[var(--ml-bg-hover)] rounded-lg px-2.5 py-1.5 text-xs text-gray-300 focus:outline-none focus:border-indigo-500/50"
                   >
                     <option value="">All levels</option>
                     <option value="INFO">INFO</option>
@@ -814,7 +814,7 @@ export function AdminPage({ onClose, currentUserId, onResetWalkthrough }: Props)
                     value={logsSourceFilter}
                     onChange={(e) => setLogsSourceFilter(e.target.value)}
                     placeholder="Filter by source…"
-                    className="bg-[#1a1a24] border border-[#2a2a38] rounded-lg px-2.5 py-1.5 text-xs text-gray-300 placeholder-gray-600 focus:outline-none focus:border-indigo-500/50 w-44"
+                    className="bg-[#1a1a24] border border-[var(--ml-bg-hover)] rounded-lg px-2.5 py-1.5 text-xs text-gray-300 placeholder-gray-600 focus:outline-none focus:border-indigo-500/50 w-44"
                   />
                 </div>
 
@@ -833,7 +833,7 @@ export function AdminPage({ onClose, currentUserId, onResetWalkthrough }: Props)
                     {logs.map((entry) => (
                       <div
                         key={entry.id}
-                        className="bg-[#1a1a24] border border-[#2a2a38] rounded-xl overflow-hidden"
+                        className="bg-[#1a1a24] border border-[var(--ml-bg-hover)] rounded-xl overflow-hidden"
                       >
                         <button
                           className="w-full flex items-start gap-3 px-4 py-2.5 text-left hover:bg-[#1e1e2e] transition"
@@ -858,7 +858,7 @@ export function AdminPage({ onClose, currentUserId, onResetWalkthrough }: Props)
                           )}
                         </button>
                         {expandedLog === entry.id && entry.details && (
-                          <div className="px-4 py-2.5 border-t border-[#252533] bg-[#12121a]">
+                          <div className="px-4 py-2.5 border-t border-[#252533] bg-[var(--ml-bg-surface)]">
                             <pre className="text-[10px] text-gray-400 whitespace-pre-wrap break-all leading-relaxed">
                               {JSON.stringify(entry.details, null, 2)}
                             </pre>
@@ -878,13 +878,13 @@ export function AdminPage({ onClose, currentUserId, onResetWalkthrough }: Props)
                     <button
                       disabled={logsPage <= 1}
                       onClick={() => loadLogs(logsPage - 1)}
-                      className="px-3 py-1.5 text-xs text-gray-400 hover:text-gray-200 border border-[#2a2a38] rounded-lg disabled:opacity-30 transition"
+                      className="px-3 py-1.5 text-xs text-gray-400 hover:text-gray-200 border border-[var(--ml-bg-hover)] rounded-lg disabled:opacity-30 transition"
                     >← Prev</button>
                     <span className="text-xs text-gray-600">Page {logsPage} of {logsPages}</span>
                     <button
                       disabled={logsPage >= logsPages}
                       onClick={() => loadLogs(logsPage + 1)}
-                      className="px-3 py-1.5 text-xs text-gray-400 hover:text-gray-200 border border-[#2a2a38] rounded-lg disabled:opacity-30 transition"
+                      className="px-3 py-1.5 text-xs text-gray-400 hover:text-gray-200 border border-[var(--ml-bg-hover)] rounded-lg disabled:opacity-30 transition"
                     >Next →</button>
                   </div>
                 )}

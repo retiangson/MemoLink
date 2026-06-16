@@ -15,7 +15,16 @@ export const EXPORT_FORMATS: { value: ExportFormat; label: string; ext: string }
   { value: "pdf",  label: "PDF", ext: ".pdf"  },
 ];
 
-function download(blob: Blob, filename: string) {
+async function download(blob: Blob, filename: string) {
+  if (window.electronAPI) {
+    const buffer = await blob.arrayBuffer();
+    const binary = Array.from(new Uint8Array(buffer));
+    const result = await window.electronAPI.saveFile({ filename, binary });
+    if (result.success && result.filePath) {
+      await window.electronAPI.openPath(result.filePath);
+    }
+    return;
+  }
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -203,18 +212,18 @@ export async function exportNote(title: string, content: string, format: ExportF
   switch (format) {
     case "md": {
       const markdown = htmlToMarkdown(html);
-      download(new Blob([markdown], { type: "text/markdown;charset=utf-8" }), `${name}.md`);
+      await download(new Blob([markdown], { type: "text/markdown;charset=utf-8" }), `${name}.md`);
       break;
     }
 
     case "txt": {
       const plain = htmlToPlainText(html);
-      download(new Blob([plain], { type: "text/plain;charset=utf-8" }), `${name}.txt`);
+      await download(new Blob([plain], { type: "text/plain;charset=utf-8" }), `${name}.txt`);
       break;
     }
 
     case "html": {
-      download(
+      await download(
         new Blob([HTML_TEMPLATE(title, html)], { type: "text/html;charset=utf-8" }),
         `${name}.html`,
       );
@@ -222,7 +231,7 @@ export async function exportNote(title: string, content: string, format: ExportF
     }
 
     case "doc": {
-      download(
+      await download(
         new Blob(["\ufeff", HTML_TEMPLATE(title, html)], { type: "application/msword;charset=utf-8" }),
         `${name}.doc`,
       );
@@ -236,7 +245,7 @@ export async function exportNote(title: string, content: string, format: ExportF
         },
         sections: [{ properties: {}, children: buildDocxParagraphs(html) }],
       });
-      download(await Packer.toBlob(doc), `${name}.docx`);
+      await download(await Packer.toBlob(doc), `${name}.docx`);
       break;
     }
 
@@ -248,7 +257,7 @@ export async function exportNote(title: string, content: string, format: ExportF
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Note");
       const buf = XLSX.write(wb, { type: "array", bookType: "xlsx" });
-      download(
+      await download(
         new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }),
         `${name}.xlsx`,
       );

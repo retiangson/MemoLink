@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+﻿import React, { useEffect, useState, useCallback } from "react";
 import {
   getInsights,
   analyzeInsights,
@@ -103,7 +103,7 @@ export function InsightsPanel({ workspaceId, onOpenNote }: InsightsPanelProps) {
   const badgeCount = urgentCount + warningCount;
 
   return (
-    <div className="border-b border-[#1e1e2a]">
+    <div className="border-b border-[var(--ml-bg-panel)]">
       {/* ── Section header ── */}
       <button
         onClick={() => setOpen((v) => !v)}

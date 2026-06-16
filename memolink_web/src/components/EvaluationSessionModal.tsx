@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+﻿import React, { useState } from "react";
 import { startSession } from "../api/evaluationApi";
 import type { EvalSession } from "../hooks/useEvaluation";
 
@@ -51,7 +51,7 @@ export function EvaluationSessionModal({ show, onClose, workspaceId, onStarted }
 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <div className="bg-[#1a1a24] border border-[#2a2a38] rounded-2xl w-[560px] max-w-full max-h-[88vh] overflow-y-auto p-6 shadow-2xl text-white" onClick={e => e.stopPropagation()}>
+      <div className="bg-[#1a1a24] border border-[var(--ml-bg-hover)] rounded-2xl w-[560px] max-w-full max-h-[88vh] overflow-y-auto p-6 shadow-2xl text-white" onClick={e => e.stopPropagation()}>
         <div className="flex items-center gap-2.5 mb-1">
           <svg className="w-5 h-5 text-cyan-400" fill="currentColor" viewBox="0 0 16 16"><path d="M0 0h1v15h15v1H0zm14.817 3.113a.5.5 0 0 1 .07.704l-4.5 5.5a.5.5 0 0 1-.74.037L7.06 6.767l-3.656 5.027a.5.5 0 0 1-.808-.588l4-5.5a.5.5 0 0 1 .758-.06l2.609 2.61 4.15-5.073a.5.5 0 0 1 .704-.07"/></svg>
           <h2 className="font-semibold text-base">MemoLink Evaluation Session</h2>
@@ -61,14 +61,14 @@ export function EvaluationSessionModal({ show, onClose, workspaceId, onStarted }
         <div className="space-y-3">
           <div>
             <label className="block text-[11px] font-medium text-gray-500 uppercase tracking-wider mb-1">Your role</label>
-            <select value={role} onChange={e => setRole(e.target.value)} className="w-full bg-[#12121a] border border-[#2a2a38] rounded-lg px-3 py-2 text-[13px] text-gray-200 focus:outline-none focus:border-cyan-500">
+            <select value={role} onChange={e => setRole(e.target.value)} className="w-full bg-[var(--ml-bg-surface)] border border-[var(--ml-bg-hover)] rounded-lg px-3 py-2 text-[13px] text-gray-200 focus:outline-none focus:border-cyan-500">
               <option value="">Select…</option>
               {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
             </select>
           </div>
           <div>
             <label className="block text-[11px] font-medium text-gray-500 uppercase tracking-wider mb-1">AI tool usage frequency</label>
-            <select value={freq} onChange={e => setFreq(e.target.value)} className="w-full bg-[#12121a] border border-[#2a2a38] rounded-lg px-3 py-2 text-[13px] text-gray-200 focus:outline-none focus:border-cyan-500">
+            <select value={freq} onChange={e => setFreq(e.target.value)} className="w-full bg-[var(--ml-bg-surface)] border border-[var(--ml-bg-hover)] rounded-lg px-3 py-2 text-[13px] text-gray-200 focus:outline-none focus:border-cyan-500">
               <option value="">Select…</option>
               {FREQ.map(f => <option key={f} value={f}>{f}</option>)}
             </select>
@@ -81,7 +81,7 @@ export function EvaluationSessionModal({ show, onClose, workspaceId, onStarted }
         </div>
 
         <div className="flex justify-end gap-2 mt-5">
-          <button onClick={onClose} className="px-3 py-1.5 rounded-lg text-xs text-gray-400 border border-[#2a2a38] hover:text-gray-200 transition">Cancel</button>
+          <button onClick={onClose} className="px-3 py-1.5 rounded-lg text-xs text-gray-400 border border-[var(--ml-bg-hover)] hover:text-gray-200 transition">Cancel</button>
           <button onClick={start} disabled={!consent || busy} className="px-4 py-1.5 rounded-lg text-xs font-medium bg-cyan-600 hover:bg-cyan-500 text-white disabled:opacity-40 disabled:cursor-not-allowed transition">
             {busy ? "Starting…" : "Start Evaluation"}
           </button>

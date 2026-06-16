@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+﻿import React, { useState, useRef, useEffect } from "react";
 import { RichNoteEditor, ttsHighlightKey } from "./RichNoteEditor";
 import { splitSentences } from "../hooks/useTTS";
 import { useRecording } from "../hooks/useRecording";
@@ -299,7 +299,7 @@ export function NoteEditorView({
       </div>
 
       {/* Rich editor */}
-      <div className={`flex-1 overflow-hidden flex flex-col border border-[#1e1e2a] rounded-xl bg-[#0a0a0f] ${activeTab !== "editor" ? "hidden" : ""}`}>
+      <div className={`flex-1 overflow-hidden flex flex-col border border-[var(--ml-bg-panel)] rounded-xl bg-[var(--ml-bg-bar)] ${activeTab !== "editor" ? "hidden" : ""}`}>
         <RichNoteEditor
           key={String(noteKey)}
           noteKey={noteKey}
@@ -311,7 +311,7 @@ export function NoteEditorView({
 
       {/* Source view */}
       {activeTab === "source" && (
-        <div className="flex-1 overflow-hidden border border-[#1e1e2a] rounded-xl bg-[#0a0a0f]">
+        <div className="flex-1 overflow-hidden border border-[var(--ml-bg-panel)] rounded-xl bg-[var(--ml-bg-bar)]">
           <textarea
             readOnly
             value={rawContent}
@@ -322,7 +322,7 @@ export function NoteEditorView({
 
       {/* Timeline tab */}
       {activeTab === "timeline" && noteId && (
-        <div className="flex-1 min-h-0 overflow-y-auto border border-[#1e1e2a] rounded-xl bg-[#0a0a0f] p-4">
+        <div className="flex-1 min-h-0 overflow-y-auto border border-[var(--ml-bg-panel)] rounded-xl bg-[var(--ml-bg-bar)] p-4">
           <TimelinePanel noteId={noteId} onJump={jumpToText} />
         </div>
       )}
@@ -352,27 +352,27 @@ export function NoteEditorView({
             {showPicker && (
               <>
                 <div className="fixed inset-0 z-[9]" onClick={() => setShowPicker(false)} />
-                <div className="absolute bottom-full left-0 mb-1 z-10 bg-[#1e1e2a] border border-[#2a2a38] rounded-xl shadow-xl overflow-hidden min-w-[160px]">
+                <div className="absolute bottom-full left-0 mb-1 z-10 bg-[var(--ml-bg-panel)] border border-[var(--ml-bg-hover)] rounded-xl shadow-xl overflow-hidden min-w-[160px]">
                   <button
                     onClick={() => startRecording("mic")}
-                    className="w-full text-left px-4 py-2.5 text-xs text-gray-300 hover:bg-[#2a2a38] flex items-center gap-2 transition"
+                    className="w-full text-left px-4 py-2.5 text-xs text-gray-300 hover:bg-[var(--ml-bg-hover)] flex items-center gap-2 transition"
                   >
                     🎤 Microphone
                   </button>
                   <button
                     onClick={() => startRecording("computer")}
-                    className="w-full text-left px-4 py-2.5 text-xs text-gray-300 hover:bg-[#2a2a38] flex items-center gap-2 transition"
+                    className="w-full text-left px-4 py-2.5 text-xs text-gray-300 hover:bg-[var(--ml-bg-hover)] flex items-center gap-2 transition"
                   >
                     🖥️ Computer Audio
                   </button>
-                  <div className="border-t border-[#2a2a38] px-3 py-2 space-y-2">
+                  <div className="border-t border-[var(--ml-bg-hover)] px-3 py-2 space-y-2">
                     <div>
                       <label className="block text-[10px] text-gray-500 mb-1 uppercase tracking-wider">Capture Mode</label>
                       <select
                         value={recordMode}
                         onChange={(e) => setRecordMode(e.target.value as "default" | "lecture")}
                         onClick={(e) => e.stopPropagation()}
-                        className="w-full bg-[#0f0f13] border border-[#2a2a38] text-gray-300 text-xs rounded-lg px-2 py-1.5 focus:outline-none focus:border-indigo-500"
+                        className="w-full bg-[var(--ml-bg-base)] border border-[var(--ml-bg-hover)] text-gray-300 text-xs rounded-lg px-2 py-1.5 focus:outline-none focus:border-indigo-500"
                       >
                         <option value="default">Quick Voice Note</option>
                         <option value="lecture">Lecture Capture</option>
@@ -384,7 +384,7 @@ export function NoteEditorView({
                         value={recordBackend}
                         onChange={(e) => setRecordBackend(e.target.value as "auto" | "whisper" | "deepgram")}
                         onClick={(e) => e.stopPropagation()}
-                        className="w-full bg-[#0f0f13] border border-[#2a2a38] text-gray-300 text-xs rounded-lg px-2 py-1.5 focus:outline-none focus:border-indigo-500"
+                        className="w-full bg-[var(--ml-bg-base)] border border-[var(--ml-bg-hover)] text-gray-300 text-xs rounded-lg px-2 py-1.5 focus:outline-none focus:border-indigo-500"
                       >
                         <option value="auto">Auto</option>
                         <option value="whisper">OpenAI Whisper</option>
@@ -396,8 +396,8 @@ export function NoteEditorView({
                         onClick={(e) => { e.stopPropagation(); if (recordMode !== "lecture") setAutoStopOnSilence((v) => !v); }}
                         className={`w-full flex items-center justify-between rounded-lg border px-2.5 py-2 text-xs transition ${
                           recordMode === "lecture"
-                            ? "border-[#2a2a38] text-gray-600 cursor-not-allowed"
-                            : "border-[#2a2a38] text-gray-300 hover:border-indigo-500/40"
+                            ? "border-[var(--ml-bg-hover)] text-gray-600 cursor-not-allowed"
+                            : "border-[var(--ml-bg-hover)] text-gray-300 hover:border-indigo-500/40"
                         }`}
                       >
                         <span>Auto-stop on silence</span>
@@ -412,13 +412,13 @@ export function NoteEditorView({
                       </p>
                     </div>
                   </div>
-                  <div className="border-t border-[#2a2a38] px-3 py-2">
+                  <div className="border-t border-[var(--ml-bg-hover)] px-3 py-2">
                     <label className="block text-[10px] text-gray-500 mb-1 uppercase tracking-wider">Language</label>
                     <select
                       value={language}
                       onChange={(e) => setLanguage(e.target.value)}
                       onClick={(e) => e.stopPropagation()}
-                      className="w-full bg-[#0f0f13] border border-[#2a2a38] text-gray-300 text-xs rounded-lg px-2 py-1.5 focus:outline-none focus:border-indigo-500"
+                      className="w-full bg-[var(--ml-bg-base)] border border-[var(--ml-bg-hover)] text-gray-300 text-xs rounded-lg px-2 py-1.5 focus:outline-none focus:border-indigo-500"
                     >
                       {LANGUAGES.map((l) => (
                         <option key={l.code} value={l.code}>{l.label}</option>
@@ -456,15 +456,15 @@ export function NoteEditorView({
           {showExport && (
             <>
               <div className="fixed inset-0 z-[9]" onClick={() => setShowExport(false)} />
-              <div className="absolute bottom-full left-0 mb-1 z-10 bg-[#1e1e2a] border border-[#2a2a38] rounded-xl shadow-xl overflow-hidden min-w-[160px]">
-                <div className="px-3 py-2 border-b border-[#2a2a38]">
+              <div className="absolute bottom-full left-0 mb-1 z-10 bg-[var(--ml-bg-panel)] border border-[var(--ml-bg-hover)] rounded-xl shadow-xl overflow-hidden min-w-[160px]">
+                <div className="px-3 py-2 border-b border-[var(--ml-bg-hover)]">
                   <span className="text-[10px] text-gray-500 uppercase tracking-wider font-medium">Export as…</span>
                 </div>
                 {EXPORT_FORMATS.map((f) => (
                   <button
                     key={f.value}
                     onClick={() => handleExport(f.value)}
-                    className="w-full text-left px-4 py-2 text-xs text-gray-300 hover:bg-[#2a2a38] flex items-center justify-between gap-3 transition"
+                    className="w-full text-left px-4 py-2 text-xs text-gray-300 hover:bg-[var(--ml-bg-hover)] flex items-center justify-between gap-3 transition"
                   >
                     <span>{f.label}</span>
                     <span className="text-gray-600 font-mono text-[10px]">{f.ext}</span>
@@ -543,7 +543,7 @@ export function NoteEditorView({
         </span>
 
         <span className="text-xs text-gray-600 shrink-0">{isNoteDirty ? "Unsaved" : "Saved"}</span>
-        <button onClick={onDiscard} disabled={!isNoteDirty} className="px-3 py-1 rounded-full text-xs border border-[#2a2a38] text-gray-400 disabled:opacity-30 shrink-0">
+        <button onClick={onDiscard} disabled={!isNoteDirty} className="px-3 py-1 rounded-full text-xs border border-[var(--ml-bg-hover)] text-gray-400 disabled:opacity-30 shrink-0">
           Discard
         </button>
         <button onClick={onSave} disabled={!isNoteDirty} className="px-4 py-1 rounded-full text-xs bg-indigo-600 hover:bg-indigo-500 text-white disabled:opacity-30 disabled:cursor-not-allowed shrink-0">

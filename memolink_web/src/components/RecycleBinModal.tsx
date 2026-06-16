@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+﻿import React, { useEffect, useState } from "react";
 import {
   listTrashedNotes, restoreNote, permanentDeleteNote,
 } from "../api/client";
@@ -78,17 +78,17 @@ export function RecycleBinModal({ onClose, onNoteRestored, onConvRestored }: Rec
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="w-full max-w-[520px] mx-4 max-h-[80vh] flex flex-col bg-[#0f0f13] border border-[#2a2a38] rounded-2xl shadow-2xl overflow-hidden">
+      <div className="w-full max-w-[520px] mx-4 max-h-[80vh] flex flex-col bg-[var(--ml-bg-base)] border border-[var(--ml-bg-hover)] rounded-2xl shadow-2xl overflow-hidden">
 
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-[#1e1e2a] shrink-0">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--ml-bg-panel)] shrink-0">
           <div className="flex items-center gap-2.5">
             <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 16 16">
               <path d="M11 1.5v1h3.5a.5.5 0 0 1 0 1h-.538l-.853 10.66A2 2 0 0 1 11.115 16h-6.23a2 2 0 0 1-1.994-1.84L2.038 3.5H1.5a.5.5 0 0 1 0-1H5v-1A1.5 1.5 0 0 1 6.5 0h3A1.5 1.5 0 0 1 11 1.5m-5 0v1h4v-1a.5.5 0 0 0-.5-.5h-3a.5.5 0 0 0-.5.5M4.5 5.029l.5 8.5a.5.5 0 1 0 .998-.06l-.5-8.5a.5.5 0 1 0-.998.06m6.53-.528a.5.5 0 0 0-.528.47l-.5 8.5a.5.5 0 0 0 .998.058l.5-8.5a.5.5 0 0 0-.47-.528M8 4.5a.5.5 0 0 0-.5.5v8.5a.5.5 0 0 0 1 0V5a.5.5 0 0 0-.5-.5"/>
             </svg>
             <span className="text-sm font-semibold text-gray-200">Recycle Bin</span>
             {totalCount > 0 && (
-              <span className="text-xs text-gray-500 bg-[#1e1e2a] px-2 py-0.5 rounded-full">{totalCount}</span>
+              <span className="text-xs text-gray-500 bg-[var(--ml-bg-panel)] px-2 py-0.5 rounded-full">{totalCount}</span>
             )}
           </div>
           <div className="flex items-center gap-2">
@@ -105,7 +105,7 @@ export function RecycleBinModal({ onClose, onNoteRestored, onConvRestored }: Rec
         </div>
 
         {/* Tabs */}
-        <div className="flex border-b border-[#1e1e2a] shrink-0">
+        <div className="flex border-b border-[var(--ml-bg-panel)] shrink-0">
           {(["notes", "chats"] as const).map((t) => (
             <button
               key={t}
@@ -193,7 +193,7 @@ function TrashItem({
 }) {
   const date = new Date(deletedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" });
   return (
-    <div className="flex items-start gap-3 p-3 rounded-xl bg-[#1a1a24] border border-[#2a2a38] hover:border-[#3a3a4a] transition group">
+    <div className="flex items-start gap-3 p-3 rounded-xl bg-[#1a1a24] border border-[var(--ml-bg-hover)] hover:border-[#3a3a4a] transition group">
       <div className="mt-0.5 shrink-0 text-gray-600">
         {icon === "note" ? (
           <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="currentColor" viewBox="0 0 16 16">

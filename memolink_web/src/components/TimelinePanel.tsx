@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+﻿import React, { useState, useEffect, useCallback } from "react";
 import { getTimeline, generateTimeline, type TimelineData } from "../api/timelineApi";
 
 interface Props {
@@ -16,7 +16,7 @@ const MOMENT_CONFIG: Record<string, { color: string; label: string; icon: string
 
 function TimestampBadge({ ts }: { ts: string }) {
   return (
-    <span className="shrink-0 font-mono text-[10px] font-bold px-2 py-0.5 rounded-md bg-[#0a0a0f] border border-[#2a2a38] text-indigo-300">
+    <span className="shrink-0 font-mono text-[10px] font-bold px-2 py-0.5 rounded-md bg-[var(--ml-bg-bar)] border border-[var(--ml-bg-hover)] text-indigo-300">
       {ts}
     </span>
   );
@@ -44,20 +44,20 @@ function Section({
 }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <div className="border border-[#2a2a38] rounded-xl overflow-hidden">
+    <div className="border border-[var(--ml-bg-hover)] rounded-xl overflow-hidden">
       <button
         onClick={() => setOpen(o => !o)}
         className="w-full flex items-center justify-between px-4 py-2.5 bg-[#1a1a24] hover:bg-[#1e1e2e] transition"
       >
         <div className="flex items-center gap-2">
           <span className={`text-xs font-semibold ${color}`}>{title}</span>
-          <span className="text-[10px] text-gray-600 bg-[#12121a] border border-[#2a2a38] px-1.5 py-0.5 rounded-full">{count}</span>
+          <span className="text-[10px] text-gray-600 bg-[var(--ml-bg-surface)] border border-[var(--ml-bg-hover)] px-1.5 py-0.5 rounded-full">{count}</span>
         </div>
         <svg xmlns="http://www.w3.org/2000/svg" className={`w-3.5 h-3.5 text-gray-600 transition-transform ${open ? "" : "-rotate-90"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
         </svg>
       </button>
-      {open && <div className="divide-y divide-[#2a2a38]">{children}</div>}
+      {open && <div className="divide-y divide-[var(--ml-bg-hover)]">{children}</div>}
     </div>
   );
 }
@@ -114,8 +114,8 @@ export function TimelinePanel({ noteId, onJump }: Props) {
       {/* Header row */}
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2 text-xs text-gray-500">
-          {durLabel && <span className="px-2 py-0.5 bg-[#12121a] border border-[#2a2a38] rounded-full">{durLabel} estimated</span>}
-          {data?.word_count && <span className="px-2 py-0.5 bg-[#12121a] border border-[#2a2a38] rounded-full">{data.word_count.toLocaleString()} words</span>}
+          {durLabel && <span className="px-2 py-0.5 bg-[var(--ml-bg-surface)] border border-[var(--ml-bg-hover)] rounded-full">{durLabel} estimated</span>}
+          {data?.word_count && <span className="px-2 py-0.5 bg-[var(--ml-bg-surface)] border border-[var(--ml-bg-hover)] rounded-full">{data.word_count.toLocaleString()} words</span>}
         </div>
         <button
           onClick={handleGenerate}

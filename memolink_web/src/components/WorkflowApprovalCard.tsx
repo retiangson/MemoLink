@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+﻿import React, { useState } from "react";
 import { executeWorkflow, type WorkflowAction } from "../api/workflowApi";
 
 interface Props {
@@ -83,9 +83,9 @@ export function WorkflowApprovalCard({ understanding, actions, conversationId, w
   const totalCount = actions.length;
 
   return (
-    <div className="mt-2 rounded-2xl border border-[#2a2a38] bg-[#12121a] overflow-hidden">
+    <div className="mt-2 rounded-2xl border border-[var(--ml-bg-hover)] bg-[var(--ml-bg-surface)] overflow-hidden">
       {/* Header */}
-      <div className="flex items-center gap-2.5 px-5 py-3 border-b border-[#2a2a38] bg-[#1a1a24]">
+      <div className="flex items-center gap-2.5 px-5 py-3 border-b border-[var(--ml-bg-hover)] bg-[#1a1a24]">
         <span className="text-base">⚡</span>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-white">Workflow Agent</p>
@@ -110,7 +110,7 @@ export function WorkflowApprovalCard({ understanding, actions, conversationId, w
       </div>
 
       {/* Action list */}
-      <div className="divide-y divide-[#2a2a38]">
+      <div className="divide-y divide-[var(--ml-bg-hover)]">
         {actions.map((action) => {
           const isApproved = approved.has(action.id);
           const state = actionStates[action.id];
@@ -178,7 +178,7 @@ export function WorkflowApprovalCard({ understanding, actions, conversationId, w
 
       {/* Footer */}
       {phase === "approval" && (
-        <div className="px-5 py-3 border-t border-[#2a2a38] bg-[#0f0f16] flex items-center justify-between gap-3">
+        <div className="px-5 py-3 border-t border-[var(--ml-bg-hover)] bg-[#0f0f16] flex items-center justify-between gap-3">
           <div className="flex gap-2">
             <button
               onClick={approveAll}
@@ -197,7 +197,7 @@ export function WorkflowApprovalCard({ understanding, actions, conversationId, w
           <div className="flex gap-2">
             <button
               onClick={() => setPhase("done")}
-              className="px-3 py-1.5 text-xs text-gray-500 hover:text-gray-300 border border-[#2a2a38] rounded-lg transition"
+              className="px-3 py-1.5 text-xs text-gray-500 hover:text-gray-300 border border-[var(--ml-bg-hover)] rounded-lg transition"
             >
               Cancel
             </button>
@@ -214,7 +214,7 @@ export function WorkflowApprovalCard({ understanding, actions, conversationId, w
 
       {/* Execution summary */}
       {(phase === "executing" || phase === "done") && summary && (
-        <div className="px-5 py-3 border-t border-[#2a2a38] bg-[#0f0f16]">
+        <div className="px-5 py-3 border-t border-[var(--ml-bg-hover)] bg-[#0f0f16]">
           <p className="text-xs text-gray-300 leading-relaxed">{summary}</p>
         </div>
       )}

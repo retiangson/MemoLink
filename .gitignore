@@ -23,10 +23,17 @@ memolink_web/node_modules/
 memolink_web/dist/
 memolink_web/.vite/
 
-# Editor
+# Editor / IDE state
 .vscode/
 .idea/
+.vs/
 *.DS_Store
+
+# Electron compiled output (rebuilt on every dev run)
+memolink_web/dist-electron/
+
+# Claude Code local settings
+.claude/
 
 # Logs
 *.log
