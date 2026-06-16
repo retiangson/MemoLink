@@ -37,6 +37,7 @@
       ]
     },
     "nsis": {
+      "artifactName": "MemoLink-Setup.exe",
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,

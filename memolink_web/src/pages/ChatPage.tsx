@@ -787,7 +787,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
 
                   {/* Download Desktop App */}
                   <a
-                    href="https://github.com/retiangson/MemoLink/releases/latest"
+                    href="https://github.com/retiangson/MemoLink/releases/latest/download/MemoLink-Setup.exe"
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={() => setUserMenuOpen(false)}

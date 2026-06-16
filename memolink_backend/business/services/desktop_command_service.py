@@ -85,5 +85,20 @@ class DesktopCommandService:
 
     # ── Desktop presence ──────────────────────────────────────────────────────
 
+    def touch_heartbeat(self, user_id: int) -> None:
+        self._repo.touch_heartbeat(user_id)
+
     def is_desktop_online(self, user_id: int) -> bool:
-        return len(_desktop_queues.get(user_id, [])) > 0
+        # In-memory fast path (single-instance / local dev)
+        if len(_desktop_queues.get(user_id, [])) > 0:
+            return True
+        # DB heartbeat — works across Lambda instances
+        return self._repo.has_recent_heartbeat(user_id, within_seconds=90)
+
+    def get_and_mark_running(self, user_id: int) -> list:
+        """Return pending commands and immediately mark them running to prevent double-pickup."""
+        from memolink_backend.contracts.desktop_command_contracts import DesktopCommandResponseDTO
+        cmds = self._repo.list_pending(user_id)
+        for cmd in cmds:
+            self._repo.set_running(cmd.id)
+        return [DesktopCommandResponseDTO.model_validate(cmd) for cmd in cmds]
