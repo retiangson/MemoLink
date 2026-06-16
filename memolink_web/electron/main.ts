@@ -169,7 +169,8 @@ ipcMain.handle("memolink:get-info", () => ({
 // ── Remote Desktop Bridge ─────────────────────────────────────────────────────
 // Connects to the backend SSE stream and executes commands sent from web/mobile.
 
-let bridgeAbortController: AbortController | null = null;
+let bridgeHeartbeatTimer: ReturnType<typeof setInterval> | null = null;
+let bridgePollTimer: ReturnType<typeof setInterval> | null = null;
 
 async function executeRemoteCommand(commandType: string, payload: any): Promise<{ ok: boolean; output?: string; error?: string }> {
   try {
@@ -233,46 +234,49 @@ function postResult(baseUrl: string, token: string, commandId: number, result: {
 }
 
 function startDesktopBridge(baseUrl: string, token: string) {
-  if (bridgeAbortController) bridgeAbortController.abort();
-  bridgeAbortController = new AbortController();
+  if (bridgeHeartbeatTimer) clearInterval(bridgeHeartbeatTimer);
+  if (bridgePollTimer) clearInterval(bridgePollTimer);
 
-  const sseUrl = new URL("/api/desktop/listen", baseUrl);
-  const lib = sseUrl.protocol === "https:" ? https : http;
+  const authHeaders = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
 
-  function connect() {
-    const req = lib.request(sseUrl, {
-      headers: { Authorization: `Bearer ${token}`, Accept: "text/event-stream", "Cache-Control": "no-cache" },
-    });
-
-    req.on("response", (res) => {
-      let buf = "";
-      res.on("data", (chunk: Buffer) => {
-        buf += chunk.toString();
-        const lines = buf.split("\n");
-        buf = lines.pop() ?? "";
-        for (const line of lines) {
-          if (!line.startsWith("data: ")) continue;
-          try {
-            const msg = JSON.parse(line.slice(6));
-            executeRemoteCommand(msg.command_type, msg.payload).then((result) => {
-              postResult(baseUrl, token, msg.command_id, result);
-            });
-          } catch { /* ignore malformed */ }
-        }
+  function request(method: string, path: string, body?: string): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const url = new URL(path, baseUrl);
+      const lib = url.protocol === "https:" ? https : http;
+      const bodyBuf = body ? Buffer.from(body) : Buffer.alloc(0);
+      const req = lib.request(url, {
+        method,
+        headers: { ...authHeaders, "Content-Length": bodyBuf.length },
+      }, (res) => {
+        let data = "";
+        res.on("data", (c: Buffer) => { data += c.toString(); });
+        res.on("end", () => resolve(data));
       });
-      res.on("end", () => {
-        if (!bridgeAbortController?.signal.aborted) setTimeout(connect, 3000);
-      });
+      req.on("error", reject);
+      if (bodyBuf.length) req.write(bodyBuf);
+      req.end();
     });
-
-    req.on("error", () => {
-      if (!bridgeAbortController?.signal.aborted) setTimeout(connect, 5000);
-    });
-
-    req.end();
   }
 
-  connect();
+  function sendHeartbeat() {
+    request("POST", "/api/desktop/heartbeat").catch(() => {});
+  }
+
+  function pollCommands() {
+    request("GET", "/api/desktop/pending").then((body) => {
+      const commands: Array<{ id: number; command_type: string; payload: Record<string, unknown> }> = JSON.parse(body);
+      for (const cmd of commands) {
+        executeRemoteCommand(cmd.command_type, cmd.payload).then((result) => {
+          postResult(baseUrl, token, cmd.id, result);
+        });
+      }
+    }).catch(() => {});
+  }
+
+  sendHeartbeat();
+  pollCommands();
+  bridgeHeartbeatTimer = setInterval(sendHeartbeat, 30_000);
+  bridgePollTimer = setInterval(pollCommands, 2_000);
 }
 
 // Renderer tells main to start the bridge (called after user logs in)
@@ -282,8 +286,8 @@ ipcMain.handle("memolink:bridge-connect", (_, { baseUrl, token }: { baseUrl: str
 });
 
 ipcMain.handle("memolink:bridge-disconnect", () => {
-  bridgeAbortController?.abort();
-  bridgeAbortController = null;
+  if (bridgeHeartbeatTimer) { clearInterval(bridgeHeartbeatTimer); bridgeHeartbeatTimer = null; }
+  if (bridgePollTimer) { clearInterval(bridgePollTimer); bridgePollTimer = null; }
   return { ok: true };
 });
 

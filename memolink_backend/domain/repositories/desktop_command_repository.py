@@ -56,7 +56,33 @@ class DesktopCommandRepository:
     def list_pending(self, user_id: int) -> list[DesktopCommand]:
         return (
             self._db.query(DesktopCommand)
-            .filter(DesktopCommand.user_id == user_id, DesktopCommand.status == "pending")
+            .filter(
+                DesktopCommand.user_id == user_id,
+                DesktopCommand.status == "pending",
+                DesktopCommand.command_type != "__heartbeat__",
+            )
             .order_by(DesktopCommand.created_at)
             .all()
+        )
+
+    def touch_heartbeat(self, user_id: int) -> None:
+        """Upsert a heartbeat record — delete old one and insert fresh so created_at is current."""
+        self._db.query(DesktopCommand).filter(
+            DesktopCommand.user_id == user_id,
+            DesktopCommand.command_type == "__heartbeat__",
+        ).delete()
+        self._db.add(DesktopCommand(user_id=user_id, command_type="__heartbeat__", payload={}, status="done"))
+        self._db.commit()
+
+    def has_recent_heartbeat(self, user_id: int, within_seconds: int = 90) -> bool:
+        from datetime import datetime, timezone, timedelta
+        cutoff = datetime.now(timezone.utc) - timedelta(seconds=within_seconds)
+        return bool(
+            self._db.query(DesktopCommand)
+            .filter(
+                DesktopCommand.user_id == user_id,
+                DesktopCommand.command_type == "__heartbeat__",
+                DesktopCommand.created_at >= cutoff,
+            )
+            .first()
         )

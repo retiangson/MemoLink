@@ -79,3 +79,22 @@ def desktop_status(
     c: RequestContainer = Depends(get_request_container),
 ):
     return {"online": c.desktop().is_desktop_online(current_user_id)}
+
+
+@router.post("/heartbeat")
+def desktop_heartbeat(
+    current_user_id: int = Depends(get_current_user),
+    c: RequestContainer = Depends(get_request_container),
+):
+    """Electron app calls this every 30s to mark itself online."""
+    c.desktop().touch_heartbeat(current_user_id)
+    return {"ok": True}
+
+
+@router.get("/pending", response_model=list[DesktopCommandResponseDTO])
+def get_pending_commands(
+    current_user_id: int = Depends(get_current_user),
+    c: RequestContainer = Depends(get_request_container),
+):
+    """Electron app polls this every 2s; commands are marked running on pickup."""
+    return c.desktop().get_and_mark_running(current_user_id)
