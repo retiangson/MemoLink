@@ -126,6 +126,14 @@ export function RightPanel({
 
   const hasEmail = emailConnected || emailRecords.length > 0;
 
+  // Count only records that are actually rendered in a collapsible section
+  const visibleEmailCount = emailAccounts.length === 0
+    ? emailRecords.length
+    : emailAccounts.reduce((sum, acct) => sum + emailRecords.filter((r) =>
+        r.email_account_id === acct.id ||
+        (emailAccounts.length === 1 && r.email_account_id == null)
+      ).length, 0);
+
   function toggleAccountCollapse(accountId: number) {
     setCollapsedAccountIds((prev) => {
       const next = new Set(prev);
@@ -381,9 +389,9 @@ export function RightPanel({
                 <path d="M0 4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2zm2-1a1 1 0 0 0-1 1v.217l7 4.2 7-4.2V4a1 1 0 0 0-1-1zm13 2.383-4.708 2.825L15 11.105zm-.034 6.876-5.64-3.471L8 9.583l-1.326-.795-5.64 3.47A1 1 0 0 0 2 13h12a1 1 0 0 0 .966-.741M1 11.105l4.708-2.897L1 5.383z"/>
               </svg>
               <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Email</span>
-              {emailRecords.length > 0 && (
+              {visibleEmailCount > 0 && (
                 <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-blue-500/20 text-blue-400">
-                  {emailRecords.length}
+                  {visibleEmailCount}
                 </span>
               )}
             </div>
