@@ -8,8 +8,8 @@
     "dev": "vite",
     "dev:electron": "node scripts/dev-electron.mjs",
     "build": "vite build",
-    "build:electron": "vite build --config vite.electron.config.ts && electron-builder",
-    "build:electron:publish": "vite build --config vite.electron.config.ts && electron-builder --publish always",
+    "build:electron": "node scripts/build-electron.mjs && electron-builder",
+    "build:electron:publish": "node scripts/build-electron.mjs && electron-builder --publish always",
     "preview": "vite preview"
   },
   "build": {
