@@ -14,8 +14,8 @@ import { fileURLToPath } from "url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, "..");
 
-// 1. Build the React renderer
-await viteBuild({ root, configFile: path.join(root, "vite.config.ts") });
+// 1. Build the React renderer with relative asset paths for file:// protocol
+await viteBuild({ root, configFile: path.join(root, "vite.config.ts"), base: "./" });
 console.log("\n  Renderer built.");
 
 // 2. Compile Electron main + preload (same config as dev-electron.mjs)
