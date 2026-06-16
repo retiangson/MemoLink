@@ -47,12 +47,12 @@ export function RightPanel({
 }: RightPanelProps) {
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState<SuggestionItem | null>(null);
-  const [showNoteReminders, setShowNoteReminders] = useState(true);
-  const [showEmailReminders, setShowEmailReminders] = useState(true);
+  const [showNoteReminders, setShowNoteReminders] = useState(false);
+  const [showEmailReminders, setShowEmailReminders] = useState(false);
   const [collapsedAccountIds, setCollapsedAccountIds] = useState<Set<number>>(new Set());
   const [selectedEmail, setSelectedEmail] = useState<EmailRecord | null>(null);
   const [emailDeleteLoading, setEmailDeleteLoading] = useState<number | null>(null);
-  const [showTeams, setShowTeams] = useState(true);
+  const [showTeams, setShowTeams] = useState(false);
   const [teamsChats, setTeamsChats] = useState<TeamsChat[]>([]);
   const [teamsChatsLoading, setTeamsChatsLoading] = useState(false);
   const [selectedChat, setSelectedChat] = useState<TeamsChat | null>(null);

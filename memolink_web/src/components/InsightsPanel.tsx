@@ -63,7 +63,7 @@ interface InsightsPanelProps {
 
 export function InsightsPanel({ workspaceId, onOpenNote }: InsightsPanelProps) {
   const [insights, setInsights] = useState<ProactiveInsight[]>([]);
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
