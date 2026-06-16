@@ -19,3 +19,5 @@ class EmailRecord(Base):
     synced_at = Column(DateTime(timezone=True), server_default=func.now())
     note_appended = Column(Boolean, nullable=False, default=False)  # True once appended to Email Digest
     gmail_thread_id = Column(String(255), nullable=True)  # For threading replies
+    # DB migration: ALTER TABLE email_records ADD COLUMN IF NOT EXISTS email_account_id INTEGER REFERENCES email_accounts(id) ON DELETE SET NULL;
+    email_account_id = Column(Integer, ForeignKey("email_accounts.id", ondelete="SET NULL"), nullable=True, index=True)

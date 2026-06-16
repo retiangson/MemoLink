@@ -1,9 +1,14 @@
 import { api } from "./client";
 
+export interface EmailAccount {
+  id: number;
+  email: string;
+  provider: string;
+}
+
 export interface EmailStatus {
   connected: boolean;
-  email: string | null;
-  provider?: string;
+  accounts: EmailAccount[];
 }
 
 export interface EmailRecord {
@@ -18,6 +23,7 @@ export interface EmailRecord {
   email_date: string | null;
   gmail_thread_id?: string | null;
   gmail_message_id?: string;
+  email_account_id?: number | null;
 }
 
 export interface SyncResult {
@@ -36,8 +42,9 @@ export async function getEmailConnectUrl(): Promise<string> {
   return res.data.url;
 }
 
-export async function disconnectEmail(): Promise<void> {
-  await api.delete("/email/disconnect");
+export async function disconnectEmail(emailAddress?: string): Promise<void> {
+  const params = emailAddress ? { email_address: emailAddress } : {};
+  await api.delete("/email/disconnect", { params });
 }
 
 export async function syncEmails(): Promise<SyncResult> {
@@ -58,8 +65,9 @@ export async function autoProcessEmails(workspaceId?: number | null): Promise<Au
   return res.data;
 }
 
-export async function listEmails(): Promise<EmailRecord[]> {
-  const res = await api.get("/email/emails");
+export async function listEmails(emailAccountId?: number): Promise<EmailRecord[]> {
+  const params = emailAccountId != null ? { email_account_id: emailAccountId } : {};
+  const res = await api.get("/email/emails", { params });
   return res.data.emails;
 }
 
