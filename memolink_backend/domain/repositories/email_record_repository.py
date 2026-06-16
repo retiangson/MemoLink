@@ -30,6 +30,15 @@ class EmailRecordRepository:
             .all()
         )
 
+    def list_by_account(self, user_id: int, email_account_id: int, limit: int = 50) -> list[EmailRecord]:
+        return (
+            self.db.query(EmailRecord)
+            .filter(EmailRecord.user_id == user_id, EmailRecord.email_account_id == email_account_id)
+            .order_by(EmailRecord.importance_score.desc(), EmailRecord.email_date.desc())
+            .limit(limit)
+            .all()
+        )
+
     def get_by_id(self, user_id: int, record_id: int) -> Optional[EmailRecord]:
         return self.db.query(EmailRecord).filter(
             EmailRecord.id == record_id,

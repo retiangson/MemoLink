@@ -129,19 +129,27 @@ def email_status(
     user_id: int = Depends(get_current_user),
     c: RequestContainer = Depends(get_request_container),
 ):
-    row = c.domain.get_email_account_repository().get_by_user_id(user_id)
-    if not row:
-        return {"connected": False, "email": None}
-    return {"connected": True, "email": row.email_address, "provider": row.provider}
+    accounts = c.domain.get_email_account_repository().list_by_user(user_id)
+    if not accounts:
+        return {"connected": False, "accounts": []}
+    return {
+        "connected": True,
+        "accounts": [{"id": a.id, "email": a.email_address, "provider": a.provider} for a in accounts],
+    }
 
 
 @router.delete("/disconnect")
 def disconnect_email(
+    email_address: Optional[str] = Query(default=None),
     user_id: int = Depends(get_current_user),
     c: RequestContainer = Depends(get_request_container),
 ):
-    c.domain.get_email_account_repository().delete_by_user_id(user_id)
-    c.domain.get_email_record_repository().delete_all_by_user(user_id)
+    repo = c.domain.get_email_account_repository()
+    if email_address:
+        repo.delete_by_email(user_id, email_address)
+    else:
+        repo.delete_by_user_id(user_id)
+        c.domain.get_email_record_repository().delete_all_by_user(user_id)
     return {"ok": True}
 
 
@@ -172,10 +180,11 @@ async def auto_process(
 
 @router.get("/emails")
 def list_emails(
+    email_account_id: int | None = Query(default=None),
     user_id: int = Depends(get_current_user),
     c: RequestContainer = Depends(get_request_container),
 ):
-    return {"emails": c.email().list_emails(user_id)}
+    return {"emails": c.email().list_emails(user_id, email_account_id=email_account_id)}
 
 
 @router.get("/emails/{email_id}")

@@ -9,8 +9,24 @@ class EmailAccountRepository:
     def __init__(self, db: Session):
         self.db = db
 
+    def list_by_user(self, user_id: int) -> list[EmailAccount]:
+        return self.db.query(EmailAccount).filter(EmailAccount.user_id == user_id).all()
+
     def get_by_user_id(self, user_id: int) -> Optional[EmailAccount]:
+        """Return first account for user (backward compat for single-account code paths)."""
         return self.db.query(EmailAccount).filter(EmailAccount.user_id == user_id).first()
+
+    def get_by_email(self, user_id: int, email_address: str) -> Optional[EmailAccount]:
+        return self.db.query(EmailAccount).filter(
+            EmailAccount.user_id == user_id,
+            EmailAccount.email_address == email_address,
+        ).first()
+
+    def get_by_id(self, user_id: int, account_id: int) -> Optional[EmailAccount]:
+        return self.db.query(EmailAccount).filter(
+            EmailAccount.id == account_id,
+            EmailAccount.user_id == user_id,
+        ).first()
 
     def upsert(
         self,
@@ -21,9 +37,8 @@ class EmailAccountRepository:
         token_expiry: Optional[datetime] = None,
         provider: str = "google",
     ) -> EmailAccount:
-        row = self.get_by_user_id(user_id)
+        row = self.get_by_email(user_id, email_address)
         if row:
-            row.email_address = email_address
             row.encrypted_access_token = encrypt_text(access_token)
             row.encrypted_refresh_token = encrypt_text(refresh_token)
             row.token_expiry = token_expiry
@@ -42,12 +57,16 @@ class EmailAccountRepository:
         self.db.refresh(row)
         return row
 
-    def get_decrypted_tokens(self, user_id: int) -> Optional[dict]:
-        row = self.get_by_user_id(user_id)
+    def get_decrypted_tokens(self, user_id: int, email_account_id: int | None = None) -> Optional[dict]:
+        if email_account_id:
+            row = self.get_by_id(user_id, email_account_id)
+        else:
+            row = self.get_by_user_id(user_id)
         if not row:
             return None
         return {
             "email": row.email_address,
+            "email_account_id": row.id,
             "access_token": decrypt_text(row.encrypted_access_token),
             "refresh_token": decrypt_text(row.encrypted_refresh_token),
             "token_expiry": row.token_expiry,
@@ -56,5 +75,13 @@ class EmailAccountRepository:
 
     def delete_by_user_id(self, user_id: int) -> bool:
         deleted = self.db.query(EmailAccount).filter(EmailAccount.user_id == user_id).delete()
+        self.db.commit()
+        return deleted > 0
+
+    def delete_by_email(self, user_id: int, email_address: str) -> bool:
+        deleted = self.db.query(EmailAccount).filter(
+            EmailAccount.user_id == user_id,
+            EmailAccount.email_address == email_address,
+        ).delete()
         self.db.commit()
         return deleted > 0

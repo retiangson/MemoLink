@@ -6,6 +6,8 @@ import { buildGoogleCalendarUrl } from "../utils/reminderUtils";
 import { InsightsPanel } from "./InsightsPanel";
 import { listTeamsChats, getTeamsMessages, sendTeamsMessage, chatToNote } from "../api/teamsApi";
 import type { TeamsChat, TeamsMessage } from "../api/teamsApi";
+import type { EmailRecord, EmailAccount } from "../api/emailApi";
+import { EmailDetailModal } from "./EmailDetailModal";
 
 interface RightPanelProps {
   open: boolean;
@@ -21,6 +23,10 @@ interface RightPanelProps {
   notificationPermission: NotificationPermission;
   onRequestNotificationPermission: () => void;
   emailConnected?: boolean;
+  emailAccounts?: EmailAccount[];
+  emailRecords?: EmailRecord[];
+  onCreateReminderFromEmail?: (emailId: number) => void;
+  onDeleteEmailRecord?: (emailId: number) => Promise<void>;
   isSyncingEmail?: boolean;
   onSyncEmail?: () => void;
   emailSyncResult?: string | null;
@@ -34,7 +40,8 @@ export function RightPanel({
   open, onClose, items, isGenerating,
   onAddManual, onToggleDone, onUpdate, onRemove, onClearDone,
   onGenerate, notificationPermission, onRequestNotificationPermission,
-  emailConnected, isSyncingEmail, onSyncEmail, emailSyncResult,
+  emailConnected, emailAccounts = [], emailRecords = [], onCreateReminderFromEmail, onDeleteEmailRecord,
+  isSyncingEmail, onSyncEmail, emailSyncResult,
   teamsConnected,
   insightsEnabled, workspaceId, onOpenNote,
 }: RightPanelProps) {
@@ -42,6 +49,9 @@ export function RightPanel({
   const [selectedItem, setSelectedItem] = useState<SuggestionItem | null>(null);
   const [showNoteReminders, setShowNoteReminders] = useState(true);
   const [showEmailReminders, setShowEmailReminders] = useState(true);
+  const [activeEmailAccountId, setActiveEmailAccountId] = useState<number | null>(null);
+  const [selectedEmail, setSelectedEmail] = useState<EmailRecord | null>(null);
+  const [emailDeleteLoading, setEmailDeleteLoading] = useState<number | null>(null);
   const [showTeams, setShowTeams] = useState(true);
   const [teamsChats, setTeamsChats] = useState<TeamsChat[]>([]);
   const [teamsChatsLoading, setTeamsChatsLoading] = useState(false);
@@ -109,8 +119,17 @@ export function RightPanel({
   const today = `${_d.getFullYear()}-${String(_d.getMonth() + 1).padStart(2, "0")}-${String(_d.getDate()).padStart(2, "0")}`;
   const doneCount = items.filter((i) => i.done).length;
 
-  const noteItems  = items.filter((i) => !i.email_record_id);
-  const emailItems = items.filter((i) => !!i.email_record_id);
+  const noteItems = items.filter((i) => !i.email_record_id);
+
+  // Build a set of email_record_ids that already have reminders (for "Pinned" badge)
+  const pinnedEmailIds = new Set(items.filter((i) => !!i.email_record_id).map((i) => i.email_record_id!));
+
+  // Filter email records for the currently active account tab
+  const visibleEmailRecords = activeEmailAccountId
+    ? emailRecords.filter((r) => r.email_account_id === activeEmailAccountId)
+    : emailRecords;
+
+  const hasEmail = emailConnected || emailRecords.length > 0;
 
   const renderCard = (item: SuggestionItem) => {
     const isToday   = !item.done && item.due_date === today;
@@ -295,8 +314,8 @@ export function RightPanel({
         )}
       </div>
 
-      {/* ── Section 2: Email Reminders (only shown when connected or items exist) ── */}
-      {(emailConnected || emailItems.length > 0) && (
+      {/* ── Section 2: Email (shown when connected or records exist) ── */}
+      {hasEmail && (
         <div className="border-b border-[var(--ml-bg-panel)]">
           <button
             onClick={() => setShowEmailReminders((v) => !v)}
@@ -307,9 +326,9 @@ export function RightPanel({
                 <path d="M0 4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2zm2-1a1 1 0 0 0-1 1v.217l7 4.2 7-4.2V4a1 1 0 0 0-1-1zm13 2.383-4.708 2.825L15 11.105zm-.034 6.876-5.64-3.471L8 9.583l-1.326-.795-5.64 3.47A1 1 0 0 0 2 13h12a1 1 0 0 0 .966-.741M1 11.105l4.708-2.897L1 5.383z"/>
               </svg>
               <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Email</span>
-              {emailItems.length > 0 && (
+              {emailRecords.length > 0 && (
                 <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-blue-500/20 text-blue-400">
-                  {emailItems.length}
+                  {emailRecords.length}
                 </span>
               )}
             </div>
@@ -320,7 +339,34 @@ export function RightPanel({
 
           {showEmailReminders && (
             <div className="px-3 pb-3 flex flex-col gap-2">
-              {/* Sync from Email */}
+
+              {/* Per-account tabs (only when multiple accounts) */}
+              {emailAccounts.length > 1 && (
+                <div className="flex gap-1 flex-wrap">
+                  <button
+                    onClick={() => setActiveEmailAccountId(null)}
+                    className={`px-2 py-0.5 rounded text-[10px] font-medium transition border ${
+                      activeEmailAccountId === null
+                        ? "bg-blue-600/20 border-blue-500/40 text-blue-300"
+                        : "bg-transparent border-[var(--ml-bg-hover)] text-gray-500 hover:text-gray-300"
+                    }`}
+                  >All</button>
+                  {emailAccounts.map((a) => (
+                    <button
+                      key={a.id}
+                      onClick={() => setActiveEmailAccountId(a.id)}
+                      className={`px-2 py-0.5 rounded text-[10px] font-medium transition border truncate max-w-[110px] ${
+                        activeEmailAccountId === a.id
+                          ? "bg-blue-600/20 border-blue-500/40 text-blue-300"
+                          : "bg-transparent border-[var(--ml-bg-hover)] text-gray-500 hover:text-gray-300"
+                      }`}
+                      title={a.email}
+                    >{a.email.split("@")[0]}</button>
+                  ))}
+                </div>
+              )}
+
+              {/* Sync button */}
               {emailConnected && (
                 <>
                   <button
@@ -342,12 +388,72 @@ export function RightPanel({
                 </>
               )}
 
-              {emailItems.length === 0 && (
+              {/* Email record cards */}
+              {visibleEmailRecords.length === 0 ? (
                 <p className="text-[11px] text-gray-600 text-center pt-1">
-                  No email reminders yet.
+                  {emailConnected ? "Sync to load emails." : "No emails yet."}
                 </p>
+              ) : (
+                visibleEmailRecords.map((email) => {
+                  const isPinned = pinnedEmailIds.has(email.id);
+                  const score = email.importance_score ?? 3;
+                  const urgencyLabel = score >= 4.5 ? { t: "Urgent", cls: "text-red-400 bg-red-500/15" }
+                    : score >= 3.5 ? { t: "Important", cls: "text-orange-400 bg-orange-500/15" }
+                    : { t: "Notable", cls: "text-blue-400 bg-blue-500/10" };
+                  const dateLabel = email.email_date
+                    ? new Date(email.email_date).toLocaleDateString(undefined, { month: "short", day: "numeric" })
+                    : "";
+
+                  return (
+                    <div
+                      key={email.id}
+                      className="group rounded-xl border bg-[#131320] border-[var(--ml-bg-hover)] hover:border-blue-500/30 transition overflow-hidden cursor-pointer"
+                      onClick={() => setSelectedEmail(email)}
+                    >
+                      {/* Card header */}
+                      <div className="flex items-start gap-2 p-2.5">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[11px] font-medium text-gray-200 leading-snug break-words line-clamp-2">
+                            {email.subject}
+                          </p>
+                          <p className="text-[10px] text-gray-500 truncate mt-0.5">
+                            {email.sender_name || email.sender_email}
+                          </p>
+                        </div>
+                        {/* Delete button */}
+                        <button
+                          title="Remove email"
+                          disabled={emailDeleteLoading === email.id}
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            if (!onDeleteEmailRecord) return;
+                            setEmailDeleteLoading(email.id);
+                            try { await onDeleteEmailRecord(email.id); } finally { setEmailDeleteLoading(null); }
+                          }}
+                          className="shrink-0 w-5 h-5 flex items-center justify-center text-gray-700 hover:text-red-400 transition opacity-0 group-hover:opacity-100 disabled:opacity-40 text-xs leading-none"
+                        >
+                          {emailDeleteLoading === email.id
+                            ? <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
+                            : "✕"}
+                        </button>
+                      </div>
+
+                      {/* Badges row */}
+                      <div className="flex items-center gap-1.5 px-2.5 pb-2 flex-wrap">
+                        <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded ${urgencyLabel.cls}`}>
+                          {urgencyLabel.t}
+                        </span>
+                        {dateLabel && <span className="text-[10px] text-gray-600">{dateLabel}</span>}
+                        {isPinned && (
+                          <span className="text-[9px] text-blue-400/70 px-1.5 py-0.5 rounded border border-blue-500/20 bg-blue-500/10 ml-auto">
+                            📌 Pinned
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
               )}
-              {emailItems.map(renderCard)}
             </div>
           )}
         </div>
@@ -499,6 +605,17 @@ export function RightPanel({
         onSave={(id, fields) => onUpdate(id, fields)}
         onDelete={(id) => onRemove(id)}
         onToggleDone={(id) => onToggleDone(id)}
+      />
+
+      {/* Email detail modal */}
+      <EmailDetailModal
+        email={selectedEmail}
+        isPinned={selectedEmail ? pinnedEmailIds.has(selectedEmail.id) : false}
+        linkedReminderId={selectedEmail ? (items.find((i) => i.email_record_id === selectedEmail.id)?.id ?? null) : null}
+        onClose={() => setSelectedEmail(null)}
+        onPinEmail={async (emailId) => { await onCreateReminderFromEmail?.(emailId); }}
+        onUnpinReminder={(reminderId) => onRemove(reminderId)}
+        onDeleteEmail={async (emailId) => { await onDeleteEmailRecord?.(emailId); }}
       />
     </div>
     </>

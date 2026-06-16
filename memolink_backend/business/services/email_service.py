@@ -75,6 +75,41 @@ def _get_header(headers: list, name: str) -> str:
             return h["value"]
     return ""
 
+def _batch_extract_reminders(emails: list[dict]) -> list[dict | None]:
+    """Extract reminders from multiple emails in a single GPT call."""
+    if not emails:
+        return []
+    items_text = "\n".join(
+        f"{i+1}. Subject: {e['subject']}\n   From: {e['sender']}\n   Snippet: {(e.get('snippet') or '')[:200]}"
+        for i, e in enumerate(emails)
+    )
+    prompt = (
+        "For each email below, extract a reminder if it has a deadline or requires action.\n"
+        "Return ONLY a JSON array with one object per email:\n"
+        '{"text": "title max 80 chars or null", "description": "one sentence or null", '
+        '"due_date": "YYYY-MM-DD or null", "due_time": "HH:MM or null"}\n\n'
+        f"Emails:\n{items_text}\n\n"
+        f"Return exactly {len(emails)} objects. Use null for all fields if the email needs no action."
+    )
+    try:
+        client = OpenAI(api_key=settings.openai_api_key)
+        resp = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0,
+            max_tokens=600,
+        )
+        content = resp.choices[0].message.content.strip()
+        match = re.search(r"\[.*?\]", content, re.DOTALL)
+        if match:
+            results = json.loads(match.group())
+            if isinstance(results, list) and len(results) == len(emails):
+                return [r if r.get("text") else None for r in results]
+    except Exception:
+        pass
+    return [None] * len(emails)
+
+
 def _score_emails_with_gpt(emails: list[dict]) -> list[float]:
     if not emails:
         return []
@@ -122,11 +157,12 @@ class EmailService:
         self.embedding_service = embedding_service
         self.gmail = gmail_connector or GmailConnector(account_repo)
 
-    async def sync(self, user_id: int, max_results: int = 25) -> dict:
+    async def sync(self, user_id: int, email_account_id: int | None = None, max_results: int = 25) -> dict:
         message_ids = await self.gmail.list_messages(
             user_id,
             query="is:unread OR is:important -category:promotions -category:social",
             max_results=max_results,
+            email_account_id=email_account_id,
         )
         new_ids = [mid for mid in message_ids if not self.record_repo.exists(user_id, mid)]
         if not new_ids:
@@ -135,7 +171,7 @@ class EmailService:
         # Fetch full messages
         raw_emails = []
         for mid in new_ids:
-            msg = await self.gmail.get_message(user_id, mid, format="full")
+            msg = await self.gmail.get_message(user_id, mid, format="full", email_account_id=email_account_id)
             if msg:
                 raw_emails.append((mid, msg))
 
@@ -176,6 +212,7 @@ class EmailService:
             if score >= 3.0:
                 record = self.record_repo.create(
                     user_id=user_id,
+                    email_account_id=email_account_id,
                     gmail_message_id=email["mid"],
                     gmail_thread_id=email.get("thread_id"),
                     subject=email["subject"],
@@ -199,8 +236,11 @@ class EmailService:
 
         return {"synced": saved, "skipped": len(message_ids) - len(new_ids), "filtered": len(new_ids) - saved}
 
-    def list_emails(self, user_id: int) -> list[dict]:
-        rows = self.record_repo.list_by_user(user_id)
+    def list_emails(self, user_id: int, email_account_id: int | None = None) -> list[dict]:
+        if email_account_id:
+            rows = self.record_repo.list_by_account(user_id, email_account_id)
+        else:
+            rows = self.record_repo.list_by_user(user_id)
         return [
             {
                 "id": r.id,
@@ -211,6 +251,7 @@ class EmailService:
                 "importance_score": r.importance_score,
                 "is_read": r.is_read,
                 "email_date": r.email_date.isoformat() if r.email_date else None,
+                "email_account_id": r.email_account_id,
             }
             for r in rows
         ]
@@ -577,11 +618,20 @@ class EmailService:
 
     async def auto_process(self, user_id: int, db, workspace_id: int | None = None) -> dict:
         workspace_id = None  # Email items are always global - visible across all workspaces
-        """Sync emails, append important ones to the Email Digest note, create reminders for deadlines."""
+        """Sync all connected email accounts, update Email Digest note, create reminders for deadlines."""
         from memolink_backend.domain.models.note import Note
 
-        # 1 - sync new emails from Gmail
-        sync_result = await self.sync(user_id)
+        # 1 - sync all connected accounts
+        accounts = self.account_repo.list_by_user(user_id)
+        if not accounts:
+            raise ValueError("No email account connected")
+
+        total_synced = 0
+        total_filtered = 0
+        for account in accounts:
+            result = await self.sync(user_id, email_account_id=account.id)
+            total_synced += result.get("synced", 0)
+            total_filtered += result.get("filtered", 0)
 
         # 1b - backfill embeddings for records saved before embedding was added
         self.backfill_embeddings(user_id)
@@ -632,27 +682,32 @@ class EmailService:
                 self.record_repo.mark_appended([r.id for r in important])
                 notes_added = len(important)
 
-        # Create reminders for emails where GPT detects a deadline
-        for r in important:
-            data = self.extract_reminder(user_id, r.id)
-            if data and data.get("due_date") and self.reminder_repo:
-                self.reminder_repo.create_reminder(
-                    user_id=user_id,
-                    workspace_id=workspace_id,
-                    text=data["text"],
-                    description=data.get("description"),
-                    reminder_type="ai",
-                    due_date=data["due_date"],
-                    due_time=data.get("due_time"),
-                    email_record_id=r.id,
-                )
-                reminders_created += 1
+        # Batch extract reminders for all important emails in ONE GPT call (much faster)
+        if important and self.reminder_repo:
+            email_dicts = [
+                {"subject": r.subject, "sender": r.sender_name or r.sender_email, "snippet": r.snippet or ""}
+                for r in important
+            ]
+            reminder_data = _batch_extract_reminders(email_dicts)
+            for r, data in zip(important, reminder_data):
+                if data and data.get("due_date"):
+                    self.reminder_repo.create_reminder(
+                        user_id=user_id,
+                        workspace_id=workspace_id,
+                        text=data["text"],
+                        description=data.get("description"),
+                        reminder_type="ai",
+                        due_date=data["due_date"],
+                        due_time=data.get("due_time"),
+                        email_record_id=r.id,
+                    )
+                    reminders_created += 1
 
         return {
-            "synced": sync_result.get("synced", 0),
+            "synced": total_synced,
             "notes_added": notes_added,
             "reminders_created": reminders_created,
-            "filtered": sync_result.get("filtered", 0),
+            "filtered": total_filtered,
         }
 
     def reply_suggestions(self, user_id: int, record_id: int) -> list[str]:

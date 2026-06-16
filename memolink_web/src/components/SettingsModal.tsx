@@ -91,7 +91,7 @@ export function SettingsModal({
   const [teamsError, setTeamsError] = useState<string | null>(null);
 
   // Email connection state
-  const [emailStatus, setEmailStatus] = useState<EmailStatus>({ connected: false, email: null });
+  const [emailStatus, setEmailStatus] = useState<EmailStatus>({ connected: false, accounts: [] });
   const [emailLoading, setEmailLoading] = useState(false);
   const [emailConnecting, setEmailConnecting] = useState(false);
   const [emailConnectError, setEmailConnectError] = useState<string | null>(null);
@@ -393,7 +393,7 @@ export function SettingsModal({
     setEmailLoading(true);
     try {
       await disconnectEmail();
-      setEmailStatus({ connected: false, email: null });
+      setEmailStatus({ connected: false, accounts: [] });
       await loadConnectors();
     } catch { /* silently fail */ } finally {
       setEmailLoading(false);
@@ -1109,21 +1109,38 @@ export function SettingsModal({
               <div className="space-y-4">
                 {emailStatus.connected ? (
                   <>
-                    {/* Connected header */}
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-green-400 shrink-0" />
-                        <span className="text-xs text-gray-400 truncate">{emailStatus.email}</span>
-                      </div>
-                      <button onClick={handleDisconnectEmail} disabled={emailLoading} className={btnDanger}>
-                        {emailLoading ? "Disconnecting…" : "Disconnect"}
-                      </button>
+                    {/* Connected accounts */}
+                    <div className="space-y-1.5">
+                      {emailStatus.accounts.map((acct) => (
+                        <div key={acct.id} className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-full bg-green-400 shrink-0" />
+                            <span className="text-xs text-gray-400 truncate">{acct.email}</span>
+                          </div>
+                          <button
+                            onClick={async () => {
+                              setEmailLoading(true);
+                              try {
+                                await disconnectEmail(acct.email);
+                                await loadConnectors();
+                              } catch { /* silently fail */ } finally { setEmailLoading(false); }
+                            }}
+                            disabled={emailLoading}
+                            className={btnDanger}
+                          >
+                            {emailLoading ? "…" : "Remove"}
+                          </button>
+                        </div>
+                      ))}
                     </div>
 
                     {/* Sync bar */}
                     <div className="flex items-center gap-2 flex-wrap">
                       <button onClick={runAutoProcess} disabled={syncing} className={btnPrimary}>
                         {syncing ? "Syncing…" : "↻ Refresh"}
+                      </button>
+                      <button onClick={handleConnectEmail} disabled={emailConnecting} className={btnGhost}>
+                        {emailConnecting ? "Redirecting…" : "+ Add account"}
                       </button>
                       {syncing && <span className="text-xs text-gray-500">Syncing emails, creating notes & reminders…</span>}
                       {!syncing && autoResult && (

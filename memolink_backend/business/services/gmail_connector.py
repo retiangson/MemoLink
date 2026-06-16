@@ -18,8 +18,8 @@ class GmailConnector:
     def __init__(self, account_repo: EmailAccountRepository):
         self.account_repo = account_repo
 
-    def _get_tokens_or_raise(self, user_id: int) -> dict:
-        tokens = self.account_repo.get_decrypted_tokens(user_id)
+    def _get_tokens_or_raise(self, user_id: int, email_account_id: int | None = None) -> dict:
+        tokens = self.account_repo.get_decrypted_tokens(user_id, email_account_id=email_account_id)
         if not tokens:
             raise ValueError("No email account connected")
         return tokens
@@ -33,8 +33,8 @@ class GmailConnector:
             token_expiry=expiry,
         )
 
-    async def get_valid_access_token(self, user_id: int) -> str:
-        tokens = self._get_tokens_or_raise(user_id)
+    async def get_valid_access_token(self, user_id: int, email_account_id: int | None = None) -> str:
+        tokens = self._get_tokens_or_raise(user_id, email_account_id)
         expiry = tokens.get("token_expiry")
         if expiry and datetime.now(tz=timezone.utc) >= expiry:
             refresh_token = tokens.get("refresh_token", "")
@@ -43,8 +43,8 @@ class GmailConnector:
             return new_token
         return tokens["access_token"]
 
-    def get_valid_access_token_sync(self, user_id: int) -> str:
-        tokens = self._get_tokens_or_raise(user_id)
+    def get_valid_access_token_sync(self, user_id: int, email_account_id: int | None = None) -> str:
+        tokens = self._get_tokens_or_raise(user_id, email_account_id)
         expiry = tokens.get("token_expiry")
         if expiry and datetime.now(tz=timezone.utc) >= expiry:
             refresh_token = tokens.get("refresh_token", "")
@@ -89,8 +89,8 @@ class GmailConnector:
         expiry = datetime.fromtimestamp(time.time() + expires_in, tz=timezone.utc)
         return access_token, expiry
 
-    async def list_messages(self, user_id: int, *, query: str, max_results: int) -> list[str]:
-        access_token = await self.get_valid_access_token(user_id)
+    async def list_messages(self, user_id: int, *, query: str, max_results: int, email_account_id: int | None = None) -> list[str]:
+        access_token = await self.get_valid_access_token(user_id, email_account_id)
         async with httpx.AsyncClient() as client:
             resp = await client.get(
                 f"{GMAIL_API}/messages",
@@ -101,8 +101,8 @@ class GmailConnector:
             raise ValueError(f"Gmail API error: {resp.status_code}")
         return [item["id"] for item in resp.json().get("messages", [])]
 
-    def list_messages_sync(self, user_id: int, *, query: str, max_results: int) -> list[str]:
-        access_token = self.get_valid_access_token_sync(user_id)
+    def list_messages_sync(self, user_id: int, *, query: str, max_results: int, email_account_id: int | None = None) -> list[str]:
+        access_token = self.get_valid_access_token_sync(user_id, email_account_id)
         with httpx.Client() as client:
             resp = client.get(
                 f"{GMAIL_API}/messages",
@@ -113,8 +113,8 @@ class GmailConnector:
             raise ValueError(f"Gmail API error: {resp.status_code}")
         return [item["id"] for item in resp.json().get("messages", [])]
 
-    async def get_message(self, user_id: int, gmail_message_id: str, *, format: str = "full") -> dict | None:
-        access_token = await self.get_valid_access_token(user_id)
+    async def get_message(self, user_id: int, gmail_message_id: str, *, format: str = "full", email_account_id: int | None = None) -> dict | None:
+        access_token = await self.get_valid_access_token(user_id, email_account_id)
         async with httpx.AsyncClient() as client:
             resp = await client.get(
                 f"{GMAIL_API}/messages/{gmail_message_id}",
@@ -125,8 +125,8 @@ class GmailConnector:
             return None
         return resp.json()
 
-    def get_message_sync(self, user_id: int, gmail_message_id: str, *, format: str = "full") -> dict | None:
-        access_token = self.get_valid_access_token_sync(user_id)
+    def get_message_sync(self, user_id: int, gmail_message_id: str, *, format: str = "full", email_account_id: int | None = None) -> dict | None:
+        access_token = self.get_valid_access_token_sync(user_id, email_account_id)
         with httpx.Client() as client:
             resp = client.get(
                 f"{GMAIL_API}/messages/{gmail_message_id}",
@@ -143,8 +143,9 @@ class GmailConnector:
         *,
         raw_message: str,
         thread_id: Optional[str] = None,
+        email_account_id: int | None = None,
     ) -> dict:
-        access_token = await self.get_valid_access_token(user_id)
+        access_token = await self.get_valid_access_token(user_id, email_account_id)
         payload: dict = {"raw": raw_message}
         if thread_id:
             payload["threadId"] = thread_id
@@ -164,8 +165,9 @@ class GmailConnector:
         *,
         gmail_message_id: str,
         attachment_id: str,
+        email_account_id: int | None = None,
     ) -> bytes:
-        access_token = await self.get_valid_access_token(user_id)
+        access_token = await self.get_valid_access_token(user_id, email_account_id)
         async with httpx.AsyncClient() as client:
             resp = await client.get(
                 f"{GMAIL_API}/messages/{gmail_message_id}/attachments/{attachment_id}",

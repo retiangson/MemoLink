@@ -33,7 +33,8 @@ import { TEMP_ID, convLabel } from "../types";
 import { useWorkspace } from "../hooks/useWorkspace";
 import { useFeatureFlags } from "../hooks/useFeatureFlags";
 import { fetchAdminFeedback } from "../api/adminApi";
-import { getEmailStatus, autoProcessEmails } from "../api/emailApi";
+import { getEmailStatus, autoProcessEmails, listEmails, emailToReminder, deleteEmail } from "../api/emailApi";
+import type { EmailRecord, EmailAccount } from "../api/emailApi";
 import { getTeamsStatus } from "../api/teamsApi";
 import { AdminPage } from "./AdminPage";
 import { suggestActions, type WorkflowAction } from "../api/workflowApi";
@@ -87,6 +88,8 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
   const evaluationActive = flags.evaluation_analytics_enabled && evalStatus.loaded && !evalStatus.exhausted;
   const [evalRatings, setEvalRatings] = useState<Record<string, Record<string, number | string>>>({});
   const [emailConnected, setEmailConnected] = useState(false);
+  const [emailAccounts, setEmailAccounts] = useState<EmailAccount[]>([]);
+  const [emailRecords, setEmailRecords] = useState<EmailRecord[]>([]);
   const [teamsConnected, setTeamsConnected] = useState(false);
   const [isSyncingEmail, setIsSyncingEmail] = useState(false);
   const [emailSyncResult, setEmailSyncResult] = useState<string | null>(null);
@@ -139,8 +142,20 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
   }
   useEffect(() => { refreshFeedbackCount(); }, []);
 
+  async function loadEmailData() {
+    try {
+      const s = await getEmailStatus();
+      setEmailConnected(s.connected);
+      setEmailAccounts(s.accounts ?? []);
+      if (s.connected) {
+        const records = await listEmails();
+        setEmailRecords(records);
+      }
+    } catch { /* ignore */ }
+  }
+
   useEffect(() => {
-    getEmailStatus().then(s => setEmailConnected(s.connected)).catch(() => {});
+    loadEmailData();
     getTeamsStatus().then(s => setTeamsConnected(s.connected)).catch(() => {});
   }, []);
 
@@ -149,7 +164,8 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
     setEmailSyncResult(null);
     try {
       const result = await autoProcessEmails();
-      await Promise.all([suggestions.reload(), reloadNotes()]);
+      const [records] = await Promise.all([listEmails(), suggestions.reload(), reloadNotes()]);
+      setEmailRecords(records);
       if (result.synced === 0) {
         setEmailSyncResult("✓ No new emails");
       } else {
@@ -177,6 +193,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
     ) {
       setShowSettings(true);
       if (params.get("teams_connected") === "1") setTeamsConnected(true);
+      if (params.get("email_connected") === "1") loadEmailData();
       window.history.replaceState({}, "", window.location.pathname);
     }
     const emailErr = params.get("email_error");
@@ -1297,6 +1314,18 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
         notificationPermission={notifPermission}
         onRequestNotificationPermission={requestNotifPermission}
         emailConnected={emailConnected && flags.email_enabled}
+        emailAccounts={flags.email_enabled ? emailAccounts : []}
+        emailRecords={flags.email_enabled ? emailRecords : []}
+        onCreateReminderFromEmail={async (emailId) => {
+          try {
+            await emailToReminder(emailId);
+            await suggestions.reload();
+          } catch { /* ignore */ }
+        }}
+        onDeleteEmailRecord={async (emailId) => {
+          await deleteEmail(emailId);
+          setEmailRecords((prev) => prev.filter((r) => r.id !== emailId));
+        }}
         teamsConnected={teamsConnected}
         isSyncingEmail={isSyncingEmail}
         onSyncEmail={handleSyncEmail}
