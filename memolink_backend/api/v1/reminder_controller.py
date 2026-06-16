@@ -1,11 +1,15 @@
+import json
+import datetime
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from typing import Optional
+from openai import OpenAI
 from memolink_backend.core.security import get_current_user
 from memolink_backend.core.db import get_db
 from memolink_backend.domain.models.reminder import Reminder
 from memolink_backend.di.request_container import get_request_container, RequestContainer
+from memolink_backend.core.config import settings
 
 router = APIRouter(prefix="/reminders", tags=["reminders"])
 
@@ -95,6 +99,50 @@ def update_reminder(
         reminder.due_time = req.due_time or None
     db.commit()
     return _serialize(reminder)
+
+
+class DetectReminderRequest(BaseModel):
+    message: str
+
+
+@router.post("/detect")
+def detect_reminder_from_message(
+    req: DetectReminderRequest,
+    user_id: int = Depends(get_current_user),
+):
+    today = datetime.date.today().isoformat()
+    client = OpenAI(api_key=settings.openai_api_key)
+    try:
+        resp = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        f"Today is {today}. You are a smart reminder assistant. "
+                        "Given a chat message, decide if it describes a concrete task, event, or deadline the user needs to remember. "
+                        "Ignore vague or purely informational messages. "
+                        "If a reminder is warranted, rewrite the task as a short, clear, grammatically correct reminder title in title case "
+                        "(e.g. 'Attend Anime Watching Meeting', 'Submit Assignment', 'Call Doctor'). "
+                        "Also extract due_date (YYYY-MM-DD, resolved from relative words like 'tomorrow' using today's date) and due_time (HH:MM 24h), both nullable. "
+                        'Respond ONLY with JSON: {"detected": true/false, "text": "...", "due_date": null, "due_time": null}'
+                    ),
+                },
+                {"role": "user", "content": req.message},
+            ],
+            max_tokens=120,
+            temperature=0,
+            response_format={"type": "json_object"},
+        )
+        result = json.loads(resp.choices[0].message.content)
+        return {
+            "detected": bool(result.get("detected")),
+            "text": result.get("text") or None,
+            "due_date": result.get("due_date") or None,
+            "due_time": result.get("due_time") or None,
+        }
+    except Exception:
+        return {"detected": False, "text": None, "due_date": None, "due_time": None}
 
 
 @router.delete("/{reminder_id}")

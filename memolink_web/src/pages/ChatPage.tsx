@@ -34,6 +34,8 @@ import { useWorkspace } from "../hooks/useWorkspace";
 import { useFeatureFlags } from "../hooks/useFeatureFlags";
 import { fetchAdminFeedback } from "../api/adminApi";
 import { getEmailStatus, autoProcessEmails, listEmails, emailToReminder, deleteEmail } from "../api/emailApi";
+import { detectReminderFromMessage } from "../api/reminderApi";
+import { ChatReminderSuggestion } from "../components/ChatReminderSuggestion";
 import type { EmailRecord, EmailAccount } from "../api/emailApi";
 import { getTeamsStatus } from "../api/teamsApi";
 import { AdminPage } from "./AdminPage";
@@ -78,6 +80,9 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
   const [showWorkspaceManager, setShowWorkspaceManager] = useState(false);
   const [showAdmin, setShowAdmin] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
+  const [chatReminderSuggestion, setChatReminderSuggestion] = useState<{
+    text: string; due_date: string | null; due_time: string | null; messageId: number;
+  } | null>(null);
   const [editingNoteTab, setEditingNoteTab] = useState<number | null>(null);
   const [editingChatTabId, setEditingChatTabId] = useState<number | null>(null);
   const [editingChatTitle, setEditingChatTitle] = useState("");
@@ -304,6 +309,8 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
     const wasStreaming = prevStreamingRef.current;
     prevStreamingRef.current = chat.streaming;
 
+    // Clear old suggestion when user sends a new message (streaming starts)
+    if (!wasStreaming && chat.streaming) { setChatReminderSuggestion(null); return; }
     if (!wasStreaming || chat.streaming) return;           // only on streaming → false transition
     if (!flags.workflow_enabled) return;
     if (localStorage.getItem("memolink_workflow_suggestions") === "false") return;
@@ -330,6 +337,21 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
         setWorkflowSuggestions(prev => ({ ...prev, [last.id]: actions }));
       }
     });
+
+    // Smart reminder detection — scan the user's message (most likely to contain tasks/deadlines)
+    const scanText = precedingUser?.content ?? last.content;
+    if (scanText.length >= 5 && !chatReminderSuggestion) {
+      detectReminderFromMessage(scanText).then((result) => {
+        if (result.detected && result.text) {
+          setChatReminderSuggestion({
+            text: result.text,
+            due_date: result.due_date,
+            due_time: result.due_time,
+            messageId: last.id,
+          });
+        }
+      }).catch(() => {});
+    }
   }, [chat.streaming]);
 
   // ── Chat tab actions ──────────────────────────────────────────────────────
@@ -1052,6 +1074,18 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                 />
               )}
               <RunningProcessBanner />
+              {chatReminderSuggestion && (
+                <ChatReminderSuggestion
+                  text={chatReminderSuggestion.text}
+                  due_date={chatReminderSuggestion.due_date}
+                  due_time={chatReminderSuggestion.due_time}
+                  onAdd={(text, due_date, due_time) => {
+                    suggestions.addManual(text, null, due_date, due_time);
+                    setChatReminderSuggestion(null);
+                  }}
+                  onDismiss={() => setChatReminderSuggestion(null)}
+                />
+              )}
               <ChatInput
                 input={chat.input}
                 setInput={chat.setInput}
@@ -1179,6 +1213,18 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                   </div>
                 )}
                 <RunningProcessBanner />
+                {chatReminderSuggestion && (
+                  <ChatReminderSuggestion
+                    text={chatReminderSuggestion.text}
+                    due_date={chatReminderSuggestion.due_date}
+                    due_time={chatReminderSuggestion.due_time}
+                    onAdd={(text, due_date, due_time) => {
+                      suggestions.addManual(text, null, due_date, due_time);
+                      setChatReminderSuggestion(null);
+                    }}
+                    onDismiss={() => setChatReminderSuggestion(null)}
+                  />
+                )}
                 <ChatInput
                   input={chat.input}
                   setInput={chat.setInput}

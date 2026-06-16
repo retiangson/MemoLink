@@ -39,3 +39,14 @@ export async function updateReminder(id: number, fields: ReminderUpdate): Promis
 export async function deleteReminder(id: number): Promise<void> {
   await api.delete(`/reminders/${id}`);
 }
+
+export interface DetectedReminder {
+  detected: boolean;
+  text: string | null;
+  due_date: string | null;
+  due_time: string | null;
+}
+
+export async function detectReminderFromMessage(message: string): Promise<DetectedReminder> {
+  return (await api.post("/reminders/detect", { message })).data;
+}
