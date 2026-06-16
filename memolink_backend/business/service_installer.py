@@ -41,6 +41,7 @@ class ServiceInstaller:
                 embedding_service=self._domain.get_embedding_service(),
                 github_service=GitHubConnectorService(connector_repo),
                 jira_service=JiraConnectorService(connector_repo),
+                desktop_service=self.get_desktop_command_service(),
             ),
         )
 

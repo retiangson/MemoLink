@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+import time
 from dataclasses import dataclass
 from typing import Iterator, Optional
 
@@ -383,6 +384,7 @@ class ActionAgentRunner:
         embedding_service: Optional[EmbeddingService] = None,
         github_service=None,
         jira_service=None,
+        desktop_service=None,
     ):
         self.conv_repo = conv_repo
         self.note_repo = note_repo
@@ -397,6 +399,7 @@ class ActionAgentRunner:
         )
         self.github = github_service
         self.jira = jira_service
+        self._desktop = desktop_service
 
     def _resolve_model(self, model: Optional[str]) -> str:
         selected = model or settings.openai_chat_model
@@ -499,8 +502,39 @@ class ActionAgentRunner:
         return result or "No web results found."
 
     def _run_shell(self, command: str, user_id: Optional[int] = None, timeout: Optional[int] = None) -> str:
+        # Route through the Electron desktop bridge when the app is connected.
+        # This ensures Windows path commands run on the user's actual PC, not the cloud server.
+        if user_id and self._desktop and self._desktop.is_desktop_online(user_id):
+            return self._run_shell_via_desktop(command, user_id, timeout_sec=timeout or 60)
         result = run_shell(command, timeout=timeout or 8, user_id=user_id)
         return format_shell_result(result)
+
+    def _run_shell_via_desktop(self, command: str, user_id: int, timeout_sec: int = 60) -> str:
+        from memolink_backend.contracts.desktop_command_contracts import DesktopCommandCreateDTO
+        dto = DesktopCommandCreateDTO(command_type="exec", payload={"command": command})
+        cmd = self._desktop.create_command(user_id, dto)
+
+        deadline = time.time() + timeout_sec
+        while time.time() < deadline:
+            time.sleep(0.5)
+            result = self._desktop.get_command(cmd.id, user_id)
+            if result and result.result is not None:
+                try:
+                    data = json.loads(result.result)
+                    ok = data.get("ok", False)
+                    output = (data.get("output") or "").strip()
+                    error = (data.get("error") or "").strip()
+                    status = "✅ Success" if ok else "❌ Failed"
+                    parts = [f"Command: {command}", status]
+                    if output:
+                        parts.append(f"\n--- output ---\n{output}")
+                    if error:
+                        parts.append(f"\n--- error ---\n{error}")
+                    return "\n".join(parts)
+                except Exception:
+                    return str(result.result)
+
+        return f"Command: {command}\n⏱️ Timed out after {timeout_sec}s waiting for the desktop app to respond."
 
     def _read_file(self, path: str, offset: int = 0, limit: Optional[int] = None) -> str:
         result = read_file(path, offset=offset, limit=limit)
