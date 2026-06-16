@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+﻿import React, { useState } from "react";
 
 interface Props {
   paused: boolean;
@@ -33,22 +33,22 @@ export function TTSPlayerBar({ paused, rate, voices, selectedVoice, onPauseResum
       {showVoices && (
         <>
           <div className="fixed inset-0 z-50" onClick={() => { setShowVoices(false); setVoiceSearch(""); }} />
-          <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 z-50 w-72 bg-[#1a1a24] border border-[#2a2a38] rounded-2xl shadow-2xl overflow-hidden">
-            <div className="px-3 py-2.5 border-b border-[#2a2a38]">
+          <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 z-50 w-72 bg-[#1a1a24] border border-[var(--ml-bg-hover)] rounded-2xl shadow-2xl overflow-hidden">
+            <div className="px-3 py-2.5 border-b border-[var(--ml-bg-hover)]">
               <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1.5">Select Voice</p>
               <input
                 autoFocus
                 value={voiceSearch}
                 onChange={e => setVoiceSearch(e.target.value)}
                 placeholder="Search voices…"
-                className="w-full bg-[#12121a] border border-[#2a2a38] rounded-lg px-2.5 py-1.5 text-xs text-gray-300 placeholder-gray-600 focus:outline-none focus:border-indigo-500"
+                className="w-full bg-[var(--ml-bg-surface)] border border-[var(--ml-bg-hover)] rounded-lg px-2.5 py-1.5 text-xs text-gray-300 placeholder-gray-600 focus:outline-none focus:border-indigo-500"
               />
             </div>
             <div className="max-h-52 overflow-y-auto">
               {/* Default option */}
               <button
                 onClick={() => { onVoiceChange(null); setShowVoices(false); setVoiceSearch(""); }}
-                className={`w-full flex items-center justify-between px-3 py-2 text-left hover:bg-[#2a2a38] transition ${!selectedVoice ? "bg-indigo-500/10" : ""}`}
+                className={`w-full flex items-center justify-between px-3 py-2 text-left hover:bg-[var(--ml-bg-hover)] transition ${!selectedVoice ? "bg-indigo-500/10" : ""}`}
               >
                 <span className={`text-xs ${!selectedVoice ? "text-indigo-300 font-medium" : "text-gray-400"}`}>Default (system)</span>
                 {!selectedVoice && <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 shrink-0" />}
@@ -57,7 +57,7 @@ export function TTSPlayerBar({ paused, rate, voices, selectedVoice, onPauseResum
                 <button
                   key={i}
                   onClick={() => { onVoiceChange(v); setShowVoices(false); setVoiceSearch(""); }}
-                  className={`w-full flex items-center justify-between gap-2 px-3 py-2 text-left hover:bg-[#2a2a38] transition ${selectedVoice?.name === v.name ? "bg-indigo-500/10" : ""}`}
+                  className={`w-full flex items-center justify-between gap-2 px-3 py-2 text-left hover:bg-[var(--ml-bg-hover)] transition ${selectedVoice?.name === v.name ? "bg-indigo-500/10" : ""}`}
                 >
                   <div className="min-w-0">
                     <p className={`text-xs truncate ${selectedVoice?.name === v.name ? "text-indigo-300 font-medium" : "text-gray-300"}`}>{v.name}</p>

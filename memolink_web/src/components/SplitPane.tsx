@@ -1,4 +1,4 @@
-import React, { useRef, useCallback } from "react";
+﻿import React, { useRef, useCallback } from "react";
 
 interface SplitPaneProps {
   direction: "horizontal" | "vertical";
@@ -61,7 +61,7 @@ export function SplitPane({
         </div>
         <div
           onMouseDown={onMouseDown}
-          className="w-1 shrink-0 bg-[#1e1e2a] hover:bg-indigo-500/60 active:bg-indigo-500 cursor-col-resize transition-colors select-none"
+          className="w-1 shrink-0 bg-[var(--ml-bg-panel)] hover:bg-indigo-500/60 active:bg-indigo-500 cursor-col-resize transition-colors select-none"
         />
         <div style={{ width: rest }} className="overflow-hidden flex flex-col min-w-0">
           {second}
@@ -77,7 +77,7 @@ export function SplitPane({
       </div>
       <div
         onMouseDown={onMouseDown}
-        className="h-1 shrink-0 bg-[#1e1e2a] hover:bg-indigo-500/60 active:bg-indigo-500 cursor-row-resize transition-colors select-none"
+        className="h-1 shrink-0 bg-[var(--ml-bg-panel)] hover:bg-indigo-500/60 active:bg-indigo-500 cursor-row-resize transition-colors select-none"
       />
       <div style={{ height: rest }} className="overflow-hidden flex flex-col min-h-0">
         {second}

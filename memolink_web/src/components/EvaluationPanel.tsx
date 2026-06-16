@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+﻿import React, { useState } from "react";
 import { startTask, completeTask, endSession } from "../api/evaluationApi";
 import type { EvalSession } from "../hooks/useEvaluation";
 
@@ -87,7 +87,7 @@ export function EvaluationPanel({ session, workspaceId, onEnd }: Props) {
               const started = !!st.taskId;
               return (
                 <div key={t.key} className={`flex items-center gap-2 px-2 py-1.5 rounded-lg border text-[11px] ${
-                  st.done ? "bg-emerald-500/10 border-emerald-500/25" : started ? "bg-cyan-500/10 border-cyan-500/25" : "bg-[#12121a] border-[#2a2a38]"
+                  st.done ? "bg-emerald-500/10 border-emerald-500/25" : started ? "bg-cyan-500/10 border-cyan-500/25" : "bg-[var(--ml-bg-surface)] border-[var(--ml-bg-hover)]"
                 }`}>
                   <span className="flex-1 min-w-0">
                     <span className={`${st.done ? "text-emerald-300 line-through" : "text-gray-300"}`}>{t.name}</span>

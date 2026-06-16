@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+﻿import React, { useEffect, useState } from "react";
 import { useRecording } from "../hooks/useRecording";
 import { SlashCommandPicker } from "./SlashCommandPicker";
 import { SLASH_COMMANDS } from "../constants/slashCommands";
@@ -138,20 +138,20 @@ export function ChatInput({
       {showLangPicker && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setShowLangPicker(false)} />
-          <div className="fixed bottom-24 right-1/2 translate-x-1/2 z-50 bg-[#1e1e2a] border border-[#2a2a38] rounded-2xl shadow-2xl overflow-hidden w-56">
-            <p className="px-4 py-2.5 text-[11px] font-semibold text-gray-500 uppercase tracking-wider border-b border-[#2a2a38]">
+          <div className="fixed bottom-24 right-1/2 translate-x-1/2 z-50 bg-[var(--ml-bg-panel)] border border-[var(--ml-bg-hover)] rounded-2xl shadow-2xl overflow-hidden w-56">
+            <p className="px-4 py-2.5 text-[11px] font-semibold text-gray-500 uppercase tracking-wider border-b border-[var(--ml-bg-hover)]">
               Select Language
             </p>
             {LANG_OPTIONS.map((l) => (
               <button
                 key={l.code}
                 onClick={() => startWithLang(l.code)}
-                className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-[#2a2a38] hover:text-white transition"
+                className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-[var(--ml-bg-hover)] hover:text-white transition"
               >
                 {l.label}
               </button>
             ))}
-            <div className="border-t border-[#2a2a38] px-4 py-3">
+            <div className="border-t border-[var(--ml-bg-hover)] px-4 py-3">
               <button
                 onClick={() => setAutoStopOnSilence((v) => !v)}
                 className="w-full flex items-center justify-between text-xs text-gray-300"
@@ -214,7 +214,7 @@ export function ChatInput({
               {pendingFiles.map((file, i) => (
                 <div
                   key={i}
-                  className="flex items-center gap-2 bg-[#1e1e2a] border border-[#2a2a38] rounded-xl px-2.5 py-1.5 max-w-[220px]"
+                  className="flex items-center gap-2 bg-[var(--ml-bg-panel)] border border-[var(--ml-bg-hover)] rounded-xl px-2.5 py-1.5 max-w-[220px]"
                 >
                   {file.type.startsWith("image/") ? (
                     <img src={URL.createObjectURL(file)} alt={file.name} className="w-6 h-6 rounded object-cover" />
@@ -329,7 +329,7 @@ export function ChatInput({
                         <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
                       </svg>
                     </button>
-                    <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-1.5 py-0.5 text-[10px] text-white bg-[#1e1e2a] border border-[#2a2a38] rounded whitespace-nowrap hidden group-hover:block pointer-events-none z-50">
+                    <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-1.5 py-0.5 text-[10px] text-white bg-[var(--ml-bg-panel)] border border-[var(--ml-bg-hover)] rounded whitespace-nowrap hidden group-hover:block pointer-events-none z-50">
                       Attach file
                     </span>
                   </div>
@@ -353,7 +353,7 @@ export function ChatInput({
                     </svg>
                     {webSearch && <span>Web</span>}
                   </button>
-                  <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-1.5 py-0.5 text-[10px] text-white bg-[#1e1e2a] border border-[#2a2a38] rounded whitespace-nowrap hidden group-hover:block pointer-events-none z-50">
+                  <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-1.5 py-0.5 text-[10px] text-white bg-[var(--ml-bg-panel)] border border-[var(--ml-bg-hover)] rounded whitespace-nowrap hidden group-hover:block pointer-events-none z-50">
                     {webSearch ? "Web search on" : "Web search"}
                   </span>
                 </div>
@@ -375,7 +375,7 @@ export function ChatInput({
                   </svg>
                   {discussionMode && <span>Discussion</span>}
                 </button>
-                <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-1.5 py-0.5 text-[10px] text-white bg-[#1e1e2a] border border-[#2a2a38] rounded whitespace-nowrap hidden group-hover:block pointer-events-none z-50">
+                <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-1.5 py-0.5 text-[10px] text-white bg-[var(--ml-bg-panel)] border border-[var(--ml-bg-hover)] rounded whitespace-nowrap hidden group-hover:block pointer-events-none z-50">
                   {discussionMode ? "Discussion mode on" : "Discussion mode"}
                 </span>
               </div>
@@ -432,7 +432,7 @@ export function ChatInput({
                     </span>
                   )}
                 </div>
-                <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-1.5 py-0.5 text-[10px] text-white bg-[#1e1e2a] border border-[#2a2a38] rounded whitespace-nowrap hidden group-hover:block pointer-events-none z-50">
+                <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-1.5 py-0.5 text-[10px] text-white bg-[var(--ml-bg-panel)] border border-[var(--ml-bg-hover)] rounded whitespace-nowrap hidden group-hover:block pointer-events-none z-50">
                   {recording.isRecording ? (autoStopOnSilence ? "Recording - auto-stop on pause" : "Stop recording") : "Voice input"}
                 </span>
               </div>
@@ -459,7 +459,7 @@ export function ChatInput({
                     </svg>
                   )}
                 </button>
-                <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-1.5 py-0.5 text-[10px] text-white bg-[#1e1e2a] border border-[#2a2a38] rounded whitespace-nowrap hidden group-hover:block pointer-events-none z-50">
+                <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-1.5 py-0.5 text-[10px] text-white bg-[var(--ml-bg-panel)] border border-[var(--ml-bg-hover)] rounded whitespace-nowrap hidden group-hover:block pointer-events-none z-50">
                   {isBusy ? "Working..." : "Send"}
                 </span>
               </div>
@@ -468,7 +468,7 @@ export function ChatInput({
         </div>
 
         <p className="text-center text-[11px] text-gray-700 mt-2">
-          Press <kbd className="bg-[#1e1e2a] border border-[#2a2a38] rounded px-1 py-0.5 text-[10px]">Enter</kbd> to send &nbsp;·&nbsp; <kbd className="bg-[#1e1e2a] border border-[#2a2a38] rounded px-1 py-0.5 text-[10px]">Shift+Enter</kbd> for new line
+          Press <kbd className="bg-[var(--ml-bg-panel)] border border-[var(--ml-bg-hover)] rounded px-1 py-0.5 text-[10px]">Enter</kbd> to send &nbsp;·&nbsp; <kbd className="bg-[var(--ml-bg-panel)] border border-[var(--ml-bg-hover)] rounded px-1 py-0.5 text-[10px]">Shift+Enter</kbd> for new line
         </p>
       </div>
     </footer>

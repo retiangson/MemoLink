@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+﻿import React, { useState, useRef, useEffect } from "react";
 import { importVideo, uploadVideo } from "../api/videoApi";
 
 interface VideoImportModalProps {
@@ -71,10 +71,10 @@ export function VideoImportModal({ onClose, onImport }: VideoImportModalProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <div className="w-full max-w-md bg-[#0f0f13] border border-[#2a2a38] rounded-2xl shadow-2xl flex flex-col overflow-hidden">
+      <div className="w-full max-w-md bg-[var(--ml-bg-base)] border border-[var(--ml-bg-hover)] rounded-2xl shadow-2xl flex flex-col overflow-hidden">
 
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-[#1e1e2a]">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--ml-bg-panel)]">
           <div className="flex items-center gap-2.5">
             <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-red-400" viewBox="0 0 16 16" fill="currentColor">
               <path d="M6.79 5.093A.5.5 0 0 0 6 5.5v5a.5.5 0 0 0 .79.407l3.5-2.5a.5.5 0 0 0 0-.814z"/>
@@ -86,7 +86,7 @@ export function VideoImportModal({ onClose, onImport }: VideoImportModalProps) {
         </div>
 
         {/* Tabs */}
-        <div className="flex border-b border-[#1e1e2a]">
+        <div className="flex border-b border-[var(--ml-bg-panel)]">
           {(["url", "upload"] as Tab[]).map((t) => (
             <button
               key={t}
@@ -118,7 +118,7 @@ export function VideoImportModal({ onClose, onImport }: VideoImportModalProps) {
                   onKeyDown={(e) => { if (e.key === "Enter" && canSubmit) handleImport(); if (e.key === "Escape") onClose(); }}
                   placeholder="https://www.youtube.com/watch?v=…"
                   disabled={loading}
-                  className="w-full bg-[#0a0a0f] border border-[#2a2a38] focus:border-indigo-500 rounded-xl px-3 py-2.5 text-sm text-gray-200 placeholder-gray-600 outline-none transition disabled:opacity-50"
+                  className="w-full bg-[var(--ml-bg-bar)] border border-[var(--ml-bg-hover)] focus:border-indigo-500 rounded-xl px-3 py-2.5 text-sm text-gray-200 placeholder-gray-600 outline-none transition disabled:opacity-50"
                 />
               </div>
 
@@ -154,7 +154,7 @@ export function VideoImportModal({ onClose, onImport }: VideoImportModalProps) {
                     ? "border-indigo-500 bg-indigo-500/10"
                     : file
                       ? "border-emerald-500/40 bg-emerald-500/5"
-                      : "border-[#2a2a38] hover:border-indigo-500/40 hover:bg-indigo-500/5"
+                      : "border-[var(--ml-bg-hover)] hover:border-indigo-500/40 hover:bg-indigo-500/5"
                 }`}
               >
                 <input
@@ -209,11 +209,11 @@ export function VideoImportModal({ onClose, onImport }: VideoImportModalProps) {
         </div>
 
         {/* Footer */}
-        <div className="px-5 py-4 border-t border-[#1e1e2a] flex justify-end gap-2">
+        <div className="px-5 py-4 border-t border-[var(--ml-bg-panel)] flex justify-end gap-2">
           <button
             onClick={onClose}
             disabled={loading}
-            className="px-4 py-1.5 rounded-full text-xs border border-[#2a2a38] text-gray-400 hover:text-gray-200 hover:border-[#3a3a4a] disabled:opacity-40 transition"
+            className="px-4 py-1.5 rounded-full text-xs border border-[var(--ml-bg-hover)] text-gray-400 hover:text-gray-200 hover:border-[#3a3a4a] disabled:opacity-40 transition"
           >
             Cancel
           </button>

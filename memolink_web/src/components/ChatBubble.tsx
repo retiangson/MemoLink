@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+﻿import React, { useState } from "react";
 import { marked } from "marked";
 import MarkdownRenderer from "./MarkdownRenderer";
 import { translateText } from "../api/chatApi";
@@ -287,12 +287,12 @@ export default function ChatBubble({ role, content, model, streaming, onAdd, onD
       {showLangPicker && (
         <>
           <div className="fixed inset-0 z-[9]" onClick={() => setShowLangPicker(false)} />
-          <div className={`absolute bottom-full mb-1 z-10 bg-[#1e1e2a] border border-[#2a2a38] rounded-xl shadow-xl overflow-hidden min-w-[140px] ${isUser ? "right-0" : "left-0"}`}>
+          <div className={`absolute bottom-full mb-1 z-10 bg-[var(--ml-bg-panel)] border border-[var(--ml-bg-hover)] rounded-xl shadow-xl overflow-hidden min-w-[140px] ${isUser ? "right-0" : "left-0"}`}>
             {TRANSLATE_LANGUAGES.map((lang) => (
               <button
                 key={lang}
                 onClick={() => handleTranslate(lang)}
-                className="w-full text-left px-3 py-2 text-xs text-gray-300 hover:bg-[#2a2a38] transition"
+                className="w-full text-left px-3 py-2 text-xs text-gray-300 hover:bg-[var(--ml-bg-hover)] transition"
               >
                 {lang}
               </button>
@@ -300,7 +300,7 @@ export default function ChatBubble({ role, content, model, streaming, onAdd, onD
           </div>
         </>
       )}
-      <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-1.5 py-0.5 text-[10px] text-white bg-[#1e1e2a] border border-[#2a2a38] rounded whitespace-nowrap hidden group-hover:block pointer-events-none z-50">
+      <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-1.5 py-0.5 text-[10px] text-white bg-[var(--ml-bg-panel)] border border-[var(--ml-bg-hover)] rounded whitespace-nowrap hidden group-hover:block pointer-events-none z-50">
         {isTranslating ? "Translating…" : "Translate"}
       </span>
       <button
@@ -427,7 +427,7 @@ export default function ChatBubble({ role, content, model, streaming, onAdd, onD
               <div className="flex gap-2">
                 <button
                   onClick={() => navigator.clipboard.writeText(edit)}
-                  className="px-2.5 py-1 text-[11px] text-gray-400 hover:text-gray-200 bg-[#1e1e2a] rounded-lg transition"
+                  className="px-2.5 py-1 text-[11px] text-gray-400 hover:text-gray-200 bg-[var(--ml-bg-panel)] rounded-lg transition"
                 >
                   Copy
                 </button>
@@ -524,7 +524,7 @@ export default function ChatBubble({ role, content, model, streaming, onAdd, onD
                 </svg>
               )}
             </button>
-            <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-1.5 py-0.5 text-[10px] text-white bg-[#1e1e2a] border border-[#2a2a38] rounded whitespace-nowrap hidden group-hover:block pointer-events-none z-50">
+            <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-1.5 py-0.5 text-[10px] text-white bg-[var(--ml-bg-panel)] border border-[var(--ml-bg-hover)] rounded whitespace-nowrap hidden group-hover:block pointer-events-none z-50">
               {copied ? "Copied!" : "Copy"}
             </span>
           </div>
@@ -550,7 +550,7 @@ export default function ChatBubble({ role, content, model, streaming, onAdd, onD
                   </svg>
                 )}
               </button>
-              <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-1.5 py-0.5 text-[10px] text-white bg-[#1e1e2a] border border-[#2a2a38] rounded whitespace-nowrap hidden group-hover:block pointer-events-none z-50">
+              <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-1.5 py-0.5 text-[10px] text-white bg-[var(--ml-bg-panel)] border border-[var(--ml-bg-hover)] rounded whitespace-nowrap hidden group-hover:block pointer-events-none z-50">
                 {isSavingNote ? "Saving to notes..." : noteSaved ? "Saved to notes" : "Save to notes"}
               </span>
             </div>
@@ -562,7 +562,7 @@ export default function ChatBubble({ role, content, model, streaming, onAdd, onD
                   <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                 </svg>
               </button>
-              <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-1.5 py-0.5 text-[10px] text-white bg-[#1e1e2a] border border-[#2a2a38] rounded whitespace-nowrap hidden group-hover:block pointer-events-none z-50">
+              <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-1.5 py-0.5 text-[10px] text-white bg-[var(--ml-bg-panel)] border border-[var(--ml-bg-hover)] rounded whitespace-nowrap hidden group-hover:block pointer-events-none z-50">
                 Try again
               </span>
             </div>
@@ -574,7 +574,7 @@ export default function ChatBubble({ role, content, model, streaming, onAdd, onD
                   <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                 </svg>
               </button>
-              <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-1.5 py-0.5 text-[10px] text-white bg-[#1e1e2a] border border-[#2a2a38] rounded whitespace-nowrap hidden group-hover:block pointer-events-none z-50">
+              <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-1.5 py-0.5 text-[10px] text-white bg-[var(--ml-bg-panel)] border border-[var(--ml-bg-hover)] rounded whitespace-nowrap hidden group-hover:block pointer-events-none z-50">
                 Delete
               </span>
             </div>
@@ -584,7 +584,7 @@ export default function ChatBubble({ role, content, model, streaming, onAdd, onD
           <div className="flex items-center gap-3 flex-wrap">
             {modelAttributionEnabled && model && (
               <div className="flex items-center gap-1.5 text-[10px] text-gray-700 select-none">
-                <span className="inline-flex items-center justify-center w-[14px] h-[14px] rounded bg-[#1a1a24] border border-[#2a2a38]">
+                <span className="inline-flex items-center justify-center w-[14px] h-[14px] rounded bg-[#1a1a24] border border-[var(--ml-bg-hover)]">
                   <svg className="w-2 h-2 text-indigo-400/60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
                   </svg>
@@ -613,7 +613,7 @@ export default function ChatBubble({ role, content, model, streaming, onAdd, onD
                   </div>
                   {confidenceReason && (
                     <div className="absolute bottom-full left-0 mb-1.5 w-56 hidden group-hover:block z-50">
-                      <div className="bg-[#1e1e2a] border border-[#2a2a38] rounded-xl px-3 py-2 shadow-xl">
+                      <div className="bg-[var(--ml-bg-panel)] border border-[var(--ml-bg-hover)] rounded-xl px-3 py-2 shadow-xl">
                         <p className={`text-[10px] font-semibold mb-0.5 ${cfg.text}`}>{cfg.label}</p>
                         <p className="text-[11px] text-gray-400 leading-relaxed">{confidenceReason}</p>
                       </div>
@@ -667,7 +667,7 @@ export default function ChatBubble({ role, content, model, streaming, onAdd, onD
                   <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                 </svg>
               </button>
-              <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-1.5 py-0.5 text-[10px] text-white bg-[#1e1e2a] border border-[#2a2a38] rounded whitespace-nowrap hidden group-hover:block pointer-events-none z-50">
+              <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-1.5 py-0.5 text-[10px] text-white bg-[var(--ml-bg-panel)] border border-[var(--ml-bg-hover)] rounded whitespace-nowrap hidden group-hover:block pointer-events-none z-50">
                 Try again
               </span>
             </div>
@@ -679,7 +679,7 @@ export default function ChatBubble({ role, content, model, streaming, onAdd, onD
                   <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                 </svg>
               </button>
-              <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-1.5 py-0.5 text-[10px] text-white bg-[#1e1e2a] border border-[#2a2a38] rounded whitespace-nowrap hidden group-hover:block pointer-events-none z-50">
+              <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-1.5 py-0.5 text-[10px] text-white bg-[var(--ml-bg-panel)] border border-[var(--ml-bg-hover)] rounded whitespace-nowrap hidden group-hover:block pointer-events-none z-50">
                 Delete
               </span>
             </div>

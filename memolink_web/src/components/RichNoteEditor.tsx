@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+﻿import React, { useEffect, useRef } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Underline from "@tiptap/extension-underline";
@@ -225,7 +225,7 @@ export function RichNoteEditor({ value, onChange, noteKey, disabled, editorRef }
   return (
     <div className="flex flex-col h-full">
       {/* ── Toolbar — single swipeable strip ────────────────────────── */}
-      <div className="relative border-b border-[#1e1e2a] shrink-0 bg-[#0d0d12]">
+      <div className="relative border-b border-[var(--ml-bg-panel)] shrink-0 bg-[#0d0d12]">
         <div className="flex items-center gap-0.5 px-1 py-1.5 overflow-x-auto scrollbar-none">
           {/* Most used -------------------------------------------------- */}
           <Btn title="Undo" onClick={() => e.chain().focus().undo().run()} disabled={!e.can().undo()}>

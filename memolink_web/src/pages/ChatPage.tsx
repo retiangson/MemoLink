@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+﻿import React, { useEffect, useRef, useState } from "react";
 import { saveUser, type User } from "../utils/auth";
 import { useNotes } from "../hooks/useNotes";
 import { useNoteEditor } from "../hooks/useNoteEditor";
@@ -13,6 +13,7 @@ import { SplitPane } from "../components/SplitPane";
 import { RecycleBinModal } from "../components/RecycleBinModal";
 import { MessageList } from "../components/MessageList";
 import { ChatInput } from "../components/ChatInput";
+import { RunningProcessBanner } from "../components/RunningProcessBanner";
 import { DeleteModal } from "../components/DeleteModal";
 import { SettingsModal } from "../components/SettingsModal";
 import { HelpModal } from "../components/HelpModal";
@@ -38,6 +39,7 @@ import { AdminPage } from "./AdminPage";
 import { suggestActions, type WorkflowAction } from "../api/workflowApi";
 import { OnboardingTour } from "../components/OnboardingTour";
 import { CoreMemoryView } from "../components/CoreMemoryView";
+import { useTheme, THEMES, THEME_META, type Theme } from "../hooks/useTheme";
 
 type WorkspaceHook = ReturnType<typeof useWorkspace>;
 type LayoutMode = "stacked" | "columns" | "rows";
@@ -63,6 +65,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
   const [rightPanelOpen, setRightPanelOpen] = useState(() => window.innerWidth >= 640);
   const [recycleBinOpen, setRecycleBinOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const { theme, setTheme } = useTheme();
   const [showSettings, setShowSettings] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [showMemoGraph, setShowMemoGraph] = useState(false);
@@ -436,7 +439,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
   }
 
   if (!convs.activeConversation) return (
-    <div className="flex h-full w-full items-center justify-center bg-[#0f0f13] text-gray-400">
+    <div className="flex h-full w-full items-center justify-center bg-[var(--ml-bg-base)] text-gray-400">
       Loading…
     </div>
   );
@@ -465,21 +468,21 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
   }
 
   return (
-    <div className="h-full w-full bg-[#16161d] text-gray-100 flex relative">
+    <div className="h-full w-full bg-[var(--ml-bg-surface)] text-gray-100 flex relative">
 
       {menuData && (
         <div className="absolute z-[9999]" style={{ top: menuData.top, left: menuData.left, width: 160 }}>
-          <div className="bg-[#1e1e2a] border border-[#2a2a38] rounded-xl shadow-xl overflow-hidden">
+          <div className="bg-[var(--ml-bg-panel)] border border-[var(--ml-bg-hover)] rounded-xl shadow-xl overflow-hidden">
             {menuData.type === "note" && (
               <>
-                <button onClick={() => { handleOpenNote(menuData.item); setMenuData(null); }} className="w-full text-left px-4 py-2.5 hover:bg-[#2a2a38] text-sm">Edit</button>
-                <button onClick={() => { handleDeleteNote(menuData.item.id); setMenuData(null); }} className="w-full text-left px-4 py-2.5 hover:bg-[#3a1a1a] text-red-400 text-sm">Delete</button>
+                <button onClick={() => { handleOpenNote(menuData.item); setMenuData(null); }} className="w-full text-left px-4 py-2.5 hover:bg-[var(--ml-bg-hover)] text-sm">Edit</button>
+                <button onClick={() => { handleDeleteNote(menuData.item.id); setMenuData(null); }} className="w-full text-left px-4 py-2.5 hover:bg-[var(--ml-bg-danger)] text-red-400 text-sm">Delete</button>
               </>
             )}
             {menuData.type === "conversation" && (
               <>
-                <button onClick={() => { convs.handleRename(menuData.item); setMenuData(null); }} className="w-full text-left px-4 py-2.5 hover:bg-[#2a2a38] text-sm">Rename</button>
-                <button onClick={() => { convs.handleDeleteConv(menuData.item.id); setMenuData(null); }} className="w-full text-left px-4 py-2.5 hover:bg-[#3a1a1a] text-red-400 text-sm">Delete</button>
+                <button onClick={() => { convs.handleRename(menuData.item); setMenuData(null); }} className="w-full text-left px-4 py-2.5 hover:bg-[var(--ml-bg-hover)] text-sm">Rename</button>
+                <button onClick={() => { convs.handleDeleteConv(menuData.item.id); setMenuData(null); }} className="w-full text-left px-4 py-2.5 hover:bg-[var(--ml-bg-danger)] text-red-400 text-sm">Delete</button>
               </>
             )}
           </div>
@@ -558,13 +561,13 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
       <div className="flex-1 flex flex-col h-full overflow-hidden">
 
         {/* ── Unified tab bar ───────────────────────────────────────────── */}
-        <div id="tour-tab-bar" className="flex bg-[#0a0a0f] border-b border-[#1e1e2a] shrink-0" style={{ minHeight: 40 }}>
+        <div id="tour-tab-bar" className="flex bg-[var(--ml-bg-bar)] border-b border-[var(--ml-bg-panel)] shrink-0" style={{ minHeight: 40 }}>
 
           {/* Sidebar toggle - all screen sizes, left of tabs */}
           {!sidebarOpen && (
             <button
               onClick={() => setSidebarOpen(true)}
-              className="flex shrink-0 h-full px-3 items-center justify-center hover:bg-[#1e1e2a] transition border-r border-[#1e1e2a]"
+              className="flex shrink-0 h-full px-3 items-center justify-center hover:bg-[var(--ml-bg-panel)] transition border-r border-[var(--ml-bg-panel)]"
               aria-label="Open sidebar"
             >
               <img src="/memolink-icon.png" alt="" className="h-5 w-5 rounded-md bg-white object-cover" />
@@ -592,7 +595,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                   onTouchEnd={cancelLongPress}
                   onTouchMove={cancelLongPress}
                   className={`flex items-center gap-1.5 px-3 h-10 text-xs cursor-grab active:cursor-grabbing border-b-2 transition shrink-0 select-none ${
-                    isActive ? "border-indigo-500 text-white bg-[#0f0f13]" : "border-transparent text-gray-500 hover:text-gray-300 hover:bg-[#0f0f13]/60"
+                    isActive ? "border-indigo-500 text-white bg-[var(--ml-bg-base)]" : "border-transparent text-gray-500 hover:text-gray-300 hover:bg-[var(--ml-bg-base)]"
                   } ${isDragOver ? "border-l-2 border-l-indigo-400" : ""}`}
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3 shrink-0 opacity-70" fill="currentColor" viewBox="0 0 16 16">
@@ -606,7 +609,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                   ) : (
                     <span className="max-w-[120px] truncate">{convLabel(chat)}</span>
                   )}
-                  <button onClick={(e) => { e.stopPropagation(); handleCloseChat(chat.id); }} className="text-gray-600 hover:text-gray-300 w-3.5 h-3.5 flex items-center justify-center rounded-sm hover:bg-[#2a2a38] transition leading-none">×</button>
+                  <button onClick={(e) => { e.stopPropagation(); handleCloseChat(chat.id); }} className="text-gray-600 hover:text-gray-300 w-3.5 h-3.5 flex items-center justify-center rounded-sm hover:bg-[var(--ml-bg-hover)] transition leading-none">×</button>
                 </div>
               );
             })}
@@ -629,7 +632,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                   onTouchEnd={cancelLongPress}
                   onTouchMove={cancelLongPress}
                   className={`flex items-center gap-1.5 px-3 h-10 text-xs cursor-grab active:cursor-grabbing border-b-2 transition shrink-0 select-none ${
-                    isActive ? "border-indigo-500 text-white bg-[#0f0f13]" : "border-transparent text-gray-500 hover:text-gray-300 hover:bg-[#0f0f13]/60"
+                    isActive ? "border-indigo-500 text-white bg-[var(--ml-bg-base)]" : "border-transparent text-gray-500 hover:text-gray-300 hover:bg-[var(--ml-bg-base)]"
                   } ${isDragOver ? "border-l-2 border-l-indigo-400" : ""}`}
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3 shrink-0 opacity-70" fill="currentColor" viewBox="0 0 16 16">
@@ -643,7 +646,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                   ) : (
                     <span className="max-w-[120px] truncate">{note.titleDraft.trim() || "Untitled"}</span>
                   )}
-                  <button onClick={(e) => { e.stopPropagation(); editor.closeNote(i); }} className="text-gray-600 hover:text-gray-300 w-3.5 h-3.5 flex items-center justify-center rounded-sm hover:bg-[#2a2a38] transition leading-none">×</button>
+                  <button onClick={(e) => { e.stopPropagation(); editor.closeNote(i); }} className="text-gray-600 hover:text-gray-300 w-3.5 h-3.5 flex items-center justify-center rounded-sm hover:bg-[var(--ml-bg-hover)] transition leading-none">×</button>
                 </div>
               );
             })}
@@ -660,7 +663,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
             >
               <button
                 onClick={() => setRightPanelOpen(true)}
-                className={`relative flex items-center justify-center w-7 h-7 rounded-lg transition ${urgentCount > 0 ? "hover:bg-amber-500/10" : "hover:bg-[#2a2a38]"}`}
+                className={`relative flex items-center justify-center w-7 h-7 rounded-lg transition ${urgentCount > 0 ? "hover:bg-amber-500/10" : "hover:bg-[var(--ml-bg-hover)]"}`}
                 title={urgentCount > 0 ? `${urgentCount} reminder${urgentCount > 1 ? "s" : ""} due today` : "Open suggestions & reminders"}
               >
                 {urgentCount > 0 && <span className="animate-ping absolute inline-flex w-3.5 h-3.5 rounded-full bg-amber-400 opacity-30" />}
@@ -674,11 +677,11 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                 )}
               </button>
               {bellTooltipVisible && urgentCount > 0 && (
-                <div className="absolute right-0 top-full mt-1 z-[9999] w-56 rounded-xl bg-[#1e1e2a] border border-amber-500/30 shadow-xl p-2.5">
+                <div className="absolute right-0 top-full mt-1 z-[9999] w-56 rounded-xl bg-[var(--ml-bg-panel)] border border-amber-500/30 shadow-xl p-2.5">
                   <p className="text-[10px] font-semibold text-amber-400 uppercase tracking-wider mb-1.5">Due today</p>
                   <div className="overflow-y-auto max-h-40" onScroll={() => setBellTooltipVisible(false)}>
                     {todayItems.map((item) => (
-                      <div key={item.id} className="py-0.5 border-b border-[#2a2a38] last:border-0">
+                      <div key={item.id} className="py-0.5 border-b border-[var(--ml-bg-hover)] last:border-0">
                         <p className="text-[11px] text-gray-300 leading-snug">{item.text}</p>
                         {item.due_time && (
                           <p className="text-[10px] text-amber-400/70 mt-0.5">{item.due_time}</p>
@@ -709,14 +712,14 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
               {userMenuOpen && (
                 <>
                   <div className="fixed inset-0 z-[9998] bg-black/50 sm:hidden" onClick={() => setUserMenuOpen(false)} />
-                  <div className="fixed inset-x-0 bottom-0 z-[9999] rounded-t-2xl max-h-[70vh] overflow-y-auto sm:absolute sm:inset-auto sm:right-0 sm:top-full sm:mt-2 sm:rounded-xl sm:w-52 sm:max-h-none bg-[#1e1e2a] border border-[#2a2a38] shadow-2xl py-1">
+                  <div className="fixed inset-x-0 bottom-0 z-[9999] rounded-t-2xl max-h-[70vh] overflow-y-auto sm:absolute sm:inset-auto sm:right-0 sm:top-full sm:mt-2 sm:rounded-xl sm:w-52 sm:max-h-none bg-[var(--ml-bg-panel)] border border-[var(--ml-bg-hover)] shadow-2xl py-1">
                   {/* Email header */}
-                  <div className="px-3 py-2.5 border-b border-[#2a2a38]">
+                  <div className="px-3 py-2.5 border-b border-[var(--ml-bg-hover)]">
                     <p className="text-[11px] text-gray-500 truncate">{user.email}</p>
                   </div>
 
                   {/* Layout orientation */}
-                  <div className="px-3 py-2 border-b border-[#2a2a38]">
+                  <div className="px-3 py-2 border-b border-[var(--ml-bg-hover)]">
                     <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1.5">Layout</p>
                     <div className="flex gap-1">
                       {([
@@ -728,7 +731,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                           key={mode}
                           title={label}
                           onClick={() => { handleLayoutChange(mode); setUserMenuOpen(false); }}
-                          className={`flex-1 flex flex-col items-center gap-1 py-1.5 rounded-lg transition text-[10px] ${layoutMode === mode ? "bg-indigo-600 text-white" : "text-gray-400 hover:bg-[#2a2a38] hover:text-gray-200"}`}
+                          className={`flex-1 flex flex-col items-center gap-1 py-1.5 rounded-lg transition text-[10px] ${layoutMode === mode ? "bg-indigo-600 text-white" : "text-gray-400 hover:bg-[var(--ml-bg-hover)] hover:text-gray-200"}`}
                         >
                           {idx === 0 && (
                             <svg viewBox="0 0 16 16" className="w-4 h-4" fill="currentColor">
@@ -754,10 +757,26 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                     </div>
                   </div>
 
+                  {/* Theme */}
+                  <div className="px-3 py-2 border-b border-[var(--ml-bg-hover)]">
+                    <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1.5">Theme</p>
+                    <div className="flex gap-1.5">
+                      {THEMES.map((t) => (
+                        <button
+                          key={t}
+                          title={THEME_META[t].label}
+                          onClick={() => setTheme(t)}
+                          style={{ backgroundColor: THEME_META[t].swatch }}
+                          className={`w-6 h-6 rounded-full border-2 transition-transform ${theme === t ? "border-indigo-400 scale-110" : "border-white/20 hover:border-white/50"}`}
+                        />
+                      ))}
+                    </div>
+                  </div>
+
                   {/* Settings */}
                   <button
                     onClick={() => { setUserMenuOpen(false); setShowSettings(true); }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-300 hover:bg-[#2a2a38] hover:text-white transition"
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-300 hover:bg-[var(--ml-bg-hover)] hover:text-white transition"
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-gray-500" fill="currentColor" viewBox="0 0 16 16">
                       <path d="M8 4.754a3.246 3.246 0 1 0 0 6.492 3.246 3.246 0 0 0 0-6.492M5.754 8a2.246 2.246 0 1 1 4.492 0 2.246 2.246 0 0 1-4.492 0"/>
@@ -769,7 +788,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                   {/* Help */}
                   <button
                     onClick={() => { setUserMenuOpen(false); setShowHelp(true); }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-300 hover:bg-[#2a2a38] hover:text-white transition"
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-300 hover:bg-[var(--ml-bg-hover)] hover:text-white transition"
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-gray-500" fill="currentColor" viewBox="0 0 16 16">
                       <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16"/>
@@ -855,7 +874,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                   {/* Send Feedback */}
                   <button
                     onClick={() => { setUserMenuOpen(false); setShowFeedback(true); }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-300 hover:bg-[#2a2a38] hover:text-white transition"
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-300 hover:bg-[var(--ml-bg-hover)] hover:text-white transition"
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-gray-500 shrink-0" fill="currentColor" viewBox="0 0 16 16">
                       <path d="M14 1a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H4.414A2 2 0 0 0 3 11.586l-2 2V2a1 1 0 0 1 1-1zM2 0a2 2 0 0 0-2 2v12.793a.5.5 0 0 0 .854.353l2.853-2.853A1 1 0 0 1 4.414 12H14a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2z"/>
@@ -878,7 +897,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                     </button>
                   )}
 
-                  <div className="border-t border-[#2a2a38] my-1" />
+                  <div className="border-t border-[var(--ml-bg-hover)] my-1" />
 
                   {/* Sign Out */}
                   <button
@@ -1000,6 +1019,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                   onVoiceChange={chat.tts.setSelectedVoice}
                 />
               )}
+              <RunningProcessBanner />
               <ChatInput
                 input={chat.input}
                 setInput={chat.setInput}
@@ -1027,9 +1047,9 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
             ratio={layoutMode === "columns" ? colRatio : rowRatio}
             onRatioChange={layoutMode === "columns" ? handleColRatio : handleRowRatio}
             first={
-              <div className="flex flex-col h-full min-h-0 bg-[#0f0f13]">
+              <div className="flex flex-col h-full min-h-0 bg-[var(--ml-bg-base)]">
                 {/* Chat panel mini tab bar */}
-                <div className="flex items-center overflow-x-auto shrink-0 bg-[#0a0a0f] border-b border-[#1e1e2a]" style={{ minHeight: 36 }}>
+                <div className="flex items-center overflow-x-auto shrink-0 bg-[var(--ml-bg-bar)] border-b border-[var(--ml-bg-panel)]" style={{ minHeight: 36 }}>
                   {convs.openChats.map((ch, i) => {
                     const isActive = convs.activeConversation?.id === ch.id;
                     const isDragOver = dragOverTab?.type === "chat" && dragOverTab.index === i && dragSrcRef.current?.index !== i;
@@ -1043,14 +1063,14 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                         onDragEnd={() => { dragSrcRef.current = null; setDragOverTab(null); }}
                         onClick={() => handleActivateChat(ch.id)}
                         className={`flex items-center gap-1.5 px-3 h-9 text-xs cursor-grab active:cursor-grabbing border-b-2 transition shrink-0 select-none ${
-                          isActive ? "border-indigo-500 text-white bg-[#0f0f13]" : "border-transparent text-gray-500 hover:text-gray-300"
+                          isActive ? "border-indigo-500 text-white bg-[var(--ml-bg-base)]" : "border-transparent text-gray-500 hover:text-gray-300"
                         } ${isDragOver ? "border-l-2 border-l-indigo-400" : ""}`}
                       >
                         <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3 shrink-0 opacity-70" fill="currentColor" viewBox="0 0 16 16">
                           <path d="M2.678 11.894a1 1 0 0 1 .287.801 11 11 0 0 1-.398 2c1.395-.323 2.247-.697 2.634-.893a1 1 0 0 1 .71-.074A8 8 0 0 0 8 14c3.996 0 7-2.807 7-6s-3.004-6-7-6-7 2.808-7 6c0 1.468.617 2.83 1.678 3.894z"/>
                         </svg>
                         <span className="max-w-[100px] truncate">{convLabel(ch)}</span>
-                        <button onClick={(e) => { e.stopPropagation(); handleCloseChat(ch.id); }} className="text-gray-600 hover:text-gray-300 w-3.5 h-3.5 flex items-center justify-center rounded-sm hover:bg-[#2a2a38] transition leading-none">×</button>
+                        <button onClick={(e) => { e.stopPropagation(); handleCloseChat(ch.id); }} className="text-gray-600 hover:text-gray-300 w-3.5 h-3.5 flex items-center justify-center rounded-sm hover:bg-[var(--ml-bg-hover)] transition leading-none">×</button>
                       </div>
                     );
                   })}
@@ -1126,6 +1146,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                     </button>
                   </div>
                 )}
+                <RunningProcessBanner />
                 <ChatInput
                   input={chat.input}
                   setInput={chat.setInput}
@@ -1148,9 +1169,9 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
               </div>
             }
             second={
-              <div className="flex flex-col h-full min-h-0 bg-[#0f0f13]">
+              <div className="flex flex-col h-full min-h-0 bg-[var(--ml-bg-base)]">
                 {/* Note panel mini tab bar */}
-                <div className="flex items-center overflow-x-auto shrink-0 bg-[#0a0a0f] border-b border-[#1e1e2a]" style={{ minHeight: 36 }}>
+                <div className="flex items-center overflow-x-auto shrink-0 bg-[var(--ml-bg-bar)] border-b border-[var(--ml-bg-panel)]" style={{ minHeight: 36 }}>
                   {editor.openNotes.map((note, i) => {
                     const isActive = editor.activeIndex === i;
                     const isDragOver = dragOverTab?.type === "note" && dragOverTab.index === i && dragSrcRef.current?.index !== i;
@@ -1165,7 +1186,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                         onClick={() => { editor.setActiveIndex(i); setActiveTabType("note"); }}
                         onDoubleClick={(e) => { e.stopPropagation(); editor.setActiveIndex(i); setActiveTabType("note"); setEditingNoteTab(i); }}
                         className={`flex items-center gap-1.5 px-3 h-9 text-xs cursor-grab active:cursor-grabbing border-b-2 transition shrink-0 select-none ${
-                          isActive ? "border-indigo-500 text-white bg-[#0f0f13]" : "border-transparent text-gray-500 hover:text-gray-300"
+                          isActive ? "border-indigo-500 text-white bg-[var(--ml-bg-base)]" : "border-transparent text-gray-500 hover:text-gray-300"
                         } ${isDragOver ? "border-l-2 border-l-indigo-400" : ""}`}
                       >
                         <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3 shrink-0 opacity-70" fill="currentColor" viewBox="0 0 16 16">
@@ -1184,7 +1205,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                         ) : (
                           <span className="max-w-[100px] truncate">{note.titleDraft.trim() || "Untitled"}</span>
                         )}
-                        <button onClick={(e) => { e.stopPropagation(); editor.closeNote(i); }} className="text-gray-600 hover:text-gray-300 w-3.5 h-3.5 flex items-center justify-center rounded-sm hover:bg-[#2a2a38] transition leading-none">×</button>
+                        <button onClick={(e) => { e.stopPropagation(); editor.closeNote(i); }} className="text-gray-600 hover:text-gray-300 w-3.5 h-3.5 flex items-center justify-center rounded-sm hover:bg-[var(--ml-bg-hover)] transition leading-none">×</button>
                       </div>
                     );
                   })}

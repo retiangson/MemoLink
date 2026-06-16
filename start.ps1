@@ -14,7 +14,10 @@ Get-Process -Name "powershell" -ErrorAction SilentlyContinue |
 
 # Kill npm / node / vite on the dev port
 Get-Process -Name "node" -ErrorAction SilentlyContinue |
-    Where-Object { $_.CommandLine -match "vite|npm" } |
+    Where-Object { $_.CommandLine -match "vite|npm|electron" } |
+    Stop-Process -Force -ErrorAction SilentlyContinue
+
+Get-Process -Name "electron" -ErrorAction SilentlyContinue |
     Stop-Process -Force -ErrorAction SilentlyContinue
 
 # Brief pause to let ports release
@@ -32,6 +35,12 @@ $frontend = Start-Process powershell -ArgumentList `
     "`$host.UI.RawUI.WindowTitle = 'MemoLink Frontend'; cd '$root\memolink_web'; npm run dev" `
     -PassThru
 
+$desktop = Start-Process powershell -ArgumentList `
+    "-NoExit", "-Command",
+    "`$host.UI.RawUI.WindowTitle = 'MemoLink Desktop'; cd '$root\memolink_web'; npm run dev:electron" `
+    -PassThru
+
 Write-Host "Backend  PID: $($backend.Id)" -ForegroundColor Green
 Write-Host "Frontend PID: $($frontend.Id)" -ForegroundColor Green
-Write-Host "Run .\start.ps1 again to restart both servers." -ForegroundColor DarkGray
+Write-Host "Desktop  PID: $($desktop.Id)" -ForegroundColor Green
+Write-Host "Run .\start.ps1 again to restart all." -ForegroundColor DarkGray

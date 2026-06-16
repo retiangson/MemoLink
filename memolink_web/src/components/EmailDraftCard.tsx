@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+﻿import React, { useState, useMemo } from "react";
 import { marked } from "marked";
 import { api } from "../api/client";
 import { RichNoteEditor } from "./RichNoteEditor";
@@ -98,7 +98,7 @@ export function EmailDraftCard({ to, subject, body: initialBody, messageId, thre
       </div>
 
       {/* Message — divider then editor/preview */}
-      <div className="border-t border-[#1e1e2a]">
+      <div className="border-t border-[var(--ml-bg-panel)]">
         {editing ? (
           /* Full TipTap editor with toolbar */
           <div className="h-72">
@@ -132,7 +132,7 @@ export function EmailDraftCard({ to, subject, body: initialBody, messageId, thre
       </div>
 
       {/* Actions */}
-      <div className="flex items-center gap-2 px-4 py-2.5 border-t border-[#1e1e2a]">
+      <div className="flex items-center gap-2 px-4 py-2.5 border-t border-[var(--ml-bg-panel)]">
         {status === "error" && (
           <span className="text-red-400 text-xs flex-1">{errorMsg}</span>
         )}
@@ -140,7 +140,7 @@ export function EmailDraftCard({ to, subject, body: initialBody, messageId, thre
           <button
             onClick={() => setEditing((v) => !v)}
             disabled={status === "sending"}
-            className="px-3 py-1.5 text-xs text-gray-400 hover:text-gray-200 bg-[#1e1e2a] hover:bg-[#2a2a38] rounded-lg transition"
+            className="px-3 py-1.5 text-xs text-gray-400 hover:text-gray-200 bg-[var(--ml-bg-panel)] hover:bg-[var(--ml-bg-hover)] rounded-lg transition"
           >
             {editing ? "Done" : "Edit"}
           </button>

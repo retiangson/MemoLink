@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+﻿import React, { useState } from "react";
 import { confirmAction, type WorkflowAction } from "../api/workflowApi";
 import type { Message } from "../types";
 
@@ -88,7 +88,7 @@ export function WorkflowActionBar({ actions, conversationId, workspaceId, model,
     const yesLabel = ACTION_YES_LABELS[action.type] ?? "Yes";
 
     return (
-      <div className="mt-3 pt-3 border-t border-[#2a2a38]/60">
+      <div className="mt-3 pt-3 border-t border-[var(--ml-bg-hover)]">
         {state === "idle" && (
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-center gap-2 text-xs text-gray-400">
@@ -98,7 +98,7 @@ export function WorkflowActionBar({ actions, conversationId, workspaceId, model,
             <div className="flex gap-2 shrink-0">
               <button
                 onClick={() => setDismissed(true)}
-                className="px-3 py-1 rounded-lg text-xs text-gray-500 border border-[#2a2a38] hover:text-gray-200 hover:border-[#3a3a48] transition"
+                className="px-3 py-1 rounded-lg text-xs text-gray-500 border border-[var(--ml-bg-hover)] hover:text-gray-200 hover:border-[#3a3a48] transition"
               >
                 No
               </button>
@@ -134,7 +134,7 @@ export function WorkflowActionBar({ actions, conversationId, workspaceId, model,
             <div className="flex gap-2 shrink-0">
               <button
                 onClick={() => setDismissed(true)}
-                className="px-3 py-1 rounded-lg text-xs text-gray-500 border border-[#2a2a38] hover:text-gray-200 transition"
+                className="px-3 py-1 rounded-lg text-xs text-gray-500 border border-[var(--ml-bg-hover)] hover:text-gray-200 transition"
               >
                 Skip
               </button>
@@ -153,7 +153,7 @@ export function WorkflowActionBar({ actions, conversationId, workspaceId, model,
 
   // Multiple actions - show a "I can help with:" prompt with individual buttons
   return (
-    <div className="mt-3 pt-3 border-t border-[#2a2a38]/60 space-y-2">
+    <div className="mt-3 pt-3 border-t border-[var(--ml-bg-hover)] space-y-2">
       {!allSettled && (
         <div className="flex items-center justify-between">
           <p className="text-xs text-gray-500">I can help with a few things:</p>
@@ -192,8 +192,8 @@ export function WorkflowActionBar({ actions, conversationId, workspaceId, model,
                 state === "error"
                   ? "bg-red-500/10 border-red-500/25 text-red-400 hover:bg-red-500/15"
                   : state === "loading"
-                    ? "bg-[#1e1e2a] border-[#2a2a38] text-gray-500 cursor-not-allowed"
-                    : "bg-[#1a1a24] border-[#2a2a38] text-gray-300 hover:border-indigo-500/40 hover:text-indigo-300 hover:bg-indigo-500/5"
+                    ? "bg-[var(--ml-bg-panel)] border-[var(--ml-bg-hover)] text-gray-500 cursor-not-allowed"
+                    : "bg-[#1a1a24] border-[var(--ml-bg-hover)] text-gray-300 hover:border-indigo-500/40 hover:text-indigo-300 hover:bg-indigo-500/5"
               }`}
             >
               {state === "loading" ? (
@@ -212,7 +212,7 @@ export function WorkflowActionBar({ actions, conversationId, workspaceId, model,
         {!anyDone && (
           <button
             onClick={() => setDismissed(true)}
-            className="px-3 py-1.5 rounded-xl text-xs text-gray-600 border border-[#2a2a38]/50 hover:text-gray-400 hover:border-[#2a2a38] transition"
+            className="px-3 py-1.5 rounded-xl text-xs text-gray-600 border border-[var(--ml-bg-hover)] hover:text-gray-400 hover:border-[var(--ml-bg-hover)] transition"
           >
             No thanks
           </button>

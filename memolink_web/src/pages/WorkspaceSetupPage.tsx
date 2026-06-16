@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import type { Workspace, WorkspaceType } from "../types";
 
 const WORKSPACE_TYPES: WorkspaceType[] = ["Academic", "Professional", "Personal", "Project", "Other"];
@@ -39,7 +39,7 @@ export function WorkspaceSetupPage({ onCreated, onAdd }: WorkspaceSetupPageProps
   }
 
   return (
-    <div className="h-full w-full bg-[#0f0f13] flex flex-col items-center justify-center px-4 overflow-y-auto">
+    <div className="h-full w-full bg-[var(--ml-bg-base)] flex flex-col items-center justify-center px-4 overflow-y-auto">
       <div className="w-full max-w-md">
         <div className="flex items-center gap-3 mb-8">
           <img src="/memolink-icon.png" alt="" className="h-10 w-10 rounded-xl bg-white object-cover" />
@@ -49,7 +49,7 @@ export function WorkspaceSetupPage({ onCreated, onAdd }: WorkspaceSetupPageProps
           </div>
         </div>
 
-        <form onSubmit={handleCreate} className="bg-[#16161d] border border-[#1e1e2a] rounded-2xl p-6 space-y-5">
+        <form onSubmit={handleCreate} className="bg-[var(--ml-bg-surface)] border border-[var(--ml-bg-panel)] rounded-2xl p-6 space-y-5">
           <div>
             <label className="block text-xs font-semibold text-gray-400 mb-1.5 uppercase tracking-wider">Workspace Name</label>
             <input
@@ -57,7 +57,7 @@ export function WorkspaceSetupPage({ onCreated, onAdd }: WorkspaceSetupPageProps
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. Computer Science, Work Projects…"
-              className="w-full bg-[#0f0f13] border border-[#2a2a38] rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500 transition"
+              className="w-full bg-[var(--ml-bg-base)] border border-[var(--ml-bg-hover)] rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500 transition"
               autoFocus
             />
           </div>
@@ -73,7 +73,7 @@ export function WorkspaceSetupPage({ onCreated, onAdd }: WorkspaceSetupPageProps
                   className={`flex flex-col items-center gap-1 py-2.5 rounded-xl border text-xs transition ${
                     type === t
                       ? "border-indigo-500 bg-indigo-500/10 text-indigo-300"
-                      : "border-[#2a2a38] text-gray-500 hover:border-[#3a3a4a] hover:text-gray-300"
+                      : "border-[var(--ml-bg-hover)] text-gray-500 hover:border-[#3a3a4a] hover:text-gray-300"
                   }`}
                 >
                   <span className="text-lg">{TYPE_ICONS[t]}</span>
@@ -92,7 +92,7 @@ export function WorkspaceSetupPage({ onCreated, onAdd }: WorkspaceSetupPageProps
               onChange={(e) => setDescription(e.target.value)}
               placeholder="What is this workspace for?"
               rows={2}
-              className="w-full bg-[#0f0f13] border border-[#2a2a38] rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500 transition resize-none"
+              className="w-full bg-[var(--ml-bg-base)] border border-[var(--ml-bg-hover)] rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500 transition resize-none"
             />
           </div>
 

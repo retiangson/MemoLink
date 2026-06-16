@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+﻿import React, { useEffect, useState } from "react";
 import {
   getActiveSurvey, submitSurvey, getMySurveyResponse,
   type ActiveSurvey, type SurveyQuestion, type SurveyAnswerInput,
@@ -118,11 +118,11 @@ export function SurveyModal({ show, onClose, workspaceId }: Props) {
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4" onClick={onClose}>
       <div
-        className="bg-[#1a1a24] border border-[#2a2a38] rounded-2xl w-[680px] max-w-full max-h-[88vh] flex flex-col shadow-2xl text-white overflow-hidden"
+        className="bg-[#1a1a24] border border-[var(--ml-bg-hover)] rounded-2xl w-[680px] max-w-full max-h-[88vh] flex flex-col shadow-2xl text-white overflow-hidden"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[#2a2a38] shrink-0">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--ml-bg-hover)] shrink-0">
           <div className="flex items-center gap-2.5">
             <svg className="w-5 h-5 text-indigo-400" fill="currentColor" viewBox="0 0 16 16">
               <path d="M9.5 0a.5.5 0 0 1 .5.5.5.5 0 0 0 .5.5.5.5 0 0 1 .5.5V2a.5.5 0 0 1-.5.5h-5A.5.5 0 0 1 5 2v-.5a.5.5 0 0 1 .5-.5.5.5 0 0 0 .5-.5.5.5 0 0 1 .5-.5z"/>
@@ -134,7 +134,7 @@ export function SurveyModal({ show, onClose, workspaceId }: Props) {
               <p className="text-[11px] text-gray-500">Academic evaluation · ~3 minutes</p>
             </div>
           </div>
-          <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-500 hover:text-gray-200 hover:bg-[#2a2a38] transition">
+          <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-500 hover:text-gray-200 hover:bg-[var(--ml-bg-hover)] transition">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
@@ -153,7 +153,7 @@ export function SurveyModal({ show, onClose, workspaceId }: Props) {
                 </div>
               )}
               <p className="text-sm text-gray-400 leading-relaxed">{survey.intro}</p>
-              <div className="bg-[#12121a] border border-[#2a2a38] rounded-xl p-4">
+              <div className="bg-[var(--ml-bg-surface)] border border-[var(--ml-bg-hover)] rounded-xl p-4">
                 <p className="text-xs font-semibold text-indigo-300 uppercase tracking-wider mb-2">Before you start</p>
                 <ul className="space-y-1.5 text-[13px] text-gray-400">
                   {[
@@ -179,7 +179,7 @@ export function SurveyModal({ show, onClose, workspaceId }: Props) {
             <div className="space-y-7">
               {survey.sections.map(sec => (
                 <div key={sec.section}>
-                  <h3 className="text-sm font-semibold text-indigo-300 mb-3 pb-1.5 border-b border-[#2a2a38]">{sec.section}</h3>
+                  <h3 className="text-sm font-semibold text-indigo-300 mb-3 pb-1.5 border-b border-[var(--ml-bg-hover)]">{sec.section}</h3>
                   <div className="space-y-5">
                     {sec.questions.map(q => (
                       <QuestionField
@@ -214,7 +214,7 @@ export function SurveyModal({ show, onClose, workspaceId }: Props) {
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-3.5 border-t border-[#2a2a38] shrink-0 flex items-center justify-between">
+        <div className="px-6 py-3.5 border-t border-[var(--ml-bg-hover)] shrink-0 flex items-center justify-between">
           <p className="text-[11px] text-gray-700">MemoLink · Capstone evaluation</p>
           <div className="flex gap-2">
             {step === "consent" && (
@@ -228,7 +228,7 @@ export function SurveyModal({ show, onClose, workspaceId }: Props) {
             )}
             {step === "form" && (
               <>
-                <button onClick={() => setStep("consent")} className="px-3 py-1.5 rounded-lg text-xs text-gray-400 border border-[#2a2a38] hover:text-gray-200 transition">Back</button>
+                <button onClick={() => setStep("consent")} className="px-3 py-1.5 rounded-lg text-xs text-gray-400 border border-[var(--ml-bg-hover)] hover:text-gray-200 transition">Back</button>
                 <button
                   disabled={submitting}
                   onClick={handleSubmit}
@@ -280,7 +280,7 @@ function QuestionField({
                 onClick={() => onChange(String(n))}
                 title={LIKERT_LABELS[n - 1]}
                 className={`flex-1 py-2 rounded-lg text-xs font-medium border transition ${
-                  sel ? "bg-indigo-600 border-indigo-500 text-white" : "bg-[#12121a] border-[#2a2a38] text-gray-400 hover:border-indigo-500/40"
+                  sel ? "bg-indigo-600 border-indigo-500 text-white" : "bg-[var(--ml-bg-surface)] border-[var(--ml-bg-hover)] text-gray-400 hover:border-indigo-500/40"
                 }`}
               >
                 {n}
@@ -305,7 +305,7 @@ function QuestionField({
             const sel = value === opt;
             return (
               <label key={opt} className={`flex items-center gap-2.5 px-3 py-2 rounded-lg border cursor-pointer transition ${
-                sel ? "bg-indigo-500/10 border-indigo-500/40" : "bg-[#12121a] border-[#2a2a38] hover:border-[#3a3a48]"
+                sel ? "bg-indigo-500/10 border-indigo-500/40" : "bg-[var(--ml-bg-surface)] border-[var(--ml-bg-hover)] hover:border-[#3a3a48]"
               }`}>
                 <input type="radio" name={q.question_key} checked={sel} onChange={() => onChange(opt)} className="accent-indigo-500" />
                 <span className="text-[13px] text-gray-300">{opt}</span>
@@ -317,7 +317,7 @@ function QuestionField({
               value={otherText}
               onChange={e => onOtherText(e.target.value)}
               placeholder="Please specify…"
-              className="w-full bg-[#12121a] border border-[#2a2a38] rounded-lg px-3 py-2 text-[13px] text-gray-200 placeholder-gray-600 focus:outline-none focus:border-indigo-500"
+              className="w-full bg-[var(--ml-bg-surface)] border border-[var(--ml-bg-hover)] rounded-lg px-3 py-2 text-[13px] text-gray-200 placeholder-gray-600 focus:outline-none focus:border-indigo-500"
             />
           )}
         </div>
@@ -335,7 +335,7 @@ function QuestionField({
             const sel = arr.includes(opt);
             return (
               <label key={opt} className={`flex items-center gap-2.5 px-3 py-2 rounded-lg border cursor-pointer transition ${
-                sel ? "bg-indigo-500/10 border-indigo-500/40" : "bg-[#12121a] border-[#2a2a38] hover:border-[#3a3a48]"
+                sel ? "bg-indigo-500/10 border-indigo-500/40" : "bg-[var(--ml-bg-surface)] border-[var(--ml-bg-hover)] hover:border-[#3a3a48]"
               }`}>
                 <input type="checkbox" checked={sel} onChange={() => onToggleMulti(opt)} className="accent-indigo-500" />
                 <span className="text-[13px] text-gray-300">{opt}</span>
@@ -355,7 +355,7 @@ function QuestionField({
           value={(value as string) ?? ""}
           onChange={e => onChange(e.target.value)}
           rows={4}
-          className="w-full bg-[#12121a] border border-[#2a2a38] rounded-lg px-3 py-2 text-[13px] text-gray-200 placeholder-gray-600 focus:outline-none focus:border-indigo-500 resize-y"
+          className="w-full bg-[var(--ml-bg-surface)] border border-[var(--ml-bg-hover)] rounded-lg px-3 py-2 text-[13px] text-gray-200 placeholder-gray-600 focus:outline-none focus:border-indigo-500 resize-y"
           placeholder="Your answer…"
         />
       </div>
@@ -369,7 +369,7 @@ function QuestionField({
       <input
         value={(value as string) ?? ""}
         onChange={e => onChange(e.target.value)}
-        className="w-full bg-[#12121a] border border-[#2a2a38] rounded-lg px-3 py-2 text-[13px] text-gray-200 placeholder-gray-600 focus:outline-none focus:border-indigo-500"
+        className="w-full bg-[var(--ml-bg-surface)] border border-[var(--ml-bg-hover)] rounded-lg px-3 py-2 text-[13px] text-gray-200 placeholder-gray-600 focus:outline-none focus:border-indigo-500"
         placeholder="Your answer…"
       />
     </div>

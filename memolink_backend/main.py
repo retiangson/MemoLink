@@ -61,6 +61,8 @@ from memolink_backend.api.v1 import (
     survey_controller,
     evaluation_controller,
     core_memory_controller,
+    desktop_commands_controller,
+    shell_processes_controller,
 )
 
 # Register all models so SQLAlchemy sees them
@@ -85,6 +87,7 @@ import memolink_backend.domain.models.proactive_insight # noqa: F401
 import memolink_backend.domain.models.note_timeline      # noqa: F401
 import memolink_backend.domain.models.survey              # noqa: F401
 import memolink_backend.domain.models.evaluation          # noqa: F401
+import memolink_backend.domain.models.desktop_command     # noqa: F401
 
 if os.getenv("MEMOLINK_SKIP_DB_BOOTSTRAP") != "1":
     with engine.connect() as _conn:
@@ -754,12 +757,14 @@ app.include_router(teams_controller.router, prefix="/api")
 app.include_router(connectors_controller.router, prefix="/api")
 app.include_router(memograph_controller.router, prefix="/api")
 app.include_router(proactive_insight_controller.router, prefix="/api")
+app.include_router(desktop_commands_controller.router, prefix="/api")
 app.include_router(study_controller.router, prefix="/api")
 app.include_router(timeline_controller.router, prefix="/api")
 app.include_router(workflow_controller.router, prefix="/api")
 app.include_router(survey_controller.router, prefix="/api")
 app.include_router(evaluation_controller.router, prefix="/api")
 app.include_router(core_memory_controller.router, prefix="/api")
+app.include_router(shell_processes_controller.router, prefix="/api")
 
 # AWS Lambda handler - only active when running inside Lambda
 if os.getenv("AWS_LAMBDA_FUNCTION_NAME"):

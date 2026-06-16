@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+﻿import React, { useState } from "react";
 import { login, register, forgotPassword, resetPassword } from "../api/authApi";
 import { saveUser } from "../utils/auth";
 
@@ -90,7 +90,7 @@ export function LoginPage({ onLogin, initialResetToken }: { onLogin: () => void;
     : "Set new password";
 
   return (
-    <div className="h-screen w-screen flex bg-[#0f0f13] text-white">
+    <div className="h-screen w-screen flex bg-[var(--ml-bg-base)] text-white">
 
       {/* LEFT - Form */}
       <div className="flex flex-col justify-center items-center w-full md:w-1/2 p-8">
@@ -112,7 +112,7 @@ export function LoginPage({ onLogin, initialResetToken }: { onLogin: () => void;
             {/* Email field - shown for login, register, forgot */}
             {mode !== "reset" && (
               <input
-                className="w-full p-3 rounded-xl bg-[#1e1e2a] border border-[#2a2a38] text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 transition"
+                className="w-full p-3 rounded-xl bg-[var(--ml-bg-panel)] border border-[var(--ml-bg-hover)] text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 transition"
                 placeholder="Email"
                 type="email"
                 value={email}
@@ -124,7 +124,7 @@ export function LoginPage({ onLogin, initialResetToken }: { onLogin: () => void;
             {/* Password field - shown for login, register, reset */}
             {mode !== "forgot" && (
               <input
-                className="w-full p-3 rounded-xl bg-[#1e1e2a] border border-[#2a2a38] text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 transition"
+                className="w-full p-3 rounded-xl bg-[var(--ml-bg-panel)] border border-[var(--ml-bg-hover)] text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 transition"
                 placeholder={mode === "reset" ? "New password" : "Password"}
                 type="password"
                 value={password}
@@ -136,7 +136,7 @@ export function LoginPage({ onLogin, initialResetToken }: { onLogin: () => void;
             {/* Confirm password - register + reset */}
             {(mode === "register" || mode === "reset") && (
               <input
-                className="w-full p-3 rounded-xl bg-[#1e1e2a] border border-[#2a2a38] text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 transition"
+                className="w-full p-3 rounded-xl bg-[var(--ml-bg-panel)] border border-[var(--ml-bg-hover)] text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 transition"
                 placeholder="Confirm password"
                 type="password"
                 value={confirmPassword}

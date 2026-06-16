@@ -4,6 +4,8 @@ import { streamCommand } from "../api/commandApi";
 import { createConversation, renameConversation } from "../api/conversationApi";
 import { buildDiscussionCommand } from "../constants/slashCommands";
 import { useTTS } from "./useTTS";
+import { parseIntent, executeIntent, extractCodeFromResponse } from "../utils/desktopCommands";
+import { createDesktopCommand, waitForDesktopCommand, isDesktopOnline } from "../api/desktopApi";
 import type { ChatStreamEvent, Conversation, Message } from "../types";
 import { TEMP_ID } from "../types";
 
@@ -95,6 +97,95 @@ export function useChat({ activeConversation, setActiveConversation, setConversa
         setConversations((p) => [updated, ...p.filter((c) => c.id !== updated.id)]);
         setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
       } else {
+        // Check for desktop file system intents (both local Electron and remote web-to-desktop)
+        const fsIntent = !trimmed.startsWith("/") ? parseIntent(trimmed) : null;
+
+        // Immediate commands (mkdir, list, read, open, delete, write with known content)
+        if (fsIntent && fsIntent.kind !== "none" && fsIntent.kind !== "write-ai") {
+          if (window.electronAPI) {
+            // Local Electron execution
+            const fsResult = await executeIntent(fsIntent);
+            const aiMsg: Message = {
+              id: Date.now(),
+              role: "assistant",
+              content: (fsResult.ok ? "✅ " : "❌ ") + fsResult.message,
+            };
+            updated = { ...updated, messages: [...updated.messages, aiMsg] };
+            setActiveConversation(updated);
+            setConversations((p) => [updated, ...p.filter((c) => c.id !== updated.id)]);
+            setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
+            return;
+          } else {
+            // Web/mobile mode — route to the desktop bridge
+            const desktopOnline = await isDesktopOnline();
+            if (!desktopOnline) {
+              const aiMsg: Message = {
+                id: Date.now(),
+                role: "assistant",
+                content: "⚠️ Your desktop app is offline. Open MemoLink on your PC to execute file system commands remotely.",
+              };
+              updated = { ...updated, messages: [...updated.messages, aiMsg] };
+              setActiveConversation(updated);
+              setConversations((p) => [updated, ...p.filter((c) => c.id !== updated.id)]);
+              setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
+              return;
+            }
+
+            // Map intent to backend command type + payload
+            const cmdTypeMap: Record<string, string> = {
+              mkdir: "mkdir", write: "write-file", list: "list-dir",
+              read: "read-file", open: "open", delete: "delete",
+            };
+            const payloadMap: Record<string, unknown> =
+              fsIntent.kind === "write"
+                ? { path: fsIntent.path, content: fsIntent.content }
+                : { path: (fsIntent as any).path };
+
+            const pendingMsg: Message = {
+              id: Date.now(),
+              role: "assistant",
+              content: `⏳ Sending to your desktop… (\`${cmdTypeMap[fsIntent.kind]}\`)`,
+            };
+            updated = { ...updated, messages: [...updated.messages, pendingMsg] };
+            setActiveConversation(updated);
+            setConversations((p) => [updated, ...p.filter((c) => c.id !== updated.id)]);
+
+            try {
+              const queued = await createDesktopCommand(cmdTypeMap[fsIntent.kind], payloadMap as Record<string, unknown>);
+              const done = await waitForDesktopCommand(queued.id);
+              let resultText = "";
+              if (done.result) {
+                try {
+                  const parsed = JSON.parse(done.result);
+                  resultText = parsed.ok
+                    ? `✅ ${parsed.output ?? "Done"}`
+                    : `❌ ${parsed.error ?? "Failed"}`;
+                } catch {
+                  resultText = done.status === "done" ? `✅ Done` : `❌ Failed`;
+                }
+              } else {
+                resultText = done.status === "done" ? "✅ Done" : "❌ Failed";
+              }
+              setActiveConversation((prev) => {
+                if (!prev) return prev;
+                return { ...prev, messages: prev.messages.map((m) => m.id === pendingMsg.id ? { ...m, content: resultText } : m) };
+              });
+            } catch (err: any) {
+              setActiveConversation((prev) => {
+                if (!prev) return prev;
+                return { ...prev, messages: prev.messages.map((m) => m.id === pendingMsg.id ? { ...m, content: `❌ ${err.message}` } : m) };
+              });
+            }
+            setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
+            return;
+          }
+        }
+
+        // write-ai: create directory now, let AI generate content, save after streaming
+        if (fsIntent?.kind === "write-ai" && window.electronAPI) {
+          await window.electronAPI.mkdir(fsIntent.dir);
+        }
+
         // Text-only: stream the response token by token
         const placeholderMsg: Message = { id: STREAMING_ID, role: "assistant", content: "__THINKING__" };
         updated = { ...updated, messages: [...updated.messages, placeholderMsg] };
@@ -103,6 +194,7 @@ export function useChat({ activeConversation, setActiveConversation, setConversa
         let toolStatus = "";   // tool-call status lines shown above the answer
         let accum = "";
         let firstContent = true;
+        let streamingFinalId: number = STREAMING_ID;
         const isSlashCommand = trimmed.startsWith("/");
 
         // Store prompt so searchOnline can re-send it with web_search=true
@@ -180,6 +272,7 @@ export function useChat({ activeConversation, setActiveConversation, setConversa
               continue;
             case "message.complete": {
               const finalId = event.message_id ?? STREAMING_ID;
+              streamingFinalId = finalId;
               const finalModel = event.model;
               const confidence = event.confidence ?? undefined;
               const confidenceReason = event.confidence_reason ?? undefined;
@@ -263,6 +356,52 @@ export function useChat({ activeConversation, setActiveConversation, setConversa
             default:
               continue;
           }
+        }
+
+        // After streaming: if write-ai intent, extract code and save to disk
+        if (fsIntent?.kind === "write-ai" && window.electronAPI) {
+          const code = extractCodeFromResponse(accum);
+          const saveRes = await window.electronAPI.writeFile(fsIntent.fullPath, code);
+          const saveNote = saveRes.success
+            ? `\n\n---\n✅ Saved to **${saveRes.path ?? fsIntent.fullPath}**`
+            : `\n\n---\n❌ Could not save file: ${saveRes.error}`;
+          setActiveConversation((prev) => {
+            if (!prev) return prev;
+            return { ...prev, messages: prev.messages.map((m) => m.id === streamingFinalId ? { ...m, content: m.content + saveNote } : m) };
+          });
+          setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
+        } else if (fsIntent?.kind === "write-ai") {
+          const code = extractCodeFromResponse(accum);
+          let saveNote = "";
+          try {
+            const desktopOnline = await isDesktopOnline();
+            if (!desktopOnline) {
+              saveNote = "\n\n---\n⚠️ Your desktop app is offline, so I could not save this file locally.";
+            } else {
+              const queued = await createDesktopCommand("write-file", {
+                path: fsIntent.fullPath,
+                content: code,
+              });
+              const done = await waitForDesktopCommand(queued.id);
+              if (done.result) {
+                const parsed = JSON.parse(done.result);
+                saveNote = parsed.ok
+                  ? `\n\n---\n✅ Saved to **${parsed.output?.replace(/^File created:\s*/i, "") || fsIntent.fullPath}**`
+                  : `\n\n---\n❌ Could not save file: ${parsed.error ?? "Desktop command failed"}`;
+              } else {
+                saveNote = done.status === "done"
+                  ? `\n\n---\n✅ Saved to **${fsIntent.fullPath}**`
+                  : "\n\n---\n❌ Could not save file: Desktop command failed";
+              }
+            }
+          } catch (err: any) {
+            saveNote = `\n\n---\n❌ Could not save file: ${err.message}`;
+          }
+          setActiveConversation((prev) => {
+            if (!prev) return prev;
+            return { ...prev, messages: prev.messages.map((m) => m.id === streamingFinalId ? { ...m, content: m.content + saveNote } : m) };
+          });
+          setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
         }
       }
     } finally {

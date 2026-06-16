@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+﻿import React, { useState, useEffect } from "react";
 import { recordRating, type MessageRating } from "../api/evaluationApi";
 
 interface Props {
@@ -67,7 +67,7 @@ export function EvaluationRatingBar({ messageId, initial }: Props) {
               return (
                 <button key={n} onClick={() => rate(s.type, n)} title={n === 1 ? "Strongly disagree" : n === 5 ? "Strongly agree" : String(n)}
                   className={`w-6 h-6 rounded text-[11px] border transition ${
-                    sel ? "bg-cyan-600 border-cyan-500 text-white" : "bg-[#12121a] border-[#2a2a38] text-gray-400 hover:border-cyan-500/40"
+                    sel ? "bg-cyan-600 border-cyan-500 text-white" : "bg-[var(--ml-bg-surface)] border-[var(--ml-bg-hover)] text-gray-400 hover:border-cyan-500/40"
                   }`}>{n}</button>
               );
             })}
@@ -81,7 +81,7 @@ export function EvaluationRatingBar({ messageId, initial }: Props) {
           {SUPPORTED.map(o => (
             <button key={o.value} onClick={() => chooseSupported(o.value)}
               className={`px-2 py-1 rounded-lg text-[10px] border transition ${
-                supported === o.value ? "bg-cyan-600 border-cyan-500 text-white" : "bg-[#12121a] border-[#2a2a38] text-gray-400 hover:border-cyan-500/40"
+                supported === o.value ? "bg-cyan-600 border-cyan-500 text-white" : "bg-[var(--ml-bg-surface)] border-[var(--ml-bg-hover)] text-gray-400 hover:border-cyan-500/40"
               }`}>{o.label}</button>
           ))}
         </div>

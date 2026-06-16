@@ -1,5 +1,77 @@
 @import "tailwindcss";
 
+/* ── Theme tokens ──────────────────────────────────────────────────────────── */
+:root {
+  --ml-bg-base:    #0f0f13;
+  --ml-bg-bar:     #0a0a0f;
+  --ml-bg-surface: #16161d;
+  --ml-bg-panel:   #1e1e2a;
+  --ml-bg-hover:   #2a2a38;
+  --ml-bg-danger:  #3a1a1a;
+  --ml-text-primary: #e2e8f0;
+  --ml-text-muted:   #94a3b8;
+  --ml-border:       #2a2a38;
+  --ml-scrollbar:    #2a2a38;
+  --ml-accent:       #4f46e5;
+}
+
+[data-theme="midnight"] {
+  --ml-bg-base:    #07091a;
+  --ml-bg-bar:     #050714;
+  --ml-bg-surface: #0d1126;
+  --ml-bg-panel:   #141928;
+  --ml-bg-hover:   #1e2845;
+  --ml-bg-danger:  #2d1530;
+  --ml-text-primary: #dde4f5;
+  --ml-text-muted:   #7b90c4;
+  --ml-border:       #1e2845;
+  --ml-scrollbar:    #1e2845;
+  --ml-accent:       #3b5bdb;
+}
+
+[data-theme="light"] {
+  --ml-bg-base:    #f8fafc;
+  --ml-bg-bar:     #f1f5f9;
+  --ml-bg-surface: #ffffff;
+  --ml-bg-panel:   #f1f5f9;
+  --ml-bg-hover:   #e2e8f0;
+  --ml-bg-danger:  #fef2f2;
+  --ml-text-primary: #0f172a;
+  --ml-text-muted:   #64748b;
+  --ml-border:       #e2e8f0;
+  --ml-scrollbar:    #cbd5e1;
+  --ml-accent:       #4f46e5;
+}
+
+[data-theme="solarized"] {
+  --ml-bg-base:    #001e26;
+  --ml-bg-bar:     #00171f;
+  --ml-bg-surface: #002b36;
+  --ml-bg-panel:   #073642;
+  --ml-bg-hover:   #0d3d4d;
+  --ml-bg-danger:  #3a1a1a;
+  --ml-text-primary: #93a1a1;
+  --ml-text-muted:   #657b83;
+  --ml-border:       #0d3d4d;
+  --ml-scrollbar:    #0d3d4d;
+  --ml-accent:       #268bd2;
+}
+
+[data-theme="violet"] {
+  --ml-bg-base:    #0c0916;
+  --ml-bg-bar:     #070512;
+  --ml-bg-surface: #120d22;
+  --ml-bg-panel:   #18122e;
+  --ml-bg-hover:   #231840;
+  --ml-bg-danger:  #3a1020;
+  --ml-text-primary: #e8e0f8;
+  --ml-text-muted:   #9980c8;
+  --ml-border:       #231840;
+  --ml-scrollbar:    #231840;
+  --ml-accent:       #7c3aed;
+}
+
+/* ── Base styles ────────────────────────────────────────────────────────────── */
 html, body {
   height: 100dvh;
   width: 100%;
@@ -7,8 +79,8 @@ html, body {
   padding: 0;
   overflow: hidden;
   font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
-  background-color: #0f0f13;
-  color: #e2e8f0;
+  background-color: var(--ml-bg-base);
+  color: var(--ml-text-primary);
 }
 
 #root {
@@ -23,12 +95,11 @@ html, body {
   width: 100%;
   display: flex;
   overflow: hidden;
-  /* Prevent iPhone home indicator from covering the bottom */
   padding-bottom: env(safe-area-inset-bottom);
 }
 
 .markdown-body {
-  color: #E8E8E8 !important;
+  color: var(--ml-text-primary) !important;
 }
 
 @keyframes blink {
@@ -36,7 +107,7 @@ html, body {
   50% { opacity: 0; }
 }
 
-/* ── Custom scrollbars - thin, dark, indigo accent ─────────────────────── */
+/* ── Custom scrollbars ──────────────────────────────────────────────────────── */
 ::-webkit-scrollbar {
   width: 5px;
   height: 5px;
@@ -47,22 +118,21 @@ html, body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #2a2a38;
+  background: var(--ml-scrollbar);
   border-radius: 999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #4f46e5;
+  background: var(--ml-accent);
 }
 
 ::-webkit-scrollbar-corner {
   background: transparent;
 }
 
-/* Firefox */
 * {
   scrollbar-width: thin;
-  scrollbar-color: #2a2a38 transparent;
+  scrollbar-color: var(--ml-scrollbar) transparent;
 }
 
 .scrollbar-none {
@@ -79,3 +149,16 @@ html, body {
   box-shadow: 0 0 0 1px rgba(129, 140, 248, 0.45);
   transition: background 60ms linear;
 }
+
+/* ── Light theme — remap dark Tailwind text classes to readable equivalents ── */
+[data-theme="light"] .text-white    { color: #0f172a; }
+[data-theme="light"] .text-gray-100 { color: #1e293b; }
+[data-theme="light"] .text-gray-200 { color: #334155; }
+[data-theme="light"] .text-gray-300 { color: #475569; }
+[data-theme="light"] .text-gray-400 { color: #64748b; }
+[data-theme="light"] .text-gray-500 { color: #94a3b8; }
+[data-theme="light"] .text-gray-600 { color: #64748b; }
+[data-theme="light"] .text-slate-400 { color: #64748b; }
+[data-theme="light"] input,
+[data-theme="light"] textarea        { color: #0f172a; }
+[data-theme="light"] .markdown-body  { color: #0f172a !important; }

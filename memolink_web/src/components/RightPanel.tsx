@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+﻿import React, { useState, useEffect, useCallback } from "react";
 import type { SuggestionItem } from "../hooks/useSuggestions";
 import { ReminderDetailModal } from "./ReminderDetailModal";
 import { AddReminderModal } from "./AddReminderModal";
@@ -121,12 +121,12 @@ export function RightPanel({
         onClick={() => setSelectedItem(item)}
         className={`group flex items-start gap-2.5 p-2.5 rounded-xl border transition-all cursor-pointer ${
           item.done
-            ? "bg-[#0a0a0f]/60 border-[#1a1a22] opacity-50 hover:opacity-70"
+            ? "bg-[var(--ml-bg-bar)] border-[var(--ml-bg-panel)] opacity-50 hover:opacity-70"
             : isOverdue
               ? "bg-[#1a0a0a] border-red-500/30 hover:border-red-400/50"
               : isToday
                 ? "bg-[#1a1a10] border-amber-500/40 hover:border-amber-400/60"
-                : "bg-[#1a1a24] border-[#2a2a38] hover:border-indigo-500/40"
+                : "bg-[#1a1a24] border-[var(--ml-bg-hover)] hover:border-indigo-500/40"
         }`}
       >
         <button
@@ -194,10 +194,10 @@ export function RightPanel({
     <>
       {/* Mobile backdrop */}
       <div className="fixed inset-0 bg-black/60 z-40 sm:hidden" onClick={onClose} />
-      <div id="tour-right-panel" className="fixed inset-y-0 right-0 z-50 sm:relative sm:inset-auto w-72 h-full flex flex-col bg-[#0f0f13] border-l border-[#1e1e2a] shrink-0">
+      <div id="tour-right-panel" className="fixed inset-y-0 right-0 z-50 sm:relative sm:inset-auto w-72 h-full flex flex-col bg-[var(--ml-bg-base)] border-l border-[var(--ml-bg-panel)] shrink-0">
 
       {/* Header */}
-      <div className="h-10 flex items-center justify-between px-4 border-b border-[#1e1e2a] shrink-0 bg-[#0a0a0f]">
+      <div className="h-10 flex items-center justify-between px-4 border-b border-[var(--ml-bg-panel)] shrink-0 bg-[var(--ml-bg-bar)]">
         <div className="flex items-center gap-2">
           <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 text-indigo-400" fill="currentColor" viewBox="0 0 16 16">
             <path d="M2 6a6 6 0 1 1 10.174 4.31c-.203.196-.359.4-.453.619l-.762 1.769A.5.5 0 0 1 10.5 13h-5a.5.5 0 0 1-.46-.302l-.761-1.77a2 2 0 0 0-.453-.618A5.98 5.98 0 0 1 2 6m3 8.5a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 0 1l-.224.447a1 1 0 0 1-.894.553H6.618a1 1 0 0 1-.894-.553L5.5 15a.5.5 0 0 1-.5-.5"/>
@@ -206,7 +206,7 @@ export function RightPanel({
           <button
             onClick={() => setShowAddModal(true)}
             title="Add reminder"
-            className="w-4 h-4 flex items-center justify-center rounded text-gray-600 hover:text-indigo-400 hover:bg-[#2a2a38] transition"
+            className="w-4 h-4 flex items-center justify-center rounded text-gray-600 hover:text-indigo-400 hover:bg-[var(--ml-bg-hover)] transition"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
@@ -227,7 +227,7 @@ export function RightPanel({
                 ? "text-amber-400 cursor-default"
                 : notificationPermission === "denied"
                   ? "text-gray-700 cursor-not-allowed"
-                  : "text-gray-600 hover:text-amber-400 hover:bg-[#2a2a38]"
+                  : "text-gray-600 hover:text-amber-400 hover:bg-[var(--ml-bg-hover)]"
             }`}
           >
             {notificationPermission === "denied" ? (
@@ -249,7 +249,7 @@ export function RightPanel({
       <div className="flex-1 overflow-y-auto flex flex-col min-h-0">
 
       {/* ── Section 1: Notes ── */}
-      <div className="border-b border-[#1e1e2a]">
+      <div className="border-b border-[var(--ml-bg-panel)]">
         <button
           onClick={() => setShowNoteReminders((v) => !v)}
           className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-[#1a1a24] transition text-left"
@@ -297,7 +297,7 @@ export function RightPanel({
 
       {/* ── Section 2: Email Reminders (only shown when connected or items exist) ── */}
       {(emailConnected || emailItems.length > 0) && (
-        <div className="border-b border-[#1e1e2a]">
+        <div className="border-b border-[var(--ml-bg-panel)]">
           <button
             onClick={() => setShowEmailReminders((v) => !v)}
             className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-[#1a1a24] transition text-left"
@@ -355,7 +355,7 @@ export function RightPanel({
 
       {/* ── Section 3: Teams ── */}
       {teamsConnected && (
-        <div className="border-b border-[#1e1e2a]">
+        <div className="border-b border-[var(--ml-bg-panel)]">
           <button
             onClick={() => setShowTeams((v) => !v)}
             className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-[#1a1a24] transition text-left"
@@ -385,9 +385,9 @@ export function RightPanel({
               )}
 
               {selectedChat ? (
-                <div className="bg-[#12121a] border border-[#2a2a38] rounded-xl overflow-hidden">
+                <div className="bg-[var(--ml-bg-surface)] border border-[var(--ml-bg-hover)] rounded-xl overflow-hidden">
                   {/* Chat header */}
-                  <div className="flex items-center justify-between px-3 py-2 border-b border-[#2a2a38]">
+                  <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--ml-bg-hover)]">
                     <button onClick={() => { setSelectedChat(null); setTeamsSaveResult(null); }} className="text-[11px] text-gray-500 hover:text-gray-300 transition">← Back</button>
                     <span className="text-[11px] text-gray-300 font-medium truncate max-w-[110px]">{selectedChat.topic}</span>
                     <button onClick={handleSaveToNote} className="text-[11px] text-indigo-400 hover:text-indigo-300 transition">Save</button>
@@ -416,7 +416,7 @@ export function RightPanel({
                       onChange={(e) => setTeamsReply(e.target.value)}
                       onKeyDown={(e) => { if (e.key === "Enter") handleSendReply(); }}
                       placeholder="Reply…"
-                      className="flex-1 bg-[#0f0f13] border border-[#2a2a38] rounded-lg px-2 py-1 text-[11px] text-gray-200 outline-none focus:border-violet-500/50"
+                      className="flex-1 bg-[var(--ml-bg-base)] border border-[var(--ml-bg-hover)] rounded-lg px-2 py-1 text-[11px] text-gray-200 outline-none focus:border-violet-500/50"
                     />
                     <button
                       onClick={handleSendReply}
@@ -447,7 +447,7 @@ export function RightPanel({
                     <button
                       key={chat.id}
                       onClick={() => handleOpenChat(chat)}
-                      className="w-full text-left px-2.5 py-2 bg-[#1a1a24] border border-[#2a2a38] rounded-xl hover:border-violet-500/30 transition"
+                      className="w-full text-left px-2.5 py-2 bg-[#1a1a24] border border-[var(--ml-bg-hover)] rounded-xl hover:border-violet-500/30 transition"
                     >
                       <p className="text-[11px] text-gray-200 font-medium truncate">{chat.topic}</p>
                       {chat.lastMessagePreview && (
@@ -474,7 +474,7 @@ export function RightPanel({
 
       {/* Footer: clear done - pinned at bottom */}
       {doneCount > 0 && (
-        <div className="px-3 py-2 border-t border-[#1e1e2a] shrink-0">
+        <div className="px-3 py-2 border-t border-[var(--ml-bg-panel)] shrink-0">
           <button
             onClick={onClearDone}
             className="w-full text-xs text-gray-600 hover:text-gray-400 transition py-1"

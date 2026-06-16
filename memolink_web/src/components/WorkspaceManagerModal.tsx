@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import type { Workspace, WorkspaceType } from "../types";
 import { createWorkspace, deleteWorkspace } from "../api/workspaceApi";
 
@@ -59,13 +59,13 @@ export function WorkspaceManagerModal({ workspaces, activeWorkspace, onClose, on
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
-      <div className="w-full max-w-md bg-[#16161d] border border-[#2a2a38] rounded-2xl shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-5 py-4 border-b border-[#2a2a38]">
+      <div className="w-full max-w-md bg-[var(--ml-bg-surface)] border border-[var(--ml-bg-hover)] rounded-2xl shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--ml-bg-hover)]">
           <h2 className="text-sm font-semibold text-white">Workspaces</h2>
           <button onClick={onClose} className="text-gray-500 hover:text-gray-300 text-sm">✕</button>
         </div>
 
-        <div className="flex border-b border-[#2a2a38]">
+        <div className="flex border-b border-[var(--ml-bg-hover)]">
           {(["list", "create"] as const).map((t) => (
             <button
               key={t}
@@ -83,7 +83,7 @@ export function WorkspaceManagerModal({ workspaces, activeWorkspace, onClose, on
               <p className="text-xs text-gray-600 text-center py-8">No workspaces yet.</p>
             )}
             {workspaces.map((ws) => (
-              <div key={ws.id} className="flex items-center gap-3 px-5 py-3 border-b border-[#1e1e2a] last:border-0">
+              <div key={ws.id} className="flex items-center gap-3 px-5 py-3 border-b border-[var(--ml-bg-panel)] last:border-0">
                 <span className="text-lg shrink-0">{TYPE_ICONS[ws.type as WorkspaceType] ?? "📁"}</span>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm text-gray-200 font-medium truncate">
@@ -115,7 +115,7 @@ export function WorkspaceManagerModal({ workspaces, activeWorkspace, onClose, on
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Workspace name"
                 autoFocus
-                className="w-full bg-[#0f0f13] border border-[#2a2a38] rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500 transition"
+                className="w-full bg-[var(--ml-bg-base)] border border-[var(--ml-bg-hover)] rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500 transition"
               />
             </div>
             <div>
@@ -126,7 +126,7 @@ export function WorkspaceManagerModal({ workspaces, activeWorkspace, onClose, on
                     key={t}
                     type="button"
                     onClick={() => setType(t)}
-                    className={`flex flex-col items-center gap-0.5 py-2 rounded-xl border text-[10px] transition ${type === t ? "border-indigo-500 bg-indigo-500/10 text-indigo-300" : "border-[#2a2a38] text-gray-500 hover:border-[#3a3a4a]"}`}
+                    className={`flex flex-col items-center gap-0.5 py-2 rounded-xl border text-[10px] transition ${type === t ? "border-indigo-500 bg-indigo-500/10 text-indigo-300" : "border-[var(--ml-bg-hover)] text-gray-500 hover:border-[#3a3a4a]"}`}
                   >
                     <span className="text-base">{TYPE_ICONS[t]}</span>
                     <span>{t}</span>
@@ -141,7 +141,7 @@ export function WorkspaceManagerModal({ workspaces, activeWorkspace, onClose, on
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="What is this workspace for?"
                 rows={2}
-                className="w-full bg-[#0f0f13] border border-[#2a2a38] rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500 transition resize-none"
+                className="w-full bg-[var(--ml-bg-base)] border border-[var(--ml-bg-hover)] rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500 transition resize-none"
               />
             </div>
             {error && <p className="text-xs text-red-400">{error}</p>}
