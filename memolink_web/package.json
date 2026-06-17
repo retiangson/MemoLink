@@ -28,6 +28,13 @@
       "owner": "retiangson",
       "repo": "MemoLink"
     },
+    "extraResources": [
+      {
+        "from": "../memolink_backend/whatsapp_bridge",
+        "to": "whatsapp_bridge",
+        "filter": ["bridge.js", "package.json", "node_modules/**"]
+      }
+    ],
     "win": {
       "target": [
         {

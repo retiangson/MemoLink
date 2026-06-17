@@ -31,6 +31,16 @@ interface ElectronAPI {
 
   bridgeConnect: (baseUrl: string, token: string) => Promise<{ ok: boolean }>;
   bridgeDisconnect: () => Promise<{ ok: boolean }>;
+
+  waStart: () => Promise<{ started: boolean; error?: string }>;
+  waStop: () => Promise<{ stopped: boolean }>;
+  waReset: () => Promise<{ reset: boolean }>;
+  waProxy: (opts: {
+    method: string;
+    path: string;
+    body?: Record<string, unknown>;
+    params?: Record<string, string>;
+  }) => Promise<{ ok: boolean; data?: unknown; error?: string }>;
 }
 
 declare global {

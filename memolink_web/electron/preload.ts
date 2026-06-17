@@ -33,4 +33,16 @@ contextBridge.exposeInMainWorld("electronAPI", {
 
   bridgeDisconnect: () =>
     ipcRenderer.invoke("memolink:bridge-disconnect"),
+
+  waStart: () =>
+    ipcRenderer.invoke("memolink:wa-start"),
+
+  waStop: () =>
+    ipcRenderer.invoke("memolink:wa-stop"),
+
+  waReset: () =>
+    ipcRenderer.invoke("memolink:wa-reset"),
+
+  waProxy: (opts: { method: string; path: string; body?: Record<string, unknown>; params?: Record<string, string> }) =>
+    ipcRenderer.invoke("memolink:wa-proxy", opts),
 });

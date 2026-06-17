@@ -4,7 +4,8 @@ const { autoUpdater } = updaterPkg;
 import path from "path";
 import fs from "fs/promises";
 import os from "os";
-import { exec } from "child_process";
+import { exec, spawn, execSync } from "child_process";
+import type { ChildProcess } from "child_process";
 import { promisify } from "util";
 import { fileURLToPath } from "url";
 import https from "https";
@@ -165,6 +166,86 @@ ipcMain.handle("memolink:get-info", () => ({
   version: app.getVersion(),
   platform: process.platform,
 }));
+
+// ── WhatsApp Bridge (local Node.js subprocess) ────────────────────────────────
+
+const WA_PORT = 3797;
+let waBridgeProc: ChildProcess | null = null;
+
+function findNodeBin(): string | null {
+  try {
+    const result = process.platform === "win32"
+      ? execSync("where node", { timeout: 3000 }).toString().split("\n")[0].trim()
+      : execSync("which node", { timeout: 3000 }).toString().trim();
+    if (result) return result;
+  } catch { /* fall through to hardcoded paths */ }
+  const candidates = process.platform === "win32"
+    ? ["C:\\Program Files\\nodejs\\node.exe", "C:\\Program Files (x86)\\nodejs\\node.exe"]
+    : ["/usr/local/bin/node", "/usr/bin/node"];
+  for (const c of candidates) {
+    try { if (require("fs").existsSync(c)) return c; } catch { }
+  }
+  return null;
+}
+
+function waBridgePath(): string {
+  return app.isPackaged
+    ? path.join(process.resourcesPath, "whatsapp_bridge", "bridge.js")
+    : path.join(__dirname, "../../memolink_backend/whatsapp_bridge/bridge.js");
+}
+
+ipcMain.handle("memolink:wa-start", async () => {
+  if (waBridgeProc && waBridgeProc.exitCode === null) return { started: false };
+  const node = findNodeBin();
+  if (!node) return { error: "Node.js not found. Please install Node.js 20+." };
+  const sessionDir = path.join(os.homedir(), ".memolink", "whatsapp", "session");
+  await fs.mkdir(sessionDir, { recursive: true });
+  waBridgeProc = spawn(node, [waBridgePath(), "--port", String(WA_PORT), "--session", sessionDir], {
+    stdio: "ignore",
+    detached: false,
+  });
+  return { started: true };
+});
+
+ipcMain.handle("memolink:wa-stop", async () => {
+  if (waBridgeProc) { waBridgeProc.kill(); waBridgeProc = null; }
+  return { stopped: true };
+});
+
+ipcMain.handle("memolink:wa-reset", async () => {
+  if (waBridgeProc) { waBridgeProc.kill(); waBridgeProc = null; }
+  const sessionDir = path.join(os.homedir(), ".memolink", "whatsapp");
+  try { await fs.rm(sessionDir, { recursive: true, force: true }); } catch { }
+  return { reset: true };
+});
+
+ipcMain.handle("memolink:wa-proxy", async (_, { method, path: reqPath, body, params }: {
+  method: string; path: string; body?: Record<string, unknown>; params?: Record<string, string>;
+}) => {
+  return new Promise((resolve) => {
+    try {
+      const url = new URL(`http://127.0.0.1:${WA_PORT}${reqPath}`);
+      if (params) Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, String(v)));
+      const bodyStr = body ? JSON.stringify(body) : undefined;
+      const req = http.request(url, {
+        method: method.toUpperCase(),
+        headers: { "Content-Type": "application/json", ...(bodyStr ? { "Content-Length": Buffer.byteLength(bodyStr) } : {}) },
+      }, (res) => {
+        let raw = "";
+        res.on("data", (c: Buffer) => { raw += c.toString(); });
+        res.on("end", () => {
+          try { resolve({ ok: true, data: JSON.parse(raw) }); }
+          catch { resolve({ ok: true, data: raw }); }
+        });
+      });
+      req.on("error", (e) => resolve({ ok: false, error: e.message }));
+      if (bodyStr) req.write(bodyStr);
+      req.end();
+    } catch (e: any) {
+      resolve({ ok: false, error: e.message });
+    }
+  });
+});
 
 // ── Remote Desktop Bridge ─────────────────────────────────────────────────────
 // Connects to the backend SSE stream and executes commands sent from web/mobile.
@@ -328,6 +409,10 @@ app.whenReady().then(() => {
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
+});
+
+app.on("before-quit", () => {
+  if (waBridgeProc) { waBridgeProc.kill(); waBridgeProc = null; }
 });
 
 app.on("window-all-closed", () => {
