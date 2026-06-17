@@ -40,7 +40,7 @@ jobs:
           VITE_DESKTOP_DOWNLOAD_URL: https://${{ secrets.S3_UPLOAD_BUCKET }}.s3.${{ secrets.AWS_REGION }}.amazonaws.com/downloads/MemoLink-Setup.exe
 
       - name: Package installer
-        run: npx electron-builder --win
+        run: npx electron-builder --win --publish never
         working-directory: memolink_web
 
       - name: Configure AWS credentials
