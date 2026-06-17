@@ -22,7 +22,7 @@ import {
 import { Boom } from "@hapi/boom";
 import express from "express";
 import pino from "pino";
-import { mkdirSync } from "fs";
+import { mkdirSync, readdirSync, readFileSync } from "fs";
 import path from "path";
 import QRCode from "qrcode";
 
@@ -48,7 +48,6 @@ let sock = null;
 let connectionState = "disconnected";
 let latestQRImage = null;
 let historySynced = false;
-let connectedAt = 0;
 
 // chatId → [MsgObj]
 const messagesByChat = new Map();
@@ -56,12 +55,13 @@ const messagesByChat = new Map();
 const chatMeta = new Map();
 // jid → display name
 const contactNames = new Map();
+// lid user id → phone user id, populated from Baileys auth-state mapping files
+const lidToPhone = new Map();
 // "chatId::msgId" → raw Baileys message (kept for media download)
 const rawMessages = new Map();
 
 const MAX_MESSAGES_PER_CHAT = 5000;
 const MAX_RAW_MESSAGES = 20000; // cap to avoid OOM
-const HISTORY_READY_FALLBACK_MS = 30000;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -95,17 +95,105 @@ function extractBody(msg) {
   );
 }
 
+function jidUser(jid) {
+  return String(jid || "").replace(/@.*/, "");
+}
+
+function normalizeJid(jid) {
+  const value = String(jid || "").trim();
+  if (!value) return "";
+  return value.replace(/:\d+@/, "@");
+}
+
+function rememberLidAlias(lid, phone) {
+  const lidUser = jidUser(lid);
+  const phoneUser = jidUser(phone);
+  if (lidUser && phoneUser && lidUser !== phoneUser) {
+    lidToPhone.set(lidUser, phoneUser);
+  }
+}
+
+function refreshLidAliases() {
+  try {
+    for (const file of readdirSync(SESSION_DIR)) {
+      const match = file.match(/^lid-mapping-(\d+)\.json$/);
+      if (!match) continue;
+      const lid = JSON.parse(readFileSync(path.join(SESSION_DIR, file), "utf8"));
+      rememberLidAlias(lid, match[1]);
+    }
+  } catch {}
+}
+
+function jidAliases(jid) {
+  const normalized = normalizeJid(jid);
+  const user = jidUser(normalized);
+  const aliases = new Set([normalized]);
+
+  if (normalized.endsWith("@lid")) {
+    const phone = lidToPhone.get(user);
+    if (phone) {
+      aliases.add(`${phone}@s.whatsapp.net`);
+      aliases.add(`${phone}@c.us`);
+    }
+  } else if (normalized.endsWith("@s.whatsapp.net")) {
+    aliases.add(`${user}@c.us`);
+  } else if (normalized.endsWith("@c.us")) {
+    aliases.add(`${user}@s.whatsapp.net`);
+  }
+
+  return Array.from(aliases).filter(Boolean);
+}
+
+function sameDisplayName(a, b) {
+  return String(a || "").trim().toLowerCase() === String(b || "").trim().toLowerCase();
+}
+
+function chatNameFor(chatId) {
+  return chatMeta.get(chatId)?.name || contactNames.get(chatId) || jidUser(chatId);
+}
+
+function usablePushName(msg, chatId, isGroup) {
+  const name = String(msg?.pushName || "").trim();
+  if (!name) return "";
+
+  // In some group deliveries Baileys can surface the group title as pushName.
+  // Keep chat identity and participant identity separate, matching Hermes'
+  // senderName/chatName split.
+  if (isGroup && sameDisplayName(name, chatNameFor(chatId))) return "";
+  if (isGroup && sameDisplayName(name, jidUser(chatId))) return "";
+  return name;
+}
+
 function displayNameFor(jid) {
   if (!jid) return "Unknown";
-  return contactNames.get(jid) || jid.replace(/@.*/, "");
+  refreshLidAliases();
+  for (const alias of jidAliases(jid)) {
+    const name = contactNames.get(alias);
+    if (name) return name;
+  }
+  return jidUser(jid);
 }
 
 function updateContact(contact) {
   const name = contact?.name || contact?.notify || contact?.verifiedName;
-  if (name && contact?.id) {
-    contactNames.set(contact.id, name);
-    const meta = chatMeta.get(contact.id);
-    if (meta) chatMeta.set(contact.id, { ...meta, name });
+  const ids = [
+    contact?.id,
+    contact?.jid,
+    contact?.lid,
+    contact?.phoneNumber ? `${jidUser(contact.phoneNumber)}@s.whatsapp.net` : null,
+    contact?.phone ? `${jidUser(contact.phone)}@s.whatsapp.net` : null,
+  ].map(normalizeJid).filter(Boolean);
+
+  if (contact?.lid && (contact?.id || contact?.jid || contact?.phoneNumber || contact?.phone)) {
+    rememberLidAlias(contact.lid, contact.id || contact.jid || contact.phoneNumber || contact.phone);
+  }
+
+  if (name && ids.length) {
+    for (const id of ids) {
+      contactNames.set(id, name);
+    }
+    const meta = chatMeta.get(ids[0]);
+    if (meta) chatMeta.set(ids[0], { ...meta, name });
   }
 }
 
@@ -123,9 +211,14 @@ function updateChat(chat) {
 }
 
 function isHistoryReady() {
-  if (historySynced) return true;
+  const messageCount = totalMessageCount();
+  if (historySynced && messageCount > 0) return true;
   if (connectionState !== "connected") return false;
-  return chatMeta.size > 0 || (connectedAt > 0 && Date.now() - connectedAt >= HISTORY_READY_FALLBACK_MS);
+  return messageCount > 0;
+}
+
+function totalMessageCount() {
+  return Array.from(messagesByChat.values()).reduce((sum, msgs) => sum + msgs.length, 0);
 }
 
 function msgToObj(msg) {
@@ -136,15 +229,16 @@ function msgToObj(msg) {
   const senderId    = msg.key.fromMe
     ? (sock?.user?.id || "me")
     : (participant || chatId);
+  const pushName    = usablePushName(msg, chatId, isGroup);
 
   let senderName;
   if (msg.key.fromMe) {
     senderName = "me";
   } else if (isGroup || participant) {
-    // Priority: pushName (sent by WhatsApp on every message) → stored contact name → phone number
-    senderName = msg.pushName || displayNameFor(senderId);
+    // Priority: trustworthy pushName → stored contact name → phone number.
+    senderName = pushName || displayNameFor(senderId);
   } else {
-    senderName = msg.pushName || displayNameFor(chatId);
+    senderName = pushName || displayNameFor(chatId);
   }
 
   return {
@@ -165,8 +259,10 @@ function addMessage(chatId, msg) {
 
   // Capture pushName (sender's display name) sent on every WhatsApp message
   const participant = msg.key?.participant || msg.participant;
-  if (msg.pushName) {
-    contactNames.set(participant || chatId, msg.pushName);
+  const isGroup = chatId.endsWith("@g.us");
+  const pushName = usablePushName(msg, chatId, isGroup);
+  if (pushName) {
+    contactNames.set(participant || chatId, pushName);
   }
 
   // Store raw message for later media download
@@ -253,7 +349,6 @@ async function startSocket() {
   contactNames.clear();
   rawMessages.clear();
   historySynced = false;
-  connectedAt = 0;
 
   const { state, saveCreds } = await useMultiFileAuthState(SESSION_DIR);
   const { version } = await fetchLatestBaileysVersion();
@@ -290,7 +385,6 @@ async function startSocket() {
       connectionState = "connecting";
     } else if (connection === "open") {
       connectionState = "connected";
-      connectedAt = Date.now();
       latestQRImage = null;
       console.log("[bridge] WhatsApp connected!");
     } else if (connection === "close") {
@@ -333,7 +427,7 @@ async function startSocket() {
     for (const chat of chats) {
       updateChat(chat);
     }
-    historySynced = true;  // signal that at least the chat list is ready
+    historySynced = totalMessageCount() > 0;
     console.log(`[bridge] Chats: ${chatMeta.size}`);
   });
 
@@ -371,7 +465,7 @@ async function startSocket() {
     }
 
     // Treat the first usable history batch as ready, while later batches may still add older messages.
-    if (isLatest || chatMeta.size > 0 || count > 0 || progress >= 100) historySynced = true;
+    if (count > 0 || totalMessageCount() > 0) historySynced = true;
     console.log(`[bridge] Messaging history: ${count} msgs, ${chatMeta.size} chats, progress=${progress ?? "n/a"}, latest=${isLatest ?? "n/a"}, type=${syncType ?? "n/a"}`);
   });
 
@@ -410,7 +504,7 @@ app.get("/health", (_req, res) => {
     historySynced: isHistoryReady(),
     chatCount:     chats.length,
     rawChatCount:  chatMeta.size,
-    messageCount:  Array.from(messagesByChat.values()).reduce((sum, msgs) => sum + msgs.length, 0),
+    messageCount:  totalMessageCount(),
   });
 });
 

@@ -223,7 +223,6 @@ export function SettingsModal({
   function startWaPolling() {
     stopWaPolling();
     let ticks = 0;
-    let connectedAt = 0;
     waPollingRef.current = setInterval(async () => {
       ticks++;
       try {
@@ -231,9 +230,7 @@ export function SettingsModal({
         setWaStatus(s);
         if (s.connected) {
           setWaLoading(false);
-          if (!connectedAt) connectedAt = ticks;
-          // Wait up to 30 s after connection for history sync before signalling the panel
-          if (s.historySynced || ticks - connectedAt >= 15) {
+          if (s.historySynced) {
             stopWaPolling();
             onWhatsappConnected?.();
           }
