@@ -128,12 +128,24 @@ function isHistoryReady() {
 }
 
 function msgToObj(msg) {
-  const chatId = msg.key.remoteJid;
-  const type   = mediaType(msg);
+  const chatId      = msg.key.remoteJid;
+  const isGroup     = chatId?.endsWith("@g.us");
+  const participant = msg.key.participant;
+  const type        = mediaType(msg);
+
+  let from;
+  if (msg.key.fromMe) {
+    from = "me";
+  } else if (isGroup && participant) {
+    from = displayNameFor(participant);
+  } else {
+    from = displayNameFor(chatId);
+  }
+
   return {
     id:        msg.key.id,
     chatId,
-    from:      msg.key.participant || (msg.key.fromMe ? "me" : displayNameFor(chatId)),
+    from,
     fromMe:    !!msg.key.fromMe,
     body:      extractBody(msg),
     mediaType: type,
@@ -143,6 +155,11 @@ function msgToObj(msg) {
 
 function addMessage(chatId, msg) {
   if (!chatId || chatId === "status@broadcast" || chatId.endsWith("@broadcast")) return;
+
+  // Capture pushName (sender's display name) sent on every WhatsApp message
+  if (msg.pushName && msg.key?.participant) {
+    contactNames.set(msg.key.participant, msg.pushName);
+  }
 
   // Store raw message for later media download
   const rawKey = `${chatId}::${msg.key?.id || msg.id}`;
