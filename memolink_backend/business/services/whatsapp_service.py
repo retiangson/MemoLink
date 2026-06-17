@@ -163,13 +163,20 @@ def _kill_orphan_bridge() -> None:
 
 def _clear_session(user_id: int) -> None:
     """Delete saved WhatsApp session files so the next connect shows a fresh QR."""
-    session = Path.home() / ".memolink" / "whatsapp" / str(user_id)
-    if session.exists():
-        shutil.rmtree(session, ignore_errors=True)
+    for base in [Path.home() / ".memolink" / "whatsapp", Path("/tmp") / "memolink" / "whatsapp"]:
+        session = base / str(user_id)
+        if session.exists():
+            shutil.rmtree(session, ignore_errors=True)
 
 
 def start_bridge(user_id: int) -> dict:
     """Start the Node.js WhatsApp bridge for this user."""
+    if os.getenv("AWS_LAMBDA_FUNCTION_NAME"):
+        raise RuntimeError(
+            "WhatsApp is not available in the Lambda deployment. "
+            "The bridge needs a persistent process and port — use a server or container deployment instead."
+        )
+
     proc = _bridge_processes.get(user_id)
     if proc and proc.poll() is None:
         return {"started": False, "message": "Bridge already running"}
