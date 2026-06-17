@@ -28,40 +28,28 @@ jobs:
           cache: "npm"
           cache-dependency-path: memolink_web/package-lock.json
 
-      - name: Check version and create git tag
-        id: version
+      - name: Delete existing release and retag v1.0.0
         run: |
-          $ver = (Get-Content package.json | ConvertFrom-Json).version
-          echo "value=$ver" >> $env:GITHUB_OUTPUT
-          $tagExists = git ls-remote --tags origin "refs/tags/v$ver"
-          if ($tagExists) {
-            echo "released=true" >> $env:GITHUB_OUTPUT
-            Write-Host "Version v$ver already released — skipping build."
-          } else {
-            echo "released=false" >> $env:GITHUB_OUTPUT
-            Write-Host "New version v$ver — tagging commit and building release."
-            git config user.name "github-actions[bot]"
-            git config user.email "github-actions[bot]@users.noreply.github.com"
-            git tag "v$ver"
-            git push origin "v$ver"
-          }
-        working-directory: memolink_web
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          gh release delete v1.0.0 --yes --cleanup-tag 2>$null
+          git tag -f v1.0.0
+          git push origin v1.0.0 --force
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: pwsh
 
       - name: Install dependencies
-        if: steps.version.outputs.released == 'false'
         run: npm ci
         working-directory: memolink_web
 
       - name: Build renderer + Electron main
-        if: steps.version.outputs.released == 'false'
         run: node scripts/build-electron.mjs
         working-directory: memolink_web
         env:
           VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
 
       - name: Package and publish to GitHub Releases
-        if: steps.version.outputs.released == 'false'
         run: npx electron-builder --win --publish always
         working-directory: memolink_web
         env:
