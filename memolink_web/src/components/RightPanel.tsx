@@ -8,6 +8,8 @@ import { listTeamsChats, getTeamsMessages, sendTeamsMessage, chatToNote } from "
 import type { TeamsChat, TeamsMessage } from "../api/teamsApi";
 import type { EmailRecord, EmailAccount } from "../api/emailApi";
 import { EmailDetailModal } from "./EmailDetailModal";
+import { listWhatsappChats, getWhatsappMessages, getWhatsappProfilePicture, sendWhatsappMessage, deleteWhatsappMessage, deleteWhatsappChat, suggestWhatsappReply, getWhatsappMedia } from "../api/whatsappApi";
+import type { WhatsappChat, WhatsappMessage } from "../api/whatsappApi";
 
 interface RightPanelProps {
   open: boolean;
@@ -31,6 +33,7 @@ interface RightPanelProps {
   onSyncEmail?: () => void;
   emailSyncResult?: string | null;
   teamsConnected?: boolean;
+  whatsappConnected?: boolean;
   insightsEnabled?: boolean;
   workspaceId?: number | null;
   onOpenNote?: (noteId: number) => void;
@@ -43,6 +46,7 @@ export function RightPanel({
   emailConnected, emailAccounts = [], emailRecords = [], onCreateReminderFromEmail, onDeleteEmailRecord,
   isSyncingEmail, onSyncEmail, emailSyncResult,
   teamsConnected,
+  whatsappConnected,
   insightsEnabled, workspaceId, onOpenNote,
 }: RightPanelProps) {
   const [showAddModal, setShowAddModal] = useState(false);
@@ -62,6 +66,26 @@ export function RightPanel({
   const [teamsSending, setTeamsSending] = useState(false);
   const [teamsSaveResult, setTeamsSaveResult] = useState<string | null>(null);
   const [teamsError, setTeamsError] = useState<string | null>(null);
+
+  // WhatsApp state
+  const [showWhatsapp, setShowWhatsapp] = useState(false);
+  const [waChats, setWaChats] = useState<WhatsappChat[]>([]);
+  const [waChatsLoading, setWaChatsLoading] = useState(false);
+  const [selectedWaChat, setSelectedWaChat] = useState<WhatsappChat | null>(null);
+  const [waMessages, setWaMessages] = useState<WhatsappMessage[]>([]);
+  const [waMsgTotal, setWaMsgTotal] = useState(0);
+  const [waMsgOffset, setWaMsgOffset] = useState(0);
+  const [waMsgLoading, setWaMsgLoading] = useState(false);
+  const [waOlderLoading, setWaOlderLoading] = useState(false);
+  const [waReply, setWaReply] = useState("");
+  const [waSending, setWaSending] = useState(false);
+  const [waSuggestions, setWaSuggestions] = useState<string[]>([]);
+  const [waSuggestLoading, setWaSuggestLoading] = useState(false);
+  const [waError, setWaError] = useState<string | null>(null);
+  const [waMediaCache, setWaMediaCache] = useState<Map<string, string>>(new Map());
+  const [waAvatarCache, setWaAvatarCache] = useState<Map<string, string | null>>(new Map());
+  const [waDeletingId, setWaDeletingId] = useState<string | null>(null);
+  const [waDeletingChat, setWaDeletingChat] = useState(false);
 
   const loadTeamsChats = useCallback(async () => {
     setTeamsChatsLoading(true);
@@ -112,6 +136,160 @@ export function RightPanel({
     } catch { setTeamsSaveResult("Failed to save."); }
   }
 
+  const loadWaChats = useCallback(async () => {
+    setWaChatsLoading(true);
+    setWaError(null);
+    try {
+      const chats = await listWhatsappChats();
+      setWaChats(chats);
+      setWaAvatarCache((prev) => {
+        const liveIds = new Set(chats.map((chat) => chat.id));
+        const next = new Map<string, string | null>();
+        for (const [chatId, url] of prev) {
+          if (liveIds.has(chatId) && url) next.set(chatId, url);
+        }
+        return next;
+      });
+    } catch {
+      setWaError("Could not load WhatsApp chats.");
+    } finally { setWaChatsLoading(false); }
+  }, []);
+
+  useEffect(() => {
+    if (!open || !whatsappConnected) return;
+    loadWaChats();
+    // Re-fetch a few times to catch history that arrives after connection
+    let n = 0;
+    const poll = setInterval(() => {
+      n++;
+      loadWaChats();
+      if (n >= 8) clearInterval(poll); // stop after ~24 s
+    }, 3000);
+    return () => clearInterval(poll);
+  }, [open, whatsappConnected]);
+
+  useEffect(() => {
+    if (!showWhatsapp || waChats.length === 0) return;
+    const missing = waChats.filter((chat) => !waAvatarCache.has(chat.id)).slice(0, 12);
+    if (missing.length === 0) return;
+
+    let cancelled = false;
+    (async () => {
+      const entries = await Promise.all(
+        missing.map(async (chat) => [chat.id, await getWhatsappProfilePicture(chat.id)] as const)
+      );
+      if (cancelled) return;
+      setWaAvatarCache((prev) => {
+        const next = new Map(prev);
+        for (const [chatId, url] of entries) next.set(chatId, url);
+        return next;
+      });
+    })();
+
+    return () => { cancelled = true; };
+  }, [showWhatsapp, waChats, waAvatarCache]);
+
+  async function handleOpenWaChat(chat: WhatsappChat) {
+    setSelectedWaChat(chat);
+    setWaMessages([]);
+    setWaMsgTotal(0);
+    setWaMsgOffset(0);
+    setWaSuggestions([]);
+    setWaReply("");
+    setWaError(null);
+    setWaMsgLoading(true);
+    try {
+      const { messages, total } = await getWhatsappMessages(chat.id, 30, 0);
+      setWaMessages(messages);
+      setWaMsgTotal(total);
+      setWaMsgOffset(0);
+    } catch {
+      setWaError("Could not load messages.");
+    } finally { setWaMsgLoading(false); }
+  }
+
+  async function handleLoadOlderWaMessages() {
+    if (!selectedWaChat) return;
+    const nextOffset = waMsgOffset + 30;
+    setWaOlderLoading(true);
+    try {
+      const { messages, total } = await getWhatsappMessages(selectedWaChat.id, 30, nextOffset);
+      setWaMessages((prev) => [...messages, ...prev]);
+      setWaMsgTotal(total);
+      setWaMsgOffset(nextOffset);
+    } catch { /* ignore */ } finally { setWaOlderLoading(false); }
+  }
+
+  async function handleSendWaReply() {
+    if (!selectedWaChat || !waReply.trim()) return;
+    setWaSending(true);
+    try {
+      await sendWhatsappMessage(selectedWaChat.id, waReply.trim());
+      setWaReply("");
+      const { messages, total } = await getWhatsappMessages(selectedWaChat.id, 30, 0);
+      setWaMessages(messages);
+      setWaMsgTotal(total);
+      setWaMsgOffset(0);
+    } catch { /* ignore */ } finally { setWaSending(false); }
+  }
+
+  async function handleDeleteWaMessage(message: WhatsappMessage) {
+    if (!selectedWaChat || !message.fromMe || waDeletingId) return;
+    if (!window.confirm("Delete this WhatsApp message for everyone?")) return;
+    setWaDeletingId(message.id);
+    setWaError(null);
+    try {
+      await deleteWhatsappMessage(selectedWaChat.id, message.id);
+      setWaMessages((prev) => prev.filter((m) => m.id !== message.id));
+      setWaMsgTotal((prev) => Math.max(0, prev - 1));
+      setWaMediaCache((prev) => {
+        const next = new Map(prev);
+        next.delete(message.id);
+        return next;
+      });
+    } catch (err: any) {
+      setWaError(err?.response?.data?.detail ?? "Could not delete message.");
+    } finally {
+      setWaDeletingId(null);
+    }
+  }
+
+  async function handleDeleteWaConversation() {
+    if (!selectedWaChat || waDeletingChat) return;
+    if (!window.confirm(`Delete the WhatsApp conversation with ${selectedWaChat.name}? This removes the chat from your WhatsApp account.`)) return;
+    const chatId = selectedWaChat.id;
+    setWaDeletingChat(true);
+    setWaError(null);
+    try {
+      await deleteWhatsappChat(chatId);
+      setWaChats((prev) => prev.filter((chat) => chat.id !== chatId));
+      setSelectedWaChat(null);
+      setWaMessages([]);
+      setWaMsgTotal(0);
+      setWaMsgOffset(0);
+      setWaSuggestions([]);
+      setWaReply("");
+      setWaMediaCache((prev) => {
+        const next = new Map(prev);
+        for (const msg of waMessages) next.delete(msg.id);
+        return next;
+      });
+    } catch (err: any) {
+      setWaError(err?.response?.data?.detail ?? "Could not delete conversation.");
+    } finally {
+      setWaDeletingChat(false);
+    }
+  }
+
+  async function handleWaSuggestReply() {
+    if (!selectedWaChat) return;
+    setWaSuggestLoading(true);
+    setWaSuggestions([]);
+    try {
+      setWaSuggestions(await suggestWhatsappReply(selectedWaChat.id));
+    } catch { /* ignore */ } finally { setWaSuggestLoading(false); }
+  }
+
   if (!open) return null;
 
   const _d = new Date();
@@ -125,6 +303,36 @@ export function RightPanel({
   const pinnedEmailIds = new Set(items.filter((i) => !!i.email_record_id).map((i) => i.email_record_id!));
 
   const hasEmail = emailConnected || emailRecords.length > 0;
+
+  function waInitials(name: string): string {
+    const clean = (name || "?").replace(/^\+/, "").trim();
+    const parts = clean.split(/\s+/).filter(Boolean);
+    if (parts.length >= 2) return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+    return clean.slice(0, 2).toUpperCase();
+  }
+
+  function renderWaAvatar(chat: WhatsappChat, sizeClass = "h-7 w-7") {
+    const avatarUrl = waAvatarCache.get(chat.id) ?? chat.avatarUrl ?? null;
+    if (avatarUrl) {
+      return (
+        <img
+          src={avatarUrl}
+          alt=""
+          onError={() => setWaAvatarCache((prev) => {
+            const next = new Map(prev);
+            next.set(chat.id, null);
+            return next;
+          })}
+          className={`${sizeClass} shrink-0 rounded-full object-cover border border-green-500/20 bg-[var(--ml-bg-hover)]`}
+        />
+      );
+    }
+    return (
+      <div className={`${sizeClass} shrink-0 rounded-full border border-green-500/20 bg-green-500/10 text-[10px] font-semibold text-green-300 flex items-center justify-center`}>
+        {waInitials(chat.name)}
+      </div>
+    );
+  }
 
   // Count only records that are actually rendered in a collapsible section
   const visibleEmailCount = emailAccounts.length === 0
@@ -592,7 +800,279 @@ export function RightPanel({
         </div>
       )}
 
-      {/* ── Section 4: AI Insights ── */}
+      {/* ── Section 4: WhatsApp ── */}
+      {whatsappConnected && (
+        <div className="border-b border-[var(--ml-bg-panel)]">
+          <button
+            onClick={() => setShowWhatsapp((v) => !v)}
+            className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-[#1a1a24] transition text-left"
+          >
+            <div className="flex items-center gap-2">
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 text-green-400 shrink-0" fill="currentColor" viewBox="0 0 16 16">
+                <path d="M13.601 2.326A7.85 7.85 0 0 0 7.994 0C3.627 0 .068 3.558.064 7.926c0 1.399.366 2.76 1.057 3.965L0 16l4.204-1.102a7.9 7.9 0 0 0 3.79.965h.004c4.368 0 7.926-3.558 7.93-7.93A7.9 7.9 0 0 0 13.6 2.326zM7.994 14.521a6.6 6.6 0 0 1-3.356-.92l-.24-.144-2.494.654.666-2.433-.156-.251a6.56 6.56 0 0 1-1.007-3.505c0-3.626 2.957-6.584 6.591-6.584a6.56 6.56 0 0 1 4.66 1.931 6.56 6.56 0 0 1 1.928 4.66c-.004 3.639-2.961 6.592-6.592 6.592m3.615-4.934c-.197-.099-1.17-.578-1.353-.646-.182-.065-.315-.099-.445.099-.133.197-.513.646-.627.775-.114.133-.232.148-.43.05-.197-.1-.836-.308-1.592-.985-.59-.525-.985-1.175-1.103-1.372-.114-.198-.011-.304.088-.403.087-.088.197-.232.296-.346.1-.114.133-.198.198-.33.065-.134.034-.248-.015-.347-.05-.099-.445-1.076-.612-1.47-.16-.389-.323-.335-.445-.34-.114-.007-.247-.007-.38-.007a.73.73 0 0 0-.529.247c-.182.198-.691.677-.691 1.654s.71 1.916.81 2.049c.098.133 1.394 2.132 3.383 2.992.47.205.84.326 1.129.418.475.152.904.129 1.246.08.38-.058 1.171-.48 1.338-.943.164-.464.164-.86.114-.943-.049-.084-.182-.133-.38-.232"/>
+              </svg>
+              <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">WhatsApp</span>
+              {waChats.length > 0 && (
+                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-green-500/20 text-green-400">
+                  {waChats.length}
+                </span>
+              )}
+            </div>
+            <svg xmlns="http://www.w3.org/2000/svg" className={`w-3 h-3 text-gray-600 transition-transform ${showWhatsapp ? "" : "-rotate-90"}`} fill="currentColor" viewBox="0 0 16 16">
+              <path d="M7.247 11.14 2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z"/>
+            </svg>
+          </button>
+
+          {showWhatsapp && (
+            <div className="px-3 pb-3 flex flex-col gap-2">
+              {waError && (
+                <div className="rounded-lg border border-red-500/20 bg-red-500/10 px-2.5 py-2 text-[11px] text-red-300">
+                  {waError}
+                </div>
+              )}
+
+              {!selectedWaChat && (
+                <button
+                  onClick={loadWaChats}
+                  disabled={waChatsLoading}
+                  className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 text-[11px] text-green-400 hover:text-green-300 border border-green-500/20 hover:border-green-500/40 rounded-lg hover:bg-green-500/5 transition disabled:opacity-40"
+                >
+                  {waChatsLoading
+                    ? <><svg className="w-3 h-3 animate-spin shrink-0" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>Loading…</>
+                    : <>↻ Refresh chats ({waChats.length})</>}
+                </button>
+              )}
+
+              {selectedWaChat ? (
+                <div className="bg-[var(--ml-bg-surface)] border border-[var(--ml-bg-hover)] rounded-xl overflow-hidden">
+                  {/* Chat header */}
+                  <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--ml-bg-hover)]">
+                    <button
+                      onClick={() => { setSelectedWaChat(null); setWaSuggestions([]); setWaReply(""); }}
+                      className="text-[11px] text-gray-500 hover:text-gray-300 transition"
+                    >← Back</button>
+                    <div className="flex items-center gap-2 min-w-0 max-w-[150px]">
+                      {renderWaAvatar(selectedWaChat, "h-7 w-7")}
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-[11px] text-gray-300 font-medium truncate w-full">{selectedWaChat.name}</span>
+                        {!selectedWaChat.id.endsWith("@g.us") && (
+                          <span className="text-[9px] text-gray-600 truncate w-full">+{selectedWaChat.id.replace("@s.whatsapp.net", "")}</span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={handleWaSuggestReply}
+                        disabled={waSuggestLoading || waDeletingChat}
+                        className="text-[11px] text-green-400 hover:text-green-300 transition disabled:opacity-40"
+                      >
+                        {waSuggestLoading ? "…" : "✦ Suggest"}
+                      </button>
+                      <button
+                        onClick={handleDeleteWaConversation}
+                        disabled={waDeletingChat}
+                        title="Delete conversation"
+                        className="flex h-6 w-6 items-center justify-center rounded-md text-gray-600 transition hover:bg-red-500/10 hover:text-red-300 disabled:cursor-wait disabled:opacity-50"
+                      >
+                        {waDeletingChat ? (
+                          <svg className="h-3 w-3 animate-spin" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                          </svg>
+                        ) : (
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0z"/>
+                            <path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1 0-2H5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1h2.5a1 1 0 0 1 1 1M4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4zM2.5 3h11V2h-11z"/>
+                          </svg>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Messages */}
+                  <div className="px-3 py-2 max-h-52 overflow-y-auto space-y-2">
+                    {/* Load older */}
+                    {!waMsgLoading && waMessages.length > 0 && waMsgOffset + 30 < waMsgTotal && (
+                      <button
+                        onClick={handleLoadOlderWaMessages}
+                        disabled={waOlderLoading}
+                        className="w-full text-[10px] text-gray-500 hover:text-gray-300 py-1 border border-[var(--ml-bg-hover)] rounded-lg hover:bg-[var(--ml-bg-hover)] transition disabled:opacity-40"
+                      >
+                        {waOlderLoading ? "Loading…" : `↑ Load older messages (${waMsgTotal - waMessages.length} more)`}
+                      </button>
+                    )}
+                    {waMsgLoading ? (
+                      <p className="text-[11px] text-gray-600">Loading…</p>
+                    ) : waMessages.length === 0 ? (
+                      <p className="text-[11px] text-gray-600">No messages yet</p>
+                    ) : waMessages.map((m) => {
+                      const bubbleCls = m.fromMe
+                        ? "bg-green-600/20 text-gray-200"
+                        : "bg-[var(--ml-bg-hover)] text-gray-300";
+                      const isPreviewableImage = m.mediaType === "image" || m.mediaType === "sticker";
+                      const cachedImg = isPreviewableImage ? waMediaCache.get(m.id) : undefined;
+                      return (
+                        <div key={m.id} className={`flex flex-col ${m.fromMe ? "items-end" : "items-start"}`}>
+                          {!m.fromMe && (
+                            <p className="text-[10px] text-green-400 font-medium mb-0.5">{m.from}</p>
+                          )}
+                          <div className="group/message flex items-start gap-1 max-w-[90%]">
+                          {m.fromMe && (
+                            <button
+                              onClick={() => handleDeleteWaMessage(m)}
+                              disabled={waDeletingId === m.id}
+                              title="Delete for everyone"
+                              className="mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-gray-600 opacity-0 transition hover:bg-red-500/10 hover:text-red-300 group-hover/message:opacity-100 disabled:cursor-wait disabled:opacity-50"
+                            >
+                              {waDeletingId === m.id ? (
+                                <svg className="h-3 w-3 animate-spin" fill="none" viewBox="0 0 24 24">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                                </svg>
+                              ) : (
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="currentColor" viewBox="0 0 16 16">
+                                  <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0z"/>
+                                  <path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1 0-2H5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1h2.5a1 1 0 0 1 1 1M4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4zM2.5 3h11V2h-11z"/>
+                                </svg>
+                              )}
+                            </button>
+                          )}
+                          <div className={`rounded-xl overflow-hidden ${bubbleCls}`}>
+                            {isPreviewableImage ? (
+                              cachedImg ? (
+                                <img
+                                  src={cachedImg}
+                                  alt={m.mediaType === "sticker" ? "sticker" : "image"}
+                                  className={m.mediaType === "sticker"
+                                    ? "max-w-28 max-h-28 object-contain rounded-xl"
+                                    : "max-w-full max-h-36 object-cover rounded-xl"}
+                                />
+                              ) : (
+                                <button
+                                  onClick={async () => {
+                                    const result = await getWhatsappMedia(m.chatId, m.id);
+                                    if (result?.data_url) {
+                                      setWaMediaCache((prev) => new Map(prev).set(m.id, result.data_url));
+                                    }
+                                  }}
+                                  className="flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] text-gray-400 hover:text-gray-200 transition"
+                                >
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 shrink-0" fill="currentColor" viewBox="0 0 16 16">
+                                    <path d="M6.002 5.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0"/>
+                                    <path d="M2.002 1a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V3a2 2 0 0 0-2-2zm12 1a1 1 0 0 1 1 1v6.5l-3.777-1.947a.5.5 0 0 0-.577.093l-3.71 3.71-2.66-1.772a.5.5 0 0 0-.63.062L1.002 12V3a1 1 0 0 1 1-1z"/>
+                                  </svg>
+                                  {m.mediaType === "sticker"
+                                    ? "Tap to load sticker"
+                                    : m.body !== "[image]" ? m.body : "Tap to load image"}
+                                </button>
+                              )
+                            ) : m.mediaType === "audio" ? (
+                              <div className="flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] text-gray-400">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" fill="currentColor" viewBox="0 0 16 16">
+                                  <path d="M6 3a.5.5 0 0 1 .5.5v9a.5.5 0 0 1-1 0v-9A.5.5 0 0 1 6 3m2.5 2a.5.5 0 0 1 .5.5v5a.5.5 0 0 1-1 0v-5a.5.5 0 0 1 .5-.5M3 6.5a.5.5 0 0 1 1 0v3a.5.5 0 0 1-1 0zm6.5-.5a.5.5 0 0 1 .5.5v3a.5.5 0 0 1-1 0v-3a.5.5 0 0 1 .5-.5M1 8a.5.5 0 0 1 .5-.5h.5a.5.5 0 0 1 0 1h-.5A.5.5 0 0 1 1 8m11 0a.5.5 0 0 1 .5-.5h.5a.5.5 0 0 1 0 1h-.5A.5.5 0 0 1 12 8"/>
+                                </svg>
+                                Voice message
+                              </div>
+                            ) : m.mediaType === "video" || m.mediaType === "document" ? (
+                              <div className="flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] text-gray-400">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3 shrink-0" fill="currentColor" viewBox="0 0 16 16">
+                                  <path d="M4 0h5.293A1 1 0 0 1 10 .293L13.707 4a1 1 0 0 1 .293.707V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2m5.5 1.5v2a1 1 0 0 0 1 1h2z"/>
+                                </svg>
+                                {m.body}
+                              </div>
+                            ) : (
+                              <p className="px-2.5 py-1.5 text-[11px] leading-snug">{m.body}</p>
+                            )}
+                          </div>
+                          </div>
+                          <p className="text-[9px] text-gray-700 mt-0.5 px-1">
+                            {new Date(m.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                          </p>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* AI Suggestions */}
+                  {waSuggestions.length > 0 && (
+                    <div className="px-3 pb-2 flex flex-col gap-1">
+                      <p className="text-[10px] text-gray-600 mb-0.5">AI suggestions — tap to use:</p>
+                      {waSuggestions.map((s, i) => (
+                        <button
+                          key={i}
+                          onClick={() => setWaReply(s)}
+                          className="text-left text-[11px] px-2.5 py-1.5 rounded-lg border border-green-500/20 bg-green-500/5 text-gray-300 hover:bg-green-500/15 hover:border-green-500/40 transition leading-snug"
+                        >
+                          {s}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Reply input */}
+                  <div className="px-3 pb-2.5 flex gap-1.5">
+                    <input
+                      type="text"
+                      value={waReply}
+                      onChange={(e) => setWaReply(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter") handleSendWaReply(); }}
+                      placeholder="Reply…"
+                      className="flex-1 bg-[var(--ml-bg-base)] border border-[var(--ml-bg-hover)] rounded-lg px-2 py-1 text-[11px] text-gray-200 outline-none focus:border-green-500/50"
+                    />
+                    <button
+                      onClick={handleSendWaReply}
+                      disabled={waSending || !waReply.trim()}
+                      className="px-2.5 py-1 text-[11px] bg-green-600/20 border border-green-500/30 text-green-300 rounded-lg hover:bg-green-600/30 disabled:opacity-40 transition"
+                    >
+                      {waSending ? "…" : "Send"}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  {waChats.length === 0 && !waChatsLoading && (
+                    <p className="text-[11px] text-gray-600 text-center pt-1">
+                      {waError ?? "No chats yet — send a WhatsApp message to populate."}
+                    </p>
+                  )}
+                  {waChats.map((chat) => {
+                    const isGroup = chat.id.endsWith("@g.us");
+                    const phoneNum = !isGroup ? `+${chat.id.replace("@s.whatsapp.net", "")}` : null;
+                    const showNum = phoneNum && phoneNum !== `+${chat.name}`;
+                    return (
+                      <button
+                        key={chat.id}
+                        onClick={() => handleOpenWaChat(chat)}
+                        className="w-full text-left px-2.5 py-2 bg-[#1a1a24] border border-[var(--ml-bg-hover)] rounded-xl hover:border-green-500/30 transition shadow-sm shadow-black/30"
+                      >
+                        <div className="flex items-start gap-2 min-w-0">
+                          {renderWaAvatar(chat)}
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <p className="text-[11px] text-gray-200 font-medium truncate flex-1">{chat.name}</p>
+                              {isGroup && (
+                                <span className="text-[9px] text-green-600 shrink-0">group</span>
+                              )}
+                            </div>
+                            {showNum && (
+                              <p className="text-[10px] text-gray-600 truncate mt-0.5">{phoneNum}</p>
+                            )}
+                            {chat.lastMessage && (
+                              <p className="text-[10px] text-gray-600 truncate mt-0.5 opacity-70">{chat.lastMessage}</p>
+                            )}
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Section 5: AI Insights ── */}
       {insightsEnabled && (
         <InsightsPanel
           workspaceId={workspaceId ?? null}

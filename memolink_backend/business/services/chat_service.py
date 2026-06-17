@@ -19,16 +19,18 @@ _HTML_TAG = re.compile(r"<[^>]+>")
 _BASE64_IMG_MD = re.compile(r'!\[([^\]]*)\]\(data:[^)]{20,}\)', re.IGNORECASE)
 # Matches HTML img tags whose src is a base64 data URL
 _BASE64_IMG_HTML = re.compile(r'<img\b[^>]*\bsrc=["\']data:[^"\']{20,}["\'][^>]*>', re.IGNORECASE)
-# Strips body_b64 attribute from email_draft tags so large note bodies don't bloat conversation history
+# Strips body_b64 attributes from draft tags so large note bodies don't bloat conversation history
 _EMAIL_DRAFT_BODY = re.compile(r'\s+body_b64="[^"]*"', re.IGNORECASE)
+_WHATSAPP_DRAFT_BODY = re.compile(r'\s+body_b64="[^"]*"', re.IGNORECASE)
 
 
 def _strip_base64_images(text: str) -> str:
     """Replace embedded base64 images with a short placeholder to prevent token overflow.
-    Also strips email draft body_b64 attributes from conversation history."""
+    Also strips draft body_b64 attributes from conversation history."""
     text = _BASE64_IMG_MD.sub(r'[generated image: \1]', text)
     text = _BASE64_IMG_HTML.sub('[embedded image]', text)
     text = _EMAIL_DRAFT_BODY.sub('', text)
+    text = _WHATSAPP_DRAFT_BODY.sub('', text)
     return text
 from memolink_backend.domain.repositories.conversation_repository import ConversationRepository
 from memolink_backend.domain.repositories.note_repository import NoteRepository
@@ -415,6 +417,18 @@ _GENERAL_IMPROVE_WRITING_RE = re.compile(
     r"^\s*(?:can|could|would|will)\s+you\s+make\s+this\s+better\b|^\s*(?:please\s+)?(?:improve|rewrite|polish|edit|clean[\s-]?up|fix|format)\s+(?:this|the following)\b",
     re.IGNORECASE,
 )
+_WHATSAPP_DIRECT_TO_RE = re.compile(
+    r"\bto\s+(\+?\d[\d\s().-]{5,}\d|[0-9]+@s\.whatsapp\.net|[0-9-]+@g\.us)\b",
+    re.IGNORECASE,
+)
+_WHATSAPP_CONTENT_BEFORE_RE = re.compile(
+    r"^\s*(?:can|could|would|will)\s+you\s+(?:please\s+)?send\s+(.+?)\s+(?:using|via|through|on)\s+whatsapp\s+to\s+(.+?)\s*$",
+    re.IGNORECASE | re.DOTALL,
+)
+_WHATSAPP_CONTENT_TO_RE = re.compile(
+    r"^\s*(?:can|could|would|will)\s+you\s+(?:please\s+)?send\s+(.+?)\s+to\s+(.+?)\s+(?:using|via|through|on)\s+whatsapp\s*$",
+    re.IGNORECASE | re.DOTALL,
+)
 
 
 def _extract_improve_note_name(text: str) -> str | None:
@@ -428,6 +442,34 @@ def _extract_improve_note_name(text: str) -> str | None:
 
 def _looks_like_general_writing_improve_request(text: str) -> bool:
     return bool(_GENERAL_IMPROVE_WRITING_RE.search(text or ""))
+
+
+def _extract_whatsapp_draft_intent(text: str) -> dict | None:
+    lower = (text or "").lower()
+    if "whatsapp" not in lower or not re.search(r"\b(send|message|share)\b", lower):
+        return None
+
+    for pattern in (_WHATSAPP_CONTENT_BEFORE_RE, _WHATSAPP_CONTENT_TO_RE):
+        match = pattern.search(text)
+        if match:
+            return {
+                "body_hint": match.group(1).strip().strip('"\'., '),
+                "recipient": match.group(2).strip().strip('"\'., '),
+            }
+
+    recipient_match = _WHATSAPP_DIRECT_TO_RE.search(text)
+    if not recipient_match:
+        return None
+
+    before = text[:recipient_match.start()].strip()
+    before = re.sub(
+        r"^\s*(?:can|could|would|will)\s+you\s+(?:please\s+)?(?:send|message|share)\s+",
+        "",
+        before,
+        flags=re.IGNORECASE,
+    )
+    before = re.sub(r"\s+(?:using|via|through|on)\s+whatsapp\s*$", "", before, flags=re.IGNORECASE).strip()
+    return {"body_hint": before.strip('"\'., '), "recipient": recipient_match.group(1).strip()}
 
 
 # High-capability OpenAI models with a low tokens-per-minute (TPM) cap on lower
@@ -743,6 +785,7 @@ class ChatService(IChatService):
         pre_conf_reason: str | None,
         routing_reason: str | None,
         email_draft_prefill: str | None,
+        whatsapp_draft_prefill: str | None,
     ) -> _ChatRoutePlan:
         plan = _ChatRoutePlan(
             conversation_id=conversation_id,
@@ -789,6 +832,15 @@ class ChatService(IChatService):
                 plan.smart_mode_name = "general_chat"
                 plan.extra_completion_kwargs = {}
                 plan.fetched_papers = []
+
+        if whatsapp_draft_prefill:
+            plan.decision = "direct_response"
+            plan.direct_response = self._persist_direct_response(
+                conversation_id,
+                whatsapp_draft_prefill,
+                routing_reason="Direct: whatsapp_draft",
+            )
+            return plan
 
         if email_draft_prefill:
             plan.decision = "direct_response"
@@ -1714,8 +1766,57 @@ class ChatService(IChatService):
         )
         if _current_is_bare_email and (_assistant_requested_email_details or bool(_prior_email_request)):
             _asks_compose = True
+
+        _whatsapp_draft_prefill: str | None = None
+        _whatsapp_intent = _extract_whatsapp_draft_intent(user_text)
+        if _whatsapp_intent:
+            try:
+                import html as _html_mod
+
+                recipient_hint = str(_whatsapp_intent.get("recipient") or "").strip()
+                body_hint = str(_whatsapp_intent.get("body_hint") or "").strip()
+                body_lower = body_hint.lower()
+                body_text = body_hint
+
+                if body_lower in {"my email", "my email address", "my gmail", "my gmail address"}:
+                    email_address = ""
+                    if self._email_service and dto.user_id:
+                        account_repo = getattr(self._email_service, "account_repo", None)
+                        if account_repo:
+                            try:
+                                tokens = account_repo.get_decrypted_tokens(dto.user_id)
+                                email_address = str((tokens or {}).get("email") or "").strip()
+                            except Exception:
+                                email_address = ""
+                            if not email_address:
+                                try:
+                                    account = account_repo.get_by_user_id(dto.user_id)
+                                    email_address = str(getattr(account, "email_address", "") or "").strip()
+                                except Exception:
+                                    email_address = ""
+                    if not email_address:
+                        _whatsapp_draft_prefill = (
+                            "I can create that WhatsApp draft, but I could not find your connected email address. "
+                            "Connect Gmail in Settings -> Email first, or tell me the exact email address to send."
+                        )
+                    else:
+                        body_text = email_address
+
+                if not _whatsapp_draft_prefill:
+                    if not recipient_hint or not body_text:
+                        raise ValueError("insufficient whatsapp intent")
+                    body_b64 = base64.b64encode(body_text[:4000].encode()).decode()
+                    to_safe = _html_mod.escape(recipient_hint, quote=True)
+                    _whatsapp_draft_prefill = (
+                        "Here's your WhatsApp draft — review it and click **Send** to deliver, "
+                        "or edit it first.\n\n"
+                        f'<whatsapp_draft to="{to_safe}" body_b64="{body_b64}"></whatsapp_draft>'
+                    )
+            except Exception:
+                pass
+
         _email_draft_prefill: str | None = None
-        if (_asks_compose or _asks_reply) and self._email_service and dto.user_id:
+        if not _whatsapp_intent and (_asks_compose or _asks_reply) and self._email_service and dto.user_id:
             try:
                 import re as _re
                 import json as _json
@@ -2092,7 +2193,16 @@ class ChatService(IChatService):
         # Pre-compute a deterministic confidence fallback so the badge always shows
         pre_conf_level, pre_conf_reason = _pre_confidence(all_notes, top_notes_for_confidence)
 
-        return conversation_id, system_msgs + message_history, sources, pre_conf_level, pre_conf_reason, _email_draft_prefill, suggested_web_query
+        return (
+            conversation_id,
+            system_msgs + message_history,
+            sources,
+            pre_conf_level,
+            pre_conf_reason,
+            _email_draft_prefill,
+            _whatsapp_draft_prefill,
+            suggested_web_query,
+        )
 
     def _improve_note_request(self, dto: ChatRequestDTO, note_name: str, conversation_id: int) -> ChatResponseDTO:
         workspace_id = getattr(dto, "workspace_id", None)
@@ -2243,7 +2353,7 @@ class ChatService(IChatService):
             openai_key=settings.openai_api_key,
         )
 
-        conversation_id, messages, sources, pre_conf_level, pre_conf_reason, email_draft_prefill, suggested_web_query = self._build_chat_context(dto)
+        conversation_id, messages, sources, pre_conf_level, pre_conf_reason, email_draft_prefill, whatsapp_draft_prefill, suggested_web_query = self._build_chat_context(dto)
         plan = self._build_route_plan(
             dto=dto,
             user_text=user_text,
@@ -2256,6 +2366,7 @@ class ChatService(IChatService):
             pre_conf_reason=pre_conf_reason,
             routing_reason=routing_reason,
             email_draft_prefill=email_draft_prefill,
+            whatsapp_draft_prefill=whatsapp_draft_prefill,
         )
 
         if plan.direct_response:
@@ -2385,7 +2496,7 @@ class ChatService(IChatService):
 
         t_total = time.perf_counter()
         t_ctx = time.perf_counter()
-        conversation_id, messages, sources, pre_conf_level, pre_conf_reason, email_draft_prefill, suggested_web_query = self._build_chat_context(dto)
+        conversation_id, messages, sources, pre_conf_level, pre_conf_reason, email_draft_prefill, whatsapp_draft_prefill, suggested_web_query = self._build_chat_context(dto)
         ctx_ms = int((time.perf_counter() - t_ctx) * 1000)
         plan = self._build_route_plan(
             dto=dto,
@@ -2399,6 +2510,7 @@ class ChatService(IChatService):
             pre_conf_reason=pre_conf_reason,
             routing_reason=routing_reason,
             email_draft_prefill=email_draft_prefill,
+            whatsapp_draft_prefill=whatsapp_draft_prefill,
         )
 
         if plan.direct_response:

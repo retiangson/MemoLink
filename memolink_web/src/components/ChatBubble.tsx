@@ -8,6 +8,7 @@ import { WorkflowApprovalCard } from "./WorkflowApprovalCard";
 import { WorkflowActionBar } from "./WorkflowActionBar";
 import { EvaluationRatingBar } from "./EvaluationRatingBar";
 import { EmailDraftCard } from "./EmailDraftCard";
+import { WhatsappDraftCard } from "./WhatsappDraftCard";
 import type { Message } from "../types";
 import "highlight.js/styles/github-dark.css";
 import "../styles/markdown.css";
@@ -35,6 +36,20 @@ function parseEmailDrafts(content: string): { before: string; drafts: Array<{ to
     return "[[EMAIL_DRAFT_PLACEHOLDER]]";
   });
   const parts = cleaned.split("[[EMAIL_DRAFT_PLACEHOLDER]]");
+  return { before: parts[0] || "", drafts, after: parts.slice(1).join("") };
+}
+
+function parseWhatsappDrafts(content: string): { before: string; drafts: Array<{ to: string; body: string }>; after: string } {
+  const drafts: Array<{ to: string; body: string }> = [];
+  const TAG_RE = /<whatsapp_draft((?:\s+\w+(?:_\w+)*="[^"]*")*)\s*><\/whatsapp_draft>/g;
+  const cleaned = content.replace(TAG_RE, (_, attrs) => {
+    const get = (key: string) => { const m = attrs.match(new RegExp(`${key}="([^"]*)"`)); return m ? m[1] : ""; };
+    const bodyB64 = get("body_b64");
+    const body = bodyB64 ? b64DecodeUtf8(bodyB64) : get("body");
+    drafts.push({ to: get("to"), body });
+    return "[[WHATSAPP_DRAFT_PLACEHOLDER]]";
+  });
+  const parts = cleaned.split("[[WHATSAPP_DRAFT_PLACEHOLDER]]");
   return { before: parts[0] || "", drafts, after: parts.slice(1).join("") };
 }
 
@@ -224,6 +239,7 @@ export default function ChatBubble({ role, content, model, streaming, onAdd, onD
   const cmdRunningMsg = isCmdRunning ? content.slice("__CMD_RUNNING__:".length) : "";
   const { pre, edit, noteId, post } = (isThinking || isImageGenerating || isImprovingNote || isQuiz || isWorkflowPlan || isCmdRunning) ? { pre: "", edit: null, noteId: null, post: "" } : parseNoteEdit(content);
   const { before: draftBefore, drafts: emailDrafts, after: draftAfter } = parseEmailDrafts(pre || content);
+  const { before: whatsappDraftBefore, drafts: whatsappDrafts, after: whatsappDraftAfter } = parseWhatsappDrafts(pre || content);
   const hasAssistantContent = !isThinking && content.trim().length > 0;
 
   async function handleCopy() {
@@ -372,6 +388,14 @@ export default function ChatBubble({ role, content, model, streaming, onAdd, onD
                       <EmailDraftCard key={idx} to={d.to} subject={d.subject} body={d.body} messageId={d.messageId} threadId={d.threadId} />
                     ))}
                     {draftAfter && <ContentWithNoteLinks content={draftAfter} onOpenNote={onOpenNote} />}
+                  </>
+                ) : whatsappDrafts.length > 0 ? (
+                  <>
+                    {whatsappDraftBefore && <ContentWithNoteLinks content={whatsappDraftBefore} onOpenNote={onOpenNote} />}
+                    {whatsappDrafts.map((d, idx) => (
+                      <WhatsappDraftCard key={idx} to={d.to} body={d.body} />
+                    ))}
+                    {whatsappDraftAfter && <ContentWithNoteLinks content={whatsappDraftAfter} onOpenNote={onOpenNote} />}
                   </>
                 ) : (
                   <ContentWithNoteLinks content={pre} onOpenNote={onOpenNote} />
