@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog, shell } from "electron";
+import { app, BrowserWindow, ipcMain, dialog, shell, desktopCapturer, session } from "electron";
 import updaterPkg from "electron-updater";
 const { autoUpdater } = updaterPkg;
 import path from "path";
@@ -401,6 +401,16 @@ function setupAutoUpdater() {
 }
 
 app.whenReady().then(() => {
+  // Handle getDisplayMedia so Computer Audio capture works in Electron.
+  // On Windows, 'loopback' captures all system audio via WASAPI without a dialog.
+  session.defaultSession.setDisplayMediaRequestHandler(async (_request, callback) => {
+    const sources = await desktopCapturer.getSources({ types: ["screen"] });
+    callback({
+      video: sources[0],
+      audio: process.platform === "win32" ? "loopback" : undefined,
+    });
+  });
+
   createWindow();
   // Check for updates in production builds only
   if (!process.env.VITE_DEV_SERVER_URL) {
