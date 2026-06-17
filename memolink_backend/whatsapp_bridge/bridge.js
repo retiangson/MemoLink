@@ -96,6 +96,7 @@ function extractBody(msg) {
 }
 
 function displayNameFor(jid) {
+  if (!jid) return "Unknown";
   return contactNames.get(jid) || jid.replace(/@.*/, "");
 }
 
@@ -130,25 +131,28 @@ function isHistoryReady() {
 function msgToObj(msg) {
   const chatId      = msg.key.remoteJid;
   const isGroup     = chatId?.endsWith("@g.us");
-  const participant = msg.key.participant;
+  const participant = msg.key.participant || msg.participant || null;
   const type        = mediaType(msg);
+  const senderId    = msg.key.fromMe
+    ? (sock?.user?.id || "me")
+    : (participant || chatId);
 
-  let from;
+  let senderName;
   if (msg.key.fromMe) {
-    from = "me";
-  } else if (isGroup) {
+    senderName = "me";
+  } else if (isGroup || participant) {
     // Priority: pushName (sent by WhatsApp on every message) → stored contact name → phone number
-    from = msg.pushName
-      || (participant ? displayNameFor(participant) : null)
-      || (participant ? participant.replace(/@.*/, "") : "Unknown");
+    senderName = msg.pushName || displayNameFor(senderId);
   } else {
-    from = displayNameFor(chatId);
+    senderName = msg.pushName || displayNameFor(chatId);
   }
 
   return {
     id:        msg.key.id,
     chatId,
-    from,
+    from:      senderName,
+    senderId,
+    senderName,
     fromMe:    !!msg.key.fromMe,
     body:      extractBody(msg),
     mediaType: type,
@@ -160,8 +164,9 @@ function addMessage(chatId, msg) {
   if (!chatId || chatId === "status@broadcast" || chatId.endsWith("@broadcast")) return;
 
   // Capture pushName (sender's display name) sent on every WhatsApp message
-  if (msg.pushName && msg.key?.participant) {
-    contactNames.set(msg.key.participant, msg.pushName);
+  const participant = msg.key?.participant || msg.participant;
+  if (msg.pushName) {
+    contactNames.set(participant || chatId, msg.pushName);
   }
 
   // Store raw message for later media download

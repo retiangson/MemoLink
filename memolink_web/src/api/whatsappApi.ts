@@ -23,6 +23,8 @@ export interface WhatsappMessage {
   id: string;
   chatId: string;
   from: string;
+  senderId?: string;
+  senderName?: string;
   fromMe: boolean;
   body: string;
   mediaType: "image" | "video" | "audio" | "document" | "sticker" | null;

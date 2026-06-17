@@ -908,6 +908,7 @@ export function RightPanel({
                     ) : waMessages.length === 0 ? (
                       <p className="text-[11px] text-gray-600">No messages yet</p>
                     ) : waMessages.map((m) => {
+                      const senderLabel = m.senderName || m.from || m.senderId || "Unknown";
                       const bubbleCls = m.fromMe
                         ? "bg-green-600/20 text-gray-200"
                         : "bg-[var(--ml-bg-hover)] text-gray-300";
@@ -916,7 +917,7 @@ export function RightPanel({
                       return (
                         <div key={m.id} className={`flex flex-col ${m.fromMe ? "items-end" : "items-start"}`}>
                           {!m.fromMe && (
-                            <p className="text-[10px] text-green-400 font-medium mb-0.5">{m.from}</p>
+                            <p className="text-[10px] text-green-400 font-medium mb-0.5">{senderLabel}</p>
                           )}
                           <div className="group/message flex items-start gap-1 max-w-[90%]">
                           {m.fromMe && (
