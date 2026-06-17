@@ -27,6 +27,7 @@ interface SettingsModalProps {
   teamsEnabled?: boolean;
   workflowEnabled?: boolean;
   onReplayTour?: () => void;
+  whatsappAvailable?: boolean;
   onWhatsappConnected?: () => void;
   onWhatsappDisconnected?: () => void;
 }
@@ -48,6 +49,7 @@ export function SettingsModal({
   teamsEnabled = true,
   workflowEnabled = true,
   onReplayTour,
+  whatsappAvailable = false,
   onWhatsappConnected,
   onWhatsappDisconnected,
 }: SettingsModalProps) {
@@ -621,7 +623,7 @@ export function SettingsModal({
     { id: "connectors", label: "Connectors" },
     ...(emailEnabled ? [{ id: "email" as Tab, label: "Email" }] : []),
     ...(teamsEnabled ? [{ id: "teams" as Tab, label: "Teams" }] : []),
-    { id: "whatsapp" as Tab, label: "WhatsApp" },
+    ...(whatsappAvailable ? [{ id: "whatsapp" as Tab, label: "WhatsApp" }] : []),
     ...(workflowEnabled ? [{ id: "workflow" as Tab, label: "Workflow" }] : []),
   ];
 

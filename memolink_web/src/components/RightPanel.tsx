@@ -34,6 +34,7 @@ interface RightPanelProps {
   emailSyncResult?: string | null;
   teamsConnected?: boolean;
   whatsappConnected?: boolean;
+  whatsappAvailable?: boolean;
   insightsEnabled?: boolean;
   workspaceId?: number | null;
   onOpenNote?: (noteId: number) => void;
@@ -47,6 +48,7 @@ export function RightPanel({
   isSyncingEmail, onSyncEmail, emailSyncResult,
   teamsConnected,
   whatsappConnected,
+  whatsappAvailable,
   insightsEnabled, workspaceId, onOpenNote,
 }: RightPanelProps) {
   const [showAddModal, setShowAddModal] = useState(false);
@@ -801,7 +803,7 @@ export function RightPanel({
       )}
 
       {/* ── Section 4: WhatsApp ── */}
-      {whatsappConnected && (
+      {whatsappConnected && whatsappAvailable && (
         <div className="border-b border-[var(--ml-bg-panel)]">
           <button
             onClick={() => setShowWhatsapp((v) => !v)}
