@@ -136,8 +136,11 @@ function msgToObj(msg) {
   let from;
   if (msg.key.fromMe) {
     from = "me";
-  } else if (isGroup && participant) {
-    from = displayNameFor(participant);
+  } else if (isGroup) {
+    // Priority: pushName (sent by WhatsApp on every message) → stored contact name → phone number
+    from = msg.pushName
+      || (participant ? displayNameFor(participant) : null)
+      || (participant ? participant.replace(/@.*/, "") : "Unknown");
   } else {
     from = displayNameFor(chatId);
   }
