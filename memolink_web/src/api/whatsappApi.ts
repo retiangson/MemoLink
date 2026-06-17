@@ -82,8 +82,23 @@ export async function listWhatsappChats(): Promise<WhatsappChat[]> {
   if (inElectron()) {
     const d = await bridgeRequest<{ chats: WhatsappChat[] }>("GET", "/chats");
     const chats = d.chats ?? [];
-    // Skip chats that have neither a lastMessage nor a positive messageCount
-    return chats.filter((c) => !!c.lastMessage || (c.messageCount !== undefined && c.messageCount > 0));
+    // Mirror the backend filter exactly: use messageCount if available,
+    // otherwise fetch /messages to confirm the chat has content.
+    const hasMessages = await Promise.all(
+      chats.map(async (c) => {
+        if (typeof c.messageCount === "number") return c.messageCount > 0;
+        if (c.lastMessage) return true;
+        try {
+          const r = await bridgeRequest<{ messages: unknown[]; total: number }>(
+            "GET", "/messages", { params: { chatId: c.id, limit: "1", offset: "0" } },
+          );
+          return (r.total ?? 0) > 0 || (r.messages?.length ?? 0) > 0;
+        } catch {
+          return false;
+        }
+      }),
+    );
+    return chats.filter((_, i) => hasMessages[i]);
   }
   const { data } = await api.get("/whatsapp/chats");
   return data.chats ?? [];
