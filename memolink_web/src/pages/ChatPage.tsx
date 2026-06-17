@@ -642,7 +642,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
               className="flex shrink-0 h-full px-3 items-center justify-center hover:bg-[var(--ml-bg-panel)] transition border-r border-[var(--ml-bg-panel)]"
               aria-label="Open sidebar"
             >
-              <img src="/memolink-icon.png" alt="" className="h-5 w-5 rounded-md bg-white object-cover" />
+              <img src={`${import.meta.env.BASE_URL}memolink-icon.png`} alt="" className="h-5 w-5 rounded-md bg-white object-cover" />
             </button>
           )}
 
