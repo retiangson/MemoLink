@@ -5,6 +5,7 @@ exposes async helpers for the controller.
 import asyncio
 import json
 import logging
+import os
 import re
 import shutil
 import subprocess
@@ -47,12 +48,61 @@ def _session_dir(user_id: int) -> Path:
     return p
 
 
+def _first_existing_executable(candidates: list[str | Path | None]) -> str | None:
+    for candidate in candidates:
+        if not candidate:
+            continue
+
+        path = Path(str(candidate)).expanduser()
+        if path.is_file():
+            return str(path)
+    return None
+
+
 def _find_node() -> str | None:
-    return shutil.which("node")
+    executable = "node.exe" if sys.platform == "win32" else "node"
+    bridge_dir = _bridge_dir()
+    python_dir = Path(sys.executable).parent
+
+    return _first_existing_executable(
+        [
+            os.getenv("MEMOLINK_NODE_PATH"),
+            shutil.which("node"),
+            shutil.which("node.exe"),
+            bridge_dir / "node" / executable,
+            bridge_dir / "node" / "bin" / executable,
+            python_dir / executable,
+            python_dir / "node" / executable,
+            python_dir / "node" / "bin" / executable,
+            python_dir / "resources" / "node" / executable,
+            python_dir / "resources" / "node" / "bin" / executable,
+            Path("/usr/local/bin/node"),
+            Path("/usr/bin/node"),
+        ]
+    )
 
 
 def _find_npm() -> str | None:
-    return shutil.which("npm")
+    executable = "npm.cmd" if sys.platform == "win32" else "npm"
+    bridge_dir = _bridge_dir()
+    python_dir = Path(sys.executable).parent
+
+    return _first_existing_executable(
+        [
+            os.getenv("MEMOLINK_NPM_PATH"),
+            shutil.which("npm"),
+            shutil.which("npm.cmd"),
+            bridge_dir / "node" / executable,
+            bridge_dir / "node" / "bin" / executable,
+            python_dir / executable,
+            python_dir / "node" / executable,
+            python_dir / "node" / "bin" / executable,
+            python_dir / "resources" / "node" / executable,
+            python_dir / "resources" / "node" / "bin" / executable,
+            Path("/usr/local/bin/npm"),
+            Path("/usr/bin/npm"),
+        ]
+    )
 
 
 def _kill_orphan_bridge() -> None:
@@ -107,7 +157,9 @@ def start_bridge(user_id: int) -> dict:
     node = _find_node()
     if not node:
         raise RuntimeError(
-            "Node.js is not installed. Please install Node.js to use WhatsApp."
+            "WhatsApp requires a bundled Node.js 20+ runtime in production. "
+            "Install Node.js on the host, set MEMOLINK_NODE_PATH, or rebuild the "
+            "Docker/Electron package so it includes Node and the WhatsApp bridge."
         )
 
     # Kill any orphan bridge from a previous backend session
@@ -118,9 +170,13 @@ def start_bridge(user_id: int) -> dict:
     if not nm.exists():
         npm = _find_npm()
         if not npm:
-            raise RuntimeError("npm not found – cannot install bridge dependencies.")
+            raise RuntimeError(
+                "WhatsApp bridge dependencies are missing and npm was not found. "
+                "Run npm ci --omit=dev in memolink_backend/whatsapp_bridge during "
+                "the production build, or set MEMOLINK_NPM_PATH for development."
+            )
         subprocess.run(
-            [npm, "install"],
+            [npm, "ci", "--omit=dev"] if (bridge_dir / "package-lock.json").exists() else [npm, "install"],
             cwd=str(bridge_dir),
             check=True,
             stdout=subprocess.DEVNULL,
