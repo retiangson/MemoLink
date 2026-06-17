@@ -31,8 +31,23 @@ class FakeOpenAIChat:
 
 
 class FakeEmailService:
+    account_repo = None
+
     def live_search_sync(self, user_id, query, top_k=1):
         return []
+
+
+class FakeEmailAccountRepository:
+    def __init__(self, email):
+        self.email = email
+
+    def get_decrypted_tokens(self, user_id):
+        return {"email": self.email}
+
+
+class FakeConnectedEmailService(FakeEmailService):
+    def __init__(self, email):
+        self.account_repo = FakeEmailAccountRepository(email)
 
 
 class FakeActionAgent:
@@ -72,6 +87,12 @@ def _extract_draft_subject(answer: str) -> str:
     match = re.search(r'subject="([^"]+)"', answer)
     assert match, answer
     return match.group(1)
+
+
+def _extract_whatsapp_draft_body(answer: str) -> str:
+    match = re.search(r'<whatsapp_draft[^>]*body_b64="([^"]+)"', answer)
+    assert match, answer
+    return base64.b64decode(match.group(1)).decode()
 
 
 class RecordingHybridNoteRepository(FakeNoteRepository):
@@ -588,6 +609,25 @@ def test_chat_service_builds_email_draft_for_send_that_as_email_phrase(monkeypat
     assert '<email_draft to="rectiangson@gmail.com"' in result.answer
     assert "click **Send**" in result.answer
     assert "generated research content" in _extract_draft_body(result.answer)
+
+
+def test_chat_service_builds_whatsapp_draft_for_my_email_address():
+    service = ChatService(
+        conv_repo=FakeConversationRepository(),
+        note_repo=FakeNoteRepository(),
+        embedding_service=FakeEmbeddingService(),
+        email_service=FakeConnectedEmailService("ron@example.com"),
+    )
+
+    result = service.ask(ChatRequestDTO(
+        user_id=1,
+        prompt="can you send my email address using whatsapp to 64204718827",
+    ))
+
+    assert '<whatsapp_draft to="64204718827"' in result.answer
+    assert "click **Send**" in result.answer
+    assert "ron@example.com" == _extract_whatsapp_draft_body(result.answer)
+    assert result.routing_reason == "Direct: whatsapp_draft"
 
 
 def test_chat_service_uses_prior_context_when_user_only_replies_with_email_address(monkeypatch):

@@ -38,6 +38,7 @@ import { detectReminderFromMessage } from "../api/reminderApi";
 import { ChatReminderSuggestion } from "../components/ChatReminderSuggestion";
 import type { EmailRecord, EmailAccount } from "../api/emailApi";
 import { getTeamsStatus } from "../api/teamsApi";
+import { getWhatsappStatus, startWhatsapp } from "../api/whatsappApi";
 import { AdminPage } from "./AdminPage";
 import { suggestActions, type WorkflowAction } from "../api/workflowApi";
 import { OnboardingTour } from "../components/OnboardingTour";
@@ -96,6 +97,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
   const [emailAccounts, setEmailAccounts] = useState<EmailAccount[]>([]);
   const [emailRecords, setEmailRecords] = useState<EmailRecord[]>([]);
   const [teamsConnected, setTeamsConnected] = useState(false);
+  const [whatsappConnected, setWhatsappConnected] = useState(false);
   const [isSyncingEmail, setIsSyncingEmail] = useState(false);
   const [emailSyncResult, setEmailSyncResult] = useState<string | null>(null);
   const [showTour, setShowTour] = useState(() => !localStorage.getItem("memolink_walkthrough_done"));
@@ -162,6 +164,33 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
   useEffect(() => {
     loadEmailData();
     getTeamsStatus().then(s => setTeamsConnected(s.connected)).catch(() => {});
+    // Check bridge; if still running (detached process survived) restore state immediately.
+    // If bridge died but user was previously connected, auto-restart silently so session files reconnect without a QR.
+    getWhatsappStatus().then(s => {
+      if (s.connected) {
+        setWhatsappConnected(true);
+        localStorage.setItem("memolink_wa_connected", "1");
+      } else if (localStorage.getItem("memolink_wa_connected") === "1") {
+        // Bridge died (machine restart, etc.) — silently restart it.
+        startWhatsapp().catch(() => {}).finally(() => {
+          // Poll up to 10s for the bridge to reconnect using saved session.
+          let tries = 0;
+          const poll = setInterval(() => {
+            tries++;
+            getWhatsappStatus().then(st => {
+              if (st.connected) {
+                setWhatsappConnected(true);
+                clearInterval(poll);
+              } else if (tries >= 5) {
+                // Gave up — bridge couldn't reconnect silently; user must reconnect manually.
+                localStorage.removeItem("memolink_wa_connected");
+                clearInterval(poll);
+              }
+            }).catch(() => { clearInterval(poll); });
+          }, 2000);
+        });
+      }
+    }).catch(() => {});
   }, []);
 
   async function handleSyncEmail() {
@@ -1373,6 +1402,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
           setEmailRecords((prev) => prev.filter((r) => r.id !== emailId));
         }}
         teamsConnected={teamsConnected}
+        whatsappConnected={whatsappConnected}
         isSyncingEmail={isSyncingEmail}
         onSyncEmail={handleSyncEmail}
         emailSyncResult={emailSyncResult}
@@ -1406,7 +1436,8 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
         />
       )}
 
-      <SettingsModal show={showSettings} user={user} onClose={() => setShowSettings(false)} selectedModel={selectedModel} onModelChange={handleModelChange} modelSelectionEnabled={flags.model_selection_enabled} customApiKeysEnabled={flags.custom_api_keys_enabled} ttsEnabled={flags.tts_enabled} emailEnabled={flags.email_enabled} workflowEnabled={flags.workflow_enabled} onReplayTour={() => { localStorage.removeItem("memolink_walkthrough_done"); setShowTour(true); setShowSettings(false); }} />
+      <SettingsModal show={showSettings} user={user} onClose={() => setShowSettings(false)} selectedModel={selectedModel} onModelChange={handleModelChange} modelSelectionEnabled={flags.model_selection_enabled} customApiKeysEnabled={flags.custom_api_keys_enabled} ttsEnabled={flags.tts_enabled} emailEnabled={flags.email_enabled} workflowEnabled={flags.workflow_enabled} onReplayTour={() => { localStorage.removeItem("memolink_walkthrough_done"); setShowTour(true); setShowSettings(false); }} onWhatsappConnected={() => { setWhatsappConnected(true); localStorage.setItem("memolink_wa_connected", "1"); }}
+        onWhatsappDisconnected={() => { setWhatsappConnected(false); localStorage.removeItem("memolink_wa_connected"); }} />
       <HelpModal show={showHelp} onClose={() => setShowHelp(false)} />
       <FeedbackModal show={showFeedback} onClose={() => setShowFeedback(false)} />
       <MemoGraphModal

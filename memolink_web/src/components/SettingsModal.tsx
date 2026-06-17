@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from "react";
+﻿import React, { useState, useEffect, useRef } from "react";
 import { changePassword } from "../api/client";
 import { getProviders, addProvider, updateProvider, deleteProvider } from "../api/settingsApi";
 import type { CustomProvider } from "../api/settingsApi";
@@ -8,6 +8,8 @@ import { getTeamsStatus, getTeamsConnectUrl, disconnectTeams, listTeamsChats, ge
 import type { TeamsStatus, TeamsChat, TeamsMessage } from "../api/teamsApi";
 import { listConnectors, saveGitHubConnector, getGitHubConnectUrl, deleteGitHubConnector, saveJiraConnector, getJiraConnectUrl, deleteJiraConnector } from "../api/connectorsApi";
 import type { ConnectorSummary } from "../api/connectorsApi";
+import { getWhatsappStatus, startWhatsapp, stopWhatsapp, resetWhatsappSession } from "../api/whatsappApi";
+import type { WhatsappStatus } from "../api/whatsappApi";
 import { EmailReplyPanel } from "./EmailReplyPanel";
 import { MODELS } from "../constants/models";
 import type { User } from "../utils/auth";
@@ -25,9 +27,11 @@ interface SettingsModalProps {
   teamsEnabled?: boolean;
   workflowEnabled?: boolean;
   onReplayTour?: () => void;
+  onWhatsappConnected?: () => void;
+  onWhatsappDisconnected?: () => void;
 }
 
-type Tab = "profile" | "security" | "ai" | "keys" | "tts" | "connectors" | "email" | "teams" | "workflow";
+type Tab = "profile" | "security" | "ai" | "keys" | "tts" | "connectors" | "email" | "teams" | "whatsapp" | "workflow";
 
 const BLANK_FORM = { name: "", key: "", model: "", base_url: "" };
 
@@ -44,6 +48,8 @@ export function SettingsModal({
   teamsEnabled = true,
   workflowEnabled = true,
   onReplayTour,
+  onWhatsappConnected,
+  onWhatsappDisconnected,
 }: SettingsModalProps) {
   const [tab, setTab] = useState<Tab>("profile");
 
@@ -90,6 +96,12 @@ export function SettingsModal({
   const [teamsSaveResult, setTeamsSaveResult] = useState<string | null>(null);
   const [teamsError, setTeamsError] = useState<string | null>(null);
 
+  // WhatsApp connection state
+  const [waStatus, setWaStatus] = useState<WhatsappStatus>({ connected: false, status: "disconnected", qr_image: null });
+  const [waLoading, setWaLoading] = useState(false);
+  const [waError, setWaError] = useState<string | null>(null);
+  const waPollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   // Email connection state
   const [emailStatus, setEmailStatus] = useState<EmailStatus>({ connected: false, accounts: [] });
   const [emailLoading, setEmailLoading] = useState(false);
@@ -118,6 +130,7 @@ export function SettingsModal({
   useEffect(() => {
     if (show) {
       loadProviders(); loadEmailStatus(); loadTeamsStatus(); loadConnectors();
+      getWhatsappStatus().then(setWaStatus).catch(() => {});
       const oauthErr = sessionStorage.getItem("email_oauth_error");
       if (oauthErr) { setEmailConnectError(oauthErr); sessionStorage.removeItem("email_oauth_error"); }
       const githubOauthErr = sessionStorage.getItem("github_oauth_error");
@@ -199,6 +212,69 @@ export function SettingsModal({
       const res = await chatToNote(selectedChat.id, selectedChat.topic);
       setTeamsSaveResult(`✓ Saved as note: "${res.title}"`);
     } catch { setTeamsSaveResult("Failed to save note."); }
+  }
+
+  function stopWaPolling() {
+    if (waPollingRef.current) { clearInterval(waPollingRef.current); waPollingRef.current = null; }
+  }
+
+  function startWaPolling() {
+    stopWaPolling();
+    let ticks = 0;
+    let connectedAt = 0;
+    waPollingRef.current = setInterval(async () => {
+      ticks++;
+      try {
+        const s = await getWhatsappStatus();
+        setWaStatus(s);
+        if (s.connected) {
+          setWaLoading(false);
+          if (!connectedAt) connectedAt = ticks;
+          // Wait up to 30 s after connection for history sync before signalling the panel
+          if (s.historySynced || ticks - connectedAt >= 15) {
+            stopWaPolling();
+            onWhatsappConnected?.();
+          }
+          // Still polling — waiting for historySynced
+        } else if (s.status === "disconnected") {
+          stopWaPolling();
+          setWaLoading(false);
+        } else if (ticks > 25) {
+          stopWaPolling();
+          setWaLoading(false);
+          setWaError("Bridge did not respond in time. Ensure Node.js is installed and try again.");
+        }
+      } catch {
+        stopWaPolling();
+        setWaLoading(false);
+        setWaError("Could not reach WhatsApp bridge. Check that Node.js is installed.");
+      }
+    }, 2000);
+  }
+
+  async function handleWaConnect(forceReset = false) {
+    setWaLoading(true);
+    setWaError(null);
+    try {
+      if (forceReset) {
+        await resetWhatsappSession();
+      }
+      await startWhatsapp();
+      startWaPolling();
+    } catch (err: any) {
+      setWaError(err?.response?.data?.detail ?? "Failed to start WhatsApp bridge. Ensure Node.js is installed.");
+      setWaLoading(false);
+    }
+  }
+
+  async function handleWaDisconnect() {
+    stopWaPolling();
+    setWaLoading(true);
+    try {
+      await stopWhatsapp();
+      setWaStatus({ connected: false, status: "disconnected", qr_image: null });
+      onWhatsappDisconnected?.();
+    } catch { } finally { setWaLoading(false); }
   }
 
   async function loadEmailStatus() {
@@ -545,6 +621,7 @@ export function SettingsModal({
     { id: "connectors", label: "Connectors" },
     ...(emailEnabled ? [{ id: "email" as Tab, label: "Email" }] : []),
     ...(teamsEnabled ? [{ id: "teams" as Tab, label: "Teams" }] : []),
+    { id: "whatsapp" as Tab, label: "WhatsApp" },
     ...(workflowEnabled ? [{ id: "workflow" as Tab, label: "Workflow" }] : []),
   ];
 
@@ -1390,6 +1467,146 @@ export function SettingsModal({
                       {teamsLoading ? "Redirecting…" : "Connect Microsoft Teams"}
                     </button>
                     <p className="text-[11px] text-gray-600">You'll be redirected to Microsoft to authorise access. MemoLink never stores your password.</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ── WhatsApp ── */}
+            {tab === "whatsapp" && (
+              <div className="space-y-4">
+                {waError && (
+                  <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-300 leading-relaxed">
+                    {waError}
+                  </div>
+                )}
+
+                {waStatus.connected ? (
+                  /* Connected */
+                  <>
+                    <div className="flex items-center gap-3">
+                      <span className="w-2 h-2 rounded-full bg-green-400 shrink-0" />
+                      <div className="flex-1">
+                        <p className="text-xs text-gray-300 font-medium">WhatsApp Connected</p>
+                        <p className="text-[11px] text-gray-500">
+                          {waStatus.historySynced
+                            ? `${waStatus.chatCount ?? 0} chats, ${waStatus.messageCount ?? 0} messages synced — open the Reminders panel to view.`
+                            : "Syncing chat history… this may take up to 30 s."}
+                        </p>
+                      </div>
+                      <button onClick={handleWaDisconnect} disabled={waLoading} className={btnDanger}>
+                        {waLoading ? "Stopping…" : "Disconnect"}
+                      </button>
+                    </div>
+                    {!waStatus.historySynced && (
+                      <div className="flex items-center gap-2 text-xs text-gray-500">
+                        <svg className="w-3.5 h-3.5 animate-spin shrink-0 text-green-400" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                        </svg>
+                        Syncing chats and message history from WhatsApp…
+                      </div>
+                    )}
+                    {waStatus.historySynced && (
+                      <div className="rounded-xl border border-green-500/20 bg-green-500/5 px-4 py-3 text-xs text-gray-400 leading-relaxed space-y-1">
+                        <p className="text-green-400 font-medium">✓ Ready — {waStatus.chatCount ?? 0} chats, {waStatus.messageCount ?? 0} messages loaded</p>
+                        <p>Open the Reminders panel → WhatsApp section to browse chats and get AI reply suggestions.</p>
+                      </div>
+                    )}
+                  </>
+                ) : waStatus.status === "qr" && waStatus.qr_image ? (
+                  /* QR Scan */
+                  <div className="flex flex-col items-center gap-3">
+                    <p className="text-sm font-medium text-gray-200">Scan with WhatsApp</p>
+                    <div className="p-3 bg-white rounded-2xl">
+                      <img src={waStatus.qr_image} alt="WhatsApp QR" className="w-52 h-52" />
+                    </div>
+                    <p className="text-xs text-gray-500 text-center leading-relaxed">
+                      Open WhatsApp on your phone → More options → Linked Devices → Link a Device → scan this code.
+                    </p>
+                    <div className="flex items-center gap-2 text-xs text-gray-600">
+                      <svg className="w-3 h-3 animate-spin shrink-0" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                      </svg>
+                      Waiting for scan…
+                    </div>
+                  </div>
+                ) : waStatus.status === "connecting" ? (
+                  /* Connecting — stuck state shows escape hatches */
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2 text-xs text-gray-500">
+                      <svg className="w-3.5 h-3.5 animate-spin shrink-0 text-green-400" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                      </svg>
+                      Connecting to WhatsApp… (may take up to 30 s)
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={async () => {
+                          stopWaPolling();
+                          setWaLoading(true);
+                          try { await stopWhatsapp(); } catch { /* ignore */ }
+                          setWaStatus({ connected: false, status: "disconnected", qr_image: null });
+                          onWhatsappDisconnected?.();
+                          setWaLoading(false);
+                          setWaError(null);
+                        }}
+                        className="text-xs text-gray-500 hover:text-gray-300 underline underline-offset-2 transition"
+                      >
+                        Cancel
+                      </button>
+                      <span className="text-gray-700 text-xs">·</span>
+                      <button
+                        onClick={async () => {
+                          stopWaPolling();
+                          setWaStatus({ connected: false, status: "disconnected", qr_image: null });
+                          await handleWaConnect(true);
+                        }}
+                        className="text-xs text-green-400 hover:text-green-300 underline underline-offset-2 transition"
+                      >
+                        Stuck? Get fresh QR
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  /* Disconnected */
+                  <div className="space-y-3">
+                    <p className="text-xs text-gray-400 leading-relaxed">
+                      Connect your personal WhatsApp account to read conversations, send replies, and get AI suggestions based on your notes — all locally on your machine.
+                    </p>
+                    <div className="rounded-xl border border-[var(--ml-bg-hover)] bg-[var(--ml-bg-surface)] px-4 py-3 text-[11px] text-gray-500 space-y-1.5">
+                      <p className="text-gray-400 font-medium text-xs">Requirements</p>
+                      <p>• Node.js must be installed on this machine</p>
+                      <p>• WhatsApp app on your phone (personal account)</p>
+                      <p>• The bridge runs locally — no data leaves your machine</p>
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <button
+                        onClick={() => handleWaConnect(false)}
+                        disabled={waLoading}
+                        className={btnPrimary + " flex items-center gap-2"}
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="currentColor" viewBox="0 0 16 16">
+                          <path d="M13.601 2.326A7.85 7.85 0 0 0 7.994 0C3.627 0 .068 3.558.064 7.926c0 1.399.366 2.76 1.057 3.965L0 16l4.204-1.102a7.9 7.9 0 0 0 3.79.965h.004c4.368 0 7.926-3.558 7.93-7.93A7.9 7.9 0 0 0 13.6 2.326zM7.994 14.521a6.6 6.6 0 0 1-3.356-.92l-.24-.144-2.494.654.666-2.433-.156-.251a6.56 6.56 0 0 1-1.007-3.505c0-3.626 2.957-6.584 6.591-6.584a6.56 6.56 0 0 1 4.66 1.931 6.56 6.56 0 0 1 1.928 4.66c-.004 3.639-2.961 6.592-6.592 6.592m3.615-4.934c-.197-.099-1.17-.578-1.353-.646-.182-.065-.315-.099-.445.099-.133.197-.513.646-.627.775-.114.133-.232.148-.43.05-.197-.1-.836-.308-1.592-.985-.59-.525-.985-1.175-1.103-1.372-.114-.198-.011-.304.088-.403.087-.088.197-.232.296-.346.1-.114.133-.198.198-.33.065-.134.034-.248-.015-.347-.05-.099-.445-1.076-.612-1.47-.16-.389-.323-.335-.445-.34-.114-.007-.247-.007-.38-.007a.73.73 0 0 0-.529.247c-.182.198-.691.677-.691 1.654s.71 1.916.81 2.049c.098.133 1.394 2.132 3.383 2.992.47.205.84.326 1.129.418.475.152.904.129 1.246.08.38-.058 1.171-.48 1.338-.943.164-.464.164-.86.114-.943-.049-.084-.182-.133-.38-.232"/>
+                        </svg>
+                        {waLoading ? "Starting bridge…" : "Connect WhatsApp"}
+                      </button>
+                      <button
+                        onClick={() => handleWaConnect(true)}
+                        disabled={waLoading}
+                        className={btnGhost}
+                        title="Wipe saved session and show a fresh QR code"
+                      >
+                        Fresh QR
+                      </button>
+                    </div>
+                    {waLoading && (
+                      <p className="text-[11px] text-gray-600">
+                        Starting bridge — this may take a moment on first run…
+                      </p>
+                    )}
                   </div>
                 )}
               </div>

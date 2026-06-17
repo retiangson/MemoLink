@@ -3,7 +3,7 @@ import { getToken, getUser, logout } from "../utils/auth";
 
 export const API_BASE = (import.meta.env.VITE_API_BASE_URL as string)?.replace(/\/$/, "") ?? "";
 
-export const api = axios.create({ baseURL: API_BASE });
+export const api = axios.create({ baseURL: API_BASE, timeout: 15000 });
 
 api.interceptors.request.use((config) => {
   const token = getToken();

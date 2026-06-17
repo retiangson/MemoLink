@@ -63,6 +63,7 @@ from memolink_backend.api.v1 import (
     core_memory_controller,
     desktop_commands_controller,
     shell_processes_controller,
+    whatsapp_controller,
 )
 
 # Register all models so SQLAlchemy sees them
@@ -765,6 +766,7 @@ app.include_router(survey_controller.router, prefix="/api")
 app.include_router(evaluation_controller.router, prefix="/api")
 app.include_router(core_memory_controller.router, prefix="/api")
 app.include_router(shell_processes_controller.router, prefix="/api")
+app.include_router(whatsapp_controller.router, prefix="/api")
 
 # AWS Lambda handler - only active when running inside Lambda
 if os.getenv("AWS_LAMBDA_FUNCTION_NAME"):
