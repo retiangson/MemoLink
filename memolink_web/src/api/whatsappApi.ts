@@ -81,7 +81,11 @@ export async function stopWhatsapp(): Promise<{ stopped: boolean }> {
 export async function listWhatsappChats(): Promise<WhatsappChat[]> {
   if (inElectron()) {
     const d = await bridgeRequest<{ chats: WhatsappChat[] }>("GET", "/chats");
-    return d.chats ?? [];
+    const chats = d.chats ?? [];
+    // Mirror the backend filter: skip chats that have no messages
+    return chats.filter((c) =>
+      typeof c.messageCount === "number" ? c.messageCount > 0 : !!c.lastMessage,
+    );
   }
   const { data } = await api.get("/whatsapp/chats");
   return data.chats ?? [];
