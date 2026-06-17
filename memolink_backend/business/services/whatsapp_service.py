@@ -43,9 +43,20 @@ def _bridge_dir() -> Path:
 
 
 def _session_dir(user_id: int) -> Path:
-    p = Path.home() / ".memolink" / "whatsapp" / str(user_id)
-    p.mkdir(parents=True, exist_ok=True)
-    return p
+    # Lambda and some containers have a read-only home dir; fall back to /tmp
+    bases = [
+        Path.home() / ".memolink" / "whatsapp",
+        Path("/tmp") / "memolink" / "whatsapp",
+    ]
+    for base in bases:
+        try:
+            base.mkdir(parents=True, exist_ok=True)
+            p = base / str(user_id)
+            p.mkdir(parents=True, exist_ok=True)
+            return p
+        except OSError:
+            continue
+    raise RuntimeError("Cannot create WhatsApp session directory in home or /tmp")
 
 
 def _first_existing_executable(candidates: list[str | Path | None]) -> str | None:
@@ -64,11 +75,26 @@ def _find_node() -> str | None:
     bridge_dir = _bridge_dir()
     python_dir = Path(sys.executable).parent
 
+    extra_win: list[str | Path | None] = []
+    if sys.platform == "win32":
+        # Standard Windows installer locations
+        extra_win = [
+            Path(r"C:\Program Files\nodejs") / executable,
+            Path(r"C:\Program Files (x86)\nodejs") / executable,
+            # NVM for Windows: %APPDATA%\nvm\<version>\node.exe
+            *[
+                p / executable
+                for p in (Path(os.getenv("APPDATA", "")) / "nvm").glob("*")
+                if p.is_dir()
+            ],
+        ]
+
     return _first_existing_executable(
         [
             os.getenv("MEMOLINK_NODE_PATH"),
             shutil.which("node"),
             shutil.which("node.exe"),
+            *extra_win,
             bridge_dir / "node" / executable,
             bridge_dir / "node" / "bin" / executable,
             python_dir / executable,
