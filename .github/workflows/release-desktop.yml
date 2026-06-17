@@ -28,17 +28,6 @@ jobs:
           cache: "npm"
           cache-dependency-path: memolink_web/package-lock.json
 
-      - name: Delete existing release and retag v1.0.0
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          gh release delete v1.0.0 --yes --cleanup-tag 2>$null
-          git tag -f v1.0.0
-          git push origin v1.0.0 --force
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        shell: pwsh
-
       - name: Install dependencies
         run: npm ci
         working-directory: memolink_web
@@ -48,9 +37,21 @@ jobs:
         working-directory: memolink_web
         env:
           VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
+          VITE_DESKTOP_DOWNLOAD_URL: https://${{ secrets.S3_UPLOAD_BUCKET }}.s3.${{ secrets.AWS_REGION }}.amazonaws.com/downloads/MemoLink-Setup.exe
 
-      - name: Package and publish to GitHub Releases
-        run: npx electron-builder --win --publish always
+      - name: Package installer
+        run: npx electron-builder --win
         working-directory: memolink_web
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Upload installer to S3
+        run: |
+          aws s3 cp release/MemoLink-Setup.exe s3://${{ secrets.S3_UPLOAD_BUCKET }}/downloads/MemoLink-Setup.exe --acl public-read
+        working-directory: memolink_web
+        shell: pwsh
