@@ -1,24 +1,26 @@
 # MemoLink backend — AWS Lambda container image
-FROM public.ecr.aws/lambda/nodejs:20 AS node-runtime
 
+# Stage 1: install WhatsApp bridge deps where Node/npm actually works
+FROM public.ecr.aws/lambda/nodejs:20 AS node-deps
+WORKDIR /build
+COPY memolink_backend/whatsapp_bridge/package*.json ./
+RUN npm ci --omit=dev
+
+# Stage 2: main Python Lambda image
 FROM public.ecr.aws/lambda/python:3.11
 
 WORKDIR ${LAMBDA_TASK_ROOT}
 
-# WhatsApp uses a Baileys Node.js bridge. Production must include Node because
-# the Python backend starts the bridge as a subprocess.
-COPY --from=node-runtime /var/lang/bin/node /usr/local/bin/node
-COPY --from=node-runtime /var/lang/bin/npm /usr/local/bin/npm
-COPY --from=node-runtime /var/lang/bin/npx /usr/local/bin/npx
-COPY --from=node-runtime /var/lang/lib/node_modules /usr/local/lib/node_modules
+# Copy just the node binary so the Python backend can spawn the bridge subprocess
+COPY --from=node-deps /var/lang/bin/node /usr/local/bin/node
 ENV PATH="/usr/local/bin:${PATH}"
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY memolink_backend/whatsapp_bridge/package*.json ./memolink_backend/whatsapp_bridge/
-RUN npm ci --omit=dev --prefix memolink_backend/whatsapp_bridge
-
 COPY memolink_backend/ ./memolink_backend/
+
+# Drop in the pre-built bridge node_modules (no npm needed at runtime)
+COPY --from=node-deps /build/node_modules ./memolink_backend/whatsapp_bridge/node_modules/
 
 CMD ["memolink_backend.main.handler"]
