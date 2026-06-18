@@ -33,6 +33,10 @@
         "from": "../memolink_backend/whatsapp_bridge",
         "to": "whatsapp_bridge",
         "filter": ["bridge.js", "package.json", "node_modules/**"]
+      },
+      {
+        "from": "extraResources/node.exe",
+        "to": "node.exe"
       }
     ],
     "win": {

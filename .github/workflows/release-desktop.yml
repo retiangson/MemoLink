@@ -39,6 +39,15 @@ jobs:
           VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
           VITE_DESKTOP_DOWNLOAD_URL: https://${{ secrets.S3_UPLOAD_BUCKET }}.s3.${{ secrets.AWS_REGION }}.amazonaws.com/downloads/MemoLink-Setup.exe
 
+      - name: Bundle Node.js binary for offline bridge
+        run: |
+          New-Item -ItemType Directory -Force -Path extraResources
+          $nodePath = node -e "process.stdout.write(process.execPath)"
+          Write-Host "Bundling Node.js from: $nodePath"
+          Copy-Item $nodePath "extraResources/node.exe"
+        working-directory: memolink_web
+        shell: pwsh
+
       - name: Package installer
         run: npx electron-builder --win --publish never
         working-directory: memolink_web

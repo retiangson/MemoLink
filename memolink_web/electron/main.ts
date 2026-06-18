@@ -3,6 +3,7 @@ import updaterPkg from "electron-updater";
 const { autoUpdater } = updaterPkg;
 import path from "path";
 import fs from "fs/promises";
+import { existsSync } from "fs";
 import os from "os";
 import { exec, spawn, execSync } from "child_process";
 import type { ChildProcess } from "child_process";
@@ -173,6 +174,12 @@ const WA_PORT = 3797;
 let waBridgeProc: ChildProcess | null = null;
 
 function findNodeBin(): string | null {
+  // Bundled node.exe (packaged installer) — no system Node.js required
+  if (app.isPackaged) {
+    const bundled = path.join(process.resourcesPath, "node.exe");
+    if (existsSync(bundled)) return bundled;
+  }
+  // Fall back to system Node.js
   try {
     const result = process.platform === "win32"
       ? execSync("where node", { timeout: 3000 }).toString().split("\n")[0].trim()
@@ -183,7 +190,7 @@ function findNodeBin(): string | null {
     ? ["C:\\Program Files\\nodejs\\node.exe", "C:\\Program Files (x86)\\nodejs\\node.exe"]
     : ["/usr/local/bin/node", "/usr/bin/node"];
   for (const c of candidates) {
-    try { if (require("fs").existsSync(c)) return c; } catch { }
+    if (existsSync(c)) return c;
   }
   return null;
 }
