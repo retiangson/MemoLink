@@ -1,27 +1,44 @@
-﻿import React, { useState } from "react";
-import { getReplySuggestions, sendEmailReply } from "../api/emailApi";
+﻿import React, { useRef, useState } from "react";
+import { getReplySuggestions, sendEmailReply, getGmailReplySuggestions, sendGmailReply } from "../api/emailApi";
+import { useRecording } from "../hooks/useRecording";
+import { LANGUAGES } from "../utils/languages";
+import { useEmailAttachments } from "../hooks/useEmailAttachments";
+import { EmailAttachmentList } from "./EmailAttachmentList";
 
 interface EmailReplyPanelProps {
-  emailRecordId: number;
+  emailRecordId?: number | null;
+  gmailMessageId?: string;
+  emailAccountId?: number;
   senderName: string | null;
   senderEmail: string;
   subject: string;
   defaultOpen?: boolean;
 }
 
-export function EmailReplyPanel({ emailRecordId, senderName, senderEmail, subject, defaultOpen = false }: EmailReplyPanelProps) {
+export function EmailReplyPanel({ emailRecordId, gmailMessageId, emailAccountId, senderName, senderEmail, subject, defaultOpen = false }: EmailReplyPanelProps) {
   const [open, setOpen] = useState(defaultOpen);
   const [replyBody, setReplyBody] = useState("");
   const [suggesting, setSuggesting] = useState(false);
   const [sending, setSending] = useState(false);
   const [result, setResult] = useState<{ ok: boolean; msg: string } | null>(null);
   const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [language, setLanguage] = useState("en");
+  const [isDraggingFile, setIsDraggingFile] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const attachments = useEmailAttachments();
+
+  const recording = useRecording((text) => {
+    setReplyBody((prev) => (prev ? `${prev}\n${text}` : text));
+  });
 
   async function handleSuggest() {
     setSuggesting(true);
     setResult(null);
+    const hint = replyBody.trim() || undefined;
     try {
-      const replies = await getReplySuggestions(emailRecordId);
+      const replies = gmailMessageId
+        ? await getGmailReplySuggestions(gmailMessageId, emailAccountId, hint)
+        : await getReplySuggestions(emailRecordId!, hint);
       setSuggestions(replies);
       if (replies.length > 0) setReplyBody(replies[0]);
     } catch {
@@ -36,10 +53,15 @@ export function EmailReplyPanel({ emailRecordId, senderName, senderEmail, subjec
     setSending(true);
     setResult(null);
     try {
-      await sendEmailReply(emailRecordId, replyBody.trim());
+      if (gmailMessageId) {
+        await sendGmailReply(gmailMessageId, replyBody.trim(), emailAccountId, attachments.readyAttachments);
+      } else {
+        await sendEmailReply(emailRecordId!, replyBody.trim(), attachments.readyAttachments);
+      }
       setResult({ ok: true, msg: `✓ Reply sent to ${senderName || senderEmail}` });
       setReplyBody("");
       setSuggestions([]);
+      attachments.reset();
     } catch (err: any) {
       setResult({ ok: false, msg: err?.response?.data?.detail ?? "Failed to send reply." });
     } finally {
@@ -98,13 +120,31 @@ export function EmailReplyPanel({ emailRecordId, senderName, senderEmail, subjec
         )}
 
         {/* Reply textarea */}
-        <textarea
-          value={replyBody}
-          onChange={e => setReplyBody(e.target.value)}
-          rows={3}
-          placeholder="Write your reply…"
-          className="w-full bg-[#0e0e16] border border-[var(--ml-bg-hover)] rounded-xl px-3 py-2.5 text-xs text-gray-200 placeholder-gray-700 outline-none focus:border-indigo-500 transition resize-none leading-relaxed"
-        />
+        <div
+          className={`relative rounded-xl transition ${isDraggingFile ? "ring-2 ring-indigo-500/60" : ""}`}
+          onDragOver={(e) => { e.preventDefault(); setIsDraggingFile(true); }}
+          onDragLeave={() => setIsDraggingFile(false)}
+          onDrop={(e) => {
+            e.preventDefault();
+            setIsDraggingFile(false);
+            if (e.dataTransfer.files.length) attachments.addFiles(Array.from(e.dataTransfer.files));
+          }}
+        >
+          <textarea
+            value={replyBody}
+            onChange={e => setReplyBody(e.target.value)}
+            rows={3}
+            placeholder="Write your reply…"
+            className="w-full bg-[#0e0e16] border border-[var(--ml-bg-hover)] rounded-xl px-3 py-2.5 text-xs text-gray-200 placeholder-gray-700 outline-none focus:border-indigo-500 transition resize-y leading-relaxed"
+          />
+          {isDraggingFile && (
+            <div className="absolute inset-0 flex items-center justify-center bg-indigo-500/10 border-2 border-dashed border-indigo-500/50 rounded-xl pointer-events-none">
+              <p className="text-xs text-indigo-300 font-medium">Drop files to attach</p>
+            </div>
+          )}
+        </div>
+
+        <EmailAttachmentList items={attachments.items} onRemove={attachments.removeAttachment} />
 
         {/* Result */}
         {result && (
@@ -114,10 +154,10 @@ export function EmailReplyPanel({ emailRecordId, senderName, senderEmail, subjec
         )}
 
         {/* Actions */}
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <button
             onClick={handleSuggest}
-            disabled={suggesting || sending}
+            disabled={suggesting || sending || recording.isRecording}
             className="flex items-center gap-1.5 px-3 py-2 bg-[var(--ml-bg-surface)] border border-[var(--ml-bg-hover)] hover:border-indigo-500/30 text-gray-400 hover:text-indigo-300 rounded-lg text-xs transition disabled:opacity-40"
           >
             {suggesting ? (
@@ -134,8 +174,60 @@ export function EmailReplyPanel({ emailRecordId, senderName, senderEmail, subjec
           </button>
 
           <button
+            onClick={() => (recording.isRecording ? recording.stopRecording() : recording.startRecording("mic", { language }))}
+            disabled={sending || suggesting}
+            title={recording.isRecording ? "Stop recording" : "Record voice"}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs transition disabled:opacity-40 border ${
+              recording.isRecording
+                ? "bg-red-500/10 border-red-500/30 text-red-400"
+                : "bg-[var(--ml-bg-surface)] border-[var(--ml-bg-hover)] hover:border-indigo-500/30 text-gray-400 hover:text-indigo-300"
+            }`}
+          >
+            {recording.isRecording ? (
+              <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+            ) : (
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" fill="currentColor" viewBox="0 0 16 16">
+                <path d="M3 6.5a.5.5 0 0 1 1 0V8a4 4 0 0 0 8 0V6.5a.5.5 0 0 1 1 0V8a5 5 0 0 1-4.5 4.975V15h2a.5.5 0 0 1 0 1h-5a.5.5 0 0 1 0-1h2v-2.025A5 5 0 0 1 3 8z"/>
+                <path d="M10 8a2 2 0 1 1-4 0V3a2 2 0 1 1 4 0z"/>
+              </svg>
+            )}
+            {recording.isRecording ? (recording.isTranscribing ? "Transcribing…" : "Recording…") : "Record"}
+          </button>
+
+          <select
+            value={language}
+            onChange={(e) => setLanguage(e.target.value)}
+            disabled={sending || recording.isRecording}
+            title="Recording language"
+            className="bg-[var(--ml-bg-surface)] border border-[var(--ml-bg-hover)] hover:border-indigo-500/30 text-gray-400 rounded-lg text-xs px-2 outline-none focus:border-indigo-500 transition disabled:opacity-40"
+          >
+            {LANGUAGES.map((l) => (
+              <option key={l.code} value={l.code}>{l.label}</option>
+            ))}
+          </select>
+
+          <input
+            type="file"
+            multiple
+            hidden
+            ref={fileInputRef}
+            onChange={(e) => { if (e.target.files?.length) attachments.addFiles(Array.from(e.target.files)); e.target.value = ""; }}
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={sending}
+            title="Attach files"
+            className="flex items-center gap-1.5 px-3 py-2 bg-[var(--ml-bg-surface)] border border-[var(--ml-bg-hover)] hover:border-indigo-500/30 text-gray-400 hover:text-indigo-300 rounded-lg text-xs transition disabled:opacity-40"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" fill="currentColor" viewBox="0 0 16 16">
+              <path d="M4.5 3a2.5 2.5 0 0 1 5 0v9a1.5 1.5 0 0 1-3 0V5a.5.5 0 0 1 1 0v7a.5.5 0 0 0 1 0V3a1.5 1.5 0 1 0-3 0v9a2.5 2.5 0 0 0 5 0V5a.5.5 0 0 1 1 0v7a3.5 3.5 0 1 1-7 0z" />
+            </svg>
+            Attach
+          </button>
+
+          <button
             onClick={handleSend}
-            disabled={!replyBody.trim() || sending || suggesting}
+            disabled={!replyBody.trim() || sending || suggesting || recording.isRecording || attachments.isUploading}
             className="flex items-center gap-1.5 px-3 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white rounded-lg text-xs font-medium transition ml-auto"
           >
             {sending ? (

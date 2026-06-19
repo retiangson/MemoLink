@@ -17,6 +17,7 @@ function normalizeChatStreamEvent(raw: any): ChatStreamEvent {
       routing_reason: raw.routing_reason,
       suggest_web_search: raw.suggest_web_search === true,
       search_query_suggestion: typeof raw.search_query_suggestion === "string" ? raw.search_query_suggestion : undefined,
+      email_results: Array.isArray(raw.email_results) ? raw.email_results : undefined,
     };
   }
   if (typeof raw?.close_note === "number") return { type: "note.close", note_id: raw.close_note };

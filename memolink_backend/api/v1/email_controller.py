@@ -5,7 +5,10 @@ import time
 from datetime import datetime, timezone
 from urllib.parse import quote
 
+import boto3
 import httpx
+from botocore.config import Config
+from botocore.exceptions import ClientError
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.security import HTTPBearer
@@ -16,6 +19,70 @@ from memolink_backend.core.security import get_current_user, verify_token
 from memolink_backend.di.request_container import RequestContainer, get_request_container
 
 router = APIRouter(prefix="/email", tags=["email"])
+
+# Gmail hard-caps a sent message at ~25 MB once MIME-encoded; base64 inflates
+# raw bytes by ~37%, so keep the raw attachment total comfortably under that.
+_MAX_ATTACHMENT_TOTAL_BYTES = 18 * 1024 * 1024
+
+
+def _s3():
+    kwargs = {
+        "region_name": settings.aws_region,
+        "config": Config(signature_version="s3v4", s3={"addressing_style": "virtual"}),
+    }
+    if settings.aws_access_key_id and settings.aws_secret_access_key:
+        kwargs["aws_access_key_id"] = settings.aws_access_key_id
+        kwargs["aws_secret_access_key"] = settings.aws_secret_access_key
+        if settings.aws_session_token:
+            kwargs["aws_session_token"] = settings.aws_session_token
+    return boto3.client("s3", **kwargs)
+
+
+def _download_attachments(attachments_meta: list[dict]) -> list[dict]:
+    """Download each {key, filename, content_type} from S3 and return the
+    same dicts with raw bytes under "data", enforcing a total size cap so a
+    single send can't build an oversized Gmail message."""
+    if not attachments_meta:
+        return []
+    s3 = _s3()
+    total = 0
+    out: list[dict] = []
+    for meta in attachments_meta:
+        key = meta.get("key")
+        if not key:
+            continue
+        try:
+            obj = s3.get_object(Bucket=settings.s3_upload_bucket, Key=key)
+            data = obj["Body"].read()
+        except ClientError as exc:
+            raise HTTPException(status_code=502, detail=f"Could not read attachment '{meta.get('filename', key)}': {exc}")
+        total += len(data)
+        if total > _MAX_ATTACHMENT_TOTAL_BYTES:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Attachments exceed the {_MAX_ATTACHMENT_TOTAL_BYTES // (1024 * 1024)} MB total limit per email.",
+            )
+        out.append({
+            "filename": meta.get("filename") or key.split("/")[-1],
+            "content_type": meta.get("content_type"),
+            "data": data,
+        })
+    return out
+
+
+def _cleanup_attachments(attachments_meta: list[dict]) -> None:
+    """Best-effort delete of the temporary S3 objects after a send attempt."""
+    if not attachments_meta:
+        return
+    s3 = _s3()
+    for meta in attachments_meta:
+        key = meta.get("key")
+        if not key:
+            continue
+        try:
+            s3.delete_object(Bucket=settings.s3_upload_bucket, Key=key)
+        except Exception:
+            pass
 
 GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
@@ -134,7 +201,10 @@ def email_status(
         return {"connected": False, "accounts": []}
     return {
         "connected": True,
-        "accounts": [{"id": a.id, "email": a.email_address, "provider": a.provider} for a in accounts],
+        "accounts": [
+            {"id": a.id, "email": a.email_address, "provider": a.provider, "page_size": a.page_size, "display_name": a.display_name}
+            for a in accounts
+        ],
     }
 
 
@@ -233,19 +303,26 @@ async def send_reply(
     reply_body = (body.get("body") or "").strip()
     if not reply_body:
         raise HTTPException(status_code=400, detail="Reply body cannot be empty")
-    sent = await c.email().send_reply(user_id, email_id, reply_body)
+    attachments_meta = body.get("attachments") or []
+    attachments = _download_attachments(attachments_meta)
+    try:
+        sent = await c.email().send_reply(user_id, email_id, reply_body, attachments=attachments)
+    finally:
+        _cleanup_attachments(attachments_meta)
     if not sent:
         raise HTTPException(status_code=400, detail="Failed to send reply - check Gmail connection")
     return {"ok": True}
 
 
-@router.get("/emails/{email_id}/reply-suggestions")
+@router.post("/emails/{email_id}/reply-suggestions")
 def reply_suggestions(
     email_id: int,
+    body: dict | None = None,
     user_id: int = Depends(get_current_user),
     c: RequestContainer = Depends(get_request_container),
 ):
-    replies = c.email().reply_suggestions(user_id, email_id)
+    draft_hint = (body or {}).get("draft")
+    replies = c.email().reply_suggestions(user_id, email_id, draft_hint=draft_hint)
     if replies is None or (isinstance(replies, list) and len(replies) == 0):
         raise HTTPException(status_code=404, detail="Email not found or could not generate replies")
     return {"replies": replies}
@@ -275,9 +352,12 @@ async def send_draft(
     body = payload.get("body", "")
     thread_id = payload.get("thread_id", "")
     message_id = payload.get("message_id", "")
+    email_account_id = payload.get("email_account_id")
+    attachments_meta = payload.get("attachments") or []
 
     if not to or not body:
         raise HTTPException(status_code=400, detail="to and body are required")
+    attachments = _download_attachments(attachments_meta)
     try:
         sent = await c.email().send_draft(
             user_id,
@@ -286,12 +366,198 @@ async def send_draft(
             body=body,
             thread_id=thread_id,
             message_id=message_id,
+            email_account_id=email_account_id,
+            attachments=attachments,
         )
     except ValueError as exc:
         detail = str(exc)
         status_code = 403 if "connected" in detail.lower() else 502
         raise HTTPException(status_code=status_code, detail=detail)
+    finally:
+        _cleanup_attachments(attachments_meta)
     return {"ok": True, "gmail_message_id": sent.get("id")}
+
+
+@router.post("/compose-suggest")
+def compose_suggest(
+    payload: dict,
+    user_id: int = Depends(get_current_user),
+    c: RequestContainer = Depends(get_request_container),
+):
+    """Generate a full email body draft from a short topic description, for the New Mail compose tab."""
+    to = payload.get("to", "")
+    subject = payload.get("subject", "")
+    topic = payload.get("topic", "")
+    if not topic.strip():
+        raise HTTPException(status_code=400, detail="topic is required")
+    body = c.email().generate_compose_draft(user_id, to=to, subject=subject, topic=topic)
+    if not body:
+        raise HTTPException(status_code=502, detail="Could not generate a draft")
+    return {"body": body}
+
+
+@router.get("/browse")
+async def browse_emails(
+    folder: str = Query(..., pattern="^(inbox|outbox|drafts|trash|all)$"),
+    email_account_id: int | None = Query(default=None),
+    page_token: str | None = Query(default=None),
+    page_size: int | None = Query(default=None, ge=5, le=100),
+    user_id: int = Depends(get_current_user),
+    c: RequestContainer = Depends(get_request_container),
+):
+    try:
+        result = await c.email().browse(
+            user_id,
+            folder=folder,
+            email_account_id=email_account_id,
+            page_token=page_token,
+            page_size=page_size,
+        )
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/gmail/{gmail_message_id}/archive")
+async def archive_gmail_message(
+    gmail_message_id: str,
+    email_account_id: int | None = Query(default=None),
+    user_id: int = Depends(get_current_user),
+    c: RequestContainer = Depends(get_request_container),
+):
+    try:
+        return await c.email().archive_email(
+            user_id, gmail_message_id=gmail_message_id, email_account_id=email_account_id,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/gmail/{gmail_message_id}/trash")
+async def trash_gmail_message(
+    gmail_message_id: str,
+    email_account_id: int | None = Query(default=None),
+    user_id: int = Depends(get_current_user),
+    c: RequestContainer = Depends(get_request_container),
+):
+    try:
+        return await c.email().trash_email(
+            user_id, gmail_message_id=gmail_message_id, email_account_id=email_account_id,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/gmail/{gmail_message_id}/pin")
+async def pin_gmail_message(
+    gmail_message_id: str,
+    email_account_id: int | None = Query(default=None),
+    user_id: int = Depends(get_current_user),
+    c: RequestContainer = Depends(get_request_container),
+):
+    try:
+        return await c.email().pin_email(
+            user_id, gmail_message_id=gmail_message_id, email_account_id=email_account_id,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.delete("/gmail/{gmail_message_id}/pin")
+def unpin_gmail_message(
+    gmail_message_id: str,
+    user_id: int = Depends(get_current_user),
+    c: RequestContainer = Depends(get_request_container),
+):
+    try:
+        return c.email().unpin_email(user_id, gmail_message_id=gmail_message_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/gmail/{gmail_message_id}/reply-suggestions")
+async def gmail_reply_suggestions(
+    gmail_message_id: str,
+    body: dict | None = None,
+    email_account_id: int | None = Query(default=None),
+    user_id: int = Depends(get_current_user),
+    c: RequestContainer = Depends(get_request_container),
+):
+    draft_hint = (body or {}).get("draft")
+    try:
+        replies = await c.email().gmail_reply_suggestions(
+            user_id, gmail_message_id=gmail_message_id, email_account_id=email_account_id, draft_hint=draft_hint,
+        )
+        return {"replies": replies}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/gmail/{gmail_message_id}/send-reply")
+async def gmail_send_reply(
+    gmail_message_id: str,
+    body: dict,
+    email_account_id: int | None = Query(default=None),
+    user_id: int = Depends(get_current_user),
+    c: RequestContainer = Depends(get_request_container),
+):
+    reply_body = (body.get("body") or "").strip()
+    if not reply_body:
+        raise HTTPException(status_code=400, detail="Reply body cannot be empty")
+    attachments_meta = body.get("attachments") or []
+    attachments = _download_attachments(attachments_meta)
+    try:
+        sent = await c.email().gmail_send_reply(
+            user_id, gmail_message_id=gmail_message_id, email_account_id=email_account_id, body=reply_body,
+            attachments=attachments,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    finally:
+        _cleanup_attachments(attachments_meta)
+    if not sent:
+        raise HTTPException(status_code=400, detail="Failed to send reply - check Gmail connection")
+    return {"ok": True}
+
+
+@router.post("/gmail/{gmail_message_id}/to-note", status_code=201)
+async def gmail_to_note(
+    gmail_message_id: str,
+    email_account_id: int | None = Query(default=None),
+    user_id: int = Depends(get_current_user),
+    c: RequestContainer = Depends(get_request_container),
+):
+    try:
+        note_result = await c.email().email_to_note_by_gmail_id(
+            user_id, gmail_message_id=gmail_message_id, email_account_id=email_account_id,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    if not note_result:
+        raise HTTPException(status_code=404, detail="Email not found")
+    return note_result
+
+
+@router.put("/accounts/{account_id}/settings")
+def update_account_settings(
+    account_id: int,
+    payload: dict,
+    user_id: int = Depends(get_current_user),
+    c: RequestContainer = Depends(get_request_container),
+):
+    page_size = payload.get("page_size")
+    display_name = payload.get("display_name")
+    if page_size is None and display_name is None:
+        raise HTTPException(status_code=400, detail="page_size or display_name is required")
+    try:
+        result: dict = {}
+        if page_size is not None:
+            result.update(c.email().update_account_page_size(user_id, account_id, int(page_size)))
+        if display_name is not None:
+            result.update(c.email().update_account_display_name(user_id, account_id, display_name))
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.get("/attachment/{gmail_message_id}/{attachment_id}")
@@ -300,11 +566,14 @@ async def download_attachment(
     attachment_id: str,
     filename: str = Query("attachment"),
     token: Optional[str] = Query(None),
+    email_account_id: Optional[int] = Query(None),
+    disposition: str = Query("attachment"),
     c: RequestContainer = Depends(get_request_container),
     credentials=Depends(HTTPBearer(auto_error=False)),
 ):
     """Fetch a Gmail attachment and stream it to the browser as a download.
     Accepts JWT via ?token= query param (for direct browser links) or Authorization header.
+    `disposition=inline` is used for cid: inline images rendered inside the email body.
     """
     if token:
         resolved_uid = verify_token(token)
@@ -314,7 +583,9 @@ async def download_attachment(
         raise HTTPException(status_code=401, detail="Not authenticated")
 
     try:
-        file_bytes = await c.email().download_attachment(resolved_uid, gmail_message_id, attachment_id)
+        file_bytes = await c.email().download_attachment(
+            resolved_uid, gmail_message_id, attachment_id, email_account_id=email_account_id
+        )
     except ValueError as exc:
         detail = str(exc)
         status_code = 403 if "connected" in detail.lower() else 502
@@ -325,9 +596,10 @@ async def download_attachment(
     mime, _ = mimetypes.guess_type(filename)
     content_type = mime or "application/octet-stream"
 
+    safe_disposition = "inline" if disposition == "inline" else "attachment"
     safe_filename = quote(filename)
     return Response(
         content=file_bytes,
         media_type=content_type,
-        headers={"Content-Disposition": f'attachment; filename="{safe_filename}"'},
+        headers={"Content-Disposition": f'{safe_disposition}; filename="{safe_filename}"'},
     )

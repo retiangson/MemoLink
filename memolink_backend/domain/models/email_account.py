@@ -18,3 +18,5 @@ class EmailAccount(Base):
     token_expiry = Column(DateTime(timezone=True), nullable=True)
     connected_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    page_size = Column(Integer, nullable=False, default=25)
+    display_name = Column(String(255), nullable=True)

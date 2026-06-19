@@ -21,3 +21,5 @@ class EmailRecord(Base):
     gmail_thread_id = Column(String(255), nullable=True)  # For threading replies
     # DB migration: ALTER TABLE email_records ADD COLUMN IF NOT EXISTS email_account_id INTEGER REFERENCES email_accounts(id) ON DELETE SET NULL;
     email_account_id = Column(Integer, ForeignKey("email_accounts.id", ondelete="SET NULL"), nullable=True, index=True)
+    is_pinned = Column(Boolean, nullable=False, default=False)
+    pinned_at = Column(DateTime(timezone=True), nullable=True)

@@ -6,8 +6,10 @@ import { buildGoogleCalendarUrl } from "../utils/reminderUtils";
 import { InsightsPanel } from "./InsightsPanel";
 import { listTeamsChats, getTeamsMessages, sendTeamsMessage, chatToNote } from "../api/teamsApi";
 import type { TeamsChat, TeamsMessage } from "../api/teamsApi";
-import type { EmailRecord, EmailAccount } from "../api/emailApi";
-import { EmailDetailModal } from "./EmailDetailModal";
+import type { EmailAccount, BrowseEmailResult } from "../api/emailApi";
+import { updateEmailAccountDisplayName } from "../api/emailApi";
+import { EmailFolderBrowser } from "./EmailFolderBrowser";
+import { EmailAllMailList } from "./EmailAllMailList";
 import { listWhatsappChats, getWhatsappMessages, getWhatsappProfilePicture, sendWhatsappMessage, deleteWhatsappMessage, deleteWhatsappChat, suggestWhatsappReply, getWhatsappMedia } from "../api/whatsappApi";
 import type { WhatsappChat, WhatsappMessage } from "../api/whatsappApi";
 
@@ -26,12 +28,12 @@ interface RightPanelProps {
   onRequestNotificationPermission: () => void;
   emailConnected?: boolean;
   emailAccounts?: EmailAccount[];
-  emailRecords?: EmailRecord[];
-  onCreateReminderFromEmail?: (emailId: number) => void;
-  onDeleteEmailRecord?: (emailId: number) => Promise<void>;
-  isSyncingEmail?: boolean;
-  onSyncEmail?: () => void;
-  emailSyncResult?: string | null;
+  onOpenEmailTab?: (email: BrowseEmailResult) => void;
+  onComposeNewMail?: () => void;
+  openEmailTabId?: string | null;
+  onEmailArchived?: (gmailMessageId: string) => void;
+  onEmailTrashed?: (gmailMessageId: string) => void;
+  onEmailPinChanged?: (gmailMessageId: string, isPinned: boolean) => void;
   teamsConnected?: boolean;
   whatsappConnected?: boolean;
   whatsappAvailable?: boolean;
@@ -44,8 +46,8 @@ export function RightPanel({
   open, onClose, items, isGenerating,
   onAddManual, onToggleDone, onUpdate, onRemove, onClearDone,
   onGenerate, notificationPermission, onRequestNotificationPermission,
-  emailConnected, emailAccounts = [], emailRecords = [], onCreateReminderFromEmail, onDeleteEmailRecord,
-  isSyncingEmail, onSyncEmail, emailSyncResult,
+  emailConnected, emailAccounts = [],
+  onOpenEmailTab, onComposeNewMail, openEmailTabId, onEmailArchived, onEmailTrashed, onEmailPinChanged,
   teamsConnected,
   whatsappConnected,
   whatsappAvailable,
@@ -55,9 +57,38 @@ export function RightPanel({
   const [selectedItem, setSelectedItem] = useState<SuggestionItem | null>(null);
   const [showNoteReminders, setShowNoteReminders] = useState(false);
   const [showEmailReminders, setShowEmailReminders] = useState(false);
-  const [collapsedAccountIds, setCollapsedAccountIds] = useState<Set<number>>(new Set());
-  const [selectedEmail, setSelectedEmail] = useState<EmailRecord | null>(null);
-  const [emailDeleteLoading, setEmailDeleteLoading] = useState<number | null>(null);
+  const [selectedMailTab, setSelectedMailTab] = useState<"all" | number | "calendar">("all");
+  const [totalUnreadCount, setTotalUnreadCount] = useState(0);
+  const [accountUnreadCounts, setAccountUnreadCounts] = useState<Record<number, number>>({});
+  // Optimistic local overrides for account display names, keyed by account id.
+  // The source of truth is `account.display_name` from the backend (refreshed via
+  // getEmailStatus on load); this just avoids waiting on a refetch after saving.
+  const [accountLabelOverrides, setAccountLabelOverrides] = useState<Record<number, string | null>>({});
+  const [editingAccountTabId, setEditingAccountTabId] = useState<number | null>(null);
+  const [editingAccountLabel, setEditingAccountLabel] = useState("");
+
+  function handleAccountUnreadCountChange(accountId: number, count: number) {
+    setAccountUnreadCounts((prev) => (prev[accountId] === count ? prev : { ...prev, [accountId]: count }));
+  }
+
+  function getAccountLabel(account: EmailAccount): string {
+    const override = accountLabelOverrides[account.id];
+    if (override !== undefined) return override || account.email;
+    return account.display_name || account.email;
+  }
+
+  function commitAccountLabel(accountId: number, value: string) {
+    const trimmed = value.trim();
+    setEditingAccountTabId(null);
+    setAccountLabelOverrides((prev) => ({ ...prev, [accountId]: trimmed || null }));
+    updateEmailAccountDisplayName(accountId, trimmed || null).catch(() => {
+      setAccountLabelOverrides((prev) => {
+        const next = { ...prev };
+        delete next[accountId];
+        return next;
+      });
+    });
+  }
   const [showTeams, setShowTeams] = useState(false);
   const [teamsChats, setTeamsChats] = useState<TeamsChat[]>([]);
   const [teamsChatsLoading, setTeamsChatsLoading] = useState(false);
@@ -301,10 +332,7 @@ export function RightPanel({
 
   const noteItems = items.filter((i) => !i.email_record_id);
 
-  // Build a set of email_record_ids that already have reminders (for "Pinned" badge)
-  const pinnedEmailIds = new Set(items.filter((i) => !!i.email_record_id).map((i) => i.email_record_id!));
-
-  const hasEmail = emailConnected || emailRecords.length > 0;
+  const hasEmail = emailConnected || emailAccounts.length > 0;
 
   function waInitials(name: string): string {
     const clean = (name || "?").replace(/^\+/, "").trim();
@@ -336,67 +364,12 @@ export function RightPanel({
     );
   }
 
-  // Count only records that are actually rendered in a collapsible section
-  const visibleEmailCount = emailAccounts.length === 0
-    ? emailRecords.length
-    : emailAccounts.reduce((sum, acct) => sum + emailRecords.filter((r) =>
-        r.email_account_id === acct.id ||
-        (emailAccounts.length === 1 && r.email_account_id == null)
-      ).length, 0);
-
-  function toggleAccountCollapse(accountId: number) {
-    setCollapsedAccountIds((prev) => {
-      const next = new Set(prev);
-      next.has(accountId) ? next.delete(accountId) : next.add(accountId);
-      return next;
-    });
-  }
-
-  function renderEmailCard(email: EmailRecord) {
-    const isPinned = pinnedEmailIds.has(email.id);
-    const score = email.importance_score ?? 3;
-    const urgencyLabel = score >= 4.5 ? { t: "Urgent", cls: "text-red-400 bg-red-500/15" }
-      : score >= 3.5 ? { t: "Important", cls: "text-orange-400 bg-orange-500/15" }
-      : { t: "Notable", cls: "text-blue-400 bg-blue-500/10" };
-    const dateLabel = email.email_date
-      ? new Date(email.email_date).toLocaleDateString(undefined, { month: "short", day: "numeric" })
-      : "";
-    return (
-      <div
-        key={email.id}
-        className="group rounded-xl border bg-[#131320] border-[var(--ml-bg-hover)] hover:border-blue-500/30 transition overflow-hidden cursor-pointer"
-        onClick={() => setSelectedEmail(email)}
-      >
-        <div className="flex items-start gap-2 p-2.5">
-          <div className="flex-1 min-w-0">
-            <p className="text-[11px] font-medium text-gray-200 leading-snug break-words line-clamp-2">{email.subject}</p>
-            <p className="text-[10px] text-gray-500 truncate mt-0.5">{email.sender_name || email.sender_email}</p>
-          </div>
-          <button
-            title="Remove email"
-            disabled={emailDeleteLoading === email.id}
-            onClick={async (e) => {
-              e.stopPropagation();
-              if (!onDeleteEmailRecord) return;
-              setEmailDeleteLoading(email.id);
-              try { await onDeleteEmailRecord(email.id); } finally { setEmailDeleteLoading(null); }
-            }}
-            className="shrink-0 w-5 h-5 flex items-center justify-center text-gray-700 hover:text-red-400 transition opacity-0 group-hover:opacity-100 disabled:opacity-40 text-xs leading-none"
-          >
-            {emailDeleteLoading === email.id
-              ? <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
-              : "✕"}
-          </button>
-        </div>
-        <div className="flex items-center gap-1.5 px-2.5 pb-2 flex-wrap">
-          <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded ${urgencyLabel.cls}`}>{urgencyLabel.t}</span>
-          {dateLabel && <span className="text-[10px] text-gray-600">{dateLabel}</span>}
-          {isPinned && (
-            <span className="text-[9px] text-blue-400/70 px-1.5 py-0.5 rounded border border-blue-500/20 bg-blue-500/10 ml-auto">📌 Pinned</span>
-          )}
-        </div>
-      </div>
-    );
+  function mailNavButtonClass(active: boolean) {
+    return `w-full text-center text-[11px] py-1.5 px-2.5 rounded-lg border transition ${
+      active
+        ? "border-indigo-500/40 text-indigo-300 bg-indigo-600/10"
+        : "border-[var(--ml-bg-hover)] text-gray-400 hover:text-indigo-300 hover:border-indigo-500/30"
+    }`;
   }
 
   const renderCard = (item: SuggestionItem) => {
@@ -599,9 +572,9 @@ export function RightPanel({
                 <path d="M0 4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2zm2-1a1 1 0 0 0-1 1v.217l7 4.2 7-4.2V4a1 1 0 0 0-1-1zm13 2.383-4.708 2.825L15 11.105zm-.034 6.876-5.64-3.471L8 9.583l-1.326-.795-5.64 3.47A1 1 0 0 0 2 13h12a1 1 0 0 0 .966-.741M1 11.105l4.708-2.897L1 5.383z"/>
               </svg>
               <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Email</span>
-              {visibleEmailCount > 0 && (
-                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-blue-500/20 text-blue-400">
-                  {visibleEmailCount}
+              {totalUnreadCount > 0 && (
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-indigo-600/30 text-indigo-300">
+                  {totalUnreadCount}
                 </span>
               )}
             </div>
@@ -612,81 +585,118 @@ export function RightPanel({
 
           {showEmailReminders && (
             <div className="px-3 pb-3 flex flex-col gap-2">
-
-              {/* Sync button */}
-              {emailConnected && (
-                <>
-                  <button
-                    onClick={onSyncEmail}
-                    disabled={isSyncingEmail}
-                    className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-blue-600/10 hover:bg-blue-600/20 border border-blue-500/20 text-blue-300 rounded-lg text-xs transition disabled:opacity-40 disabled:cursor-not-allowed"
-                  >
-                    {isSyncingEmail ? (
-                      <><svg className="w-3 h-3 animate-spin shrink-0" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>Syncing Email…</>
-                    ) : (
-                      <><svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3 shrink-0" fill="currentColor" viewBox="0 0 16 16"><path d="M0 4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2zm2-1a1 1 0 0 0-1 1v.217l7 4.2 7-4.2V4a1 1 0 0 0-1-1zm13 2.383-4.708 2.825L15 11.105zm-.034 6.876-5.64-3.471L8 9.583l-1.326-.795-5.64 3.47A1 1 0 0 0 2 13h12a1 1 0 0 0 .966-.741M1 11.105l4.708-2.897L1 5.383z"/></svg>Sync from Email</>
-                    )}
-                  </button>
-                  {emailSyncResult && (
-                    <p className={`text-[10px] text-center px-2 py-1 rounded-md ${emailSyncResult.startsWith("✓") ? "text-green-400 bg-green-500/10" : "text-red-400 bg-red-500/10"}`}>
-                      {emailSyncResult}
-                    </p>
-                  )}
-                </>
-              )}
-
-              {/* Per-account collapsible sections */}
               {emailAccounts.length === 0 ? (
-                <p className="text-[11px] text-gray-600 text-center pt-1">
-                  {emailConnected ? "Sync to load emails." : "No emails yet."}
-                </p>
+                <p className="text-[11px] text-gray-600 text-center pt-1">No email accounts connected.</p>
               ) : (
-                emailAccounts.map((account) => {
-                  const isCollapsed = collapsedAccountIds.has(account.id);
-                  const accountEmails = emailRecords.filter(
-                    (r) => r.email_account_id === account.id ||
-                      (emailAccounts.length === 1 && r.email_account_id == null)
-                  );
-                  return (
-                    <div key={account.id} className="rounded-xl border border-[var(--ml-bg-hover)] overflow-hidden">
-                      {/* Account header — collapse toggle */}
-                      <button
-                        onClick={() => toggleAccountCollapse(account.id)}
-                        className="w-full flex items-center gap-2 px-2.5 py-2 bg-[var(--ml-bg-surface)] hover:bg-[#1e1e2c] transition text-left"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3 text-blue-400 shrink-0" fill="currentColor" viewBox="0 0 16 16">
-                          <path d="M0 4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2zm2-1a1 1 0 0 0-1 1v.217l7 4.2 7-4.2V4a1 1 0 0 0-1-1zm13 2.383-4.708 2.825L15 11.105zm-.034 6.876-5.64-3.471L8 9.583l-1.326-.795-5.64 3.47A1 1 0 0 0 2 13h12a1 1 0 0 0 .966-.741M1 11.105l4.708-2.897L1 5.383z"/>
-                        </svg>
-                        <span className="flex-1 min-w-0 text-[11px] font-medium text-gray-300 truncate" title={account.email}>
-                          {account.email}
+                <>
+                  {/* Mail/Calendar nav — vertical list of "Load more"-style buttons */}
+                  <div className="flex flex-col gap-1">
+                    <button
+                      onClick={() => onComposeNewMail?.()}
+                      className="w-full flex items-center justify-center gap-1.5 text-[11px] font-medium py-1.5 rounded-lg border border-indigo-500/25 text-indigo-300 bg-indigo-600/10 hover:bg-indigo-600/20 transition"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" fill="currentColor" viewBox="0 0 16 16">
+                        <path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168zM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207zM9.5 2.207 12.793 5.5 11.5 6.793 8.207 3.5z"/>
+                      </svg>
+                      New Mail
+                    </button>
+                    <button onClick={() => setSelectedMailTab("all")} className={`${mailNavButtonClass(selectedMailTab === "all")} flex items-center justify-center gap-1.5`}>
+                      All Mail
+                      {totalUnreadCount > 0 && (
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-indigo-600/30 text-indigo-300">
+                          {totalUnreadCount}
                         </span>
-                        {accountEmails.length > 0 && (
-                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-blue-500/20 text-blue-400 shrink-0">
-                            {accountEmails.length}
+                      )}
+                    </button>
+                    {emailAccounts.map((account) => (
+                      <button
+                        key={account.id}
+                        onClick={() => setSelectedMailTab(account.id)}
+                        onDoubleClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedMailTab(account.id);
+                          setEditingAccountTabId(account.id);
+                          setEditingAccountLabel(getAccountLabel(account));
+                        }}
+                        title={account.email}
+                        className={`${mailNavButtonClass(selectedMailTab === account.id)} flex items-center justify-center gap-1.5`}
+                      >
+                        {editingAccountTabId === account.id ? (
+                          <input
+                            autoFocus
+                            value={editingAccountLabel}
+                            onChange={(e) => setEditingAccountLabel(e.target.value)}
+                            onBlur={() => commitAccountLabel(account.id, editingAccountLabel)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                commitAccountLabel(account.id, editingAccountLabel);
+                              }
+                              if (e.key === "Escape") {
+                                e.preventDefault();
+                                setEditingAccountTabId(null);
+                              }
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                            className="max-w-[140px] bg-transparent border-b border-indigo-400 outline-none text-white text-[11px] text-center"
+                          />
+                        ) : (
+                          <span className="truncate max-w-[140px]">{getAccountLabel(account)}</span>
+                        )}
+                        {!!accountUnreadCounts[account.id] && (
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-indigo-600/30 text-indigo-300 shrink-0">
+                            {accountUnreadCounts[account.id]}
                           </span>
                         )}
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          className={`w-3 h-3 text-gray-600 shrink-0 transition-transform ${isCollapsed ? "-rotate-90" : ""}`}
-                          fill="currentColor" viewBox="0 0 16 16"
-                        >
-                          <path d="M7.247 11.14 2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z"/>
-                        </svg>
                       </button>
+                    ))}
+                    <button onClick={() => setSelectedMailTab("calendar")} className={mailNavButtonClass(selectedMailTab === "calendar")}>
+                      Calendar
+                    </button>
+                  </div>
 
-                      {/* Account emails */}
-                      {!isCollapsed && (
-                        <div className="p-2 flex flex-col gap-1.5 border-t border-[var(--ml-bg-hover)]">
-                          {accountEmails.length === 0 ? (
-                            <p className="text-[11px] text-gray-600 text-center py-2">No emails synced yet.</p>
-                          ) : (
-                            accountEmails.map(renderEmailCard)
-                          )}
-                        </div>
+                  {/* All sub-views stay mounted (hidden via CSS, not unmounted) so switching
+                      tabs never re-triggers a Gmail fetch — only the first load per view does. */}
+                  <div className="flex flex-col gap-1.5 min-h-[2rem]">
+                    <div style={{ display: selectedMailTab === "all" ? "block" : "none" }}>
+                      {onOpenEmailTab && (
+                        <EmailAllMailList
+                          onOpenEmail={onOpenEmailTab}
+                          selectedGmailMessageId={openEmailTabId}
+                          onEmailArchived={onEmailArchived}
+                          onEmailTrashed={onEmailTrashed}
+                          onPinChanged={onEmailPinChanged}
+                          onUnreadCountChange={setTotalUnreadCount}
+                        />
                       )}
                     </div>
-                  );
-                })
+
+                    {emailAccounts.map((account) => (
+                      <div key={account.id} style={{ display: selectedMailTab === account.id ? "block" : "none" }}>
+                        {onOpenEmailTab && (
+                          <EmailFolderBrowser
+                            account={account}
+                            onOpenEmail={onOpenEmailTab}
+                            selectedGmailMessageId={openEmailTabId}
+                            onEmailArchived={onEmailArchived}
+                            onEmailTrashed={onEmailTrashed}
+                            onPinChanged={onEmailPinChanged}
+                            onUnreadCountChange={handleAccountUnreadCountChange}
+                          />
+                        )}
+                      </div>
+                    ))}
+
+                    <div style={{ display: selectedMailTab === "calendar" ? "block" : "none" }}>
+                      <div className="rounded-lg px-2.5 py-3 flex items-center gap-2 text-gray-600">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3 shrink-0" fill="currentColor" viewBox="0 0 16 16">
+                          <path d="M3.5 0a.5.5 0 0 1 .5.5V1h8V.5a.5.5 0 0 1 1 0V1h1a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2h1V.5a.5.5 0 0 1 .5-.5M1 4v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V4z"/>
+                        </svg>
+                        <span className="text-[11px]">Calendar — coming soon</span>
+                      </div>
+                    </div>
+                  </div>
+                </>
               )}
             </div>
           )}
@@ -1114,16 +1124,6 @@ export function RightPanel({
         onToggleDone={(id) => onToggleDone(id)}
       />
 
-      {/* Email detail modal */}
-      <EmailDetailModal
-        email={selectedEmail}
-        isPinned={selectedEmail ? pinnedEmailIds.has(selectedEmail.id) : false}
-        linkedReminderId={selectedEmail ? (items.find((i) => i.email_record_id === selectedEmail.id)?.id ?? null) : null}
-        onClose={() => setSelectedEmail(null)}
-        onPinEmail={async (emailId) => { await onCreateReminderFromEmail?.(emailId); }}
-        onUnpinReminder={(reminderId) => onRemove(reminderId)}
-        onDeleteEmail={async (emailId) => { await onDeleteEmailRecord?.(emailId); }}
-      />
     </div>
     </>
   );

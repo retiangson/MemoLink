@@ -22,6 +22,77 @@ _BASE64_IMG_HTML = re.compile(r'<img\b[^>]*\bsrc=["\']data:[^"\']{20,}["\'][^>]*
 # Strips body_b64 attributes from draft tags so large note bodies don't bloat conversation history
 _EMAIL_DRAFT_BODY = re.compile(r'\s+body_b64="[^"]*"', re.IGNORECASE)
 _WHATSAPP_DRAFT_BODY = re.compile(r'\s+body_b64="[^"]*"', re.IGNORECASE)
+# "find/search/check an email about X" -> structured clickable list, not GPT prose.
+# Distinct from compose ("send"/"write"/"draft") and reply ("reply"/"respond") verbs, so it
+# never collides with the email_draft direct-response branch.
+_EMAIL_SEARCH_LIST_RE = re.compile(
+    r"\b(find|search(?:\s+for)?|look\s*for|look\s*up|locate|check|show\s+me|show|see\s+if|"
+    r"do\s+i\s+have|is\s+there|got\s+any)\b.{0,40}\b(email|emails|gmail|mail)\b",
+    re.IGNORECASE,
+)
+
+
+def _has_email_search_list_intent(text: str) -> bool:
+    return bool(_EMAIL_SEARCH_LIST_RE.search(text or ""))
+
+
+_EMAIL_SEARCH_STOP_WORDS = {
+    "can", "you", "check", "my", "about", "the", "an", "a", "is", "in",
+    "for", "and", "or", "with", "from", "me", "please", "i", "have", "any",
+    "email", "emails", "gmail", "inbox", "mail", "show", "get", "find", "search",
+    "tell", "what", "do", "did", "does", "are", "was", "were", "that",
+    "new", "all", "some", "there", "see", "look", "person", "subject", "content",
+}
+
+
+_EMAIL_ADDR_RE = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")
+
+
+def _build_gmail_search_query(user_text: str) -> str:
+    """Builds a Gmail-API-compatible `q` string from free text, mapping common phrasing
+    onto Gmail search operators and dropping stop words. Shared by the chat email-RAG
+    block and the chat email-search-list direct-response branch."""
+    lower = user_text.lower()
+    operators: list[str] = []
+    consumed: set[str] = set()
+    text_for_keywords = user_text
+
+    # Literal email addresses (e.g. "check email from talk2tutu@gmail.com") must become a
+    # precise from:/to: operator — the generic [^\w] cleanup below would otherwise strip
+    # "@" and "." and mangle the address into something Gmail can never match.
+    for match in _EMAIL_ADDR_RE.finditer(user_text):
+        addr = match.group(0)
+        preceding = user_text[max(0, match.start() - 12):match.start()].lower()
+        direction = "to" if re.search(r"\bto\s*$", preceding) else "from"
+        operators.append(f"{direction}:{addr}")
+        text_for_keywords = text_for_keywords.replace(addr, "")
+
+    att_words = {"attachment", "attached", "attachments", "file", "files",
+                 "document", "documents", "pdf", "docx", "xlsx", "pptx",
+                 "zip", "image", "photo", "photos"}
+    if any(w in lower for w in att_words):
+        operators.append("has:attachment")
+        consumed |= att_words
+
+    unread_words = {"unread", "unseen"}
+    if any(w in lower for w in unread_words):
+        operators.append("is:unread")
+        consumed |= unread_words
+
+    sent_words = {"sent", "outbox"}
+    if any(w in lower for w in sent_words):
+        operators.append("in:sent")
+        consumed |= sent_words
+
+    keywords = " ".join(
+        clean for w in text_for_keywords.split()
+        if (clean := re.sub(r"[^\w]", "", w)) and
+           clean.lower() not in _EMAIL_SEARCH_STOP_WORDS and
+           clean.lower() not in consumed and
+           len(clean) > 2
+    )
+    gm_query = " ".join(operators + ([keywords] if keywords.strip() else []))
+    return gm_query.strip() or user_text
 
 
 def _strip_base64_images(text: str) -> str:
@@ -50,7 +121,10 @@ from memolink_backend.utils.academic_search import (
     paper_title_key,
     search_papers,
 )
-from memolink_backend.contracts.chat_dtos import ChatResponseDTO, ChatAnswerSource, ChatRequestDTO, ChatAttachmentDTO
+from memolink_backend.contracts.chat_dtos import (
+    ChatResponseDTO, ChatAnswerSource, ChatRequestDTO, ChatAttachmentDTO,
+    ChatEmailResultDTO, ChatEmailAttachmentDTO,
+)
 from memolink_backend.contracts.chat_stream_dtos import (
     ImageGeneratingEvent,
     MessageCompleteEvent,
@@ -762,13 +836,62 @@ class ChatService(IChatService):
         routing_reason: str | None,
         model: str = "memolink",
         sources: list[ChatAnswerSource] | None = None,
+        email_results: list[ChatEmailResultDTO] | None = None,
     ) -> ChatResponseDTO:
         assistant_msg = self.repo_conv.add_message(conversation_id, "assistant", answer, model=model)
         return ChatResponseDTO(
             answer=answer,
             sources=sources or [],
+            email_results=email_results or [],
             message_id=assistant_msg.id,
             routing_reason=routing_reason,
+        )
+
+    def _build_email_search_list_response(
+        self, *, dto: ChatRequestDTO, user_text: str, conversation_id: int,
+    ) -> ChatResponseDTO:
+        """Handles "find/search email for/about X" — returns a structured clickable list
+        instead of GPT prose. Each result is shaped to match the frontend's BrowseEmailResult
+        so clicking it opens the email in a tab with no extra fetch."""
+        gm_query = _build_gmail_search_query(user_text)
+        try:
+            raw_results = self._email_service.search_for_chat_sync(dto.user_id, gm_query, top_k=10)
+        except Exception:
+            logger.exception("Email search-list direct response failed")
+            raw_results = []
+
+        email_results = [
+            ChatEmailResultDTO(
+                id=em.get("id"),
+                gmail_message_id=em.get("gmail_message_id"),
+                gmail_thread_id=em.get("gmail_thread_id"),
+                subject=em.get("subject") or "(no subject)",
+                sender_name=em.get("sender_name"),
+                sender_email=em.get("sender_email") or "",
+                snippet=em.get("snippet"),
+                body_text=em.get("body_text"),
+                body_html=em.get("body_html"),
+                attachments=[ChatEmailAttachmentDTO(**a) for a in em.get("attachments", [])],
+                importance_score=em.get("importance_score", 3.0),
+                is_read=em.get("is_read", True),
+                email_date=em.get("email_date"),
+                email_account_id=em.get("email_account_id"),
+                email_address=em.get("email_address"),
+                is_pinned=em.get("is_pinned", False),
+            )
+            for em in raw_results
+        ]
+
+        if email_results:
+            answer = f"Found {len(email_results)} email{'s' if len(email_results) != 1 else ''} matching your search. Click one to open it."
+        else:
+            answer = "I couldn't find any emails matching that search."
+
+        return self._persist_direct_response(
+            conversation_id,
+            answer,
+            routing_reason="Direct: email_search_list",
+            email_results=email_results,
         )
 
     def _build_route_plan(
@@ -786,6 +909,7 @@ class ChatService(IChatService):
         routing_reason: str | None,
         email_draft_prefill: str | None,
         whatsapp_draft_prefill: str | None,
+        email_search_list_intent: bool = False,
     ) -> _ChatRoutePlan:
         plan = _ChatRoutePlan(
             conversation_id=conversation_id,
@@ -848,6 +972,15 @@ class ChatService(IChatService):
                 conversation_id,
                 email_draft_prefill,
                 routing_reason="Direct: email_draft",
+            )
+            return plan
+
+        if email_search_list_intent and self._email_service and dto.user_id:
+            plan.decision = "direct_response"
+            plan.direct_response = self._build_email_search_list_response(
+                dto=dto,
+                user_text=user_text,
+                conversation_id=conversation_id,
             )
             return plan
 
@@ -2050,8 +2183,12 @@ class ChatService(IChatService):
         # Email RAG — live Gmail search when user asks about email
         _email_keywords = {"email", "gmail", "inbox", "message", "attachment", "mail", "sent", "received"}
         _asks_about_email = any(kw in user_text.lower() for kw in _email_keywords)
-        print(f"[EMAIL_RAG] asks={_asks_about_email} uid={dto.user_id} has_svc={self._email_service is not None}", flush=True)
-        if _asks_about_email and dto.user_id and user_text:
+        # "find/search/look up an email" is handled as a structured clickable list further
+        # down in _build_route_plan — skip the narrative RAG pass so GPT doesn't also
+        # write prose about the same emails (and we don't hit Gmail twice).
+        _email_search_list_intent = _has_email_search_list_intent(user_text)
+        print(f"[EMAIL_RAG] asks={_asks_about_email} list_intent={_email_search_list_intent} uid={dto.user_id} has_svc={self._email_service is not None}", flush=True)
+        if _asks_about_email and not _email_search_list_intent and dto.user_id and user_text:
             email_blocks: list[str] = []
             no_account = False
             try:
@@ -2069,49 +2206,7 @@ class ChatService(IChatService):
                     if not has_account:
                         no_account = True
                     else:
-                        # Build a smart Gmail search query using Gmail operators where applicable
-                        lower = user_text.lower()
-                        operators: list[str] = []
-
-                        # Words consumed by operators — excluded from keyword query
-                        _consumed: set[str] = set()
-
-                        _att_words = {"attachment", "attached", "attachments", "file", "files",
-                                      "document", "documents", "pdf", "docx", "xlsx", "pptx",
-                                      "zip", "image", "photo", "photos"}
-                        if any(w in lower for w in _att_words):
-                            operators.append("has:attachment")
-                            _consumed |= _att_words
-
-                        _unread_words = {"unread", "unseen"}
-                        if any(w in lower for w in _unread_words):
-                            operators.append("is:unread")
-                            _consumed |= _unread_words
-
-                        _sent_words = {"sent", "outbox"}
-                        if any(w in lower for w in _sent_words):
-                            operators.append("in:sent")
-                            _consumed |= _sent_words
-
-                        # Build keyword portion — drop stop words and operator-consumed words
-                        # Strip punctuation first so quoted phrases don't leak into the query
-                        import re as _re
-                        _stop = {"can", "you", "check", "my", "about", "the", "an", "a", "is", "in",
-                                 "for", "and", "or", "with", "from", "me", "please", "i", "have", "any",
-                                 "email", "gmail", "inbox", "mail", "show", "get", "find", "search",
-                                 "tell", "what", "do", "did", "does", "are", "was", "were", "that",
-                                 "new", "all", "some", "there", "see", "look"}
-                        keywords = " ".join(
-                            clean for w in user_text.split()
-                            if (clean := _re.sub(r"[^\w]", "", w)) and
-                               clean.lower() not in _stop and
-                               clean.lower() not in _consumed and
-                               len(clean) > 2
-                        )
-                        gm_query = " ".join(operators + ([keywords] if keywords.strip() else []))
-                        if not gm_query.strip():
-                            gm_query = user_text
-
+                        gm_query = _build_gmail_search_query(user_text)
                         live = self._email_service.live_search_sync(dto.user_id, gm_query, top_k=3)
                         for em in live:
                             att_list = em.get("attachments", [])
@@ -2202,6 +2297,7 @@ class ChatService(IChatService):
             _email_draft_prefill,
             _whatsapp_draft_prefill,
             suggested_web_query,
+            _email_search_list_intent,
         )
 
     def _improve_note_request(self, dto: ChatRequestDTO, note_name: str, conversation_id: int) -> ChatResponseDTO:
@@ -2353,7 +2449,7 @@ class ChatService(IChatService):
             openai_key=settings.openai_api_key,
         )
 
-        conversation_id, messages, sources, pre_conf_level, pre_conf_reason, email_draft_prefill, whatsapp_draft_prefill, suggested_web_query = self._build_chat_context(dto)
+        conversation_id, messages, sources, pre_conf_level, pre_conf_reason, email_draft_prefill, whatsapp_draft_prefill, suggested_web_query, email_search_list_intent = self._build_chat_context(dto)
         plan = self._build_route_plan(
             dto=dto,
             user_text=user_text,
@@ -2367,6 +2463,7 @@ class ChatService(IChatService):
             routing_reason=routing_reason,
             email_draft_prefill=email_draft_prefill,
             whatsapp_draft_prefill=whatsapp_draft_prefill,
+            email_search_list_intent=email_search_list_intent,
         )
 
         if plan.direct_response:
@@ -2496,7 +2593,7 @@ class ChatService(IChatService):
 
         t_total = time.perf_counter()
         t_ctx = time.perf_counter()
-        conversation_id, messages, sources, pre_conf_level, pre_conf_reason, email_draft_prefill, whatsapp_draft_prefill, suggested_web_query = self._build_chat_context(dto)
+        conversation_id, messages, sources, pre_conf_level, pre_conf_reason, email_draft_prefill, whatsapp_draft_prefill, suggested_web_query, email_search_list_intent = self._build_chat_context(dto)
         ctx_ms = int((time.perf_counter() - t_ctx) * 1000)
         plan = self._build_route_plan(
             dto=dto,
@@ -2511,6 +2608,7 @@ class ChatService(IChatService):
             routing_reason=routing_reason,
             email_draft_prefill=email_draft_prefill,
             whatsapp_draft_prefill=whatsapp_draft_prefill,
+            email_search_list_intent=email_search_list_intent,
         )
 
         if plan.direct_response:
@@ -2520,6 +2618,7 @@ class ChatService(IChatService):
                     message_id=plan.direct_response.message_id,
                     model="memolink",
                     routing_reason=plan.direct_response.routing_reason,
+                    email_results=plan.direct_response.email_results,
                 )
             )
             return

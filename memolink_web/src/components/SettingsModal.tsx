@@ -2,7 +2,7 @@
 import { changePassword } from "../api/client";
 import { getProviders, addProvider, updateProvider, deleteProvider } from "../api/settingsApi";
 import type { CustomProvider } from "../api/settingsApi";
-import { getEmailStatus, getEmailConnectUrl, disconnectEmail, autoProcessEmails, listEmails, deleteEmail, emailToNote, emailToReminder } from "../api/emailApi";
+import { getEmailStatus, getEmailConnectUrl, disconnectEmail, autoProcessEmails, listEmails, deleteEmail, emailToNote, emailToReminder, updateEmailAccountSettings } from "../api/emailApi";
 import type { EmailStatus, EmailRecord, AutoProcessResult } from "../api/emailApi";
 import { getTeamsStatus, getTeamsConnectUrl, disconnectTeams, listTeamsChats, getTeamsMessages, sendTeamsMessage, chatToNote } from "../api/teamsApi";
 import type { TeamsStatus, TeamsChat, TeamsMessage } from "../api/teamsApi";
@@ -116,6 +116,7 @@ export function SettingsModal({
   const [selectedEmail, setSelectedEmail] = useState<EmailRecord | null>(null);
   const [actionLoading, setActionLoading] = useState<"note" | "reminder" | null>(null);
   const [actionResult, setActionResult] = useState<string | null>(null);
+  const [pageSizeSavingId, setPageSizeSavingId] = useState<number | null>(null);
   const [connectors, setConnectors] = useState<ConnectorSummary[]>([]);
   const [connectorsLoading, setConnectorsLoading] = useState(false);
   const [connectorsError, setConnectorsError] = useState<string | null>(null);
@@ -1188,24 +1189,47 @@ export function SettingsModal({
                     {/* Connected accounts */}
                     <div className="space-y-1.5">
                       {emailStatus.accounts.map((acct) => (
-                        <div key={acct.id} className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
+                        <div key={acct.id} className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
                             <span className="w-2 h-2 rounded-full bg-green-400 shrink-0" />
                             <span className="text-xs text-gray-400 truncate">{acct.email}</span>
                           </div>
-                          <button
-                            onClick={async () => {
-                              setEmailLoading(true);
-                              try {
-                                await disconnectEmail(acct.email);
-                                await loadConnectors();
-                              } catch { /* silently fail */ } finally { setEmailLoading(false); }
-                            }}
-                            disabled={emailLoading}
-                            className={btnDanger}
-                          >
-                            {emailLoading ? "…" : "Remove"}
-                          </button>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <label className="flex items-center gap-1 text-[10px] text-gray-600" title="Emails per page when browsing">
+                              Page size
+                              <input
+                                type="number"
+                                min={5}
+                                max={100}
+                                defaultValue={acct.page_size ?? 25}
+                                disabled={pageSizeSavingId === acct.id}
+                                onBlur={async (e) => {
+                                  const value = Math.min(100, Math.max(5, Number(e.target.value) || 25));
+                                  e.target.value = String(value);
+                                  if (value === acct.page_size) return;
+                                  setPageSizeSavingId(acct.id);
+                                  try {
+                                    await updateEmailAccountSettings(acct.id, value);
+                                    await loadConnectors();
+                                  } catch { /* silently fail */ } finally { setPageSizeSavingId(null); }
+                                }}
+                                className="w-14 bg-[var(--ml-bg-surface)] border border-[var(--ml-bg-hover)] rounded px-1.5 py-0.5 text-[11px] text-gray-300"
+                              />
+                            </label>
+                            <button
+                              onClick={async () => {
+                                setEmailLoading(true);
+                                try {
+                                  await disconnectEmail(acct.email);
+                                  await loadConnectors();
+                                } catch { /* silently fail */ } finally { setEmailLoading(false); }
+                              }}
+                              disabled={emailLoading}
+                              className={btnDanger}
+                            >
+                              {emailLoading ? "…" : "Remove"}
+                            </button>
+                          </div>
                         </div>
                       ))}
                     </div>

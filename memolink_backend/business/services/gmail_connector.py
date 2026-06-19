@@ -13,6 +13,20 @@ from memolink_backend.domain.repositories.email_account_repository import EmailA
 GMAIL_API = "https://www.googleapis.com/gmail/v1/users/me"
 GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
 
+# Shared, process-lifetime client so concurrent/sequential Gmail API calls reuse
+# pooled keep-alive connections instead of paying a fresh TLS handshake each time.
+_async_client: httpx.AsyncClient | None = None
+
+
+def _get_async_client() -> httpx.AsyncClient:
+    global _async_client
+    if _async_client is None or _async_client.is_closed:
+        _async_client = httpx.AsyncClient(
+            limits=httpx.Limits(max_connections=50, max_keepalive_connections=20),
+            timeout=30.0,
+        )
+    return _async_client
+
 
 class GmailConnector:
     def __init__(self, account_repo: EmailAccountRepository):
@@ -54,16 +68,16 @@ class GmailConnector:
         return tokens["access_token"]
 
     async def refresh_access_token(self, refresh_token: str) -> tuple[str, datetime]:
-        async with httpx.AsyncClient() as client:
-            resp = await client.post(
-                GOOGLE_TOKEN_URL,
-                data={
-                    "client_id": settings.google_client_id,
-                    "client_secret": settings.google_client_secret,
-                    "refresh_token": refresh_token,
-                    "grant_type": "refresh_token",
-                },
-            )
+        client = _get_async_client()
+        resp = await client.post(
+            GOOGLE_TOKEN_URL,
+            data={
+                "client_id": settings.google_client_id,
+                "client_secret": settings.google_client_secret,
+                "refresh_token": refresh_token,
+                "grant_type": "refresh_token",
+            },
+        )
         resp.raise_for_status()
         data = resp.json()
         access_token = data["access_token"]
@@ -91,12 +105,12 @@ class GmailConnector:
 
     async def list_messages(self, user_id: int, *, query: str, max_results: int, email_account_id: int | None = None) -> list[str]:
         access_token = await self.get_valid_access_token(user_id, email_account_id)
-        async with httpx.AsyncClient() as client:
-            resp = await client.get(
-                f"{GMAIL_API}/messages",
-                headers={"Authorization": f"Bearer {access_token}"},
-                params={"maxResults": max_results, "q": query},
-            )
+        client = _get_async_client()
+        resp = await client.get(
+            f"{GMAIL_API}/messages",
+            headers={"Authorization": f"Bearer {access_token}"},
+            params={"maxResults": max_results, "q": query},
+        )
         if resp.status_code != 200:
             raise ValueError(f"Gmail API error: {resp.status_code}")
         return [item["id"] for item in resp.json().get("messages", [])]
@@ -115,12 +129,12 @@ class GmailConnector:
 
     async def get_message(self, user_id: int, gmail_message_id: str, *, format: str = "full", email_account_id: int | None = None) -> dict | None:
         access_token = await self.get_valid_access_token(user_id, email_account_id)
-        async with httpx.AsyncClient() as client:
-            resp = await client.get(
-                f"{GMAIL_API}/messages/{gmail_message_id}",
-                headers={"Authorization": f"Bearer {access_token}"},
-                params={"format": format},
-            )
+        client = _get_async_client()
+        resp = await client.get(
+            f"{GMAIL_API}/messages/{gmail_message_id}",
+            headers={"Authorization": f"Bearer {access_token}"},
+            params={"format": format},
+        )
         if resp.status_code != 200:
             return None
         return resp.json()
@@ -149,14 +163,83 @@ class GmailConnector:
         payload: dict = {"raw": raw_message}
         if thread_id:
             payload["threadId"] = thread_id
-        async with httpx.AsyncClient() as client:
-            resp = await client.post(
-                f"{GMAIL_API}/messages/send",
-                headers={"Authorization": f"Bearer {access_token}"},
-                json=payload,
-            )
+        client = _get_async_client()
+        resp = await client.post(
+            f"{GMAIL_API}/messages/send",
+            headers={"Authorization": f"Bearer {access_token}"},
+            json=payload,
+        )
         if resp.status_code not in (200, 201):
             raise ValueError(f"Gmail send failed: {resp.text[:200]}")
+        return resp.json()
+
+    async def list_messages_page(
+        self,
+        user_id: int,
+        *,
+        query: str,
+        max_results: int,
+        page_token: str | None = None,
+        email_account_id: int | None = None,
+    ) -> dict:
+        access_token = await self.get_valid_access_token(user_id, email_account_id)
+        params: dict = {"maxResults": max_results, "q": query}
+        if page_token:
+            params["pageToken"] = page_token
+        client = _get_async_client()
+        resp = await client.get(
+            f"{GMAIL_API}/messages",
+            headers={"Authorization": f"Bearer {access_token}"},
+            params=params,
+        )
+        if resp.status_code != 200:
+            raise ValueError(f"Gmail API error: {resp.status_code}")
+        data = resp.json()
+        return {
+            "ids": [item["id"] for item in data.get("messages", [])],
+            "next_page_token": data.get("nextPageToken"),
+        }
+
+    async def modify_message(
+        self,
+        user_id: int,
+        *,
+        gmail_message_id: str,
+        add_label_ids: list[str] | None = None,
+        remove_label_ids: list[str] | None = None,
+        email_account_id: int | None = None,
+    ) -> dict:
+        access_token = await self.get_valid_access_token(user_id, email_account_id)
+        payload: dict = {}
+        if add_label_ids:
+            payload["addLabelIds"] = add_label_ids
+        if remove_label_ids:
+            payload["removeLabelIds"] = remove_label_ids
+        client = _get_async_client()
+        resp = await client.post(
+            f"{GMAIL_API}/messages/{gmail_message_id}/modify",
+            headers={"Authorization": f"Bearer {access_token}"},
+            json=payload,
+        )
+        if resp.status_code != 200:
+            raise ValueError(f"Gmail API error: {resp.status_code}")
+        return resp.json()
+
+    async def trash_message(
+        self,
+        user_id: int,
+        *,
+        gmail_message_id: str,
+        email_account_id: int | None = None,
+    ) -> dict:
+        access_token = await self.get_valid_access_token(user_id, email_account_id)
+        client = _get_async_client()
+        resp = await client.post(
+            f"{GMAIL_API}/messages/{gmail_message_id}/trash",
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+        if resp.status_code != 200:
+            raise ValueError(f"Gmail API error: {resp.status_code}")
         return resp.json()
 
     async def download_attachment(
@@ -168,11 +251,11 @@ class GmailConnector:
         email_account_id: int | None = None,
     ) -> bytes:
         access_token = await self.get_valid_access_token(user_id, email_account_id)
-        async with httpx.AsyncClient() as client:
-            resp = await client.get(
-                f"{GMAIL_API}/messages/{gmail_message_id}/attachments/{attachment_id}",
-                headers={"Authorization": f"Bearer {access_token}"},
-            )
+        client = _get_async_client()
+        resp = await client.get(
+            f"{GMAIL_API}/messages/{gmail_message_id}/attachments/{attachment_id}",
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
         if resp.status_code != 200:
             raise ValueError(f"Gmail API returned {resp.status_code}: {resp.text[:200]}")
         data = resp.json().get("data", "")

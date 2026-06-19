@@ -9,6 +9,8 @@ import { WorkflowActionBar } from "./WorkflowActionBar";
 import { EvaluationRatingBar } from "./EvaluationRatingBar";
 import { EmailDraftCard } from "./EmailDraftCard";
 import { WhatsappDraftCard } from "./WhatsappDraftCard";
+import { EmailResultsList } from "./EmailResultsList";
+import type { BrowseEmailResult } from "../api/emailApi";
 import type { Message } from "../types";
 import "highlight.js/styles/github-dark.css";
 import "../styles/markdown.css";
@@ -187,6 +189,8 @@ interface Props {
   onRetry?: () => void;
   suggestWebSearch?: boolean;
   onSearchOnline?: () => void;
+  emailResults?: BrowseEmailResult[];
+  onOpenEmail?: (email: BrowseEmailResult) => void;
 }
 
 const TRANSLATE_LANGUAGES = [
@@ -212,7 +216,7 @@ function parseNoteEdit(content: string): {
   };
 }
 
-export default function ChatBubble({ role, content, model, streaming, onAdd, onDelete, onApplyEdit, onOpenNote, onSaveNote, hasOpenNote, translationEnabled = true, modelAttributionEnabled = true, confidence, confidenceReason, confidenceEnabled = true, routingReason, autopilotEnabled = true, workflowContext, workflowActions, onWorkflowActionDone, onWorkflowConversationMessages, messageId, evaluationActive, evalRating, onRetry, suggestWebSearch, onSearchOnline }: Props) {
+export default function ChatBubble({ role, content, model, streaming, onAdd, onDelete, onApplyEdit, onOpenNote, onSaveNote, hasOpenNote, translationEnabled = true, modelAttributionEnabled = true, confidence, confidenceReason, confidenceEnabled = true, routingReason, autopilotEnabled = true, workflowContext, workflowActions, onWorkflowActionDone, onWorkflowConversationMessages, messageId, evaluationActive, evalRating, onRetry, suggestWebSearch, onSearchOnline, emailResults, onOpenEmail }: Props) {
   const isUser = role === "user";
   const [copied, setCopied] = useState(false);
   const [showLangPicker, setShowLangPicker] = useState(false);
@@ -476,6 +480,10 @@ export default function ChatBubble({ role, content, model, streaming, onAdd, onD
         )}
 
         {post && <div className="mt-3"><ContentWithNoteLinks content={post} onOpenNote={onOpenNote} /></div>}
+
+        {!!emailResults?.length && onOpenEmail && (
+          <EmailResultsList results={emailResults} onOpen={onOpenEmail} />
+        )}
       </div>
 
       {/* Translation bubble */}
