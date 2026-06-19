@@ -16,22 +16,30 @@ class FakeGmailConnector:
         self.message_ids = []
         self.messages = {}
 
-    async def send_message(self, user_id: int, *, raw_message: str, thread_id: str | None = None) -> dict:
+    async def send_message(
+        self, user_id: int, *, raw_message: str, thread_id: str | None = None, email_account_id: int | None = None
+    ) -> dict:
         self.sent_messages.append(
-            {"user_id": user_id, "raw_message": raw_message, "thread_id": thread_id}
+            {"user_id": user_id, "raw_message": raw_message, "thread_id": thread_id, "email_account_id": email_account_id}
         )
         return {"id": "gmail-sent-123"}
 
-    async def download_attachment(self, user_id: int, *, gmail_message_id: str, attachment_id: str) -> bytes:
+    async def download_attachment(
+        self, user_id: int, *, gmail_message_id: str, attachment_id: str, email_account_id: int | None = None
+    ) -> bytes:
         self.attachment_requests.append(
-            {"user_id": user_id, "gmail_message_id": gmail_message_id, "attachment_id": attachment_id}
+            {"user_id": user_id, "gmail_message_id": gmail_message_id, "attachment_id": attachment_id, "email_account_id": email_account_id}
         )
         return b"attachment-bytes"
 
-    def list_messages_sync(self, user_id: int, *, query: str, max_results: int) -> list[str]:
+    def list_messages_sync(
+        self, user_id: int, *, query: str, max_results: int, email_account_id: int | None = None
+    ) -> list[str]:
         return self.message_ids[:max_results]
 
-    def get_message_sync(self, user_id: int, gmail_message_id: str, *, format: str = "full") -> dict | None:
+    def get_message_sync(
+        self, user_id: int, gmail_message_id: str, *, format: str = "full", email_account_id: int | None = None
+    ) -> dict | None:
         return self.messages.get(gmail_message_id)
 
 
@@ -126,8 +134,8 @@ def test_email_service_send_draft_uses_connector_and_preserves_reply_headers():
     msg = message_from_bytes(base64.urlsafe_b64decode(sent["raw_message"] + "=="))
     assert msg["To"] == "person@example.com"
     assert msg["Subject"] == "Project update"
-    assert msg["In-Reply-To"] == "msg-abc"
-    assert msg["References"] == "msg-abc"
+    assert msg["In-Reply-To"] == "<msg-abc>"
+    assert msg["References"] == "<msg-abc>"
 
 
 def test_email_service_create_reminder_from_email_uses_reminder_repo():
