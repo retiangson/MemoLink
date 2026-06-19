@@ -73,6 +73,24 @@ class EmailAccountRepository:
             "provider": row.provider,
         }
 
+    def update_page_size(self, user_id: int, account_id: int, page_size: int) -> Optional[EmailAccount]:
+        row = self.get_by_id(user_id, account_id)
+        if not row:
+            return None
+        row.page_size = page_size
+        self.db.commit()
+        self.db.refresh(row)
+        return row
+
+    def update_display_name(self, user_id: int, account_id: int, display_name: Optional[str]) -> Optional[EmailAccount]:
+        row = self.get_by_id(user_id, account_id)
+        if not row:
+            return None
+        row.display_name = display_name
+        self.db.commit()
+        self.db.refresh(row)
+        return row
+
     def delete_by_user_id(self, user_id: int) -> bool:
         deleted = self.db.query(EmailAccount).filter(EmailAccount.user_id == user_id).delete()
         self.db.commit()

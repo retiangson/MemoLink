@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import json
-from typing import Literal, Optional
+from typing import List, Literal, Optional
 
 from pydantic import BaseModel
+
+from memolink_backend.contracts.chat_dtos import ChatEmailResultDTO
 
 
 class ChatStreamEvent(BaseModel):
@@ -29,6 +31,7 @@ class MessageCompleteEvent(ChatStreamEvent):
     routing_reason: Optional[str] = None
     suggest_web_search: bool = False
     search_query_suggestion: Optional[str] = None
+    email_results: List[ChatEmailResultDTO] = []
 
 
 class NoteCloseEvent(ChatStreamEvent):

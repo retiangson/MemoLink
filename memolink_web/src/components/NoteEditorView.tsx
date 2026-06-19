@@ -2,6 +2,7 @@
 import { RichNoteEditor, ttsHighlightKey } from "./RichNoteEditor";
 import { splitSentences } from "../hooks/useTTS";
 import { useRecording } from "../hooks/useRecording";
+import { LANGUAGES } from "../utils/languages";
 import { exportNote, EXPORT_FORMATS } from "../utils/noteExport";
 import type { ExportFormat } from "../utils/noteExport";
 import { VideoImportModal } from "./VideoImportModal";
@@ -38,24 +39,6 @@ interface NoteEditorViewProps {
   noteId?: number | null;
 }
 
-const LANGUAGES = [
-  { code: "",   label: "Auto Detect" },
-  { code: "en", label: "English" },
-  { code: "mi", label: "Māori" },
-  { code: "zh", label: "Chinese" },
-  { code: "ja", label: "Japanese" },
-  { code: "ru", label: "Russian" },
-  { code: "tl", label: "Tagalog" },
-  { code: "es", label: "Spanish" },
-  { code: "fr", label: "French" },
-  { code: "ko", label: "Korean" },
-  { code: "hi", label: "Hindi" },
-  { code: "ar", label: "Arabic" },
-  { code: "de", label: "German" },
-  { code: "pt", label: "Portuguese" },
-  { code: "it", label: "Italian" },
-];
-
 export function NoteEditorView({
   noteKey,
   noteTitleDraft, setNoteTitleDraft,
@@ -71,7 +54,7 @@ export function NoteEditorView({
   const [showPicker, setShowPicker] = useState(false);
   const [showExport, setShowExport] = useState(false);
   const [showVideoImport, setShowVideoImport] = useState(false);
-  const [language, setLanguage] = useState("");
+  const [language, setLanguage] = useState("en");
   const [recordMode, setRecordMode] = useState<"default" | "lecture">("lecture");
   const [recordBackend, setRecordBackend] = useState<"auto" | "whisper" | "deepgram">("auto");
   const [autoStopOnSilence, setAutoStopOnSilence] = useState(false);

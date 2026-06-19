@@ -246,6 +246,8 @@ if os.getenv("MEMOLINK_SKIP_DB_BOOTSTRAP") != "1":
         _conn.execute(text("CREATE INDEX IF NOT EXISTS ix_email_records_gmail_message_id ON email_records(gmail_message_id)"))
         _conn.execute(text("ALTER TABLE email_records ADD COLUMN IF NOT EXISTS note_appended BOOLEAN NOT NULL DEFAULT FALSE"))
         _conn.execute(text("ALTER TABLE email_records ADD COLUMN IF NOT EXISTS gmail_thread_id VARCHAR(255)"))
+        _conn.execute(text("ALTER TABLE email_records ADD COLUMN IF NOT EXISTS is_pinned BOOLEAN NOT NULL DEFAULT FALSE"))
+        _conn.execute(text("ALTER TABLE email_records ADD COLUMN IF NOT EXISTS pinned_at TIMESTAMPTZ"))
         _conn.execute(text("ALTER TABLE reminders ADD COLUMN IF NOT EXISTS email_record_id INTEGER REFERENCES email_records(id) ON DELETE SET NULL"))
         # Email accounts table
         _conn.execute(text("""
@@ -261,6 +263,19 @@ if os.getenv("MEMOLINK_SKIP_DB_BOOTSTRAP") != "1":
                 updated_at TIMESTAMPTZ DEFAULT now()
             )
         """))
+        _conn.execute(text("ALTER TABLE email_accounts ADD COLUMN IF NOT EXISTS page_size INTEGER NOT NULL DEFAULT 25"))
+        _conn.execute(text("ALTER TABLE email_accounts ADD COLUMN IF NOT EXISTS display_name VARCHAR(255)"))
+        _conn.execute(text("ALTER TABLE email_accounts DROP CONSTRAINT IF EXISTS email_accounts_user_id_key"))
+        _conn.execute(text("""
+            DO $$
+            BEGIN
+                ALTER TABLE email_accounts ADD CONSTRAINT uq_email_accounts_user_email UNIQUE (user_id, email_address);
+            EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL;
+            END $$;
+        """))
+        # email_records.email_account_id references email_accounts, so this must come after that table exists
+        _conn.execute(text("ALTER TABLE email_records ADD COLUMN IF NOT EXISTS email_account_id INTEGER REFERENCES email_accounts(id) ON DELETE SET NULL"))
+        _conn.execute(text("CREATE INDEX IF NOT EXISTS ix_email_records_email_account_id ON email_records(email_account_id)"))
         _conn.execute(text("""
             CREATE TABLE IF NOT EXISTS teams_accounts (
                 id SERIAL PRIMARY KEY,

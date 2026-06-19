@@ -1,6 +1,6 @@
 from typing import Optional
 from sqlalchemy.orm import Session
-from sqlalchemy import text
+from sqlalchemy import text, func
 from memolink_backend.domain.models.email_record import EmailRecord
 
 
@@ -121,6 +121,22 @@ class EmailRecordRepository:
         if not ids:
             return []
         return self.db.query(EmailRecord).filter(EmailRecord.id.in_(ids)).all()
+
+    def get_by_gmail_message_id(self, user_id: int, gmail_message_id: str) -> Optional[EmailRecord]:
+        return self.db.query(EmailRecord).filter(
+            EmailRecord.user_id == user_id,
+            EmailRecord.gmail_message_id == gmail_message_id,
+        ).first()
+
+    def set_pinned(self, user_id: int, record_id: int, pinned: bool) -> Optional[EmailRecord]:
+        row = self.get_by_id(user_id, record_id)
+        if not row:
+            return None
+        row.is_pinned = pinned
+        row.pinned_at = func.now() if pinned else None
+        self.db.commit()
+        self.db.refresh(row)
+        return row
 
     def search_by_vector(self, query_vector: list[float], user_id: int, top_k: int = 3) -> list[EmailRecord]:
         embedding_str = "[" + ",".join(str(x) for x in query_vector) + "]"

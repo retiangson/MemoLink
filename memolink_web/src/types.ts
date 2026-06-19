@@ -1,3 +1,5 @@
+import type { BrowseEmailResult } from "./api/emailApi";
+
 export type MessageRole = "user" | "assistant";
 
 export type ConfidenceLevel = "HIGH" | "MEDIUM" | "LOW" | "UNSUPPORTED";
@@ -12,6 +14,7 @@ export interface Message {
   routing_reason?: string;
   suggest_web_search?: boolean;
   search_query_suggestion?: string;
+  email_results?: BrowseEmailResult[];
 }
 
 export interface Conversation {
@@ -66,6 +69,7 @@ export type ChatStreamEvent =
       routing_reason?: string;
       suggest_web_search?: boolean;
       search_query_suggestion?: string;
+      email_results?: BrowseEmailResult[];
     }
   | { type: "note.close"; note_id: number }
   | { type: "note.open"; note_id: number }

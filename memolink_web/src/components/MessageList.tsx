@@ -1,6 +1,7 @@
 import React from "react";
 import ChatBubble from "./ChatBubble";
 import type { Conversation, Message } from "../types";
+import type { BrowseEmailResult } from "../api/emailApi";
 
 interface MessageListProps {
   messages: Message[];
@@ -29,13 +30,14 @@ interface MessageListProps {
   evalRatings?: Record<string, Record<string, number | string>>;
   onRetry?: (index: number) => void;
   onSearchOnline?: (searchQuerySuggestion?: string) => void;
+  onOpenEmail?: (email: BrowseEmailResult) => void;
 }
 
 export function MessageList({
   messages, loading, streaming, activeConversation,
   messagesContainerRef, bottomRef,
   onLoadOlder, onAddToNotes, onDeleteMessage, onDropFiles,
-  onApplyNoteEdit, onOpenNote, onSaveNote, hasOpenNote, translationEnabled = true, modelAttributionEnabled = true, confidenceEnabled = true, autopilotEnabled = true, workflowContext, workflowSuggestions, onWorkflowActionDone, onWorkflowConversationMessages, evaluationActive = false, evalRatings, onRetry, onSearchOnline,
+  onApplyNoteEdit, onOpenNote, onSaveNote, hasOpenNote, translationEnabled = true, modelAttributionEnabled = true, confidenceEnabled = true, autopilotEnabled = true, workflowContext, workflowSuggestions, onWorkflowActionDone, onWorkflowConversationMessages, evaluationActive = false, evalRatings, onRetry, onSearchOnline, onOpenEmail,
 }: MessageListProps) {
   return (
     <div
@@ -86,6 +88,8 @@ export function MessageList({
               onRetry={!isPendingAssistantMsg && onRetry ? () => onRetry(idx) : undefined}
               suggestWebSearch={!isPendingAssistantMsg && msg.role === "assistant" && isLast ? msg.suggest_web_search : undefined}
               onSearchOnline={!isPendingAssistantMsg && msg.role === "assistant" && isLast && onSearchOnline ? () => onSearchOnline(msg.search_query_suggestion) : undefined}
+              emailResults={!isPendingAssistantMsg && msg.role === "assistant" ? msg.email_results : undefined}
+              onOpenEmail={onOpenEmail}
             />
           );
         })}

@@ -16,6 +16,10 @@ import { ChatInput } from "../components/ChatInput";
 import { RunningProcessBanner } from "../components/RunningProcessBanner";
 import { DeleteModal } from "../components/DeleteModal";
 import { SettingsModal } from "../components/SettingsModal";
+import { EmailTabContent } from "../components/EmailTabContent";
+import { EmailComposeTabContent } from "../components/EmailComposeTabContent";
+import { useEmailTabs } from "../hooks/useEmailTabs";
+import { archiveEmail, trashEmail, pinEmail, unpinEmail } from "../api/emailApi";
 import { HelpModal } from "../components/HelpModal";
 import { MemoGraphModal } from "../components/MemoGraphModal";
 import { StudyModeModal } from "../components/StudyModeModal";
@@ -33,10 +37,10 @@ import { TEMP_ID, convLabel } from "../types";
 import { useWorkspace } from "../hooks/useWorkspace";
 import { useFeatureFlags } from "../hooks/useFeatureFlags";
 import { fetchAdminFeedback } from "../api/adminApi";
-import { getEmailStatus, autoProcessEmails, listEmails, emailToReminder, deleteEmail } from "../api/emailApi";
+import { getEmailStatus } from "../api/emailApi";
 import { detectReminderFromMessage } from "../api/reminderApi";
 import { ChatReminderSuggestion } from "../components/ChatReminderSuggestion";
-import type { EmailRecord, EmailAccount } from "../api/emailApi";
+import type { EmailAccount } from "../api/emailApi";
 import { getTeamsStatus } from "../api/teamsApi";
 import { getWhatsappStatus, startWhatsapp } from "../api/whatsappApi";
 import { isDesktopOnline } from "../api/desktopApi";
@@ -66,7 +70,9 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
   const [menuData, setMenuData] = useState<{ type: "note" | "conversation"; item: any; top: number; left: number } | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ id: number; content: string; index: number } | null>(null);
-  const [activeTabType, setActiveTabType] = useState<"chat" | "note">("chat");
+  const [activeTabType, setActiveTabType] = useState<"chat" | "note" | "email">("chat");
+  const emailTabs = useEmailTabs();
+  const [emailActionLoadingId, setEmailActionLoadingId] = useState<string | null>(null);
   const [rightPanelOpen, setRightPanelOpen] = useState(() => window.innerWidth >= 640);
   const [recycleBinOpen, setRecycleBinOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -96,18 +102,15 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
   const [evalRatings, setEvalRatings] = useState<Record<string, Record<string, number | string>>>({});
   const [emailConnected, setEmailConnected] = useState(false);
   const [emailAccounts, setEmailAccounts] = useState<EmailAccount[]>([]);
-  const [emailRecords, setEmailRecords] = useState<EmailRecord[]>([]);
   const [teamsConnected, setTeamsConnected] = useState(false);
   const [whatsappConnected, setWhatsappConnected] = useState(false);
   const [whatsappAvailable, setWhatsappAvailable] = useState(false);
-  const [isSyncingEmail, setIsSyncingEmail] = useState(false);
-  const [emailSyncResult, setEmailSyncResult] = useState<string | null>(null);
   const [showTour, setShowTour] = useState(() => !localStorage.getItem("memolink_walkthrough_done"));
   const [bellTooltipVisible, setBellTooltipVisible] = useState(false);
 
   // Tab drag-and-drop
-  const dragSrcRef = useRef<{ type: "chat" | "note"; index: number } | null>(null);
-  const [dragOverTab, setDragOverTab] = useState<{ type: "chat" | "note"; index: number } | null>(null);
+  const dragSrcRef = useRef<{ type: "chat" | "note" | "email"; index: number } | null>(null);
+  const [dragOverTab, setDragOverTab] = useState<{ type: "chat" | "note" | "email"; index: number } | null>(null);
 
   // Long-press to edit tab title on mobile
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -156,10 +159,6 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
       const s = await getEmailStatus();
       setEmailConnected(s.connected);
       setEmailAccounts(s.accounts ?? []);
-      if (s.connected) {
-        const records = await listEmails();
-        setEmailRecords(records);
-      }
     } catch { /* ignore */ }
   }
 
@@ -196,29 +195,6 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
       }).catch(() => {});
     });
   }, []);
-
-  async function handleSyncEmail() {
-    setIsSyncingEmail(true);
-    setEmailSyncResult(null);
-    try {
-      const result = await autoProcessEmails();
-      const [records] = await Promise.all([listEmails(), suggestions.reload(), reloadNotes()]);
-      setEmailRecords(records);
-      if (result.synced === 0) {
-        setEmailSyncResult("✓ No new emails");
-      } else {
-        const parts = [`✓ ${result.synced} email${result.synced !== 1 ? "s" : ""} synced`];
-        if (result.notes_added > 0) parts.push(`Email Digest updated`);
-        if (result.reminders_created > 0) parts.push(`${result.reminders_created} reminder${result.reminders_created !== 1 ? "s" : ""} added`);
-        setEmailSyncResult(parts.join(" · "));
-      }
-    } catch (err: any) {
-      const detail = err?.response?.data?.detail ?? "Email sync failed";
-      setEmailSyncResult(`✗ ${detail}`);
-    } finally {
-      setIsSyncingEmail(false);
-    }
-  }
 
   // Open Settings after OAuth redirects
   useEffect(() => {
@@ -330,6 +306,13 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
       setActiveTabType("chat");
     }
   }, [editor.openNotes.length]);
+
+  // When all email tabs are closed, switch back to chat
+  useEffect(() => {
+    if (emailTabs.openTabs.length === 0 && activeTabType === "email") {
+      setActiveTabType("chat");
+    }
+  }, [emailTabs.openTabs.length]);
 
   useEffect(() => {
     const close = () => { setMenuData(null); setUserMenuOpen(false); };
@@ -503,11 +486,66 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
     setShowDeleteModal(false);
   }
 
-  function handleTabDrop(type: "chat" | "note", toIndex: number) {
+  function handleTabDrop(type: "chat" | "note" | "email", toIndex: number) {
     const src = dragSrcRef.current;
     if (!src || src.type !== type) return;
     if (type === "chat") convs.reorderOpenChats(src.index, toIndex);
-    else editor.reorderNotes(src.index, toIndex);
+    else if (type === "note") editor.reorderNotes(src.index, toIndex);
+    else emailTabs.reorderEmailTabs(src.index, toIndex);
+  }
+
+  function openEmailInTab(email: import("../api/emailApi").BrowseEmailResult) {
+    emailTabs.openEmailTab(email);
+    setActiveTabType("email");
+  }
+
+  function openComposeInTab() {
+    emailTabs.openComposeTab();
+    setActiveTabType("email");
+  }
+
+  async function handleEmailArchive() {
+    const active = emailTabs.active;
+    if (!active || active.kind !== "view" || !active.email.gmail_message_id) return;
+    const gmailMessageId = active.email.gmail_message_id;
+    setEmailActionLoadingId(gmailMessageId);
+    try {
+      await archiveEmail(gmailMessageId, active.email.email_account_id ?? undefined);
+      emailTabs.closeEmailTabById(gmailMessageId);
+    } finally {
+      setEmailActionLoadingId(null);
+    }
+  }
+
+  async function handleEmailTrash() {
+    const active = emailTabs.active;
+    if (!active || active.kind !== "view" || !active.email.gmail_message_id) return;
+    const gmailMessageId = active.email.gmail_message_id;
+    setEmailActionLoadingId(gmailMessageId);
+    try {
+      await trashEmail(gmailMessageId, active.email.email_account_id ?? undefined);
+      emailTabs.closeEmailTabById(gmailMessageId);
+    } finally {
+      setEmailActionLoadingId(null);
+    }
+  }
+
+  async function handleEmailTogglePin() {
+    const active = emailTabs.active;
+    if (!active || active.kind !== "view" || !active.email.gmail_message_id) return;
+    const gmailMessageId = active.email.gmail_message_id;
+    setEmailActionLoadingId(gmailMessageId);
+    try {
+      if (active.email.is_pinned) {
+        const res = await unpinEmail(gmailMessageId);
+        emailTabs.updateEmailTab(gmailMessageId, { is_pinned: res.is_pinned });
+      } else {
+        const res = await pinEmail(gmailMessageId, active.email.email_account_id ?? undefined);
+        emailTabs.updateEmailTab(gmailMessageId, { is_pinned: res.is_pinned, id: res.id });
+      }
+    } finally {
+      setEmailActionLoadingId(null);
+    }
   }
 
   if (!convs.activeConversation) return (
@@ -517,6 +555,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
   );
 
   const isNoteActive = activeTabType === "note" && editor.openNotes.length > 0;
+  const isEmailActive = activeTabType === "email" && emailTabs.openTabs.length > 0;
 
   const _LEVEL_ORDER: Record<string, number> = { regular: 0, plus: 1, pro: 2 };
   const _userLevel = user.access_level ?? "regular";
@@ -631,7 +670,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
       />
 
       <div className="flex-1 flex flex-col h-full overflow-hidden">
-
+        <>
         {/* ── Unified tab bar ───────────────────────────────────────────── */}
         <div id="tour-tab-bar" className="flex bg-[var(--ml-bg-bar)] border-b border-[var(--ml-bg-panel)] shrink-0" style={{ minHeight: 40 }}>
 
@@ -719,6 +758,38 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                     <span className="max-w-[120px] truncate">{note.titleDraft.trim() || "Untitled"}</span>
                   )}
                   <button onClick={(e) => { e.stopPropagation(); editor.closeNote(i); }} className="text-gray-600 hover:text-gray-300 w-3.5 h-3.5 flex items-center justify-center rounded-sm hover:bg-[var(--ml-bg-hover)] transition leading-none">×</button>
+                </div>
+              );
+            })}
+
+            {/* Email tabs */}
+            {layoutMode === "stacked" && emailTabs.openTabs.map((tab, i) => {
+              const isActive = activeTabType === "email" && emailTabs.activeIndex === i;
+              const isDragOver = dragOverTab?.type === "email" && dragOverTab.index === i && dragSrcRef.current?.index !== i;
+              return (
+                <div
+                  key={tab.kind === "view" ? (tab.email.gmail_message_id ?? `email-${i}`) : tab.composeId}
+                  draggable
+                  onDragStart={() => { dragSrcRef.current = { type: "email", index: i }; }}
+                  onDragOver={(e) => { e.preventDefault(); setDragOverTab({ type: "email", index: i }); }}
+                  onDrop={(e) => { e.preventDefault(); handleTabDrop("email", i); setDragOverTab(null); }}
+                  onDragEnd={() => { dragSrcRef.current = null; setDragOverTab(null); }}
+                  onClick={() => { emailTabs.setActiveIndex(i); setActiveTabType("email"); }}
+                  className={`flex items-center gap-1.5 px-3 h-10 text-xs cursor-grab active:cursor-grabbing border-b-2 transition shrink-0 select-none ${
+                    isActive ? "border-indigo-500 text-white bg-[var(--ml-bg-base)]" : "border-transparent text-gray-500 hover:text-gray-300 hover:bg-[var(--ml-bg-base)]"
+                  } ${isDragOver ? "border-l-2 border-l-indigo-400" : ""}`}
+                >
+                  {tab.kind === "compose" ? (
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3 shrink-0 opacity-70" fill="currentColor" viewBox="0 0 16 16">
+                      <path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168zM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207zM9.5 2.207 12.793 5.5 11.5 6.793 8.207 3.5z"/>
+                    </svg>
+                  ) : (
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3 shrink-0 opacity-70" fill="currentColor" viewBox="0 0 16 16">
+                      <path d="M0 4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2zm2-1a1 1 0 0 0-1 1v.217l7 4.2 7-4.2V4a1 1 0 0 0-1-1zm13 2.383-4.708 2.825L15 11.105zm-.034 6.876-5.64-3.471L8 9.583l-1.326-.795-5.64 3.47A1 1 0 0 0 2 13h12a1 1 0 0 0 .966-.741M1 11.105l4.708-2.897L1 5.383z"/>
+                    </svg>
+                  )}
+                  <span className="max-w-[120px] truncate">{tab.kind === "compose" ? "New Mail" : (tab.email.subject || "(no subject)")}</span>
+                  <button onClick={(e) => { e.stopPropagation(); emailTabs.closeEmailTab(i); }} className="text-gray-600 hover:text-gray-300 w-3.5 h-3.5 flex items-center justify-center rounded-sm hover:bg-[var(--ml-bg-hover)] transition leading-none">×</button>
                 </div>
               );
             })}
@@ -1007,7 +1078,23 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
 
         {/* ── Content area ─────────────────────────────────────────────── */}
         {layoutMode === "stacked" ? (
-          isNoteActive ? (
+          isEmailActive ? (
+            <main className="flex-1 overflow-hidden flex flex-col">
+              {emailTabs.active && (
+                emailTabs.active.kind === "compose" ? (
+                  <EmailComposeTabContent accounts={emailAccounts} />
+                ) : (
+                  <EmailTabContent
+                    email={emailTabs.active.email}
+                    actionLoading={emailActionLoadingId === emailTabs.active.email.gmail_message_id}
+                    onArchive={handleEmailArchive}
+                    onTrash={handleEmailTrash}
+                    onTogglePin={handleEmailTogglePin}
+                  />
+                )
+              )}
+            </main>
+          ) : isNoteActive ? (
             <main className="flex-1 px-4 py-6 overflow-hidden flex flex-col">
               <NoteEditorView
                 noteKey={editor.active?.note.id ?? `new-${editor.activeIndex}`}
@@ -1089,6 +1176,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                       }
                     }}
                     onSearchOnline={chat.searchOnline}
+                    onOpenEmail={openEmailInTab}
                   />
                 </div>
               </main>
@@ -1227,6 +1315,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                         }
                       }}
                       onSearchOnline={chat.searchOnline}
+                      onOpenEmail={openEmailInTab}
                     />
                   </div>
                 </main>
@@ -1377,6 +1466,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
             }
           />
         )}
+        </>
       </div>
 
       <RightPanel
@@ -1394,23 +1484,15 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
         onRequestNotificationPermission={requestNotifPermission}
         emailConnected={emailConnected && flags.email_enabled}
         emailAccounts={flags.email_enabled ? emailAccounts : []}
-        emailRecords={flags.email_enabled ? emailRecords : []}
-        onCreateReminderFromEmail={async (emailId) => {
-          try {
-            await emailToReminder(emailId);
-            await suggestions.reload();
-          } catch { /* ignore */ }
-        }}
-        onDeleteEmailRecord={async (emailId) => {
-          await deleteEmail(emailId);
-          setEmailRecords((prev) => prev.filter((r) => r.id !== emailId));
-        }}
+        onOpenEmailTab={openEmailInTab}
+        onComposeNewMail={openComposeInTab}
+        openEmailTabId={emailTabs.active?.kind === "view" ? (emailTabs.active.email.gmail_message_id ?? null) : null}
+        onEmailArchived={emailTabs.closeEmailTabById}
+        onEmailTrashed={emailTabs.closeEmailTabById}
+        onEmailPinChanged={(gmailMessageId, isPinned) => emailTabs.updateEmailTab(gmailMessageId, { is_pinned: isPinned })}
         teamsConnected={teamsConnected}
         whatsappConnected={whatsappConnected}
         whatsappAvailable={whatsappAvailable}
-        isSyncingEmail={isSyncingEmail}
-        onSyncEmail={handleSyncEmail}
-        emailSyncResult={emailSyncResult}
         insightsEnabled={flags.proactive_insights_enabled}
         workspaceId={activeWorkspaceId}
         onOpenNote={(noteId) => {
