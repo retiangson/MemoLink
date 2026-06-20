@@ -1,7 +1,7 @@
 import { useState, useRef } from "react";
 import { getNote } from "../api/client";
 
-type NoteEditState = { id: number | null; title: string; content: string; source?: string };
+type NoteEditState = { id: number | null; title: string; content: string; source?: string; public_agent_enabled?: boolean };
 
 interface OpenTab {
   note: NoteEditState;

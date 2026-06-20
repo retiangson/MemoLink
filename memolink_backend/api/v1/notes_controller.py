@@ -3,9 +3,10 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from memolink_backend.di.request_container import RequestContainer, get_request_container
 from memolink_backend.core.security import get_current_user
+from fastapi import HTTPException
 from memolink_backend.contracts.note_dtos import (
     NoteCreateDTO, NoteGetDTO, NoteListDTO, NoteUpdateDTO,
-    NoteDeleteDTO, NoteSearchDTO, NoteResponseDTO,
+    NoteDeleteDTO, NoteSearchDTO, NoteResponseDTO, NotePublicAgentToggleDTO,
 )
 
 
@@ -96,3 +97,18 @@ def search_notes(
     c: RequestContainer = Depends(get_request_container),
 ):
     return c.notes().search_notes(dto.vector, dto.top_k)
+
+
+@router.post("/public-agent", response_model=NoteResponseDTO | None)
+def set_note_public_agent_enabled(
+    dto: NotePublicAgentToggleDTO,
+    current_user_id: int = Depends(get_current_user),
+    c: RequestContainer = Depends(get_request_container),
+):
+    try:
+        updated = c.notes().set_public_agent_enabled(dto.note_id, current_user_id, dto.enabled)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    if not updated:
+        raise HTTPException(status_code=404, detail="Note not found")
+    return updated

@@ -19,6 +19,7 @@ class NoteResponseDTO(BaseModel):
     content: str
     source: Optional[str]
     workspace_id: Optional[int] = None
+    public_agent_enabled: bool = False
 
 
 class NoteGetDTO(BaseModel):
@@ -43,3 +44,8 @@ class NoteDeleteDTO(BaseModel):
 class NoteSearchDTO(BaseModel):
     vector: List[float]
     top_k: int = 5
+
+
+class NotePublicAgentToggleDTO(BaseModel):
+    note_id: int
+    enabled: bool

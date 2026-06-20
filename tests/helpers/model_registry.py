@@ -17,3 +17,4 @@ def register_models() -> None:
     import memolink_backend.domain.models.note_timeline  # noqa: F401
     import memolink_backend.domain.models.survey  # noqa: F401
     import memolink_backend.domain.models.evaluation  # noqa: F401
+    import memolink_backend.domain.models.public_agent  # noqa: F401

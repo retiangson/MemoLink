@@ -2,7 +2,7 @@ from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime
 
-VALID_TYPES = {"Academic", "Professional", "Personal", "Project", "Other"}
+VALID_TYPES = {"Academic", "Professional", "Personal", "Project", "Other", "Public Portfolio"}
 
 
 class WorkspaceCreateDTO(BaseModel):

@@ -44,6 +44,7 @@ export type FeatureFlags = {
   evaluation_analytics_enabled: boolean;
   evaluation_admin_export_enabled: boolean;
   core_memory_notes_enabled: boolean;
+  public_portfolio_agent_enabled: boolean;
   default_model: string;
   default_language: string;
   web_search_min_level: AccessLevel;
@@ -57,6 +58,7 @@ export type FeatureFlags = {
   slash_commands_min_level: AccessLevel;
   custom_api_keys_min_level: AccessLevel;
   video_import_min_level: AccessLevel;
+  public_portfolio_agent_min_level: AccessLevel;
 };
 
 export function parseFlags(raw: Record<string, string>): FeatureFlags {
@@ -84,6 +86,7 @@ export function parseFlags(raw: Record<string, string>): FeatureFlags {
     evaluation_analytics_enabled: raw.evaluation_analytics_enabled !== "false",
     evaluation_admin_export_enabled: raw.evaluation_admin_export_enabled !== "false",
     core_memory_notes_enabled: raw.core_memory_notes_enabled !== "false",
+    public_portfolio_agent_enabled: raw.public_portfolio_agent_enabled !== "false",
     default_model: raw.default_model ?? "gpt-4o-mini",
     default_language: raw.default_language ?? "English",
     web_search_min_level: (raw.web_search_min_level ?? "regular") as AccessLevel,
@@ -97,6 +100,7 @@ export function parseFlags(raw: Record<string, string>): FeatureFlags {
     slash_commands_min_level: (raw.slash_commands_min_level ?? "regular") as AccessLevel,
     custom_api_keys_min_level: (raw.custom_api_keys_min_level ?? "regular") as AccessLevel,
     video_import_min_level: (raw.video_import_min_level ?? "regular") as AccessLevel,
+    public_portfolio_agent_min_level: (raw.public_portfolio_agent_min_level ?? "regular") as AccessLevel,
   };
 }
 
@@ -151,6 +155,8 @@ export async function updateAdminFeatures(flags: FeatureFlags): Promise<FeatureF
     evaluation_survey_enabled: String(flags.evaluation_survey_enabled),
     evaluation_analytics_enabled: String(flags.evaluation_analytics_enabled),
     evaluation_admin_export_enabled: String(flags.evaluation_admin_export_enabled),
+    core_memory_notes_enabled: String(flags.core_memory_notes_enabled),
+    public_portfolio_agent_enabled: String(flags.public_portfolio_agent_enabled),
     default_model: flags.default_model,
     default_language: flags.default_language,
     web_search_min_level: flags.web_search_min_level,
@@ -164,6 +170,7 @@ export async function updateAdminFeatures(flags: FeatureFlags): Promise<FeatureF
     slash_commands_min_level: flags.slash_commands_min_level,
     custom_api_keys_min_level: flags.custom_api_keys_min_level,
     video_import_min_level: flags.video_import_min_level,
+    public_portfolio_agent_min_level: flags.public_portfolio_agent_min_level,
   };
   const res = await api.put("/admin/features", { flags: raw });
   return parseFlags(res.data.flags);

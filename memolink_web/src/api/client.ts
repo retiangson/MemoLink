@@ -51,6 +51,9 @@ export async function restoreNote(note_id: number) {
 export async function permanentDeleteNote(note_id: number) {
   return (await api.post("/notes/permanent-delete", { note_id })).data;
 }
+export async function setNotePublicAgentEnabled(note_id: number, enabled: boolean) {
+  return (await api.post("/notes/public-agent", { note_id, enabled })).data;
+}
 
 // Auth
 export async function changePassword(current_password: string, new_password: string) {

@@ -5,13 +5,18 @@ from fastapi.testclient import TestClient
 
 from memolink_backend.api.v1.auth_controller import get_request_container
 from memolink_backend.core.db import get_db
-from memolink_backend.core.security import get_current_user
+from memolink_backend.core.security import get_current_user, get_current_user_info, UserInfo
 from memolink_backend.main import app
 from tests.helpers.api_container import ApiRequestContainer
 
 
 @contextmanager
-def api_client(db_session, user_id: int | None = None) -> Iterator[TestClient]:
+def api_client(
+    db_session,
+    user_id: int | None = None,
+    access_level: str = "regular",
+    is_admin: bool = False,
+) -> Iterator[TestClient]:
     def override_container():
         return ApiRequestContainer(db_session)
 
@@ -22,6 +27,9 @@ def api_client(db_session, user_id: int | None = None) -> Iterator[TestClient]:
     app.dependency_overrides[get_db] = override_db
     if user_id is not None:
         app.dependency_overrides[get_current_user] = lambda: user_id
+        app.dependency_overrides[get_current_user_info] = lambda: UserInfo(
+            id=user_id, access_level=access_level, is_admin=is_admin
+        )
 
     try:
         yield TestClient(app)

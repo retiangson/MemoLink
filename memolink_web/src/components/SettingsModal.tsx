@@ -11,6 +11,7 @@ import type { ConnectorSummary } from "../api/connectorsApi";
 import { getWhatsappStatus, startWhatsapp, stopWhatsapp, resetWhatsappSession } from "../api/whatsappApi";
 import type { WhatsappStatus } from "../api/whatsappApi";
 import { EmailReplyPanel } from "./EmailReplyPanel";
+import { PublicAgentsPanel } from "./PublicAgentsPanel";
 import { MODELS } from "../constants/models";
 import type { User } from "../utils/auth";
 
@@ -26,13 +27,14 @@ interface SettingsModalProps {
   emailEnabled?: boolean;
   teamsEnabled?: boolean;
   workflowEnabled?: boolean;
+  publicPortfolioAgentEnabled?: boolean;
   onReplayTour?: () => void;
   whatsappAvailable?: boolean;
   onWhatsappConnected?: () => void;
   onWhatsappDisconnected?: () => void;
 }
 
-type Tab = "profile" | "security" | "ai" | "keys" | "tts" | "connectors" | "email" | "teams" | "whatsapp" | "workflow";
+type Tab = "profile" | "security" | "ai" | "keys" | "tts" | "connectors" | "email" | "teams" | "whatsapp" | "workflow" | "public-agents";
 
 const BLANK_FORM = { name: "", key: "", model: "", base_url: "" };
 
@@ -48,6 +50,7 @@ export function SettingsModal({
   emailEnabled = true,
   teamsEnabled = true,
   workflowEnabled = true,
+  publicPortfolioAgentEnabled = false,
   onReplayTour,
   whatsappAvailable = false,
   onWhatsappConnected,
@@ -655,6 +658,7 @@ export function SettingsModal({
     ...(teamsEnabled ? [{ id: "teams" as Tab, label: "Teams" }] : []),
     ...(whatsappAvailable ? [{ id: "whatsapp" as Tab, label: "WhatsApp" }] : []),
     ...(workflowEnabled ? [{ id: "workflow" as Tab, label: "Workflow" }] : []),
+    ...(publicPortfolioAgentEnabled ? [{ id: "public-agents" as Tab, label: "Public Agents" }] : []),
   ];
 
   const inputCls = "w-full bg-[var(--ml-bg-surface)] border border-[var(--ml-bg-hover)] rounded-xl px-3 py-2 text-sm text-gray-200 outline-none focus:border-indigo-500 transition";
@@ -1758,6 +1762,9 @@ export function SettingsModal({
                 </div>
               </div>
             )}
+
+            {/* ── Public Agents ── */}
+            {tab === "public-agents" && <PublicAgentsPanel />}
 
           </div>
         </div>

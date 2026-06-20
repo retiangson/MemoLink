@@ -74,6 +74,9 @@ class RequestContainer:
     def desktop(self):
         return self.services.get_desktop_command_service()
 
+    def public_agent(self):
+        return self.services.get_public_agent_service()
+
 
 def get_request_container(db: Session = Depends(get_db)) -> RequestContainer:
     return RequestContainer(db)

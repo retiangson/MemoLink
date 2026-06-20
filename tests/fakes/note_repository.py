@@ -13,6 +13,8 @@ class FakeNoteRepository:
             content=content,
             source=source,
             workspace_id=workspace_id,
+            is_core_memory=False,
+            public_agent_enabled=False,
         )
         self.notes[note.id] = note
         return note
@@ -152,6 +154,15 @@ class FakeNoteRepository:
 
     def touch_memory_last_used(self, note_id):
         pass
+
+    # ── Public Portfolio Agent ───────────────────────────────────────────────
+
+    def set_public_agent_enabled(self, note_id, enabled):
+        note = self.notes.get(note_id)
+        if not note:
+            return None
+        note.public_agent_enabled = enabled
+        return note
 
     def save_undo_snapshot(self, note_id, title, content, command, instruction):
         pass

@@ -37,6 +37,9 @@ interface NoteEditorViewProps {
   videoImportEnabled?: boolean;
   timelineEnabled?: boolean;
   noteId?: number | null;
+  publicAgentFeatureEnabled?: boolean;
+  publicAgentEnabled?: boolean;
+  onTogglePublicAgent?: () => void;
 }
 
 export function NoteEditorView({
@@ -50,6 +53,7 @@ export function NoteEditorView({
   ttsSentenceIdx, ttsSentences, ttsWord = null,
   ttsEnabled = true, videoImportEnabled = true,
   timelineEnabled = true, noteId = null,
+  publicAgentFeatureEnabled = false, publicAgentEnabled = false, onTogglePublicAgent,
 }: NoteEditorViewProps) {
   const [showPicker, setShowPicker] = useState(false);
   const [showExport, setShowExport] = useState(false);
@@ -489,6 +493,26 @@ export function NoteEditorView({
           </svg>
           Video
         </button>}
+
+        {/* Public Portfolio Agent toggle */}
+        {publicAgentFeatureEnabled && noteId && (
+          <button
+            onClick={onTogglePublicAgent}
+            title={publicAgentEnabled
+              ? "This note can be retrieved by your public portfolio agent(s). Click to make it private again."
+              : "Make this note visible to your public portfolio agent(s). It stays private until you do this."}
+            className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs border transition shrink-0 ${
+              publicAgentEnabled
+                ? "text-emerald-400 bg-emerald-400/10 border-emerald-400/20 hover:bg-emerald-400/20"
+                : "text-gray-500 border-transparent hover:text-emerald-400 hover:bg-emerald-400/10 hover:border-emerald-400/20"
+            }`}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 16 16">
+              <path d="M8 1a2 2 0 0 1 2 2v1h2.5A1.5 1.5 0 0 1 14 5.5V13a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5.5A1.5 1.5 0 0 1 3.5 4H6V3a2 2 0 0 1 2-2zm0 1a1 1 0 0 0-1 1v1h2V3a1 1 0 0 0-1-1zM3.5 5a.5.5 0 0 0-.5.5V13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V5.5a.5.5 0 0 0-.5-.5zM6 8a1 1 0 1 1 2 0 1 1 0 0 1-2 0m4 0a1 1 0 1 1 2 0 1 1 0 0 1-2 0"/>
+            </svg>
+            {publicAgentEnabled ? "Public" : "Private"}
+          </button>
+        )}
 
         {/* TTS play — the floating player bar (same as /read) handles controls while playing */}
         {ttsEnabled && onPlay && (

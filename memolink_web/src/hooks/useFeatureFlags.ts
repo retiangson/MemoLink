@@ -25,6 +25,7 @@ const DEFAULT_FLAGS: FeatureFlags = {
   evaluation_analytics_enabled: true,
   evaluation_admin_export_enabled: true,
   core_memory_notes_enabled: true,
+  public_portfolio_agent_enabled: false,
   default_model: "gpt-4o-mini",
   default_language: "English",
   web_search_min_level: "regular",
@@ -38,6 +39,7 @@ const DEFAULT_FLAGS: FeatureFlags = {
   slash_commands_min_level: "regular",
   custom_api_keys_min_level: "regular",
   video_import_min_level: "regular",
+  public_portfolio_agent_min_level: "regular",
 };
 
 export function useFeatureFlags() {
