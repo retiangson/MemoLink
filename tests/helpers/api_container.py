@@ -49,3 +49,12 @@ class ApiRequestContainer:
         from memolink_backend.business.services.evaluation_service import EvaluationService
         from memolink_backend.domain.repositories.evaluation_repository import EvaluationRepository
         return EvaluationService(repo=EvaluationRepository(self._db))
+
+    def public_agent(self):
+        from memolink_backend.business.services.public_agent_service import PublicAgentService
+        from memolink_backend.domain.repositories.public_agent_repository import PublicAgentRepository
+        return PublicAgentService(
+            public_agent_repo=PublicAgentRepository(self._db),
+            note_repo=NoteRepository(self._db),
+            embedding_service=None,
+        )

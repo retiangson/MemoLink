@@ -74,3 +74,12 @@ class NoteService(INoteService):
 
     def search_notes(self, vector: list[float], top_k: int = 5) -> List[NoteResponseDTO]:
         return [NoteResponseDTO.model_validate(n) for n in self.repo.search_by_vector(vector, top_k)]
+
+    def set_public_agent_enabled(self, note_id: int, user_id: int, enabled: bool) -> NoteResponseDTO | None:
+        note = self.repo.get_by_id(note_id)
+        if not note or note.user_id != user_id:
+            return None
+        if note.is_core_memory and enabled:
+            raise ValueError("Core memory notes can never be exposed to the public agent")
+        updated = self.repo.set_public_agent_enabled(note_id, enabled)
+        return NoteResponseDTO.model_validate(updated) if updated else None

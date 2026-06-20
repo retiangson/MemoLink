@@ -23,6 +23,12 @@ class Note(Base):
     undo_created_at = Column(DateTime(timezone=True), nullable=True)
     undo_available = Column(Boolean, default=False, nullable=True)
 
+    # Public Portfolio Agent — explicit opt-in per note, defaults closed. A note is only ever
+    # readable by the unauthenticated public agent when this is True AND it sits in that
+    # agent's configured workspace AND it is not a core memory (see note_repository.py's
+    # search_public_agent_notes_by_vector / get_public_agent_notes_for_workspace).
+    public_agent_enabled = Column(Boolean, default=False, nullable=False, server_default="false")
+
     # Core Memory columns — extend the notes table rather than a separate system
     is_core_memory = Column(Boolean, default=False, nullable=True, index=True)
     is_encrypted = Column(Boolean, default=False, nullable=True)

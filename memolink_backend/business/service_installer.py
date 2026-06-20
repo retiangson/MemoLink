@@ -187,3 +187,11 @@ class ServiceInstaller:
     def get_desktop_command_service(self):
         from memolink_backend.business.services.desktop_command_service import DesktopCommandService
         return DesktopCommandService(repo=self._domain.get_desktop_command_repository())
+
+    def get_public_agent_service(self):
+        from memolink_backend.business.services.public_agent_service import PublicAgentService
+        return PublicAgentService(
+            public_agent_repo=self._domain.get_public_agent_repository(),
+            note_repo=self._domain.get_note_repository(),
+            embedding_service=self._domain.get_embedding_service(),
+        )

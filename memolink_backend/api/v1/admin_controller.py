@@ -33,6 +33,7 @@ DEFAULT_FLAGS: Dict[str, str] = {
     "evaluation_survey_enabled": "true",
     "evaluation_analytics_enabled": "true",
     "evaluation_admin_export_enabled": "true",
+    "public_portfolio_agent_enabled": "false",
     "default_model": "gpt-4o-mini",
     "default_language": "English",
     # Minimum access level required per feature
@@ -47,6 +48,7 @@ DEFAULT_FLAGS: Dict[str, str] = {
     "slash_commands_min_level": "regular",
     "custom_api_keys_min_level": "regular",
     "video_import_min_level": "regular",
+    "public_portfolio_agent_min_level": "regular",
 }
 
 VALID_LEVELS = {"regular", "plus", "pro"}

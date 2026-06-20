@@ -5,7 +5,7 @@ import { useNoteEditor } from "../hooks/useNoteEditor";
 import { useConversations } from "../hooks/useConversations";
 import { useChat } from "../hooks/useChat";
 import { addMessageToNoteAPI, deleteMessage } from "../api/conversationApi";
-import { getNote, updateNote } from "../api/client";
+import { getNote, updateNote, setNotePublicAgentEnabled } from "../api/client";
 import { Sidebar } from "../components/Sidebar";
 import { NoteEditorView } from "../components/NoteEditorView";
 import { RightPanel } from "../components/RightPanel";
@@ -490,6 +490,18 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
     const fresh = await saveNote(editor.selectedNote!.id, editor.noteTitleDraft, editor.noteContentDraft);
     editor.updateActiveNote(fresh);
     suggestions.generateFromNote(editor.noteTitleDraft, editor.noteContentDraft);
+  }
+
+  async function handleTogglePublicAgent() {
+    const note = editor.selectedNote;
+    if (!note || note.id === null) return;
+    const next = !note.public_agent_enabled;
+    try {
+      const fresh = await setNotePublicAgentEnabled(note.id, next);
+      editor.syncNoteById(note.id, fresh);
+    } catch (e: any) {
+      alert(e?.response?.data?.detail || "Could not change this note's public agent visibility.");
+    }
   }
 
   async function handleDeleteNote(noteId: number) {
@@ -1380,6 +1392,9 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                 videoImportEnabled={flags.video_import_enabled}
                 timelineEnabled={flags.timeline_enabled}
                 noteId={editor.active?.note.id ?? null}
+                publicAgentFeatureEnabled={flags.public_portfolio_agent_enabled}
+                publicAgentEnabled={editor.active?.note.public_agent_enabled ?? false}
+                onTogglePublicAgent={handleTogglePublicAgent}
               />
             </main>
           ) : (
@@ -1702,6 +1717,9 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                       videoImportEnabled={flags.video_import_enabled}
                       timelineEnabled={flags.timeline_enabled}
                       noteId={editor.active?.note.id ?? null}
+                      publicAgentFeatureEnabled={flags.public_portfolio_agent_enabled}
+                      publicAgentEnabled={editor.active?.note.public_agent_enabled ?? false}
+                      onTogglePublicAgent={handleTogglePublicAgent}
                     />
                   </main>
                 ) : (
@@ -1798,7 +1816,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
         />
       )}
 
-      <SettingsModal show={showSettings} user={user} onClose={() => setShowSettings(false)} selectedModel={selectedModel} onModelChange={handleModelChange} modelSelectionEnabled={flags.model_selection_enabled} customApiKeysEnabled={flags.custom_api_keys_enabled} ttsEnabled={flags.tts_enabled} emailEnabled={flags.email_enabled} workflowEnabled={flags.workflow_enabled} onReplayTour={() => { localStorage.removeItem("memolink_walkthrough_done"); setShowTour(true); setShowSettings(false); }} whatsappAvailable={whatsappAvailable}
+      <SettingsModal show={showSettings} user={user} onClose={() => setShowSettings(false)} selectedModel={selectedModel} onModelChange={handleModelChange} modelSelectionEnabled={flags.model_selection_enabled} customApiKeysEnabled={flags.custom_api_keys_enabled} ttsEnabled={flags.tts_enabled} emailEnabled={flags.email_enabled} workflowEnabled={flags.workflow_enabled} publicPortfolioAgentEnabled={flags.public_portfolio_agent_enabled} onReplayTour={() => { localStorage.removeItem("memolink_walkthrough_done"); setShowTour(true); setShowSettings(false); }} whatsappAvailable={whatsappAvailable}
         onWhatsappConnected={() => { setWhatsappConnected(true); localStorage.setItem("memolink_wa_connected", "1"); }}
         onWhatsappDisconnected={() => { setWhatsappConnected(false); localStorage.removeItem("memolink_wa_connected"); }} />
       <HelpModal show={showHelp} onClose={() => setShowHelp(false)} />

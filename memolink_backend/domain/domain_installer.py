@@ -69,3 +69,7 @@ class DomainInstaller:
     def get_proactive_insight_repository(self):
         from memolink_backend.domain.repositories.proactive_insight_repository import ProactiveInsightRepository
         return ProactiveInsightRepository(self._db)
+
+    def get_public_agent_repository(self):
+        from memolink_backend.domain.repositories.public_agent_repository import PublicAgentRepository
+        return PublicAgentRepository(self._db)

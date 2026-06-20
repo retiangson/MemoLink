@@ -4,6 +4,7 @@ import os
 import sys
 import traceback
 from fastapi import FastAPI, Request
+from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -64,6 +65,7 @@ from memolink_backend.api.v1 import (
     desktop_commands_controller,
     shell_processes_controller,
     whatsapp_controller,
+    public_agent_controller,
 )
 
 # Register all models so SQLAlchemy sees them
@@ -89,6 +91,7 @@ import memolink_backend.domain.models.note_timeline      # noqa: F401
 import memolink_backend.domain.models.survey              # noqa: F401
 import memolink_backend.domain.models.evaluation          # noqa: F401
 import memolink_backend.domain.models.desktop_command     # noqa: F401
+import memolink_backend.domain.models.public_agent         # noqa: F401
 
 if os.getenv("MEMOLINK_SKIP_DB_BOOTSTRAP") != "1":
     with engine.connect() as _conn:
@@ -615,6 +618,28 @@ if os.getenv("MEMOLINK_SKIP_DB_BOOTSTRAP") != "1":
         _conn.execute(text("ALTER TABLE notes ADD COLUMN IF NOT EXISTS memory_updated_at TIMESTAMPTZ"))
         _conn.execute(text("CREATE INDEX IF NOT EXISTS ix_notes_is_core_memory ON notes(is_core_memory)"))
         _conn.execute(text("INSERT INTO feature_flags (key, value) VALUES ('core_memory_notes_enabled', 'true') ON CONFLICT (key) DO NOTHING"))
+        # Public Portfolio Agent — per-note opt-in (defaults closed) and the agent table itself
+        _conn.execute(text("ALTER TABLE notes ADD COLUMN IF NOT EXISTS public_agent_enabled BOOLEAN NOT NULL DEFAULT FALSE"))
+        _conn.execute(text("CREATE INDEX IF NOT EXISTS ix_notes_public_agent_enabled ON notes(workspace_id, public_agent_enabled)"))
+        _conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS public_agents (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(120) NOT NULL,
+                token VARCHAR(64) UNIQUE NOT NULL,
+                workspace_id INTEGER NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+                description TEXT,
+                system_prompt TEXT,
+                public_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+                allowed_domains TEXT,
+                created_by INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                created_at TIMESTAMPTZ DEFAULT now(),
+                updated_at TIMESTAMPTZ DEFAULT now()
+            )
+        """))
+        _conn.execute(text("CREATE INDEX IF NOT EXISTS ix_public_agents_token ON public_agents(token)"))
+        _conn.execute(text("CREATE INDEX IF NOT EXISTS ix_public_agents_created_by ON public_agents(created_by)"))
+        _conn.execute(text("INSERT INTO feature_flags (key, value) VALUES ('public_portfolio_agent_enabled', 'false') ON CONFLICT (key) DO NOTHING"))
+        _conn.execute(text("INSERT INTO feature_flags (key, value) VALUES ('public_portfolio_agent_min_level', 'regular') ON CONFLICT (key) DO NOTHING"))
         # Auto-promote first user as admin if none exists
         _conn.execute(text("""
             UPDATE users SET is_admin = TRUE
@@ -688,7 +713,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     )
     return JSONResponse(
         status_code=422,
-        content={"detail": errors},
+        content={"detail": jsonable_encoder(errors)},
     )
 
 
@@ -782,6 +807,8 @@ app.include_router(evaluation_controller.router, prefix="/api")
 app.include_router(core_memory_controller.router, prefix="/api")
 app.include_router(shell_processes_controller.router, prefix="/api")
 app.include_router(whatsapp_controller.router, prefix="/api")
+app.include_router(public_agent_controller.router, prefix="/api")
+app.include_router(public_agent_controller.public_router, prefix="/api")
 
 # AWS Lambda handler - only active when running inside Lambda
 if os.getenv("AWS_LAMBDA_FUNCTION_NAME"):

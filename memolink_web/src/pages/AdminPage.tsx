@@ -30,6 +30,7 @@ const LEVEL_FEATURES: { minKey: keyof FeatureFlags; label: string }[] = [
   { minKey: "slash_commands_min_level",       label: "Slash Commands" },
   { minKey: "custom_api_keys_min_level",      label: "Custom API Keys" },
   { minKey: "video_import_min_level",         label: "Video Import" },
+  { minKey: "public_portfolio_agent_min_level", label: "Public Portfolio Agent" },
 ];
 
 const TRANSLATE_LANGUAGES = [
@@ -497,6 +498,7 @@ export function AdminPage({ onClose, currentUserId, onResetWalkthrough }: Props)
                     { key: "evaluation_survey_enabled", label: "Evaluation Survey", desc: "Show \"Take Evaluation Survey\" in the profile menu - research data collection, separate from feedback" },
                     { key: "evaluation_analytics_enabled", label: "Evaluation Analytics", desc: "Collect quantitative evaluation telemetry (session/task timings, AI metrics, ratings). Disabling stops all collection" },
                     { key: "evaluation_admin_export_enabled", label: "Evaluation Export", desc: "Allow admins to export evaluation analytics as CSV/JSON" },
+                    { key: "public_portfolio_agent_enabled", label: "Public Portfolio Agent", desc: "Enable embeddable public chat agents that answer visitor questions from notes explicitly marked public. Off by default — no public access until enabled here." },
                   ] as { key: keyof FeatureFlags; label: string; desc: string }[]).map(({ key, label, desc }) => (
                     <div key={key} className="flex items-center justify-between px-4 py-3.5 bg-[#1a1a24] border border-[var(--ml-bg-hover)] rounded-xl">
                       <div>

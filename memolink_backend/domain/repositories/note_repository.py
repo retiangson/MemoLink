@@ -411,3 +411,63 @@ class NoteRepository:
         if note and note.is_core_memory:
             note.memory_last_used_at = datetime.now(timezone.utc)
             self.db.commit()
+
+    # ── Public Portfolio Agent ───────────────────────────────────────────────
+    # These are the ONLY methods that may back the unauthenticated public agent's
+    # retrieval. Both enforce, in SQL, all three conditions at once: exact workspace
+    # match (no null-workspace passthrough like the personal search methods above),
+    # public_agent_enabled = TRUE, and core-memory exclusion. Do not add a workspace_id
+    # parameter to search_by_vector/search_hybrid/get_for_user and reuse those for public
+    # access — their permissive "OR workspace_id IS NULL" semantics would leak notes from
+    # outside the intended public workspace.
+
+    def set_public_agent_enabled(self, note_id: int, enabled: bool) -> Optional[Note]:
+        note = self.get_by_id(note_id)
+        if not note:
+            return None
+        note.public_agent_enabled = enabled
+        self.db.commit()
+        self.db.refresh(note)
+        return note
+
+    def get_public_agent_notes_for_workspace(self, workspace_id: int) -> List[Note]:
+        return (
+            self.db.query(Note)
+            .filter(
+                Note.workspace_id == workspace_id,
+                Note.deleted_at == None,
+                Note.public_agent_enabled == True,
+                or_(Note.is_core_memory == None, Note.is_core_memory == False),
+            )
+            .order_by(Note.id.desc())
+            .all()
+        )
+
+    def search_public_agent_notes_by_vector(
+        self,
+        workspace_id: int,
+        query_vector: list[float],
+        top_k: int = 5,
+    ) -> List[Note]:
+        embedding_str = "[" + ",".join(str(x) for x in query_vector) + "]"
+        sql = text("""
+            SELECT n.id
+            FROM embeddings e
+            JOIN notes n ON n.id = e.note_id
+            WHERE n.deleted_at IS NULL
+              AND n.workspace_id = :workspace_id
+              AND n.public_agent_enabled = TRUE
+              AND (n.is_core_memory IS NULL OR n.is_core_memory = FALSE)
+            ORDER BY e.vector <-> vector(:embedding)
+            LIMIT :top_k
+        """)
+        rows = self.db.execute(
+            sql,
+            {"embedding": embedding_str, "workspace_id": workspace_id, "top_k": top_k},
+        ).fetchall()
+        note_ids = [r[0] for r in rows]
+        if not note_ids:
+            return []
+        notes = self.db.query(Note).filter(Note.id.in_(note_ids)).all()
+        note_map = {n.id: n for n in notes}
+        return [note_map[nid] for nid in note_ids if nid in note_map]
