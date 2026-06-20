@@ -134,6 +134,18 @@ The widget header always shows a small "Powered by MemoLink" line under the
 title, and the avatar (if set) also renders inside the floating launcher
 button.
 
+`data-has-persona="true"` is emitted whenever the agent's `system_prompt`
+(the owner's optional persona text) is non-empty — the raw text itself is
+never sent to this public, unauthenticated widget, only this derived
+boolean. The widget uses it to decide what happens the first time a visitor
+opens the chat: if `true`, it silently sends a fixed greeting-trigger message
+("Greet me and briefly introduce yourself.") to the chat endpoint and shows
+the model's reply as the first bubble (falling back to a generic greeting if
+that call fails or comes back as the fallback message, detected the same way
+as any other message via an empty `sources` array); if persona is not set,
+it shows a generic "Hi! How can I help you today?" bubble with no network
+call at all. This first-open greeting fires once per page load.
+
 `memolink_web/public/widget.js` is vanilla JS (no React/axios/bundler
 dependency) so it can run unmodified on a third-party page. It renders inside
 a Shadow DOM (host-page CSS can't bleed in or out), reads its config from its

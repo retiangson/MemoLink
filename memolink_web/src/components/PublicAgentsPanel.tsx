@@ -14,10 +14,14 @@ function embedSnippet(agent: PublicAgent): string {
   const webOrigin = window.location.origin;
   const apiBase = (import.meta.env.VITE_API_BASE_URL as string) ?? "";
   const avatarAttr = agent.avatar_url ? ` data-avatar-url="${agent.avatar_url}"` : "";
+  // data-has-persona is a derived boolean only — the raw system_prompt text is never sent
+  // to this public, unauthenticated widget. It just tells the widget whether to ask the
+  // model for a personalized greeting on open, or show a generic one with no network call.
+  const hasPersonaAttr = agent.system_prompt?.trim() ? ` data-has-persona="true"` : "";
   // data-title defaults to this agent's own name — each PublicAgent belongs to a different
   // workspace/owner, so the widget title is per-agent (effectively per-workspace), never a
   // single hardcoded string shared across tenants.
-  return `<script src="${webOrigin}/widget.js" data-agent-token="${agent.token}" data-api-base="${apiBase}" data-title="${escapeHtmlAttr(agent.name)}"${avatarAttr} async></script>`;
+  return `<script src="${webOrigin}/widget.js" data-agent-token="${agent.token}" data-api-base="${apiBase}" data-title="${escapeHtmlAttr(agent.name)}"${avatarAttr}${hasPersonaAttr} async></script>`;
 }
 
 // Avatars are stored as base64 data URLs directly on the agent row (no upload endpoint or
