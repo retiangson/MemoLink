@@ -96,6 +96,7 @@ class PublicAgentService:
             system_prompt=dto.system_prompt,
             public_enabled=dto.public_enabled,
             allowed_domains=dto.allowed_domains,
+            avatar_url=dto.avatar_url,
         )
         return PublicAgentResponseDTO.model_validate(agent)
 
@@ -116,6 +117,8 @@ class PublicAgentService:
             public_enabled=dto.public_enabled,
             allowed_domains=dto.allowed_domains,
             workspace_id=dto.workspace_id,
+            avatar_url=dto.avatar_url,
+            clear_avatar=dto.clear_avatar,
         )
         return PublicAgentResponseDTO.model_validate(updated)
 

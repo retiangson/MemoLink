@@ -23,6 +23,7 @@ class PublicAgentRepository:
         system_prompt: Optional[str],
         public_enabled: bool,
         allowed_domains: Optional[str],
+        avatar_url: Optional[str] = None,
     ) -> PublicAgent:
         agent = PublicAgent(
             name=name,
@@ -32,6 +33,7 @@ class PublicAgentRepository:
             system_prompt=system_prompt,
             public_enabled=public_enabled,
             allowed_domains=allowed_domains,
+            avatar_url=avatar_url,
             created_by=created_by,
         )
         self.db.add(agent)
@@ -64,6 +66,8 @@ class PublicAgentRepository:
         public_enabled: Optional[bool],
         allowed_domains: Optional[str],
         workspace_id: Optional[int],
+        avatar_url: Optional[str] = None,
+        clear_avatar: bool = False,
     ) -> Optional[PublicAgent]:
         agent = self.get_by_id(agent_id)
         if not agent:
@@ -80,6 +84,10 @@ class PublicAgentRepository:
             agent.allowed_domains = allowed_domains
         if workspace_id is not None:
             agent.workspace_id = workspace_id
+        if clear_avatar:
+            agent.avatar_url = None
+        elif avatar_url is not None:
+            agent.avatar_url = avatar_url
         self.db.commit()
         self.db.refresh(agent)
         return agent

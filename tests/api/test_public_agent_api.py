@@ -260,6 +260,49 @@ def test_management_endpoints_respect_access_level_gate(db_session, fake):
     assert admin_bypass.status_code == 200
 
 
+def test_avatar_create_update_clear_and_size_validation(db_session, fake):
+    _set_flag(db_session, "public_portfolio_agent_enabled", "true")
+    user = _make_user(db_session, fake)
+    ws = _make_workspace(db_session, user)
+    small_avatar = "data:image/png;base64,iVBORw0KGgo="
+
+    with api_client(db_session, user_id=user.id) as client:
+        created = client.post(
+            "/api/public-agents",
+            json={"name": "Bot", "workspace_id": ws.id, "avatar_url": small_avatar},
+        )
+        assert created.status_code == 200
+        agent = created.json()
+        assert agent["avatar_url"] == small_avatar
+
+        rejected_non_image = client.post(
+            "/api/public-agents",
+            json={"name": "Bot2", "workspace_id": ws.id, "avatar_url": "not-a-data-url"},
+        )
+        assert rejected_non_image.status_code == 422
+
+        rejected_too_large = client.post(
+            "/api/public-agents",
+            json={"name": "Bot3", "workspace_id": ws.id, "avatar_url": "data:image/png;base64," + ("A" * 700_001)},
+        )
+        assert rejected_too_large.status_code == 422
+
+        new_avatar = "data:image/png;base64,iVBORw0KGgoNEW="
+        updated = client.post(
+            "/api/public-agents/update",
+            json={"agent_id": agent["id"], "avatar_url": new_avatar},
+        )
+        assert updated.status_code == 200
+        assert updated.json()["avatar_url"] == new_avatar
+
+        cleared = client.post(
+            "/api/public-agents/update",
+            json={"agent_id": agent["id"], "clear_avatar": True},
+        )
+        assert cleared.status_code == 200
+        assert cleared.json()["avatar_url"] is None
+
+
 def test_public_chat_rate_limit_returns_429_after_threshold(db_session, fake, monkeypatch):
     _set_flag(db_session, "public_portfolio_agent_enabled", "true")
     monkeypatch.setattr(PublicAgentService, "_complete", lambda self, agent, message, context: "STUBBED")

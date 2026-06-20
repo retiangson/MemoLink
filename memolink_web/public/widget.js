@@ -33,6 +33,7 @@
   var AGENT_TOKEN = scriptEl.getAttribute("data-agent-token");
   var API_BASE = (scriptEl.getAttribute("data-api-base") || "").replace(/\/$/, "");
   var TITLE = scriptEl.getAttribute("data-title") || "Portfolio Assistant";
+  var AVATAR_URL = scriptEl.getAttribute("data-avatar-url") || "";
   var MAX_MESSAGE_LENGTH = 2000;
 
   if (!AGENT_TOKEN || !API_BASE) {
@@ -61,7 +62,7 @@
     "* { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }",
     ".ml-launcher { position: fixed; bottom: 20px; right: 20px; width: 56px; height: 56px; border-radius: 50%;",
     "  background: #4f46e5; color: #fff; border: none; cursor: pointer; display: flex; align-items: center;",
-    "  justify-content: center; box-shadow: 0 6px 20px rgba(0,0,0,0.25); }",
+    "  justify-content: center; box-shadow: 0 6px 20px rgba(0,0,0,0.25); padding: 0; overflow: hidden; }",
     ".ml-launcher:hover { background: #4338ca; }",
     ".ml-launcher:focus-visible { outline: 2px solid #c7d2fe; outline-offset: 2px; }",
     ".ml-panel { position: fixed; bottom: 88px; right: 20px; width: min(360px, calc(100vw - 32px));",
@@ -71,9 +72,13 @@
     ".ml-panel.ml-open { display: flex; }",
     ".ml-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px;",
     "  background: #1a1a24; border-bottom: 1px solid #2a2a3a; flex-shrink: 0; }",
-    ".ml-header-title { font-size: 13px; font-weight: 600; color: #fff; }",
+    ".ml-header-left { display: flex; align-items: center; gap: 8px; min-width: 0; }",
+    ".ml-header-avatar { width: 26px; height: 26px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }",
+    ".ml-header-titles { display: flex; flex-direction: column; gap: 1px; min-width: 0; }",
+    ".ml-header-title { font-size: 13px; font-weight: 600; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }",
+    ".ml-header-sub { font-size: 10px; font-weight: 400; color: #9ca3af; }",
     ".ml-close { background: transparent; border: none; color: #9ca3af; cursor: pointer; font-size: 16px;",
-    "  line-height: 1; padding: 4px; border-radius: 6px; }",
+    "  line-height: 1; padding: 4px; border-radius: 6px; flex-shrink: 0; }",
     ".ml-close:hover { color: #fff; background: #252533; }",
     ".ml-messages { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 8px; }",
     ".ml-msg { max-width: 85%; padding: 8px 11px; border-radius: 12px; font-size: 13px; line-height: 1.4;",
@@ -106,10 +111,21 @@
   launcher.type = "button";
   launcher.setAttribute("aria-label", "Open chat with " + TITLE);
   launcher.setAttribute("aria-expanded", "false");
-  launcher.innerHTML =
-    '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">' +
-    '<path stroke-linecap="round" stroke-linejoin="round" d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>' +
-    "</svg>";
+  if (AVATAR_URL) {
+    var launcherImg = document.createElement("img");
+    launcherImg.src = AVATAR_URL;
+    launcherImg.alt = "";
+    launcherImg.style.width = "100%";
+    launcherImg.style.height = "100%";
+    launcherImg.style.borderRadius = "50%";
+    launcherImg.style.objectFit = "cover";
+    launcher.appendChild(launcherImg);
+  } else {
+    launcher.innerHTML =
+      '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">' +
+      '<path stroke-linecap="round" stroke-linejoin="round" d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>' +
+      "</svg>";
+  }
 
   var panel = document.createElement("div");
   panel.className = "ml-panel";
@@ -118,15 +134,32 @@
 
   var header = document.createElement("div");
   header.className = "ml-header";
+  var headerLeft = document.createElement("div");
+  headerLeft.className = "ml-header-left";
+  if (AVATAR_URL) {
+    var headerAvatar = document.createElement("img");
+    headerAvatar.className = "ml-header-avatar";
+    headerAvatar.src = AVATAR_URL;
+    headerAvatar.alt = "";
+    headerLeft.appendChild(headerAvatar);
+  }
+  var headerTitles = document.createElement("div");
+  headerTitles.className = "ml-header-titles";
   var headerTitle = document.createElement("span");
   headerTitle.className = "ml-header-title";
   headerTitle.textContent = TITLE;
+  var headerSub = document.createElement("span");
+  headerSub.className = "ml-header-sub";
+  headerSub.textContent = "Powered by MemoLink";
+  headerTitles.appendChild(headerTitle);
+  headerTitles.appendChild(headerSub);
+  headerLeft.appendChild(headerTitles);
   var closeBtn = document.createElement("button");
   closeBtn.className = "ml-close";
   closeBtn.type = "button";
   closeBtn.setAttribute("aria-label", "Close chat");
   closeBtn.textContent = "✕";
-  header.appendChild(headerTitle);
+  header.appendChild(headerLeft);
   header.appendChild(closeBtn);
 
   var messagesEl = document.createElement("div");

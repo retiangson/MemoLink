@@ -6,10 +6,40 @@ import {
 import { listWorkspaces } from "../api/workspaceApi";
 import type { Workspace } from "../types";
 
+function escapeHtmlAttr(value: string): string {
+  return value.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+}
+
 function embedSnippet(agent: PublicAgent): string {
   const webOrigin = window.location.origin;
   const apiBase = (import.meta.env.VITE_API_BASE_URL as string) ?? "";
-  return `<script src="${webOrigin}/widget.js" data-agent-token="${agent.token}" data-api-base="${apiBase}" async></script>`;
+  const avatarAttr = agent.avatar_url ? ` data-avatar-url="${agent.avatar_url}"` : "";
+  // data-title defaults to this agent's own name — each PublicAgent belongs to a different
+  // workspace/owner, so the widget title is per-agent (effectively per-workspace), never a
+  // single hardcoded string shared across tenants.
+  return `<script src="${webOrigin}/widget.js" data-agent-token="${agent.token}" data-api-base="${apiBase}" data-title="${escapeHtmlAttr(agent.name)}"${avatarAttr} async></script>`;
+}
+
+// Avatars are stored as base64 data URLs directly on the agent row (no upload endpoint or
+// object storage exists in this codebase) — keep the source file small so the encoded
+// string stays well under the backend's MAX_AVATAR_DATA_URL_LENGTH cap.
+const MAX_AVATAR_FILE_BYTES = 500 * 1024;
+
+function readImageAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    if (!file.type.startsWith("image/")) {
+      reject(new Error("Please choose an image file."));
+      return;
+    }
+    if (file.size > MAX_AVATAR_FILE_BYTES) {
+      reject(new Error("Image is too large (max 500KB)."));
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(new Error("Could not read that image."));
+    reader.readAsDataURL(file);
+  });
 }
 
 interface EditState {
@@ -18,6 +48,7 @@ interface EditState {
   system_prompt: string;
   allowed_domains: string;
   workspace_id: number;
+  avatar_url: string | null;
 }
 
 function toEditState(agent: PublicAgent): EditState {
@@ -27,6 +58,7 @@ function toEditState(agent: PublicAgent): EditState {
     system_prompt: agent.system_prompt ?? "",
     allowed_domains: agent.allowed_domains ?? "",
     workspace_id: agent.workspace_id,
+    avatar_url: agent.avatar_url ?? null,
   };
 }
 
@@ -39,7 +71,9 @@ export function PublicAgentsPanel() {
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
   const [newWorkspaceId, setNewWorkspaceId] = useState<number | null>(null);
+  const [newAvatarUrl, setNewAvatarUrl] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [avatarError, setAvatarError] = useState<string | null>(null);
 
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [edits, setEdits] = useState<Record<number, EditState>>({});
@@ -69,15 +103,30 @@ export function PublicAgentsPanel() {
     if (!newName.trim() || newWorkspaceId == null) return;
     setSaving(true);
     try {
-      const agent = await createPublicAgent({ name: newName.trim(), workspace_id: newWorkspaceId });
+      const agent = await createPublicAgent({
+        name: newName.trim(),
+        workspace_id: newWorkspaceId,
+        avatar_url: newAvatarUrl,
+      });
       setAgents((p) => [...p, agent]);
       setNewName("");
       setNewWorkspaceId(null);
+      setNewAvatarUrl(null);
       setCreating(false);
     } catch {
       alert("Could not create agent.");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handlePickAvatar(file: File, onResult: (dataUrl: string) => void) {
+    setAvatarError(null);
+    try {
+      const dataUrl = await readImageAsDataUrl(file);
+      onResult(dataUrl);
+    } catch (e: any) {
+      setAvatarError(e?.message ?? "Could not read that image.");
     }
   }
 
@@ -97,6 +146,8 @@ export function PublicAgentsPanel() {
         system_prompt: edit.system_prompt.trim() || null,
         allowed_domains: edit.allowed_domains.trim() || null,
         workspace_id: edit.workspace_id,
+        avatar_url: edit.avatar_url,
+        clear_avatar: edit.avatar_url == null,
       });
       setAgents((p) => p.map((a) => (a.id === agent.id ? updated : a)));
       setExpandedId(null);
@@ -173,6 +224,36 @@ export function PublicAgentsPanel() {
             />
           </div>
           <div>
+            <label className="text-xs text-gray-500">Avatar (optional)</label>
+            <div className="mt-1 flex items-center gap-3">
+              {newAvatarUrl ? (
+                <img src={newAvatarUrl} alt="" className="w-10 h-10 rounded-full object-cover border border-[var(--ml-bg-hover)]" />
+              ) : (
+                <div className="w-10 h-10 rounded-full bg-[var(--ml-bg-surface)] border border-[var(--ml-bg-hover)]" />
+              )}
+              <label className="px-2.5 py-1.5 text-[11px] text-gray-400 hover:text-gray-200 hover:bg-[#252533] rounded-lg border border-[var(--ml-bg-hover)] transition cursor-pointer">
+                Choose image
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handlePickAvatar(file, setNewAvatarUrl);
+                    e.target.value = "";
+                  }}
+                />
+              </label>
+              {newAvatarUrl && (
+                <button
+                  onClick={() => setNewAvatarUrl(null)}
+                  className="px-2.5 py-1.5 text-[11px] text-gray-500 hover:text-gray-300 transition"
+                >Remove</button>
+              )}
+            </div>
+            {avatarError && <p className="text-[10px] text-red-400 mt-1">{avatarError}</p>}
+          </div>
+          <div>
             <label className="text-xs text-gray-500">Public Workspace</label>
             <select
               value={newWorkspaceId ?? ""}
@@ -219,6 +300,11 @@ export function PublicAgentsPanel() {
             return (
               <div key={agent.id} className="bg-[#1a1a24] border border-[var(--ml-bg-hover)] rounded-xl overflow-hidden">
                 <div className="flex items-center gap-3 px-4 py-3.5">
+                  {agent.avatar_url ? (
+                    <img src={agent.avatar_url} alt="" className="w-8 h-8 rounded-full object-cover border border-[var(--ml-bg-hover)] shrink-0" />
+                  ) : (
+                    <div className="w-8 h-8 rounded-full bg-[var(--ml-bg-surface)] border border-[var(--ml-bg-hover)] shrink-0" />
+                  )}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <p className="text-sm font-medium text-gray-200 truncate">{agent.name}</p>
@@ -282,6 +368,36 @@ export function PublicAgentsPanel() {
                         onChange={(e) => setEdits((p) => ({ ...p, [agent.id]: { ...edit, name: e.target.value } }))}
                         className="mt-1 w-full bg-[var(--ml-bg-surface)] border border-[var(--ml-bg-hover)] rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-indigo-500/50"
                       />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-500">Avatar (optional)</label>
+                      <div className="mt-1 flex items-center gap-3">
+                        {edit.avatar_url ? (
+                          <img src={edit.avatar_url} alt="" className="w-10 h-10 rounded-full object-cover border border-[var(--ml-bg-hover)]" />
+                        ) : (
+                          <div className="w-10 h-10 rounded-full bg-[var(--ml-bg-surface)] border border-[var(--ml-bg-hover)]" />
+                        )}
+                        <label className="px-2.5 py-1.5 text-[11px] text-gray-400 hover:text-gray-200 hover:bg-[#252533] rounded-lg border border-[var(--ml-bg-hover)] transition cursor-pointer">
+                          Choose image
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) handlePickAvatar(file, (dataUrl) => setEdits((p) => ({ ...p, [agent.id]: { ...edit, avatar_url: dataUrl } })));
+                              e.target.value = "";
+                            }}
+                          />
+                        </label>
+                        {edit.avatar_url && (
+                          <button
+                            onClick={() => setEdits((p) => ({ ...p, [agent.id]: { ...edit, avatar_url: null } }))}
+                            className="px-2.5 py-1.5 text-[11px] text-gray-500 hover:text-gray-300 transition"
+                          >Remove</button>
+                        )}
+                      </div>
+                      {avatarError && <p className="text-[10px] text-red-400 mt-1">{avatarError}</p>}
                     </div>
                     <div>
                       <label className="text-xs text-gray-500">Public Workspace</label>
