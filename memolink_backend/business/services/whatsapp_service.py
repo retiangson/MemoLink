@@ -271,16 +271,19 @@ def get_status() -> dict:
         with httpx.Client(timeout=3.0) as client:
             data = client.get(f"{BRIDGE_URL}/health").json()
         return {
-            "connected":     data.get("status") == "connected",
-            "status":        data.get("status", "disconnected"),
-            "qr_image":      data.get("qr_image"),
-            "historySynced": data.get("historySynced", False),
-            "chatCount":     data.get("chatCount", 0),
-            "messageCount":  data.get("messageCount", 0),
+            "connected":           data.get("status") == "connected",
+            "status":              data.get("status", "disconnected"),
+            "qr_image":            data.get("qr_image"),
+            "historySynced":       data.get("historySynced", False),
+            "historySyncComplete": data.get("historySyncComplete", False),
+            "historySyncProgress": data.get("historySyncProgress"),
+            "chatCount":           data.get("chatCount", 0),
+            "messageCount":        data.get("messageCount", 0),
         }
     except Exception:
         return {"connected": False, "status": "disconnected", "qr_image": None,
-                "historySynced": False, "chatCount": 0, "messageCount": 0}
+                "historySynced": False, "historySyncComplete": False, "historySyncProgress": None,
+                "chatCount": 0, "messageCount": 0}
 
 
 async def list_chats() -> list:
@@ -373,8 +376,12 @@ async def delete_chat(chat_id: str) -> dict:
         return resp.json()
 
 
-async def suggest_reply(chat_id: str, note_context: str = "") -> list[str]:
-    """Generate 3 AI reply suggestions for the last message in a WhatsApp chat."""
+async def suggest_reply(chat_id: str, note_context: str = "", draft_reply: str = "") -> list[str]:
+    """Generate 3 AI reply suggestions for the last message in a WhatsApp chat.
+
+    If draft_reply is provided, the suggestions rework that draft (matching its
+    intent) instead of generating independent replies from scratch.
+    """
     message_result = await get_messages(chat_id, limit=10)
     messages = message_result.get("messages", []) if isinstance(message_result, dict) else message_result
     if not messages:
@@ -393,26 +400,44 @@ async def suggest_reply(chat_id: str, note_context: str = "") -> list[str]:
         if note_context and note_context.strip()
         else ""
     )
+    draft_block = (
+        "\n\nThe user's CURRENT draft reply, typed just now and not yet sent "
+        "(rewrite THIS — ignore the content/topic of any message the user already "
+        f"sent earlier in the conversation above):\n\"{draft_reply.strip()}\""
+        if draft_reply and draft_reply.strip()
+        else ""
+    )
+
+    if draft_block:
+        system_prompt = (
+            "You polish WhatsApp reply drafts. The user has typed a new, unsent draft reply; "
+            "rewrite ONLY that current draft into exactly 3 variants that preserve its intent and "
+            "key content: one professional/formal, one friendly/casual, and one very brief. "
+            "Do not base the variants on any message the user already sent earlier in the chat — "
+            "that history is for context only. "
+            "Each reply should be natural and ready to send. "
+            + ("Use the provided notes context where relevant. " if context_block else "")
+            + 'Respond ONLY with JSON: {"replies": ["...", "...", "..."]}'
+        )
+    else:
+        system_prompt = (
+            "You draft WhatsApp reply messages. Based on the conversation, "
+            "generate exactly 3 reply options: one professional/formal, "
+            "one friendly/casual, and one very brief. "
+            "Each reply should be natural and ready to send. "
+            + ("Use the provided notes context where relevant. " if context_block else "")
+            + 'Respond ONLY with JSON: {"replies": ["...", "...", "..."]}'
+        )
 
     client = OpenAI(api_key=settings.openai_api_key)
     try:
         resp = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "You draft WhatsApp reply messages. Based on the conversation, "
-                        "generate exactly 3 reply options: one professional/formal, "
-                        "one friendly/casual, and one very brief. "
-                        "Each reply should be natural and ready to send. "
-                        + ("Use the provided notes context where relevant. " if context_block else "")
-                        + 'Respond ONLY with JSON: {"replies": ["...", "...", "..."]}'
-                    ),
-                },
+                {"role": "system", "content": system_prompt},
                 {
                     "role": "user",
-                    "content": f"WhatsApp conversation:{context_block}\n\n{chat_text}\n\nGenerate 3 reply suggestions.",
+                    "content": f"WhatsApp conversation so far:\n{chat_text}{context_block}{draft_block}\n\nGenerate 3 reply suggestions.",
                 },
             ],
             max_tokens=300,

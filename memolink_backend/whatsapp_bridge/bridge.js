@@ -48,6 +48,8 @@ let sock = null;
 let connectionState = "disconnected";
 let latestQRImage = null;
 let historySynced = false;
+let historySyncProgress = null;
+let historySyncComplete = false;
 
 // chatId → [MsgObj]
 const messagesByChat = new Map();
@@ -349,6 +351,8 @@ async function startSocket() {
   contactNames.clear();
   rawMessages.clear();
   historySynced = false;
+  historySyncProgress = null;
+  historySyncComplete = false;
 
   const { state, saveCreds } = await useMultiFileAuthState(SESSION_DIR);
   const { version } = await fetchLatestBaileysVersion();
@@ -466,6 +470,10 @@ async function startSocket() {
 
     // Treat the first usable history batch as ready, while later batches may still add older messages.
     if (count > 0 || totalMessageCount() > 0) historySynced = true;
+    if (typeof progress === "number") historySyncProgress = progress;
+    // Baileys doesn't always fire isLatest reliably for accounts with on-demand
+    // per-chat history sync, so also treat 100% progress as done.
+    if (isLatest || progress === 100) historySyncComplete = true;
     console.log(`[bridge] Messaging history: ${count} msgs, ${chatMeta.size} chats, progress=${progress ?? "n/a"}, latest=${isLatest ?? "n/a"}, type=${syncType ?? "n/a"}`);
   });
 
@@ -499,12 +507,14 @@ app.use(express.json());
 app.get("/health", (_req, res) => {
   const chats = visibleChats();
   res.json({
-    status:        connectionState,
-    qr_image:      latestQRImage,
-    historySynced: isHistoryReady(),
-    chatCount:     chats.length,
-    rawChatCount:  chatMeta.size,
-    messageCount:  totalMessageCount(),
+    status:               connectionState,
+    qr_image:             latestQRImage,
+    historySynced:        isHistoryReady(),
+    historySyncComplete,
+    historySyncProgress,
+    chatCount:            chats.length,
+    rawChatCount:         chatMeta.size,
+    messageCount:         totalMessageCount(),
   });
 });
 

@@ -34,6 +34,7 @@ class DeleteChatRequest(BaseModel):
 class SuggestRequest(BaseModel):
     chat_id: str
     note_context: str = ""
+    draft_reply: str = ""
 
 
 @router.post("/start")
@@ -161,7 +162,7 @@ async def suggest_reply(
     req: SuggestRequest,
     _user_id: int = Depends(get_current_user),
 ):
-    replies = await whatsapp_service.suggest_reply(req.chat_id, req.note_context)
+    replies = await whatsapp_service.suggest_reply(req.chat_id, req.note_context, req.draft_reply)
     return {"replies": replies}
 
 
