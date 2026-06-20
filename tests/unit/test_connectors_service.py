@@ -1,5 +1,9 @@
+import asyncio
 from types import SimpleNamespace
 
+import httpx
+
+from memolink_backend.business.services import connectors_service as connectors_service_module
 from memolink_backend.business.services.action_agent import ActionAgentRunner, decide_action_agent
 from memolink_backend.business.services.connectors_service import ConnectorsService
 
@@ -171,11 +175,187 @@ def test_connectors_service_lists_known_connectors_with_status():
 
     connectors = service.list_connectors(1)
 
-    assert [item["id"] for item in connectors] == ["email", "teams", "github", "jira"]
+    assert [item["id"] for item in connectors] == ["email", "teams", "github", "jira", "spotify"]
     assert connectors[0]["connected"] is True
     assert connectors[0]["summary"] == "person@example.com"
     assert connectors[2]["summary"] == "octocat/hello-world"
     assert connectors[3]["summary"] == "MEMO"
+    assert connectors[4]["connected"] is False
+
+
+def test_spotify_oauth_connector_status_and_delete():
+    repo = FakeConnectorRepo()
+    service = ConnectorsService(
+        email_repo=FakeEmailRepo(),
+        teams_repo=FakeTeamsRepo(),
+        connector_repo=repo,
+        github_service=FakeGitHubService(),
+        jira_service=FakeJiraService(),
+    )
+
+    service.save_spotify_oauth(
+        user_id=1,
+        access_token="spotify-access",
+        refresh_token="spotify-refresh",
+        token_expiry="later",
+        account_label="Ronald",
+        profile_url="https://open.spotify.com/user/ronald",
+    )
+
+    status = service.status_spotify(1)
+    saved = repo.get_decrypted_config(1, "spotify")
+    assert status == {
+        "configured": True,
+        "account_label": "Ronald",
+        "profile_url": "https://open.spotify.com/user/ronald",
+        "missing_scopes": [],
+    }
+    assert saved["secret"] == "spotify-access"
+    assert saved["refresh_secret"] == "spotify-refresh"
+    assert service.delete_spotify(1) is True
+    assert service.status_spotify(1) == {"configured": False}
+
+
+def test_spotify_playback_targets_available_device(monkeypatch):
+    repo = FakeConnectorRepo()
+    service = ConnectorsService(
+        email_repo=FakeEmailRepo(),
+        teams_repo=FakeTeamsRepo(),
+        connector_repo=repo,
+        github_service=FakeGitHubService(),
+        jira_service=FakeJiraService(),
+    )
+    calls = []
+
+    async def fake_spotify_request(user_id, method, url, *, params=None, json_body=None):
+        calls.append((method, url, params, json_body))
+        if url.endswith("/me/player/devices"):
+            return {
+                "devices": [
+                    {"id": "restricted", "is_active": True, "is_restricted": True},
+                    {"id": "device-1", "is_active": False, "is_restricted": False},
+                ]
+            }
+        return {"ok": True}
+
+    monkeypatch.setattr(service, "_spotify_request", fake_spotify_request)
+
+    result = asyncio.run(service.control_spotify_playback(1, "play", uri="spotify:track:123"))
+
+    assert result == {"ok": True}
+    assert calls == [
+        ("GET", "https://api.spotify.com/v1/me/player/devices", None, None),
+        ("PUT", "https://api.spotify.com/v1/me/player", None, {"device_ids": ["device-1"], "play": False}),
+        ("PUT", "https://api.spotify.com/v1/me/player/play", {"device_id": "device-1"}, {"uris": ["spotify:track:123"]}),
+    ]
+
+
+def test_spotify_request_treats_empty_success_body_as_ok(monkeypatch):
+    repo = FakeConnectorRepo()
+    repo.upsert(
+        user_id=1,
+        connector_type="spotify",
+        secret="spotify-access",
+        display_name="Spotify",
+        config={},
+    )
+    service = ConnectorsService(
+        email_repo=FakeEmailRepo(),
+        teams_repo=FakeTeamsRepo(),
+        connector_repo=repo,
+        github_service=FakeGitHubService(),
+        jira_service=FakeJiraService(),
+    )
+
+    class FakeAsyncClient:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return None
+
+        async def request(self, *args, **kwargs):
+            return httpx.Response(202, content=b" ")
+
+    monkeypatch.setattr(connectors_service_module.httpx, "AsyncClient", FakeAsyncClient)
+
+    result = asyncio.run(service._spotify_request(1, "POST", "https://api.spotify.com/v1/me/player/next"))
+
+    assert result == {"ok": True}
+
+
+def test_spotify_playlist_tracks_maps_playable_tracks(monkeypatch):
+    service = ConnectorsService(
+        email_repo=FakeEmailRepo(),
+        teams_repo=FakeTeamsRepo(),
+        connector_repo=FakeConnectorRepo(),
+        github_service=FakeGitHubService(),
+        jira_service=FakeJiraService(),
+    )
+
+    async def fake_spotify_request(user_id, method, url, *, params=None, json_body=None):
+        assert method == "GET"
+        assert url == "https://api.spotify.com/v1/playlists/playlist-1/tracks"
+        assert params["limit"] == 50
+        return {
+            "total": 2,
+            "items": [
+                {
+                    "track": {
+                        "id": "track-1",
+                        "uri": "spotify:track:1",
+                        "type": "track",
+                        "name": "Song",
+                        "duration_ms": 123000,
+                        "artists": [{"name": "Artist"}],
+                        "album": {"name": "Album", "images": [{"url": "cover.jpg"}]},
+                    }
+                },
+                {"track": {"type": "episode", "name": "Podcast"}},
+            ],
+        }
+
+    monkeypatch.setattr(service, "_spotify_request", fake_spotify_request)
+
+    result = asyncio.run(service.get_spotify_playlist_tracks(1, "playlist-1"))
+
+    assert result["total"] == 2
+    assert result["tracks"] == [
+        {
+            "id": "track-1",
+            "uri": "spotify:track:1",
+            "name": "Song",
+            "artist": "Artist",
+            "album": "Album",
+            "image_url": "cover.jpg",
+            "duration_ms": 123000,
+            "external_url": None,
+        }
+    ]
+
+
+def test_spotify_shuffle_sends_state_and_device(monkeypatch):
+    service = ConnectorsService(
+        email_repo=FakeEmailRepo(),
+        teams_repo=FakeTeamsRepo(),
+        connector_repo=FakeConnectorRepo(),
+        github_service=FakeGitHubService(),
+        jira_service=FakeJiraService(),
+    )
+    calls = []
+
+    async def fake_spotify_request(user_id, method, url, *, params=None, json_body=None):
+        calls.append((method, url, params, json_body))
+        return {"ok": True}
+
+    monkeypatch.setattr(service, "_spotify_request", fake_spotify_request)
+
+    result = asyncio.run(service.control_spotify_playback(1, "shuffle", shuffle=True, device_id="device-1"))
+
+    assert result == {"ok": True}
+    assert calls == [
+        ("PUT", "https://api.spotify.com/v1/me/player/shuffle", {"state": True, "device_id": "device-1"}, None)
+    ]
 
 
 def test_save_github_settings_preserves_oauth_secret_and_account_label():

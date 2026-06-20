@@ -12,6 +12,8 @@ import { EmailFolderBrowser } from "./EmailFolderBrowser";
 import { EmailAllMailList } from "./EmailAllMailList";
 import { listWhatsappChats, getWhatsappMessages, getWhatsappProfilePicture, sendWhatsappMessage, deleteWhatsappMessage, deleteWhatsappChat, suggestWhatsappReply, getWhatsappMedia } from "../api/whatsappApi";
 import type { WhatsappChat, WhatsappMessage } from "../api/whatsappApi";
+import { SpotifyMiniPlayer } from "./SpotifyPlayer";
+import type { SpotifyApiTrack, SpotifyRepeatMode } from "../api/connectorsApi";
 
 interface RightPanelProps {
   open: boolean;
@@ -40,6 +42,23 @@ interface RightPanelProps {
   insightsEnabled?: boolean;
   workspaceId?: number | null;
   onOpenNote?: (noteId: number) => void;
+  spotifyTrack: SpotifyApiTrack | null;
+  spotifyQueueTracks: SpotifyApiTrack[];
+  spotifyPlaying: boolean;
+  spotifyConnected: boolean;
+  spotifyProgressMs: number;
+  spotifyDurationMs: number;
+  spotifyShuffle: boolean;
+  spotifyRepeatMode: SpotifyRepeatMode;
+  onSpotifyPrevious: () => void;
+  onSpotifyTogglePlay: () => void;
+  onSpotifyStop: () => void;
+  onSpotifyNext: () => void;
+  onSpotifySelectTrack: (track: SpotifyApiTrack) => void;
+  onSpotifyShuffle: (shuffle: boolean) => void;
+  onSpotifyCycleRepeat: () => void;
+  onSpotifySeek: (positionMs: number) => void;
+  onOpenSpotifyTab: () => void;
 }
 
 export function RightPanel({
@@ -52,6 +71,9 @@ export function RightPanel({
   whatsappConnected,
   whatsappAvailable,
   insightsEnabled, workspaceId, onOpenNote,
+  spotifyTrack, spotifyQueueTracks, spotifyPlaying, spotifyConnected, spotifyProgressMs, spotifyDurationMs,
+  spotifyShuffle, spotifyRepeatMode,
+  onSpotifyPrevious, onSpotifyTogglePlay, onSpotifyStop, onSpotifyNext, onSpotifySelectTrack, onSpotifyShuffle, onSpotifyCycleRepeat, onSpotifySeek, onOpenSpotifyTab,
 }: RightPanelProps) {
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState<SuggestionItem | null>(null);
@@ -66,6 +88,7 @@ export function RightPanel({
   const [accountLabelOverrides, setAccountLabelOverrides] = useState<Record<number, string | null>>({});
   const [editingAccountTabId, setEditingAccountTabId] = useState<number | null>(null);
   const [editingAccountLabel, setEditingAccountLabel] = useState("");
+  const [showSpotifyList, setShowSpotifyList] = useState(false);
 
   function handleAccountUnreadCountChange(accountId: number, count: number) {
     setAccountUnreadCounts((prev) => (prev[accountId] === count ? prev : { ...prev, [accountId]: count }));
@@ -1095,7 +1118,7 @@ export function RightPanel({
 
       </div>{/* end scrollable body */}
 
-      {/* Footer: clear done - pinned at bottom */}
+      {/* Footer: clear done - pinned above the media controls */}
       {doneCount > 0 && (
         <div className="px-3 py-2 border-t border-[var(--ml-bg-panel)] shrink-0">
           <button
@@ -1105,6 +1128,29 @@ export function RightPanel({
             Clear {doneCount} completed
           </button>
         </div>
+      )}
+
+      {spotifyConnected && (
+        <SpotifyMiniPlayer
+          track={spotifyTrack}
+          queueTracks={spotifyQueueTracks}
+          isPlaying={spotifyPlaying}
+          progressMs={spotifyProgressMs}
+          durationMs={spotifyDurationMs}
+          showList={showSpotifyList}
+          shuffle={spotifyShuffle}
+          repeatMode={spotifyRepeatMode}
+          onPrevious={onSpotifyPrevious}
+          onTogglePlay={onSpotifyTogglePlay}
+          onStop={onSpotifyStop}
+          onNext={onSpotifyNext}
+          onSelectTrack={onSpotifySelectTrack}
+          onToggleShuffle={() => onSpotifyShuffle(!spotifyShuffle)}
+          onCycleRepeat={onSpotifyCycleRepeat}
+          onSeek={onSpotifySeek}
+          onToggleList={() => setShowSpotifyList((v) => !v)}
+          onOpenFull={onOpenSpotifyTab}
+        />
       )}
 
       {/* Add reminder popup */}

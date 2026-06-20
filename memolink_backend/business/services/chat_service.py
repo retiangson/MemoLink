@@ -2496,6 +2496,7 @@ class ChatService(IChatService):
                 model=model,
                 persist_user_message=False,
                 routing_reason=plan.routing_reason,
+                spotify_device_id=dto.spotify_device_id,
             )
 
         if plan.decision == "long_academic" and plan.smart_analysis is not None:
@@ -2649,6 +2650,7 @@ class ChatService(IChatService):
                 model=model,
                 persist_user_message=False,
                 routing_reason=plan.routing_reason,
+                spotify_device_id=dto.spotify_device_id,
             )
             return
 

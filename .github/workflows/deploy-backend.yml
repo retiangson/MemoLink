@@ -103,6 +103,9 @@ jobs:
           TEAMS_CLIENT_SECRET: ${{ secrets.TEAMS_CLIENT_SECRET }}
           TEAMS_TENANT_ID: ${{ secrets.TEAMS_TENANT_ID }}
           TEAMS_REDIRECT_URI: ${{ secrets.TEAMS_REDIRECT_URI }}
+          SPOTIFY_CLIENT_ID: ${{ secrets.SPOTIFY_CLIENT_ID }}
+          SPOTIFY_CLIENT_SECRET: ${{ secrets.SPOTIFY_CLIENT_SECRET }}
+          SPOTIFY_REDIRECT_URI: ${{ secrets.SPOTIFY_REDIRECT_URI }}
         run: |
           # Build Variables JSON via Python to safely handle special characters in secret values
           ENV_JSON=$(python3 -c "
@@ -134,6 +137,9 @@ jobs:
             'TEAMS_CLIENT_SECRET': os.environ.get('TEAMS_CLIENT_SECRET', ''),
             'TEAMS_TENANT_ID': os.environ.get('TEAMS_TENANT_ID', ''),
             'TEAMS_REDIRECT_URI': os.environ.get('TEAMS_REDIRECT_URI', ''),
+            'SPOTIFY_CLIENT_ID': os.environ.get('SPOTIFY_CLIENT_ID', ''),
+            'SPOTIFY_CLIENT_SECRET': os.environ.get('SPOTIFY_CLIENT_SECRET', ''),
+            'SPOTIFY_REDIRECT_URI': os.environ.get('SPOTIFY_REDIRECT_URI', ''),
             'MEMOLINK_SKIP_DB_BOOTSTRAP': '1',
           }
           print(json.dumps({'Variables': vars}))

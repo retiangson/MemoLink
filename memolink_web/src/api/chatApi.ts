@@ -33,7 +33,7 @@ function normalizeChatStreamEvent(raw: any): ChatStreamEvent {
   return { type: "unknown", raw };
 }
 
-export async function sendChat(conversation_id: number, prompt: string, top_k = 5, workspace_id?: number | null, model?: string | null) {
+export async function sendChat(conversation_id: number, prompt: string, top_k = 5, workspace_id?: number | null, model?: string | null, spotify_device_id?: string | null) {
   return (await api.post("/chat", {
     conversation_id,
     prompt,
@@ -41,6 +41,7 @@ export async function sendChat(conversation_id: number, prompt: string, top_k = 
     workspace_id: workspace_id ?? null,
     model: model ?? null,
     core_memory_unlock_token: getVaultSession()?.token ?? null,
+    spotify_device_id: spotify_device_id ?? null,
   })).data;
 }
 
@@ -53,6 +54,7 @@ export async function* streamChat(
   model?: string | null,
   web_search = false,
   search_query_override?: string | null,
+  spotify_device_id?: string | null,
 ) {
   const token = getToken();
   const res = await fetch(`${API_BASE}/chat/stream`, {
@@ -70,6 +72,7 @@ export async function* streamChat(
       web_search,
       search_query_override: search_query_override ?? null,
       core_memory_unlock_token: getVaultSession()?.token ?? null,
+      spotify_device_id: spotify_device_id ?? null,
     }),
   });
 

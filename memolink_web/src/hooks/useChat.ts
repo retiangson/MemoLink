@@ -30,12 +30,13 @@ interface UseChatDeps {
   bottomRef: React.RefObject<HTMLDivElement | null>;
   workspaceId?: number | null;
   model?: string | null;
+  spotifyDeviceId?: string | null;
   onCloseNote?: (noteId: number) => void;
   onOpenNote?: (noteId: number) => void;
   onNoteUpdated?: (noteId: number) => void;
 }
 
-export function useChat({ activeConversation, setActiveConversation, setConversations, bottomRef, workspaceId, model, onCloseNote, onOpenNote, onNoteUpdated }: UseChatDeps) {
+export function useChat({ activeConversation, setActiveConversation, setConversations, bottomRef, workspaceId, model, spotifyDeviceId, onCloseNote, onOpenNote, onNoteUpdated }: UseChatDeps) {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [streaming, setStreaming] = useState(false);
@@ -213,6 +214,7 @@ export function useChat({ activeConversation, setActiveConversation, setConversa
                 model,
                 effectiveWebSearch,
                 options?.searchQueryOverride ?? null,
+                spotifyDeviceId ?? null,
               );
 
         for await (const rawEvent of stream) {
