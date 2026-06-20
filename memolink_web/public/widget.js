@@ -34,6 +34,12 @@
   var API_BASE = (scriptEl.getAttribute("data-api-base") || "").replace(/\/$/, "");
   var TITLE = scriptEl.getAttribute("data-title") || "Portfolio Assistant";
   var AVATAR_URL = scriptEl.getAttribute("data-avatar-url") || "";
+  // Whether the agent owner configured a custom persona (the raw text itself is never sent
+  // to this public, unauthenticated widget — only this boolean flag). Drives whether opening
+  // the chat asks the model for a personalized introduction or just shows a generic greeting.
+  var HAS_PERSONA = scriptEl.getAttribute("data-has-persona") === "true";
+  var DEFAULT_GREETING = "Hi! How can I help you today?";
+  var GREETING_TRIGGER_MESSAGE = "Greet me and briefly introduce yourself.";
   var MAX_MESSAGE_LENGTH = 2000;
 
   if (!AGENT_TOKEN || !API_BASE) {
@@ -46,6 +52,7 @@
   // In-memory-only history — never persisted anywhere.
   var history = [];
   var sending = false;
+  var greeted = false;
 
   var host = document.createElement("div");
   host.style.position = "fixed";
@@ -169,7 +176,7 @@
 
   var emptyState = document.createElement("div");
   emptyState.className = "ml-empty";
-  emptyState.textContent = "Ask a question about Ronald's public projects and notes.";
+  emptyState.textContent = "Ask a question to get started.";
   messagesEl.appendChild(emptyState);
 
   var inputRow = document.createElement("div");
@@ -194,12 +201,47 @@
   shadow.appendChild(launcher);
   shadow.appendChild(panel);
 
+  function showGreeting() {
+    if (greeted) return;
+    greeted = true;
+    if (!HAS_PERSONA) {
+      addBubble("agent", DEFAULT_GREETING);
+      return;
+    }
+    var typing = showTyping();
+    fetch(CHAT_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: GREETING_TRIGGER_MESSAGE }),
+    })
+      .then(function (res) {
+        typing.remove();
+        if (!res.ok) throw new Error("greeting failed");
+        return res.json();
+      })
+      .then(function (data) {
+        if (!data.sources || !data.sources.length) {
+          addBubble("agent", DEFAULT_GREETING);
+          return;
+        }
+        var bubble = addBubble("agent", data.answer);
+        addSources(bubble, data.sources);
+      })
+      .catch(function () {
+        if (typing.parentNode) typing.remove();
+        addBubble("agent", DEFAULT_GREETING);
+      });
+  }
+
   var isOpen = false;
   function setOpen(open) {
     isOpen = open;
     panel.classList.toggle("ml-open", open);
     launcher.setAttribute("aria-expanded", String(open));
-    if (open) input.focus();
+    if (open) {
+      input.focus();
+      showGreeting();
+    }
   }
 
   launcher.addEventListener("click", function () { setOpen(!isOpen); });
