@@ -17,6 +17,10 @@ class PublicAgent(Base):
     # Comma-separated origins allowed to embed the widget, e.g. "https://ronald.dev,https://blog.ronald.dev".
     # Empty/NULL means "no restriction" (any origin) — left as an explicit opt-in restriction, not a default.
     allowed_domains = Column(Text, nullable=True)
+    # Optional visitor-facing avatar. Stored as a data URL (base64), not a path/bucket key —
+    # there is no static-file-serving route or object-storage service in this codebase, and
+    # avatars are small, so embedding the image directly avoids standing up new infrastructure.
+    avatar_url = Column(Text, nullable=True)
     created_by = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

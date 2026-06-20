@@ -49,7 +49,24 @@ chat with an already-public one.
   `description`, `system_prompt` (owner-supplied persona text, appended to but
   never able to override the hardcoded safety system prompt), `public_enabled`
   (master kill switch, default `false`), `allowed_domains` (comma-separated
-  origin allowlist; empty = unrestricted), `created_by`.
+  origin allowlist; empty = unrestricted), `avatar_url` (optional, a base64
+  image data URL — see "Avatar" below), `created_by`.
+
+## Avatar
+
+Owners may optionally set a static picture avatar per agent (Settings →
+Public Agents → Avatar). There is no upload endpoint or object storage in
+this codebase, so the image is read client-side via `FileReader.readAsDataURL`
+and stored directly as a base64 `data:image/...` string in `avatar_url`
+(`PublicAgentCreateDTO`/`PublicAgentUpdateDTO` validate it starts with
+`data:image/` and cap its length at `MAX_AVATAR_DATA_URL_LENGTH`, ~500KB of
+binary image data, in `public_agent_dtos.py`). The frontend additionally
+rejects files over 500KB before encoding (`PublicAgentsPanel.tsx`). Clearing
+an avatar requires `clear_avatar: true` on update — `avatar_url: null` alone
+is treated as "leave unchanged," matching every other optional field on this
+endpoint. An animated/3D avatar was considered and intentionally skipped: it
+would require WebGL/Three.js or a paid third-party avatar/lip-sync service,
+conflicting with the widget's dependency-free, vanilla-JS design.
 
 ## Centralized retrieval filtering
 
@@ -101,9 +118,21 @@ external site regardless of stack):
   data-agent-token="YOUR_PUBLIC_AGENT_TOKEN"
   data-api-base="https://<memolink-api-host>/api"
   data-title="Portfolio Assistant"
+  data-avatar-url="data:image/png;base64,..."
   async
 ></script>
 ```
+
+`data-title` is generated per-agent from the agent's own `name` field by
+`embedSnippet()` — it is **not** tied to the workspace and not a fixed,
+shared string: each owner's agents show their own name, since this is a
+multi-tenant feature (the literal default `"Portfolio Assistant"` inside
+`widget.js` only applies if a hand-written embed omits `data-title`
+entirely). `data-avatar-url` is generated the same way from the agent's
+optional `avatar_url` and is omitted from the snippet when no avatar is set.
+The widget header always shows a small "Powered by MemoLink" line under the
+title, and the avatar (if set) also renders inside the floating launcher
+button.
 
 `memolink_web/public/widget.js` is vanilla JS (no React/axios/bundler
 dependency) so it can run unmodified on a third-party page. It renders inside
@@ -126,8 +155,8 @@ names in sync if either changes.
 
 Settings → Public Agents tab (visible to any logged-in user once both gates
 above pass): create/edit agents (name, workspace, description, persona system
-prompt, allowed domains), enable/disable, delete, regenerate token, and copy
-the embed snippet. This is the same `PublicAgentsPanel.tsx` component
+prompt, allowed domains, optional avatar picture), enable/disable, delete,
+regenerate token, and copy the embed snippet. This is the same `PublicAgentsPanel.tsx` component
 formerly only reachable from the Admin Panel — it has no admin-specific logic,
 so moving it to Settings required no internal changes, only relocating where
 it's mounted. Admin Panel → Features tab has the master

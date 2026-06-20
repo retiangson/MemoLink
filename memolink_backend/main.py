@@ -640,6 +640,7 @@ if os.getenv("MEMOLINK_SKIP_DB_BOOTSTRAP") != "1":
         _conn.execute(text("CREATE INDEX IF NOT EXISTS ix_public_agents_created_by ON public_agents(created_by)"))
         _conn.execute(text("INSERT INTO feature_flags (key, value) VALUES ('public_portfolio_agent_enabled', 'false') ON CONFLICT (key) DO NOTHING"))
         _conn.execute(text("INSERT INTO feature_flags (key, value) VALUES ('public_portfolio_agent_min_level', 'regular') ON CONFLICT (key) DO NOTHING"))
+        _conn.execute(text("ALTER TABLE public_agents ADD COLUMN IF NOT EXISTS avatar_url TEXT"))
         # Auto-promote first user as admin if none exists
         _conn.execute(text("""
             UPDATE users SET is_admin = TRUE

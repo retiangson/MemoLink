@@ -9,6 +9,7 @@ export interface PublicAgent {
   system_prompt: string | null;
   public_enabled: boolean;
   allowed_domains: string | null;
+  avatar_url: string | null;
   created_by: number;
   created_at: string | null;
   updated_at: string | null;
@@ -21,6 +22,7 @@ export interface PublicAgentCreateInput {
   system_prompt?: string | null;
   public_enabled?: boolean;
   allowed_domains?: string | null;
+  avatar_url?: string | null;
 }
 
 export interface PublicAgentUpdateInput {
@@ -30,6 +32,8 @@ export interface PublicAgentUpdateInput {
   public_enabled?: boolean;
   allowed_domains?: string | null;
   workspace_id?: number;
+  avatar_url?: string | null;
+  clear_avatar?: boolean;
 }
 
 export async function createPublicAgent(input: PublicAgentCreateInput): Promise<PublicAgent> {
