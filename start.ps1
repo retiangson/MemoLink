@@ -37,7 +37,7 @@ $frontend = Start-Process powershell -ArgumentList `
 
 $desktop = Start-Process powershell -ArgumentList `
     "-NoExit", "-Command",
-    "`$host.UI.RawUI.WindowTitle = 'MemoLink Desktop'; cd '$root\memolink_web'; npm run dev:electron" `
+    "`$host.UI.RawUI.WindowTitle = 'MemoLink Desktop'; cd '$root\memolink_web'; Write-Host 'Waiting 15s for backend/frontend to come up...' -ForegroundColor DarkGray; Start-Sleep -Seconds 15; npm run dev:electron" `
     -PassThru
 
 Write-Host "Backend  PID: $($backend.Id)" -ForegroundColor Green

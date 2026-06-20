@@ -19,6 +19,8 @@ import { SettingsModal } from "../components/SettingsModal";
 import { EmailTabContent } from "../components/EmailTabContent";
 import { EmailComposeTabContent } from "../components/EmailComposeTabContent";
 import { useEmailTabs } from "../hooks/useEmailTabs";
+import { WhatsappTabContent } from "../components/WhatsappTabContent";
+import { useWhatsappTabs } from "../hooks/useWhatsappTabs";
 import { archiveEmail, trashEmail, pinEmail, unpinEmail } from "../api/emailApi";
 import { HelpModal } from "../components/HelpModal";
 import { MemoGraphModal } from "../components/MemoGraphModal";
@@ -63,8 +65,8 @@ import { SpotifyFullPlayer } from "../components/SpotifyPlayer";
 
 type WorkspaceHook = ReturnType<typeof useWorkspace>;
 type LayoutMode = "stacked" | "columns" | "rows";
-type TabType = "chat" | "note" | "email" | "spotify";
-type DraggableTabType = "chat" | "note" | "email";
+type TabType = "chat" | "note" | "email" | "spotify" | "whatsapp";
+type DraggableTabType = "chat" | "note" | "email" | "whatsapp";
 
 function getSavedLayout(): LayoutMode {
   return (localStorage.getItem("memolink_layout") as LayoutMode) ?? "stacked";
@@ -85,6 +87,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
   const [deleteTarget, setDeleteTarget] = useState<{ id: number; content: string; index: number } | null>(null);
   const [activeTabType, setActiveTabType] = useState<TabType>("chat");
   const emailTabs = useEmailTabs();
+  const whatsappTabs = useWhatsappTabs();
   const [emailActionLoadingId, setEmailActionLoadingId] = useState<string | null>(null);
   const [rightPanelOpen, setRightPanelOpen] = useState(() => window.innerWidth >= 640);
   const [recycleBinOpen, setRecycleBinOpen] = useState(false);
@@ -194,30 +197,45 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
     isDesktopOnline().then(online => {
       setWhatsappAvailable(online);
       if (!online) return;
-      // Desktop is up — check if bridge is still alive (detached process survived page refresh).
-      // If bridge died but user was previously connected, auto-restart silently.
+      // Desktop is up — check if bridge is still alive. On a full app reload/relaunch,
+      // Electron kills the bridge child process entirely, so the /health request itself
+      // fails (not just "disconnected") — restart silently if the user was connected before.
+      function restartAndPoll() {
+        startWhatsapp().catch(() => {}).finally(() => {
+          let tries = 0;
+          const poll = setInterval(() => {
+            tries++;
+            getWhatsappStatus().then(st => {
+              if (st.connected) {
+                setWhatsappConnected(true);
+                clearInterval(poll);
+              } else if (tries >= 5) {
+                localStorage.removeItem("memolink_wa_connected");
+                clearInterval(poll);
+              }
+            }).catch(() => {
+              if (tries >= 5) {
+                localStorage.removeItem("memolink_wa_connected");
+                clearInterval(poll);
+              }
+            });
+          }, 2000);
+        });
+      }
       getWhatsappStatus().then(s => {
         if (s.connected) {
           setWhatsappConnected(true);
           localStorage.setItem("memolink_wa_connected", "1");
         } else if (localStorage.getItem("memolink_wa_connected") === "1") {
-          startWhatsapp().catch(() => {}).finally(() => {
-            let tries = 0;
-            const poll = setInterval(() => {
-              tries++;
-              getWhatsappStatus().then(st => {
-                if (st.connected) {
-                  setWhatsappConnected(true);
-                  clearInterval(poll);
-                } else if (tries >= 5) {
-                  localStorage.removeItem("memolink_wa_connected");
-                  clearInterval(poll);
-                }
-              }).catch(() => { clearInterval(poll); });
-            }, 2000);
-          });
+          restartAndPoll();
         }
-      }).catch(() => {});
+      }).catch(() => {
+        // Bridge process isn't running at all (e.g. killed on app relaunch) — same
+        // recovery as the "disconnected" case above, just reached via the request failing.
+        if (localStorage.getItem("memolink_wa_connected") === "1") {
+          restartAndPoll();
+        }
+      });
     });
   }, []);
 
@@ -357,6 +375,13 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
       setActiveTabType("chat");
     }
   }, [emailTabs.openTabs.length]);
+
+  // When all whatsapp tabs are closed, switch back to chat
+  useEffect(() => {
+    if (whatsappTabs.openTabs.length === 0 && activeTabType === "whatsapp") {
+      setActiveTabType("chat");
+    }
+  }, [whatsappTabs.openTabs.length]);
 
   useEffect(() => {
     if (!spotifyTabOpen && activeTabType === "spotify") {
@@ -541,12 +566,18 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
     if (!src || src.type !== type) return;
     if (type === "chat") convs.reorderOpenChats(src.index, toIndex);
     else if (type === "note") editor.reorderNotes(src.index, toIndex);
-    else emailTabs.reorderEmailTabs(src.index, toIndex);
+    else if (type === "email") emailTabs.reorderEmailTabs(src.index, toIndex);
+    else whatsappTabs.reorderWhatsappTabs(src.index, toIndex);
   }
 
   function openEmailInTab(email: import("../api/emailApi").BrowseEmailResult) {
     emailTabs.openEmailTab(email);
     setActiveTabType("email");
+  }
+
+  function openWhatsappInTab(chat: import("../api/whatsappApi").WhatsappChat) {
+    whatsappTabs.openWhatsappTab(chat);
+    setActiveTabType("whatsapp");
   }
 
   function openComposeInTab() {
@@ -706,6 +737,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
   const isNoteActive = activeTabType === "note" && editor.openNotes.length > 0;
   const isEmailActive = activeTabType === "email" && emailTabs.openTabs.length > 0;
   const isSpotifyActive = activeTabType === "spotify" && spotifyTabOpen;
+  const isWhatsappActive = activeTabType === "whatsapp" && whatsappTabs.openTabs.length > 0;
 
   const _LEVEL_ORDER: Record<string, number> = { regular: 0, plus: 1, pro: 2 };
   const _userLevel = user.access_level ?? "regular";
@@ -942,6 +974,32 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                   )}
                   <span className="max-w-[120px] truncate">{tab.kind === "compose" ? "New Mail" : (tab.email.subject || "(no subject)")}</span>
                   <button onClick={(e) => { e.stopPropagation(); emailTabs.closeEmailTab(i); }} className="text-gray-600 hover:text-gray-300 w-3.5 h-3.5 flex items-center justify-center rounded-sm hover:bg-[var(--ml-bg-hover)] transition leading-none">×</button>
+                </div>
+              );
+            })}
+
+            {/* WhatsApp tabs */}
+            {layoutMode === "stacked" && whatsappTabs.openTabs.map((tab, i) => {
+              const isActive = activeTabType === "whatsapp" && whatsappTabs.activeIndex === i;
+              const isDragOver = dragOverTab?.type === "whatsapp" && dragOverTab.index === i && dragSrcRef.current?.index !== i;
+              return (
+                <div
+                  key={tab.chat.id}
+                  draggable
+                  onDragStart={() => { dragSrcRef.current = { type: "whatsapp", index: i }; }}
+                  onDragOver={(e) => { e.preventDefault(); setDragOverTab({ type: "whatsapp", index: i }); }}
+                  onDrop={(e) => { e.preventDefault(); handleTabDrop("whatsapp", i); setDragOverTab(null); }}
+                  onDragEnd={() => { dragSrcRef.current = null; setDragOverTab(null); }}
+                  onClick={() => { whatsappTabs.setActiveIndex(i); setActiveTabType("whatsapp"); }}
+                  className={`flex items-center gap-1.5 px-3 h-10 text-xs cursor-grab active:cursor-grabbing border-b-2 transition shrink-0 select-none ${
+                    isActive ? "border-green-500 text-white bg-[var(--ml-bg-base)]" : "border-transparent text-gray-500 hover:text-gray-300 hover:bg-[var(--ml-bg-base)]"
+                  } ${isDragOver ? "border-l-2 border-l-green-400" : ""}`}
+                >
+                  <svg viewBox="0 0 16 16" className="w-3 h-3 shrink-0 text-green-500" fill="currentColor">
+                    <path d="M13.601 2.326A7.85 7.85 0 0 0 7.994 0C3.627 0 .068 3.558.064 7.926c0 1.399.366 2.76 1.057 3.965L0 16l4.204-1.102a7.93 7.93 0 0 0 3.79.965h.004c4.368 0 7.926-3.558 7.93-7.93a7.9 7.9 0 0 0-2.327-5.607M7.994 14.521a6.6 6.6 0 0 1-3.356-.92l-.24-.144-2.494.654.666-2.433-.156-.251a6.56 6.56 0 0 1-1.007-3.505c0-3.626 2.957-6.584 6.591-6.584a6.56 6.56 0 0 1 4.66 1.931 6.56 6.56 0 0 1 1.928 4.66c-.004 3.639-2.961 6.592-6.592 6.592m3.615-4.934c-.197-.099-1.17-.578-1.353-.646-.182-.065-.315-.099-.445.099-.133.197-.513.646-.627.775-.114.133-.232.148-.43.05-.197-.1-.836-.308-1.592-.985-.59-.525-.985-1.175-1.103-1.372-.114-.198-.011-.304.084-.404.084-.089.197-.232.296-.346.1-.114.133-.198.198-.33.065-.134.034-.248-.015-.347-.05-.1-.347-.836-.476-1.146-.129-.31-.262-.27-.353-.275-.084-.005-.182-.005-.282-.005a.5.5 0 0 0-.345.16c-.114.114-.444.43-.444 1.05 0 .62.456 1.215.516 1.298.065.084 1.052 1.605 2.55 2.187.355.137.633.219.852.28.36.099.687.084.946.05.297-.034.913-.373 1.04-.74.13-.365.13-.677.09-.742-.04-.06-.214-.13-.41-.23z"/>
+                  </svg>
+                  <span className="max-w-[120px] truncate">{tab.chat.name}</span>
+                  <button onClick={(e) => { e.stopPropagation(); whatsappTabs.closeWhatsappTab(i); }} className="text-gray-600 hover:text-gray-300 w-3.5 h-3.5 flex items-center justify-center rounded-sm hover:bg-[var(--ml-bg-hover)] transition leading-none">×</button>
                 </div>
               );
             })}
@@ -1281,6 +1339,15 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                     onTogglePin={handleEmailTogglePin}
                   />
                 )
+              )}
+            </main>
+          ) : isWhatsappActive ? (
+            <main className="flex-1 overflow-hidden flex flex-col">
+              {whatsappTabs.active && (
+                <WhatsappTabContent
+                  chat={whatsappTabs.active.chat}
+                  onChatDeleted={whatsappTabs.closeWhatsappTabById}
+                />
               )}
             </main>
           ) : isNoteActive ? (
@@ -1676,6 +1743,8 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
         onOpenEmailTab={openEmailInTab}
         onComposeNewMail={openComposeInTab}
         openEmailTabId={emailTabs.active?.kind === "view" ? (emailTabs.active.email.gmail_message_id ?? null) : null}
+        onOpenWhatsappTab={openWhatsappInTab}
+        openWhatsappChatId={whatsappTabs.active?.chat.id ?? null}
         onEmailArchived={emailTabs.closeEmailTabById}
         onEmailTrashed={emailTabs.closeEmailTabById}
         onEmailPinChanged={(gmailMessageId, isPinned) => emailTabs.updateEmailTab(gmailMessageId, { is_pinned: isPinned })}

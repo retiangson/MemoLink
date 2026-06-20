@@ -5,6 +5,8 @@ export interface WhatsappStatus {
   status: "disconnected" | "qr" | "connecting" | "connected";
   qr_image: string | null;
   historySynced?: boolean;
+  historySyncComplete?: boolean;
+  historySyncProgress?: number | null;
   chatCount?: number;
   rawChatCount?: number;
   messageCount?: number;
@@ -54,6 +56,8 @@ export async function getWhatsappStatus(): Promise<WhatsappStatus> {
       status: d.status ?? "disconnected",
       qr_image: d.qr_image ?? null,
       historySynced: d.historySynced ?? false,
+      historySyncComplete: d.historySyncComplete ?? false,
+      historySyncProgress: d.historySyncProgress ?? null,
       chatCount: d.chatCount ?? 0,
       messageCount: d.messageCount ?? 0,
     };
@@ -176,11 +180,12 @@ export async function getWhatsappMedia(
   }
 }
 
-export async function suggestWhatsappReply(chatId: string, noteContext = ""): Promise<string[]> {
+export async function suggestWhatsappReply(chatId: string, noteContext = "", draftReply = ""): Promise<string[]> {
   // Always goes through the backend (uses OpenAI)
   const { data } = await api.post("/whatsapp/suggest-reply", {
     chat_id: chatId,
     note_context: noteContext,
+    draft_reply: draftReply,
   });
   return data.replies ?? [];
 }
