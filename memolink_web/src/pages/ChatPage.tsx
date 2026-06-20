@@ -44,14 +44,27 @@ import type { EmailAccount } from "../api/emailApi";
 import { getTeamsStatus } from "../api/teamsApi";
 import { getWhatsappStatus, startWhatsapp } from "../api/whatsappApi";
 import { isDesktopOnline } from "../api/desktopApi";
+import {
+  controlSpotifyPlayback,
+  getSpotifyLibrary,
+  listConnectors,
+  type SpotifyApiPlaylist,
+  type SpotifyApiTrack,
+  type SpotifyPlaybackAction,
+  type SpotifyRepeatMode,
+} from "../api/connectorsApi";
+import { useSpotifyPlayer } from "../hooks/useSpotifyPlayer";
 import { AdminPage } from "./AdminPage";
 import { suggestActions, type WorkflowAction } from "../api/workflowApi";
 import { OnboardingTour } from "../components/OnboardingTour";
 import { CoreMemoryView } from "../components/CoreMemoryView";
 import { useTheme, THEMES, THEME_META, type Theme } from "../hooks/useTheme";
+import { SpotifyFullPlayer } from "../components/SpotifyPlayer";
 
 type WorkspaceHook = ReturnType<typeof useWorkspace>;
 type LayoutMode = "stacked" | "columns" | "rows";
+type TabType = "chat" | "note" | "email" | "spotify";
+type DraggableTabType = "chat" | "note" | "email";
 
 function getSavedLayout(): LayoutMode {
   return (localStorage.getItem("memolink_layout") as LayoutMode) ?? "stacked";
@@ -70,7 +83,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
   const [menuData, setMenuData] = useState<{ type: "note" | "conversation"; item: any; top: number; left: number } | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ id: number; content: string; index: number } | null>(null);
-  const [activeTabType, setActiveTabType] = useState<"chat" | "note" | "email">("chat");
+  const [activeTabType, setActiveTabType] = useState<TabType>("chat");
   const emailTabs = useEmailTabs();
   const [emailActionLoadingId, setEmailActionLoadingId] = useState<string | null>(null);
   const [rightPanelOpen, setRightPanelOpen] = useState(() => window.innerWidth >= 640);
@@ -105,12 +118,21 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
   const [teamsConnected, setTeamsConnected] = useState(false);
   const [whatsappConnected, setWhatsappConnected] = useState(false);
   const [whatsappAvailable, setWhatsappAvailable] = useState(false);
+  const [spotifyTabOpen, setSpotifyTabOpen] = useState(false);
+  const [spotifyConnected, setSpotifyConnected] = useState(false);
+  const [spotifyPlaybackError, setSpotifyPlaybackError] = useState<string | null>(null);
+  const [spotifyShuffle, setSpotifyShuffle] = useState(false);
+  const [spotifyRepeatMode, setSpotifyRepeatMode] = useState<SpotifyRepeatMode>("off");
+  const [spotifyLibrary, setSpotifyLibrary] = useState<{ playlists: SpotifyApiPlaylist[]; tracks: SpotifyApiTrack[] }>({ playlists: [], tracks: [] });
+  const [spotifyQueueContext, setSpotifyQueueContext] = useState<SpotifyApiTrack[] | null>(null);
+  const spotifyPlayer = useSpotifyPlayer(spotifyConnected);
+  const spotifyPlaying = !spotifyPlayer.isPaused;
   const [showTour, setShowTour] = useState(() => !localStorage.getItem("memolink_walkthrough_done"));
   const [bellTooltipVisible, setBellTooltipVisible] = useState(false);
 
   // Tab drag-and-drop
-  const dragSrcRef = useRef<{ type: "chat" | "note" | "email"; index: number } | null>(null);
-  const [dragOverTab, setDragOverTab] = useState<{ type: "chat" | "note" | "email"; index: number } | null>(null);
+  const dragSrcRef = useRef<{ type: DraggableTabType; index: number } | null>(null);
+  const [dragOverTab, setDragOverTab] = useState<{ type: DraggableTabType; index: number } | null>(null);
 
   // Long-press to edit tab title on mobile
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -165,6 +187,9 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
   useEffect(() => {
     loadEmailData();
     getTeamsStatus().then(s => setTeamsConnected(s.connected)).catch(() => {});
+    listConnectors()
+      .then((rows) => setSpotifyConnected(Boolean(rows.find((item) => item.id === "spotify")?.connected)))
+      .catch(() => {});
     // WhatsApp is only available when the desktop app is running locally.
     isDesktopOnline().then(online => {
       setWhatsappAvailable(online);
@@ -196,6 +221,18 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
     });
   }, []);
 
+  useEffect(() => {
+    if (!spotifyConnected) {
+      setSpotifyLibrary({ playlists: [], tracks: [] });
+      return;
+    }
+    let cancelled = false;
+    getSpotifyLibrary()
+      .then((data) => { if (!cancelled) setSpotifyLibrary(data); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [spotifyConnected]);
+
   // Open Settings after OAuth redirects
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -203,17 +240,20 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
       params.get("email_connected") === "1" ||
       params.get("teams_connected") === "1" ||
       params.get("github_connected") === "1" ||
-      params.get("jira_connected") === "1"
+      params.get("jira_connected") === "1" ||
+      params.get("spotify_connected") === "1"
     ) {
       setShowSettings(true);
       if (params.get("teams_connected") === "1") setTeamsConnected(true);
+      if (params.get("spotify_connected") === "1") setSpotifyConnected(true);
       if (params.get("email_connected") === "1") loadEmailData();
       window.history.replaceState({}, "", window.location.pathname);
     }
     const emailErr = params.get("email_error");
     const githubErr = params.get("github_error");
     const jiraErr = params.get("jira_error");
-    if (emailErr || githubErr || jiraErr) {
+    const spotifyErr = params.get("spotify_error");
+    if (emailErr || githubErr || jiraErr || spotifyErr) {
       setShowSettings(true);
       window.history.replaceState({}, "", window.location.pathname);
       if (emailErr) {
@@ -224,6 +264,9 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
       }
       if (jiraErr) {
         sessionStorage.setItem("jira_oauth_error", decodeURIComponent(jiraErr));
+      }
+      if (spotifyErr) {
+        sessionStorage.setItem("spotify_oauth_error", decodeURIComponent(spotifyErr));
       }
     }
   }, []);
@@ -257,6 +300,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
     bottomRef: convs.bottomRef,
     workspaceId: activeWorkspaceId,
     model: selectedModel,
+    spotifyDeviceId: spotifyPlayer.deviceId,
     onCloseNote: editor.closeNoteById,
     onNoteUpdated: handleNoteUpdated,
     onOpenNote: handleOpenNoteById,
@@ -313,6 +357,12 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
       setActiveTabType("chat");
     }
   }, [emailTabs.openTabs.length]);
+
+  useEffect(() => {
+    if (!spotifyTabOpen && activeTabType === "spotify") {
+      setActiveTabType("chat");
+    }
+  }, [spotifyTabOpen, activeTabType]);
 
   useEffect(() => {
     const close = () => { setMenuData(null); setUserMenuOpen(false); };
@@ -486,7 +536,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
     setShowDeleteModal(false);
   }
 
-  function handleTabDrop(type: "chat" | "note" | "email", toIndex: number) {
+  function handleTabDrop(type: DraggableTabType, toIndex: number) {
     const src = dragSrcRef.current;
     if (!src || src.type !== type) return;
     if (type === "chat") convs.reorderOpenChats(src.index, toIndex);
@@ -502,6 +552,105 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
   function openComposeInTab() {
     emailTabs.openComposeTab();
     setActiveTabType("email");
+  }
+
+  function openSpotifyInTab() {
+    setSpotifyTabOpen(true);
+    setActiveTabType("spotify");
+  }
+
+  function spotifyErrorMessage(err: any): string {
+    return err?.response?.data?.detail ?? err?.message ?? "Spotify playback failed.";
+  }
+
+  async function sendSpotifyPlayback(
+    action: SpotifyPlaybackAction,
+    payload?: { uri?: string | null; uris?: string[] | null; context_uri?: string | null; shuffle?: boolean | null; repeat_mode?: SpotifyRepeatMode | null; position_ms?: number | null },
+  ): Promise<boolean> {
+    if (!spotifyConnected) return false;
+    try {
+      setSpotifyPlaybackError(null);
+      await controlSpotifyPlayback(action, { ...payload, device_id: spotifyPlayer.deviceId });
+      return true;
+    } catch (err) {
+      console.warn("Spotify playback control failed", err);
+      setSpotifyPlaybackError(spotifyErrorMessage(err));
+      openSpotifyInTab();
+      return false;
+    }
+  }
+
+  // Builds an ad-hoc Spotify queue starting at `startUri` so native next/previous
+  // stay within this list instead of falling back to Spotify's autoplay/radio queue.
+  function buildQueueUris(tracks: SpotifyApiTrack[], startUri: string): string[] {
+    const startIndex = tracks.findIndex((t) => t.uri === startUri);
+    const ordered = startIndex >= 0 ? tracks.slice(startIndex) : tracks;
+    return ordered.map((t) => t.uri).filter((u): u is string => Boolean(u)).slice(0, 100);
+  }
+
+  async function handleSpotifySelectTrack(track: SpotifyApiTrack) {
+    if (!track.uri) return;
+    const contextTracks = spotifyQueueContext ?? spotifyLibrary.tracks;
+    const queueUris = buildQueueUris(contextTracks, track.uri);
+    await sendSpotifyPlayback("play", queueUris.length > 1 ? { uris: queueUris } : { uri: track.uri });
+  }
+
+  async function handleSpotifyPlayUri(
+    uri: string,
+    kind: "track" | "playlist",
+    contextTracks?: SpotifyApiTrack[],
+    contextUri?: string | null,
+  ) {
+    setSpotifyQueueContext(contextTracks && contextTracks.length > 0 ? contextTracks : null);
+    if (kind === "playlist") {
+      await sendSpotifyPlayback("play", { context_uri: uri });
+      return;
+    }
+    if (contextUri) {
+      await sendSpotifyPlayback("play", { context_uri: contextUri, uri });
+      return;
+    }
+    if (contextTracks && contextTracks.length > 0) {
+      const queueUris = buildQueueUris(contextTracks, uri);
+      await sendSpotifyPlayback("play", queueUris.length > 1 ? { uris: queueUris } : { uri });
+      return;
+    }
+    await sendSpotifyPlayback("play", { uri });
+  }
+
+  async function handleSpotifySeek(positionMs: number) {
+    await sendSpotifyPlayback("seek", { position_ms: Math.max(0, Math.round(positionMs)) });
+  }
+
+  async function handleSpotifyShuffle(nextShuffle: boolean) {
+    const previous = spotifyShuffle;
+    setSpotifyShuffle(nextShuffle);
+    const ok = await sendSpotifyPlayback("shuffle", { shuffle: nextShuffle });
+    if (!ok) setSpotifyShuffle(previous);
+  }
+
+  async function handleSpotifyCycleRepeat() {
+    const previous = spotifyRepeatMode;
+    const next: SpotifyRepeatMode = previous === "off" ? "context" : previous === "context" ? "track" : "off";
+    setSpotifyRepeatMode(next);
+    const ok = await sendSpotifyPlayback("repeat", { repeat_mode: next });
+    if (!ok) setSpotifyRepeatMode(previous);
+  }
+
+  async function handleSpotifyPrevious() {
+    await sendSpotifyPlayback("previous");
+  }
+
+  async function handleSpotifyNext() {
+    await sendSpotifyPlayback("next");
+  }
+
+  async function handleSpotifyStop() {
+    await sendSpotifyPlayback("stop");
+  }
+
+  function handleSpotifyTogglePlay() {
+    void sendSpotifyPlayback(spotifyPlayer.isPaused ? "play" : "pause");
   }
 
   async function handleEmailArchive() {
@@ -556,6 +705,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
 
   const isNoteActive = activeTabType === "note" && editor.openNotes.length > 0;
   const isEmailActive = activeTabType === "email" && emailTabs.openTabs.length > 0;
+  const isSpotifyActive = activeTabType === "spotify" && spotifyTabOpen;
 
   const _LEVEL_ORDER: Record<string, number> = { regular: 0, plus: 1, pro: 2 };
   const _userLevel = user.access_level ?? "regular";
@@ -655,12 +805,14 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
               const raw = localStorage.getItem(`memolink_tabs_ws_${ws.id}`);
               if (raw) {
                 const saved = JSON.parse(raw);
+                const savedTabType = saved.activeTabType === "note" ? "note" : "chat";
                 pendingChatRestoreRef.current = { chatIds: saved.chatIds ?? [], activeChatId: saved.activeChatId ?? null };
-                pendingNoteRestoreRef.current = { wsId: ws.id, noteIds: saved.noteIds ?? [], activeNoteId: saved.activeNoteId ?? null, activeTabType: saved.activeTabType ?? "chat" };
+                pendingNoteRestoreRef.current = { wsId: ws.id, noteIds: saved.noteIds ?? [], activeNoteId: saved.activeNoteId ?? null, activeTabType: savedTabType };
               }
             } catch { /* ignore corrupt saved state */ }
 
             editor.closeAllNotes();
+            setSpotifyTabOpen(false);
             setActiveTabType("chat");
           }
           await workspaceHook.switchWorkspace(ws);
@@ -793,6 +945,27 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                 </div>
               );
             })}
+
+            {/* Spotify app tab */}
+            {layoutMode === "stacked" && spotifyTabOpen && (
+              <div
+                onClick={() => setActiveTabType("spotify")}
+                className={`flex items-center gap-1.5 px-3 h-10 text-xs cursor-pointer border-b-2 transition shrink-0 select-none ${
+                  activeTabType === "spotify" ? "border-emerald-500 text-white bg-[var(--ml-bg-base)]" : "border-transparent text-gray-500 hover:text-gray-300 hover:bg-[var(--ml-bg-base)]"
+                }`}
+              >
+                <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 shrink-0 text-emerald-400" fill="currentColor">
+                  <path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20m4.59 14.42a.62.62 0 0 1-.86.2c-2.35-1.43-5.3-1.75-8.78-.96a.62.62 0 1 1-.27-1.21c3.8-.87 7.08-.49 9.7 1.11.29.18.38.56.21.86m1.22-2.72a.77.77 0 0 1-1.06.25c-2.68-1.65-6.77-2.13-9.94-1.16a.77.77 0 1 1-.45-1.48c3.62-1.1 8.12-.57 11.2 1.32.36.22.47.7.25 1.07m.1-2.84C14.7 8.95 9.39 8.77 6.32 9.7a.92.92 0 1 1-.54-1.76c3.52-1.07 9.38-.86 13.07 1.33a.92.92 0 0 1-.94 1.59"/>
+                </svg>
+                <span className="max-w-[120px] truncate">Spotify</span>
+                <button
+                  onClick={(e) => { e.stopPropagation(); setSpotifyTabOpen(false); }}
+                  className="text-gray-600 hover:text-gray-300 w-3.5 h-3.5 flex items-center justify-center rounded-sm hover:bg-[var(--ml-bg-hover)] transition leading-none"
+                >
+                  ×
+                </button>
+              </div>
+            )}
 
           </div>{/* end scrollable tabs */}
 
@@ -1078,7 +1251,23 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
 
         {/* ── Content area ─────────────────────────────────────────────── */}
         {layoutMode === "stacked" ? (
-          isEmailActive ? (
+          isSpotifyActive ? (
+            <SpotifyFullPlayer
+              track={spotifyPlayer.liveTrack}
+              isPlaying={spotifyPlaying}
+              onPrevious={handleSpotifyPrevious}
+              onTogglePlay={handleSpotifyTogglePlay}
+              onStop={handleSpotifyStop}
+              onNext={handleSpotifyNext}
+              onPlayUri={handleSpotifyPlayUri}
+              shuffle={spotifyShuffle}
+              onShuffle={handleSpotifyShuffle}
+              playerStatus={spotifyPlayer.playerStatus}
+              sdkError={spotifyPlayer.sdkError}
+              playbackError={spotifyPlaybackError}
+              onClearPlaybackError={() => setSpotifyPlaybackError(null)}
+            />
+          ) : isEmailActive ? (
             <main className="flex-1 overflow-hidden flex flex-col">
               {emailTabs.active && (
                 emailTabs.active.kind === "compose" ? (
@@ -1499,6 +1688,23 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
           const note = notes.find((n) => n.id === noteId);
           if (note) handleOpenNote(note);
         }}
+        spotifyTrack={spotifyPlayer.liveTrack}
+        spotifyQueueTracks={spotifyQueueContext ?? spotifyLibrary.tracks}
+        spotifyPlaying={spotifyPlaying}
+        spotifyConnected={spotifyConnected}
+        spotifyProgressMs={spotifyPlayer.progressMs}
+        spotifyDurationMs={spotifyPlayer.durationMs}
+        spotifyShuffle={spotifyShuffle}
+        spotifyRepeatMode={spotifyRepeatMode}
+        onSpotifyPrevious={handleSpotifyPrevious}
+        onSpotifyTogglePlay={handleSpotifyTogglePlay}
+        onSpotifyStop={handleSpotifyStop}
+        onSpotifyNext={handleSpotifyNext}
+        onSpotifySelectTrack={handleSpotifySelectTrack}
+        onSpotifyShuffle={handleSpotifyShuffle}
+        onSpotifyCycleRepeat={handleSpotifyCycleRepeat}
+        onSpotifySeek={handleSpotifySeek}
+        onOpenSpotifyTab={openSpotifyInTab}
       />
 
       <DeleteModal

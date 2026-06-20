@@ -14,6 +14,7 @@ class ChatRequestDTO(BaseModel):
     search_query_override: Optional[str] = None
     smart_mode: bool = True
     core_memory_unlock_token: Optional[str] = None
+    spotify_device_id: Optional[str] = None
 
 
 class ChatAnswerSource(BaseModel):

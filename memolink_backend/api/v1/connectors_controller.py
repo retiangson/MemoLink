@@ -25,6 +25,14 @@ ATLASSIAN_AUTH_URL = "https://auth.atlassian.com/authorize"
 ATLASSIAN_TOKEN_URL = "https://auth.atlassian.com/oauth/token"
 ATLASSIAN_RESOURCES_URL = "https://api.atlassian.com/oauth/token/accessible-resources"
 ATLASSIAN_SCOPES = "offline_access read:jira-work write:jira-work read:jira-user"
+SPOTIFY_AUTH_URL = "https://accounts.spotify.com/authorize"
+SPOTIFY_TOKEN_URL = "https://accounts.spotify.com/api/token"
+SPOTIFY_PROFILE_URL = "https://api.spotify.com/v1/me"
+SPOTIFY_SCOPES = (
+    "user-read-email user-read-private user-read-playback-state "
+    "user-modify-playback-state user-read-currently-playing streaming "
+    "playlist-read-private playlist-read-collaborative user-library-read"
+)
 
 
 class GitHubConnectorBody(BaseModel):
@@ -37,6 +45,16 @@ class GitHubConnectorBody(BaseModel):
 class JiraConnectorBody(BaseModel):
     project_key: str | None = None
     issue_type: str | None = None
+
+
+class SpotifyPlayBody(BaseModel):
+    uri: str | None = None
+    uris: list[str] | None = None
+    context_uri: str | None = None
+    device_id: str | None = None
+    shuffle: bool | None = None
+    repeat_mode: str | None = None
+    position_ms: int | None = None
 
 
 def _sign_state(user_id: int) -> str:
@@ -58,6 +76,13 @@ def _verify_state(state: str) -> int:
         return int(data["uid"])
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid or expired OAuth state")
+
+
+def _spotify_redirect_uri() -> str:
+    # Spotify no longer accepts "localhost" redirect URIs for newly-created apps.
+    # Normalize stale local env values so local development keeps working after
+    # the developer allowlists the equivalent loopback IP URI in Spotify.
+    return settings.spotify_redirect_uri.replace("://localhost:", "://127.0.0.1:")
 
 
 @router.get("")
@@ -294,3 +319,180 @@ def delete_jira_connector(
     if not c.connectors().delete_jira(user_id):
         raise HTTPException(status_code=404, detail="Jira connector not configured")
     return {"ok": True}
+
+
+@router.get("/spotify/connect-url")
+def get_spotify_connect_url(user_id: int = Depends(get_current_user)):
+    redirect_uri = _spotify_redirect_uri()
+    if not settings.spotify_client_id or not redirect_uri:
+        raise HTTPException(
+            status_code=503,
+            detail="Spotify OAuth is not fully configured — SPOTIFY_CLIENT_ID and SPOTIFY_REDIRECT_URI must be set",
+        )
+    state = _sign_state(user_id)
+    url = (
+        f"{SPOTIFY_AUTH_URL}"
+        f"?client_id={quote(settings.spotify_client_id, safe='')}"
+        f"&response_type=code"
+        f"&redirect_uri={quote(redirect_uri, safe='')}"
+        f"&scope={quote(SPOTIFY_SCOPES, safe='')}"
+        f"&state={quote(state, safe='')}"
+        f"&show_dialog=true"
+    )
+    return {"url": url, "redirect_uri": redirect_uri}
+
+
+@router.get("/spotify/debug-config")
+def spotify_debug_config():
+    return {
+        "spotify_client_id": settings.spotify_client_id[:8] + "..." if settings.spotify_client_id else "(not set)",
+        "spotify_redirect_uri": _spotify_redirect_uri(),
+        "raw_spotify_redirect_uri": settings.spotify_redirect_uri,
+    }
+
+
+@router.get("/spotify/callback")
+async def spotify_oauth_callback(
+    code: str | None = Query(default=None),
+    state: str | None = Query(default=None),
+    error: str | None = Query(default=None),
+    c: RequestContainer = Depends(get_request_container),
+):
+    frontend = settings.frontend_url.rstrip("/")
+    if error:
+        return RedirectResponse(url=f"{frontend}?spotify_error={quote(error, safe='')}")
+
+    if not code or not state:
+        raise HTTPException(status_code=400, detail="Missing Spotify OAuth code or state.")
+
+    user_id = _verify_state(state)
+
+    if not settings.spotify_client_id or not settings.spotify_client_secret:
+        raise HTTPException(status_code=503, detail="Spotify OAuth is not fully configured on the server.")
+
+    redirect_uri = _spotify_redirect_uri()
+    basic = base64.b64encode(f"{settings.spotify_client_id}:{settings.spotify_client_secret}".encode()).decode()
+    async with httpx.AsyncClient() as client:
+        token_resp = await client.post(
+            SPOTIFY_TOKEN_URL,
+            headers={
+                "Authorization": f"Basic {basic}",
+                "Content-Type": "application/x-www-form-urlencoded",
+            },
+            data={
+                "grant_type": "authorization_code",
+                "code": code,
+                "redirect_uri": redirect_uri,
+            },
+        )
+    if token_resp.status_code != 200:
+        raise HTTPException(status_code=400, detail="Failed to exchange Spotify OAuth code for tokens.")
+
+    token_data = token_resp.json()
+    access_token = (token_data.get("access_token") or "").strip()
+    refresh_token = (token_data.get("refresh_token") or "").strip() or None
+    expires_in = int(token_data.get("expires_in") or 3600)
+    if not access_token:
+        raise HTTPException(status_code=400, detail="Spotify did not return an access token.")
+
+    async with httpx.AsyncClient() as client:
+        profile_resp = await client.get(
+            SPOTIFY_PROFILE_URL,
+            headers={"Authorization": f"Bearer {access_token}", "Accept": "application/json"},
+        )
+    if profile_resp.status_code != 200:
+        raise HTTPException(status_code=400, detail="Spotify OAuth token could not access your profile.")
+
+    profile = profile_resp.json()
+    account_label = (profile.get("display_name") or profile.get("email") or profile.get("id") or "").strip()
+    profile_url = ((profile.get("external_urls") or {}).get("spotify") or "").strip()
+    c.connectors().save_spotify_oauth(
+        user_id=user_id,
+        access_token=access_token,
+        refresh_token=refresh_token,
+        token_expiry=datetime.fromtimestamp(time.time() + expires_in, tz=timezone.utc),
+        account_label=account_label or None,
+        profile_url=profile_url or None,
+        scope=(token_data.get("scope") or "").strip(),
+    )
+    return RedirectResponse(url=f"{frontend}?spotify_connected=1")
+
+
+@router.delete("/spotify")
+def delete_spotify_connector(
+    user_id: int = Depends(get_current_user),
+    c: RequestContainer = Depends(get_request_container),
+):
+    if not c.connectors().delete_spotify(user_id):
+        raise HTTPException(status_code=404, detail="Spotify connector not configured")
+    return {"ok": True}
+
+
+@router.post("/spotify/playback/{action}")
+async def control_spotify_playback(
+    action: str,
+    body: SpotifyPlayBody | None = None,
+    user_id: int = Depends(get_current_user),
+    c: RequestContainer = Depends(get_request_container),
+):
+    try:
+        return await c.connectors().control_spotify_playback(
+            user_id,
+            action,
+            uri=body.uri if body else None,
+            uris=body.uris if body else None,
+            context_uri=body.context_uri if body else None,
+            device_id=body.device_id if body else None,
+            shuffle=body.shuffle if body else None,
+            repeat_mode=body.repeat_mode if body else None,
+            position_ms=body.position_ms if body else None,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@router.get("/spotify/library")
+async def spotify_library(
+    user_id: int = Depends(get_current_user),
+    c: RequestContainer = Depends(get_request_container),
+):
+    try:
+        return await c.connectors().get_spotify_library(user_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@router.get("/spotify/search")
+async def spotify_search(
+    q: str = Query(..., min_length=1),
+    user_id: int = Depends(get_current_user),
+    c: RequestContainer = Depends(get_request_container),
+):
+    try:
+        return await c.connectors().search_spotify(user_id, q)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@router.get("/spotify/playlists/{playlist_id}/tracks")
+async def spotify_playlist_tracks(
+    playlist_id: str,
+    user_id: int = Depends(get_current_user),
+    c: RequestContainer = Depends(get_request_container),
+):
+    try:
+        return await c.connectors().get_spotify_playlist_tracks(user_id, playlist_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@router.get("/spotify/player-token")
+async def spotify_player_token(
+    user_id: int = Depends(get_current_user),
+    c: RequestContainer = Depends(get_request_container),
+):
+    try:
+        access_token = await c.connectors().get_spotify_access_token(user_id)
+        return {"access_token": access_token}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))

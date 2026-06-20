@@ -6,7 +6,7 @@ import { getEmailStatus, getEmailConnectUrl, disconnectEmail, autoProcessEmails,
 import type { EmailStatus, EmailRecord, AutoProcessResult } from "../api/emailApi";
 import { getTeamsStatus, getTeamsConnectUrl, disconnectTeams, listTeamsChats, getTeamsMessages, sendTeamsMessage, chatToNote } from "../api/teamsApi";
 import type { TeamsStatus, TeamsChat, TeamsMessage } from "../api/teamsApi";
-import { listConnectors, saveGitHubConnector, getGitHubConnectUrl, deleteGitHubConnector, saveJiraConnector, getJiraConnectUrl, deleteJiraConnector } from "../api/connectorsApi";
+import { listConnectors, saveGitHubConnector, getGitHubConnectUrl, deleteGitHubConnector, saveJiraConnector, getJiraConnectUrl, deleteJiraConnector, getSpotifyConnectUrl, deleteSpotifyConnector } from "../api/connectorsApi";
 import type { ConnectorSummary } from "../api/connectorsApi";
 import { getWhatsappStatus, startWhatsapp, stopWhatsapp, resetWhatsappSession } from "../api/whatsappApi";
 import type { WhatsappStatus } from "../api/whatsappApi";
@@ -124,8 +124,10 @@ export function SettingsModal({
   const [githubConnectError, setGitHubConnectError] = useState<string | null>(null);
   const [jiraConnecting, setJiraConnecting] = useState(false);
   const [jiraConnectError, setJiraConnectError] = useState<string | null>(null);
+  const [spotifyConnecting, setSpotifyConnecting] = useState(false);
+  const [spotifyConnectError, setSpotifyConnectError] = useState<string | null>(null);
   const [connectorSaving, setConnectorSaving] = useState<"github" | "jira" | null>(null);
-  const [connectorRemoving, setConnectorRemoving] = useState<"github" | "jira" | null>(null);
+  const [connectorRemoving, setConnectorRemoving] = useState<"github" | "jira" | "spotify" | null>(null);
   const [connectorResult, setConnectorResult] = useState<string | null>(null);
   const [gitHubForm, setGitHubForm] = useState({ owner: "", repo: "", base_url: "", branch: "" });
   const [jiraForm, setJiraForm] = useState({ project_key: "", issue_type: "Task" });
@@ -140,6 +142,8 @@ export function SettingsModal({
       if (githubOauthErr) { setGitHubConnectError(githubOauthErr); sessionStorage.removeItem("github_oauth_error"); }
       const jiraOauthErr = sessionStorage.getItem("jira_oauth_error");
       if (jiraOauthErr) { setJiraConnectError(jiraOauthErr); sessionStorage.removeItem("jira_oauth_error"); }
+      const spotifyOauthErr = sessionStorage.getItem("spotify_oauth_error");
+      if (spotifyOauthErr) { setSpotifyConnectError(spotifyOauthErr); sessionStorage.removeItem("spotify_oauth_error"); }
     }
   }, [show]);
 
@@ -405,6 +409,34 @@ export function SettingsModal({
       await loadConnectors();
     } catch (err: any) {
       setConnectorResult(err?.response?.data?.detail ?? "Failed to disconnect Jira.");
+    } finally {
+      setConnectorRemoving(null);
+    }
+  }
+
+  async function handleConnectSpotify() {
+    setSpotifyConnecting(true);
+    setSpotifyConnectError(null);
+    setConnectorResult(null);
+    try {
+      const url = await getSpotifyConnectUrl();
+      window.location.href = url;
+    } catch (err: any) {
+      setSpotifyConnecting(false);
+      setSpotifyConnectError(err?.response?.data?.detail ?? "Could not start Spotify connection. Check server configuration.");
+    }
+  }
+
+  async function handleDeleteSpotifyConnector() {
+    setConnectorRemoving("spotify");
+    setConnectorResult(null);
+    setSpotifyConnectError(null);
+    try {
+      await deleteSpotifyConnector();
+      setConnectorResult("✓ Spotify disconnected.");
+      await loadConnectors();
+    } catch (err: any) {
+      setConnectorResult(err?.response?.data?.detail ?? "Failed to disconnect Spotify.");
     } finally {
       setConnectorRemoving(null);
     }
@@ -1170,6 +1202,43 @@ export function SettingsModal({
                                   </div>
                                 )}
                                 <p className="text-[11px] text-gray-600">You'll be redirected to Atlassian to authorise access. MemoLink stores the access token securely and refreshes it when needed.</p>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {connector.id === "spotify" && (
+                          <div className="space-y-3 pt-1">
+                            {connector.connected ? (
+                              <div className="flex items-center justify-between gap-3 rounded-xl border border-[var(--ml-bg-hover)] bg-[var(--ml-bg-surface)] px-4 py-3">
+                                <div>
+                                  <p className="text-sm font-medium text-gray-200">{connector.summary || "Spotify connected"}</p>
+                                  <p className="text-xs text-gray-500">Connected via Spotify OAuth. MemoLink can use this account for playback controls from the lower-right player.</p>
+                                </div>
+                                <button onClick={handleDeleteSpotifyConnector} disabled={connectorRemoving === "spotify"} className={btnDanger}>
+                                  {connectorRemoving === "spotify" ? "Disconnecting…" : "Disconnect"}
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="space-y-4">
+                                <p className="text-sm text-gray-400">Connect Spotify so MemoLink can control your music account from the lower-right player and full Spotify tab.</p>
+                                <div className="bg-[var(--ml-bg-surface)] border border-[var(--ml-bg-hover)] rounded-xl px-4 py-4 space-y-2.5">
+                                  {["Read currently playing track", "Control playback: previous, pause, stop, next", "Open a full Spotify workspace tab", "Keep tokens encrypted with your other connectors"].map((f) => (
+                                    <div key={f} className="flex items-start gap-2 text-xs text-gray-400">
+                                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 mt-1 shrink-0" />
+                                      {f}
+                                    </div>
+                                  ))}
+                                </div>
+                                <button onClick={handleConnectSpotify} disabled={spotifyConnecting} className={btnPrimary}>
+                                  {spotifyConnecting ? "Redirecting…" : "Connect Spotify"}
+                                </button>
+                                {spotifyConnectError && (
+                                  <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-300 leading-relaxed">
+                                    {spotifyConnectError}
+                                  </div>
+                                )}
+                                <p className="text-[11px] text-gray-600">You'll be redirected to Spotify to authorise playback access. MemoLink stores the access and refresh tokens securely.</p>
                               </div>
                             )}
                           </div>

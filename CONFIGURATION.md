@@ -94,6 +94,20 @@ Without this key: Research Mode still works using **OpenAlex** as a free fallbac
 
 ---
 
+## Spotify Connector
+
+Set these backend variables to enable **Settings -> Connectors -> Spotify**.
+
+| Variable | Default | Description |
+|---|---|---|
+| `SPOTIFY_CLIENT_ID` | blank | Spotify app client ID |
+| `SPOTIFY_CLIENT_SECRET` | blank | Spotify app client secret |
+| `SPOTIFY_REDIRECT_URI` | `http://127.0.0.1:8000/api/connectors/spotify/callback` | Must match the redirect URI registered in your Spotify app |
+
+Create the app in the Spotify Developer Dashboard and add the redirect URI above for local development.
+
+---
+
 ## Email / Password Reset
 
 All SMTP variables are optional. If left blank, password reset links are printed to the backend console instead of emailed.

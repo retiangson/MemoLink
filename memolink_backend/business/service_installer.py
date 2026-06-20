@@ -42,6 +42,7 @@ class ServiceInstaller:
                 github_service=GitHubConnectorService(connector_repo),
                 jira_service=JiraConnectorService(connector_repo),
                 desktop_service=self.get_desktop_command_service(),
+                connectors_service=self.get_connectors_service(),
             ),
         )
 

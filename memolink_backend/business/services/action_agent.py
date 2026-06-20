@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import re
@@ -79,6 +80,14 @@ _ACTION_SHELL_RE = re.compile(
 )
 _EXPLICIT_TOOL_RE = re.compile(
     r"\b(?:use tools|take action|do it for me|handle it for me|perform the action)\b",
+    re.IGNORECASE,
+)
+_ACTION_MUSIC_RE = re.compile(
+    r"\bspotify\b"
+    r"|\bplay\b\s+(?!store\b|video\b|games?\b|with\b|along\b|the\s+role\b|the\s+game\b|a\s+game\b|chess\b|cards\b|it\s+safe\b|it\s+by\b|nice\b|fair\b|hard\s+to\s+get\b)\S+"
+    r"|\b(?:skip|next)\s+(?:this\s+|the\s+)?(?:song|track)\b"
+    r"|\b(?:pause|resume|stop)\b.{0,20}\b(?:song|track|music|spotify|playing)\b"
+    r"|\b(?:go back to|play)\s+the\s+(?:previous|last)\s+(?:song|track)\b",
     re.IGNORECASE,
 )
 
@@ -214,6 +223,31 @@ AGENT_TOOLS = [
     {
         "type": "function",
         "function": {
+            "name": "spotify_playback_action",
+            "description": (
+                "Control Spotify playback for the user like a real AI music companion. "
+                "Use this whenever the user asks to play a song, artist, album, or playlist, "
+                "or asks to pause, resume, skip, go back, or stop the music. "
+                "For 'play', set query to the song/artist/playlist name — this searches Spotify "
+                "and immediately starts playing the best match."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "operation": {
+                        "type": "string",
+                        "enum": ["play", "pause", "resume", "next", "previous", "stop"],
+                        "description": "play searches and plays a track or playlist by query. The others control current playback.",
+                    },
+                    "query": {"type": "string", "description": "Song, artist, or playlist to search for. Required for 'play'."},
+                },
+                "required": ["operation"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "read_file",
             "description": (
                 "Read the contents of any text or source code file on the user's local PC. "
@@ -307,6 +341,7 @@ _TOOL_LABELS = {
     "web_search": "Searching the web",
     "github_ticket_action": "Working with GitHub",
     "jira_ticket_action": "Working with Jira",
+    "spotify_playback_action": "Controlling Spotify",
     "run_shell": "Running shell command",
     "read_file": "Reading file",
     "write_file": "Writing file",
@@ -317,7 +352,11 @@ _SYSTEM_PROMPT = (
     "You are MemoLink Action Agent, an AI assistant that can take focused actions on the user's behalf. "
     "You have REAL tool access — tools execute actual operations on the user's local PC. "
     "Always use tools when the user asks to: search or manage notes, add reminders, search the web, "
-    "manage GitHub/Jira tickets, run/launch/open any app or script, or read/write/fix local files. "
+    "manage GitHub/Jira tickets, run/launch/open any app or script, read/write/fix local files, "
+    "or play/pause/skip music. "
+    "\n\nFor MUSIC requests, act like a real AI companion: call spotify_playback_action immediately "
+    "with the song/artist/playlist name as the query — never ask the user to open Spotify themselves. "
+    "After it plays, briefly confirm what's now playing.\n"
     "\n\nFor DEBUGGING and FIXING code:\n"
     "1. Use read_file to read the source file and understand the code.\n"
     "2. Use run_shell with timeout=5 to check for startup errors — if it times out with no stderr the script is working fine.\n"
@@ -348,9 +387,10 @@ def decide_action_agent(prompt: str, smart_analysis: dict | None = None) -> Acti
     connector_action = bool(_ACTION_CONNECTOR_RE.search(lower))
     shell_action = bool(_ACTION_SHELL_RE.search(lower))
     file_action = bool(_ACTION_FILE_RE.search(lower))
+    music_action = bool(_ACTION_MUSIC_RE.search(lower))
     explicit_tool_request = bool(_EXPLICIT_TOOL_RE.search(lower))
 
-    if not any((note_action, reminder_action, web_action, connector_action, shell_action, file_action, explicit_tool_request)):
+    if not any((note_action, reminder_action, web_action, connector_action, shell_action, file_action, music_action, explicit_tool_request)):
         return ActionAgentDecision(False)
 
     mode = (smart_analysis or {}).get("mode", "general_chat")
@@ -369,6 +409,8 @@ def decide_action_agent(prompt: str, smart_analysis: dict | None = None) -> Acti
         return ActionAgentDecision(True, "Smart: action_agent (shell)")
     if file_action:
         return ActionAgentDecision(True, "Smart: action_agent (file)")
+    if music_action:
+        return ActionAgentDecision(True, "Smart: action_agent (spotify)")
     if explicit_tool_request:
         return ActionAgentDecision(True, "Smart: action_agent (explicit)")
 
@@ -385,6 +427,7 @@ class ActionAgentRunner:
         github_service=None,
         jira_service=None,
         desktop_service=None,
+        connectors_service=None,
     ):
         self.conv_repo = conv_repo
         self.note_repo = note_repo
@@ -400,6 +443,7 @@ class ActionAgentRunner:
         self.github = github_service
         self.jira = jira_service
         self._desktop = desktop_service
+        self.connectors = connectors_service
 
     def _resolve_model(self, model: Optional[str]) -> str:
         selected = model or settings.openai_chat_model
@@ -713,7 +757,61 @@ class ActionAgentRunner:
             )
         return f"Unknown Jira operation: {operation}"
 
-    def _execute_tool(self, name: str, args: dict, user_id: int, workspace_id: Optional[int]) -> str:
+    @staticmethod
+    def _run_async(coro):
+        return asyncio.run(coro)
+
+    def _spotify_playback_action(self, args: dict, user_id: int, spotify_device_id: Optional[str]) -> str:
+        if self.connectors is None:
+            return "Spotify connector is not available."
+        operation = args["operation"]
+        try:
+            if operation == "play":
+                query = (args.get("query") or "").strip()
+                if not query:
+                    return "A song, artist, or playlist name is required to play music."
+                results = self._run_async(self.connectors.search_spotify(user_id, query))
+                track = next((t for t in results.get("tracks", []) if t.get("uri")), None)
+                if track:
+                    self._run_async(
+                        self.connectors.control_spotify_playback(
+                            user_id, "play", uri=track["uri"], device_id=spotify_device_id
+                        )
+                    )
+                    return f'Now playing "{track["name"]}" by {track["artist"]}.'
+                playlist = next((p for p in results.get("playlists", []) if p.get("uri")), None)
+                if playlist:
+                    self._run_async(
+                        self.connectors.control_spotify_playback(
+                            user_id, "play", context_uri=playlist["uri"], device_id=spotify_device_id
+                        )
+                    )
+                    return f'Now playing the playlist "{playlist["name"]}".'
+                return f'I couldn\'t find anything on Spotify matching "{query}".'
+            if operation in ("pause", "stop"):
+                self._run_async(self.connectors.control_spotify_playback(user_id, "pause", device_id=spotify_device_id))
+                return "Paused the music."
+            if operation == "resume":
+                self._run_async(self.connectors.control_spotify_playback(user_id, "play", device_id=spotify_device_id))
+                return "Resumed the music."
+            if operation == "next":
+                self._run_async(self.connectors.control_spotify_playback(user_id, "next", device_id=spotify_device_id))
+                return "Skipped to the next track."
+            if operation == "previous":
+                self._run_async(self.connectors.control_spotify_playback(user_id, "previous", device_id=spotify_device_id))
+                return "Went back to the previous track."
+            return f"Unknown Spotify operation: {operation}"
+        except ValueError as exc:
+            return str(exc)
+
+    def _execute_tool(
+        self,
+        name: str,
+        args: dict,
+        user_id: int,
+        workspace_id: Optional[int],
+        spotify_device_id: Optional[str] = None,
+    ) -> str:
         if name == "search_notes":
             return self._search_notes(args["query"], user_id, workspace_id)
         if name == "create_note":
@@ -743,6 +841,8 @@ class ActionAgentRunner:
             return self._github_ticket_action(args, user_id)
         if name == "jira_ticket_action":
             return self._jira_ticket_action(args, user_id)
+        if name == "spotify_playback_action":
+            return self._spotify_playback_action(args, user_id, spotify_device_id)
         return f"Unknown tool: {name}"
 
     def _run_tool_loop(
@@ -754,6 +854,7 @@ class ActionAgentRunner:
         user_id: int,
         workspace_id: Optional[int],
         stream_events: bool,
+        spotify_device_id: Optional[str] = None,
     ) -> tuple[list[dict], list[str]]:
         events: list[str] = []
         for iteration in range(5):
@@ -776,7 +877,7 @@ class ActionAgentRunner:
                 if stream_events:
                     events.append(sse_event(ToolStartEvent(label=label, tool_call=name)))
                 try:
-                    result = self._execute_tool(name, args, user_id, workspace_id)
+                    result = self._execute_tool(name, args, user_id, workspace_id, spotify_device_id)
                     ok = True
                 except Exception as exc:
                     logger.warning("Action tool %s failed: %s", name, exc)
@@ -803,6 +904,7 @@ class ActionAgentRunner:
         model: Optional[str] = None,
         persist_user_message: bool = True,
         routing_reason: str | None = None,
+        spotify_device_id: Optional[str] = None,
     ) -> ChatResponseDTO:
         user_text = prompt.strip()
         if not user_text:
@@ -823,6 +925,7 @@ class ActionAgentRunner:
                 user_id=user_id,
                 workspace_id=workspace_id,
                 stream_events=False,
+                spotify_device_id=spotify_device_id,
             )
             response = chosen_client.chat.completions.create(
                 model=chosen_model,
@@ -851,6 +954,7 @@ class ActionAgentRunner:
         model: Optional[str] = None,
         persist_user_message: bool = True,
         routing_reason: str | None = None,
+        spotify_device_id: Optional[str] = None,
     ) -> Iterator[str]:
         user_text = prompt.strip()
         if not user_text:
@@ -893,7 +997,7 @@ class ActionAgentRunner:
 
                     yield sse_event(ToolStartEvent(label=label, tool_call=name))
                     try:
-                        result = self._execute_tool(name, args, user_id, workspace_id)
+                        result = self._execute_tool(name, args, user_id, workspace_id, spotify_device_id)
                         ok = True
                     except Exception as exc:
                         logger.warning("Action tool %s failed: %s", name, exc)

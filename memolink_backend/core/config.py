@@ -57,5 +57,8 @@ class Settings(BaseSettings):
     jira_client_id: str = ""
     jira_client_secret: str = ""
     jira_redirect_uri: str = "http://localhost:8000/api/connectors/jira/callback"
+    spotify_client_id: str = ""
+    spotify_client_secret: str = ""
+    spotify_redirect_uri: str = "http://127.0.0.1:8000/api/connectors/spotify/callback"
 
 settings = Settings()
