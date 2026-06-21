@@ -115,6 +115,16 @@ export function useNoteEditor() {
     );
   }
 
+  // Update only the saved title baseline after a title-only rename, leaving any
+  // in-progress contentDraft edits untouched.
+  function syncNoteTitle(id: number, title: string) {
+    setOpenNotes((prev) =>
+      prev.map((t) =>
+        t.note.id === id ? { ...t, note: { ...t.note, title }, titleDraft: title } : t
+      )
+    );
+  }
+
   function discardChanges() {
     setOpenNotes((prev) =>
       prev.map((t, i) =>
@@ -179,7 +189,7 @@ export function useNoteEditor() {
     noteContentDraft, setNoteContentDraft,
     isNoteDirty,
     noteTab, setNoteTab,
-    openNote, closeNote, closeNoteById, closeAllNotes, reorderNotes, updateActiveNote, syncNoteById, discardChanges, applyFormat,
+    openNote, closeNote, closeNoteById, closeAllNotes, reorderNotes, updateActiveNote, syncNoteById, syncNoteTitle, discardChanges, applyFormat,
     selectedNote: active?.note ?? null,
   };
 }

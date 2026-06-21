@@ -568,6 +568,15 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
     setActiveTabType("note");
   }
 
+  async function handleRenameNoteTab(index: number) {
+    const tab = editor.openNotes[index];
+    if (!tab) return;
+    const title = tab.titleDraft.trim();
+    if (!title || tab.note.id === null || title === (tab.note.title ?? "")) return;
+    const fresh = await updateNote(tab.note.id, title, null);
+    editor.syncNoteTitle(tab.note.id, fresh.title ?? title);
+  }
+
   // ── Note CRUD ─────────────────────────────────────────────────────────────
   async function handleSaveNote() {
     if (!editor.noteTitleDraft.trim() && !editor.noteContentDraft.trim()) {
@@ -1036,8 +1045,8 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                   </svg>
                   {editingNoteTab === i ? (
                     <input autoFocus value={note.titleDraft} onChange={(e) => editor.setNoteTitleDraft(e.target.value)}
-                      onBlur={() => setEditingNoteTab(null)}
-                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === "Escape") { e.preventDefault(); setEditingNoteTab(null); } }}
+                      onBlur={() => { handleRenameNoteTab(i); setEditingNoteTab(null); }}
+                      onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleRenameNoteTab(i); setEditingNoteTab(null); } if (e.key === "Escape") { e.preventDefault(); setEditingNoteTab(null); } }}
                       onClick={(e) => e.stopPropagation()} className="max-w-[120px] bg-transparent border-b border-indigo-400 outline-none text-white text-xs" />
                   ) : (
                     <span className="max-w-[120px] truncate">{note.titleDraft.trim() || "Untitled"}</span>
@@ -1790,8 +1799,8 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                             autoFocus
                             value={note.titleDraft}
                             onChange={(e) => editor.setNoteTitleDraft(e.target.value)}
-                            onBlur={() => setEditingNoteTab(null)}
-                            onKeyDown={(e) => { if (e.key === "Enter" || e.key === "Escape") { e.preventDefault(); setEditingNoteTab(null); } }}
+                            onBlur={() => { handleRenameNoteTab(i); setEditingNoteTab(null); }}
+                            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleRenameNoteTab(i); setEditingNoteTab(null); } if (e.key === "Escape") { e.preventDefault(); setEditingNoteTab(null); } }}
                             onClick={(e) => e.stopPropagation()}
                             className="max-w-[100px] bg-transparent border-b border-indigo-400 outline-none text-white text-xs"
                           />
