@@ -26,6 +26,7 @@ export function CalendarTabContent({ calendar }: CalendarTabContentProps) {
   const { range, setRange, events, loading, hasUnconnectedAccount, createEvent, updateEvent, deleteEvent } = calendar;
   const [view, setView] = useState<"month" | "agenda">("month");
   const [modalState, setModalState] = useState<{ event: CalendarOccurrence | null; defaultDate: string | null } | null>(null);
+  const [expandedDate, setExpandedDate] = useState<string | null>(null);
 
   const monthAnchor = range.start;
   const today = useMemo(() => new Date(), []);
@@ -214,7 +215,12 @@ export function CalendarTabContent({ calendar }: CalendarTabContentProps) {
                       </button>
                     ))}
                     {overflow > 0 && (
-                      <span className="text-[10px] text-gray-600 px-1.5">+{overflow} more</span>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setExpandedDate(iso); }}
+                        className="text-left text-[10px] text-gray-500 hover:text-indigo-300 px-1.5 transition"
+                      >
+                        +{overflow} more
+                      </button>
                     )}
                   </div>
                 </div>
@@ -258,6 +264,62 @@ export function CalendarTabContent({ calendar }: CalendarTabContentProps) {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {expandedDate && (
+        <div
+          className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4"
+          onClick={() => setExpandedDate(null)}
+        >
+          <div
+            className="bg-[#1a1a24] border border-[var(--ml-bg-hover)] rounded-2xl w-full max-w-sm shadow-2xl flex flex-col max-h-[80vh]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--ml-bg-hover)] shrink-0">
+              <h2 className="text-sm font-semibold text-white">
+                {expandedDate === todayISO ? "Today" : expandedDate}
+              </h2>
+              <button
+                onClick={() => setExpandedDate(null)}
+                className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-500 hover:text-gray-200 hover:bg-[var(--ml-bg-hover)] transition"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="px-3 py-3 space-y-1.5 overflow-y-auto flex-1">
+              {(eventsByDate.get(expandedDate) ?? []).map((ev) => (
+                <button
+                  key={`${ev.reminder_id}-${ev.occurrence_date}`}
+                  onClick={() => { setExpandedDate(null); openEdit(ev); }}
+                  className="w-full text-left flex items-start gap-2.5 p-2.5 rounded-xl border border-[var(--ml-bg-hover)] bg-[var(--ml-bg-surface)] hover:border-indigo-500/40 transition"
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-xs ${ev.done ? "line-through text-gray-600" : "text-gray-200"}`}>{ev.text}</p>
+                    <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                      <span className="text-[10px] text-gray-600">
+                        {ev.all_day ? "All day" : ev.due_time ? formatTime12h(ev.due_time) : ""}
+                      </span>
+                      {ev.source === "google" && <span className="text-[10px] text-blue-400/70">Google</span>}
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+            <div className="px-5 py-3 border-t border-[var(--ml-bg-hover)] shrink-0">
+              <button
+                onClick={() => { const d = expandedDate; setExpandedDate(null); openCreate(d); }}
+                className="w-full flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl transition"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                </svg>
+                Add Event
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

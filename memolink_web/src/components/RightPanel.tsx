@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useCallback } from "react";
+﻿import React, { useState, useEffect, useCallback, useRef } from "react";
 import type { SuggestionItem } from "../hooks/useSuggestions";
 import { ReminderDetailModal } from "./ReminderDetailModal";
 import { AddReminderModal } from "./AddReminderModal";
@@ -66,6 +66,32 @@ interface RightPanelProps {
   onOpenCalendarTab?: () => void;
 }
 
+type PanelSectionKey = "reminders" | "calendar" | "email" | "teams" | "whatsapp";
+const DEFAULT_SECTION_ORDER: PanelSectionKey[] = ["reminders", "calendar", "email", "teams", "whatsapp"];
+const SECTION_ORDER_STORAGE_KEY = "memolink_panel_section_order";
+
+function loadSectionOrder(): PanelSectionKey[] {
+  try {
+    const raw = localStorage.getItem(SECTION_ORDER_STORAGE_KEY);
+    if (!raw) return DEFAULT_SECTION_ORDER;
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return DEFAULT_SECTION_ORDER;
+    const valid = parsed.filter((k): k is PanelSectionKey => DEFAULT_SECTION_ORDER.includes(k));
+    const missing = DEFAULT_SECTION_ORDER.filter((k) => !valid.includes(k));
+    return [...valid, ...missing];
+  } catch {
+    return DEFAULT_SECTION_ORDER;
+  }
+}
+
+function SectionDragHandle() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3 text-gray-700 shrink-0" fill="currentColor" viewBox="0 0 16 16">
+      <path d="M7 2a1 1 0 1 1-2 0 1 1 0 0 1 2 0zm3 0a1 1 0 1 1-2 0 1 1 0 0 1 2 0zM7 5a1 1 0 1 1-2 0 1 1 0 0 1 2 0zm3 0a1 1 0 1 1-2 0 1 1 0 0 1 2 0zM7 8a1 1 0 1 1-2 0 1 1 0 0 1 2 0zm3 0a1 1 0 1 1-2 0 1 1 0 0 1 2 0zm-3 3a1 1 0 1 1-2 0 1 1 0 0 1 2 0zm3 0a1 1 0 1 1-2 0 1 1 0 0 1 2 0z"/>
+    </svg>
+  );
+}
+
 export function RightPanel({
   open, onClose, items, isGenerating,
   onAddManual, onToggleDone, onUpdate, onRemove, onClearDone,
@@ -85,6 +111,7 @@ export function RightPanel({
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState<SuggestionItem | null>(null);
   const [showNoteReminders, setShowNoteReminders] = useState(false);
+  const [showCalendar, setShowCalendar] = useState(false);
   const [showEmailReminders, setShowEmailReminders] = useState(false);
   const [selectedMailTab, setSelectedMailTab] = useState<"all" | number>("all");
   const [totalUnreadCount, setTotalUnreadCount] = useState(0);
@@ -96,6 +123,35 @@ export function RightPanel({
   const [editingAccountTabId, setEditingAccountTabId] = useState<number | null>(null);
   const [editingAccountLabel, setEditingAccountLabel] = useState("");
   const [showSpotifyList, setShowSpotifyList] = useState(false);
+
+  const [sectionOrder, setSectionOrder] = useState<PanelSectionKey[]>(loadSectionOrder);
+  const sectionDragRef = useRef<PanelSectionKey | null>(null);
+  const [sectionDragOver, setSectionDragOver] = useState<PanelSectionKey | null>(null);
+
+  useEffect(() => {
+    localStorage.setItem(SECTION_ORDER_STORAGE_KEY, JSON.stringify(sectionOrder));
+  }, [sectionOrder]);
+
+  function handleSectionDragStart(key: PanelSectionKey) {
+    sectionDragRef.current = key;
+  }
+
+  function handleSectionDragEnd() {
+    sectionDragRef.current = null;
+    setSectionDragOver(null);
+  }
+
+  function handleSectionDrop(targetKey: PanelSectionKey) {
+    const sourceKey = sectionDragRef.current;
+    sectionDragRef.current = null;
+    setSectionDragOver(null);
+    if (!sourceKey || sourceKey === targetKey) return;
+    setSectionOrder((prev) => {
+      const next = prev.filter((k) => k !== sourceKey);
+      next.splice(next.indexOf(targetKey), 0, sourceKey);
+      return next;
+    });
+  }
 
   function handleAccountUnreadCountChange(accountId: number, count: number) {
     setAccountUnreadCounts((prev) => (prev[accountId] === count ? prev : { ...prev, [accountId]: count }));
@@ -270,6 +326,12 @@ export function RightPanel({
 
   const hasEmail = emailConnected || emailAccounts.length > 0;
 
+  const todayCalendarEvents = calendarEvents.filter((e) => e.occurrence_date === today);
+  const upcomingCalendarEvents = calendarEvents
+    .filter((e) => e.occurrence_date >= today && !e.done)
+    .sort((a, b) => a.occurrence_date.localeCompare(b.occurrence_date) || (a.due_time ?? "").localeCompare(b.due_time ?? ""))
+    .slice(0, 3);
+
   function waInitials(name: string): string {
     const clean = (name || "?").replace(/^\+/, "").trim();
     const parts = clean.split(/\s+/).filter(Boolean);
@@ -432,12 +494,21 @@ export function RightPanel({
       <div className="flex-1 overflow-y-auto flex flex-col min-h-0">
 
       {/* ── Section 1: General Reminders ── */}
-      <div className="border-b border-[var(--ml-bg-panel)]">
+      <div
+        draggable
+        onDragStart={() => handleSectionDragStart("reminders")}
+        onDragOver={(e) => { e.preventDefault(); if (sectionDragOver !== "reminders") setSectionDragOver("reminders"); }}
+        onDrop={(e) => { e.preventDefault(); handleSectionDrop("reminders"); }}
+        onDragEnd={handleSectionDragEnd}
+        style={{ order: sectionOrder.indexOf("reminders") }}
+        className={`border-b border-[var(--ml-bg-panel)] cursor-grab active:cursor-grabbing ${sectionDragOver === "reminders" ? "ring-1 ring-inset ring-indigo-500/50 bg-indigo-500/5" : ""}`}
+      >
         <button
           onClick={() => setShowNoteReminders((v) => !v)}
           className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-[#1a1a24] transition text-left"
         >
           <div className="flex items-center gap-2">
+            <SectionDragHandle />
             <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 text-indigo-400 shrink-0" fill="currentColor" viewBox="0 0 16 16">
               <path d="M14.5 3a.5.5 0 0 1 .5.5v9a.5.5 0 0 1-.5.5h-13a.5.5 0 0 1-.5-.5v-9a.5.5 0 0 1 .5-.5zm-13-1A1.5 1.5 0 0 0 0 3.5v9A1.5 1.5 0 0 0 1.5 14h13a1.5 1.5 0 0 0 1.5-1.5v-9A1.5 1.5 0 0 0 14.5 2z"/>
               <path d="M7 5.5a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 0 1h-5a.5.5 0 0 1-.5-.5m-1.496-.854a.5.5 0 0 1 0 .708l-1.5 1.5a.5.5 0 0 1-.708 0l-.5-.5a.5.5 0 1 1 .708-.708l.146.147 1.146-1.147a.5.5 0 0 1 .708 0M7 9.5a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 0 1h-5a.5.5 0 0 1-.5-.5m-1.496-.854a.5.5 0 0 1 0 .708l-1.5 1.5a.5.5 0 0 1-.708 0l-.5-.5a.5.5 0 1 1 .708-.708l.146.147 1.146-1.147a.5.5 0 0 1 .708 0"/>
@@ -483,67 +554,94 @@ export function RightPanel({
         )}
       </div>
 
-      {/* ── Section 1.5: Calendar mini-widget ── */}
-      {onOpenCalendarTab && (() => {
-        const now = new Date();
-        const todayISO = [now.getFullYear(), String(now.getMonth() + 1).padStart(2, "0"), String(now.getDate()).padStart(2, "0")].join("-");
-        const todayEvents = calendarEvents.filter((e) => e.occurrence_date === todayISO);
-        const upcoming = calendarEvents
-          .filter((e) => e.occurrence_date >= todayISO && !e.done)
-          .sort((a, b) => a.occurrence_date.localeCompare(b.occurrence_date) || (a.due_time ?? "").localeCompare(b.due_time ?? ""))
-          .slice(0, 3);
-        return (
-          <div className="border-b border-[var(--ml-bg-panel)] px-4 py-3">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={onOpenCalendarTab}
-                  title="Open Calendar"
-                  className="w-5 h-5 flex items-center justify-center rounded-md text-indigo-400 hover:text-white hover:bg-indigo-600/30 transition shrink-0"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 8V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-2m8-5h8m-4-4v8" />
-                  </svg>
-                </button>
-                <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Calendar</span>
-                {calendarLoading && (
-                  <svg className="w-3 h-3 animate-spin text-gray-600" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
-                )}
-              </div>
-              <span className="text-[10px] text-gray-600">
-                {todayEvents.length > 0 ? `${todayEvents.length} today` : "Nothing today"}
-              </span>
+      {/* ── Section 1.5: Calendar ── */}
+      {onOpenCalendarTab && (
+        <div
+          draggable
+          onDragStart={() => handleSectionDragStart("calendar")}
+          onDragOver={(e) => { e.preventDefault(); if (sectionDragOver !== "calendar") setSectionDragOver("calendar"); }}
+          onDrop={(e) => { e.preventDefault(); handleSectionDrop("calendar"); }}
+          onDragEnd={handleSectionDragEnd}
+          style={{ order: sectionOrder.indexOf("calendar") }}
+          className={`border-b border-[var(--ml-bg-panel)] cursor-grab active:cursor-grabbing ${sectionDragOver === "calendar" ? "ring-1 ring-inset ring-indigo-500/50 bg-indigo-500/5" : ""}`}
+        >
+          <button
+            onClick={() => setShowCalendar((v) => !v)}
+            className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-[#1a1a24] transition text-left"
+          >
+            <div className="flex items-center gap-2">
+              <SectionDragHandle />
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 text-indigo-400 shrink-0" fill="currentColor" viewBox="0 0 16 16">
+                <path d="M3.5 0a.5.5 0 0 1 .5.5V1h8V.5a.5.5 0 0 1 1 0V1h1a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2h1V.5a.5.5 0 0 1 .5-.5M1 4v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V4z"/>
+              </svg>
+              <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Calendar</span>
+              {todayCalendarEvents.length > 0 && (
+                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-400">
+                  {todayCalendarEvents.length}
+                </span>
+              )}
+              {calendarLoading && (
+                <svg className="w-3 h-3 animate-spin text-gray-600" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
+              )}
             </div>
-            {upcoming.length === 0 ? (
-              <p className="text-[11px] text-gray-600">No upcoming events.</p>
-            ) : (
-              <div className="flex flex-col gap-1">
-                {upcoming.map((ev) => (
-                  <button
-                    key={`${ev.reminder_id}-${ev.occurrence_date}`}
-                    onClick={onOpenCalendarTab}
-                    className="w-full flex items-center gap-2 text-left px-2 py-1 rounded-lg hover:bg-[#1a1a24] transition"
-                  >
-                    <span className={`text-[10px] shrink-0 w-12 ${ev.occurrence_date === todayISO ? "text-indigo-400" : "text-gray-600"}`}>
-                      {ev.occurrence_date === todayISO ? "Today" : ev.occurrence_date.slice(5)}
-                    </span>
-                    <span className="text-[11px] text-gray-300 truncate">{ev.text}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        );
-      })()}
+            <div className="flex items-center gap-1">
+              <button
+                onClick={(e) => { e.stopPropagation(); onOpenCalendarTab(); }}
+                title="Open Calendar"
+                className="w-5 h-5 flex items-center justify-center rounded-md text-gray-600 hover:text-indigo-400 hover:bg-[var(--ml-bg-hover)] transition shrink-0"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 8V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-2m8-5h8m-4-4v8" />
+                </svg>
+              </button>
+              <svg xmlns="http://www.w3.org/2000/svg" className={`w-3 h-3 text-gray-600 transition-transform ${showCalendar ? "" : "-rotate-90"}`} fill="currentColor" viewBox="0 0 16 16">
+                <path d="M7.247 11.14 2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z"/>
+              </svg>
+            </div>
+          </button>
+
+          {showCalendar && (
+            <div className="px-4 pb-3">
+              {upcomingCalendarEvents.length === 0 ? (
+                <p className="text-[11px] text-gray-600 text-center pt-1">No upcoming events.</p>
+              ) : (
+                <div className="flex flex-col gap-1">
+                  {upcomingCalendarEvents.map((ev) => (
+                    <button
+                      key={`${ev.reminder_id}-${ev.occurrence_date}`}
+                      onClick={onOpenCalendarTab}
+                      className="w-full flex items-center gap-2 text-left px-2 py-1 rounded-lg hover:bg-[#1a1a24] transition"
+                    >
+                      <span className={`text-[10px] shrink-0 w-12 ${ev.occurrence_date === today ? "text-indigo-400" : "text-gray-600"}`}>
+                        {ev.occurrence_date === today ? "Today" : ev.occurrence_date.slice(5)}
+                      </span>
+                      <span className="text-[11px] text-gray-300 truncate">{ev.text}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── Section 2: Email (shown when connected or records exist) ── */}
       {hasEmail && (
-        <div className="border-b border-[var(--ml-bg-panel)]">
+        <div
+          draggable
+          onDragStart={() => handleSectionDragStart("email")}
+          onDragOver={(e) => { e.preventDefault(); if (sectionDragOver !== "email") setSectionDragOver("email"); }}
+          onDrop={(e) => { e.preventDefault(); handleSectionDrop("email"); }}
+          onDragEnd={handleSectionDragEnd}
+          style={{ order: sectionOrder.indexOf("email") }}
+          className={`border-b border-[var(--ml-bg-panel)] cursor-grab active:cursor-grabbing ${sectionDragOver === "email" ? "ring-1 ring-inset ring-indigo-500/50 bg-indigo-500/5" : ""}`}
+        >
           <button
             onClick={() => setShowEmailReminders((v) => !v)}
             className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-[#1a1a24] transition text-left"
           >
             <div className="flex items-center gap-2">
+              <SectionDragHandle />
               <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 text-blue-400 shrink-0" fill="currentColor" viewBox="0 0 16 16">
                 <path d="M0 4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2zm2-1a1 1 0 0 0-1 1v.217l7 4.2 7-4.2V4a1 1 0 0 0-1-1zm13 2.383-4.708 2.825L15 11.105zm-.034 6.876-5.64-3.471L8 9.583l-1.326-.795-5.64 3.47A1 1 0 0 0 2 13h12a1 1 0 0 0 .966-.741M1 11.105l4.708-2.897L1 5.383z"/>
               </svg>
@@ -669,12 +767,21 @@ export function RightPanel({
 
       {/* ── Section 3: Teams ── */}
       {teamsConnected && (
-        <div className="border-b border-[var(--ml-bg-panel)]">
+        <div
+          draggable
+          onDragStart={() => handleSectionDragStart("teams")}
+          onDragOver={(e) => { e.preventDefault(); if (sectionDragOver !== "teams") setSectionDragOver("teams"); }}
+          onDrop={(e) => { e.preventDefault(); handleSectionDrop("teams"); }}
+          onDragEnd={handleSectionDragEnd}
+          style={{ order: sectionOrder.indexOf("teams") }}
+          className={`border-b border-[var(--ml-bg-panel)] cursor-grab active:cursor-grabbing ${sectionDragOver === "teams" ? "ring-1 ring-inset ring-indigo-500/50 bg-indigo-500/5" : ""}`}
+        >
           <button
             onClick={() => setShowTeams((v) => !v)}
             className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-[#1a1a24] transition text-left"
           >
             <div className="flex items-center gap-2">
+              <SectionDragHandle />
               <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 text-violet-400 shrink-0" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M19.5 5.25a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0M14.25 10.5a2.25 2.25 0 1 0 0-4.5 2.25 2.25 0 0 0 0 4.5M5.25 7.5a2.25 2.25 0 1 0 4.5 0 2.25 2.25 0 0 0-4.5 0m2.25 3a3.75 3.75 0 0 0-3.75 3.75v.75h7.5v-.75A3.75 3.75 0 0 0 7.5 10.5m6.75 1.5a5.26 5.26 0 0 1 1.575.243A3.74 3.74 0 0 1 17.25 15v.75H21V15a3.75 3.75 0 0 0-6.75-2.25z"/>
               </svg>
@@ -778,12 +885,21 @@ export function RightPanel({
 
       {/* ── Section 4: WhatsApp ── */}
       {whatsappConnected && whatsappAvailable && (
-        <div className="border-b border-[var(--ml-bg-panel)]">
+        <div
+          draggable
+          onDragStart={() => handleSectionDragStart("whatsapp")}
+          onDragOver={(e) => { e.preventDefault(); if (sectionDragOver !== "whatsapp") setSectionDragOver("whatsapp"); }}
+          onDrop={(e) => { e.preventDefault(); handleSectionDrop("whatsapp"); }}
+          onDragEnd={handleSectionDragEnd}
+          style={{ order: sectionOrder.indexOf("whatsapp") }}
+          className={`border-b border-[var(--ml-bg-panel)] cursor-grab active:cursor-grabbing ${sectionDragOver === "whatsapp" ? "ring-1 ring-inset ring-indigo-500/50 bg-indigo-500/5" : ""}`}
+        >
           <button
             onClick={() => setShowWhatsapp((v) => !v)}
             className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-[#1a1a24] transition text-left"
           >
             <div className="flex items-center gap-2">
+              <SectionDragHandle />
               <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 text-green-400 shrink-0" fill="currentColor" viewBox="0 0 16 16">
                 <path d="M13.601 2.326A7.85 7.85 0 0 0 7.994 0C3.627 0 .068 3.558.064 7.926c0 1.399.366 2.76 1.057 3.965L0 16l4.204-1.102a7.9 7.9 0 0 0 3.79.965h.004c4.368 0 7.926-3.558 7.93-7.93A7.9 7.9 0 0 0 13.6 2.326zM7.994 14.521a6.6 6.6 0 0 1-3.356-.92l-.24-.144-2.494.654.666-2.433-.156-.251a6.56 6.56 0 0 1-1.007-3.505c0-3.626 2.957-6.584 6.591-6.584a6.56 6.56 0 0 1 4.66 1.931 6.56 6.56 0 0 1 1.928 4.66c-.004 3.639-2.961 6.592-6.592 6.592m3.615-4.934c-.197-.099-1.17-.578-1.353-.646-.182-.065-.315-.099-.445.099-.133.197-.513.646-.627.775-.114.133-.232.148-.43.05-.197-.1-.836-.308-1.592-.985-.59-.525-.985-1.175-1.103-1.372-.114-.198-.011-.304.088-.403.087-.088.197-.232.296-.346.1-.114.133-.198.198-.33.065-.134.034-.248-.015-.347-.05-.099-.445-1.076-.612-1.47-.16-.389-.323-.335-.445-.34-.114-.007-.247-.007-.38-.007a.73.73 0 0 0-.529.247c-.182.198-.691.677-.691 1.654s.71 1.916.81 2.049c.098.133 1.394 2.132 3.383 2.992.47.205.84.326 1.129.418.475.152.904.129 1.246.08.38-.058 1.171-.48 1.338-.943.164-.464.164-.86.114-.943-.049-.084-.182-.133-.38-.232"/>
               </svg>
@@ -867,12 +983,14 @@ export function RightPanel({
         </div>
       )}
 
-      {/* ── Section 5: AI Insights ── */}
+      {/* ── Section 5: AI Insights (always last, not reorderable) ── */}
       {insightsEnabled && (
-        <InsightsPanel
-          workspaceId={workspaceId ?? null}
-          onOpenNote={onOpenNote}
-        />
+        <div style={{ order: 99 }}>
+          <InsightsPanel
+            workspaceId={workspaceId ?? null}
+            onOpenNote={onOpenNote}
+          />
+        </div>
       )}
 
       </div>{/* end scrollable body */}
