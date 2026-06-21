@@ -58,3 +58,15 @@ class ApiRequestContainer:
             note_repo=NoteRepository(self._db),
             embedding_service=None,
         )
+
+    def calendar(self):
+        from memolink_backend.business.services.calendar_service import CalendarService
+        from memolink_backend.business.services.calendar_connector import CalendarConnector
+        from memolink_backend.business.services.gmail_connector import GmailConnector
+        from memolink_backend.domain.repositories.email_account_repository import EmailAccountRepository
+        account_repo = EmailAccountRepository(self._db)
+        return CalendarService(
+            reminder_repo=ReminderRepository(self._db),
+            account_repo=account_repo,
+            calendar_connector=CalendarConnector(GmailConnector(account_repo)),
+        )
