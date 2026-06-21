@@ -3,6 +3,10 @@ import type { WhatsappChat } from "../api/whatsappApi";
 
 export interface OpenWhatsappTab {
   chat: WhatsappChat;
+  // Lives here (in ChatPage's hook state, never unmounted) rather than as local state
+  // inside WhatsappTabContent, so an in-progress reply survives switching to a different
+  // tab type (Chat/Email/Note) and back, which unmounts and remounts WhatsappTabContent.
+  draft: string;
 }
 
 export function useWhatsappTabs() {
@@ -25,10 +29,14 @@ export function useWhatsappTabs() {
         setActiveIndex(existing);
         return prev;
       }
-      const next: OpenWhatsappTab[] = [...prev, { chat }];
+      const next: OpenWhatsappTab[] = [...prev, { chat, draft: "" }];
       setActiveIndex(next.length - 1);
       return next;
     });
+  }
+
+  function setWhatsappDraft(chatId: string, draft: string) {
+    setOpenTabs((prev) => prev.map((t) => (t.chat.id === chatId ? { ...t, draft } : t)));
   }
 
   function closeWhatsappTab(index?: number) {
@@ -59,6 +67,13 @@ export function useWhatsappTabs() {
     setActiveIndex(0);
   }
 
+  // Replaces the whole tab list at once — used to restore tabs saved to localStorage
+  // after a reload or a fresh login, as opposed to opening tabs one at a time.
+  function restoreTabs(tabs: OpenWhatsappTab[], activeIndex: number) {
+    setOpenTabs(tabs);
+    setActiveIndex(tabs.length > 0 ? Math.min(Math.max(activeIndex, 0), tabs.length - 1) : 0);
+  }
+
   function reorderWhatsappTabs(fromIndex: number, toIndex: number) {
     if (fromIndex === toIndex) return;
     setOpenTabs((prev) => {
@@ -83,5 +98,7 @@ export function useWhatsappTabs() {
     closeWhatsappTabById,
     closeAllWhatsappTabs,
     reorderWhatsappTabs,
+    setWhatsappDraft,
+    restoreTabs,
   };
 }

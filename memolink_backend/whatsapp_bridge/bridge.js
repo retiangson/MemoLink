@@ -97,6 +97,48 @@ function extractBody(msg) {
   );
 }
 
+function quotedBody(quotedMsg) {
+  if (!quotedMsg) return null;
+  if (quotedMsg.conversation) return quotedMsg.conversation;
+  if (quotedMsg.extendedTextMessage?.text) return quotedMsg.extendedTextMessage.text;
+  if (quotedMsg.imageMessage) return quotedMsg.imageMessage.caption || "[image]";
+  if (quotedMsg.videoMessage) return quotedMsg.videoMessage.caption || "[video]";
+  if (quotedMsg.audioMessage) return "[voice/audio]";
+  if (quotedMsg.documentMessage) return quotedMsg.documentMessage.fileName || "[document]";
+  if (quotedMsg.stickerMessage) return "[sticker]";
+  if (quotedMsg.buttonsResponseMessage?.selectedDisplayText) return quotedMsg.buttonsResponseMessage.selectedDisplayText;
+  if (quotedMsg.listResponseMessage?.title) return quotedMsg.listResponseMessage.title;
+  return "[message]";
+}
+
+// Quoted/replied-to context lives in contextInfo, nested under whichever message-type
+// container the reply itself is (text reply → extendedTextMessage, media reply → that
+// media's own message object, etc.) — there is no single fixed path.
+function extractQuoted(msg) {
+  const m = msg?.message;
+  if (!m) return null;
+  const ctx =
+    m.extendedTextMessage?.contextInfo ||
+    m.imageMessage?.contextInfo ||
+    m.videoMessage?.contextInfo ||
+    m.audioMessage?.contextInfo ||
+    m.documentMessage?.contextInfo ||
+    m.stickerMessage?.contextInfo ||
+    m.buttonsResponseMessage?.contextInfo ||
+    m.listResponseMessage?.contextInfo ||
+    null;
+  if (!ctx?.quotedMessage) return null;
+
+  const participant = ctx.participant || null;
+  const isMe = !!(participant && sock?.user?.id && jidUser(participant) === jidUser(sock.user.id));
+
+  return {
+    id: ctx.stanzaId || null,
+    senderName: isMe ? "me" : (participant ? displayNameFor(participant) : null),
+    body: quotedBody(ctx.quotedMessage),
+  };
+}
+
 function jidUser(jid) {
   return String(jid || "").replace(/@.*/, "");
 }
@@ -253,6 +295,7 @@ function msgToObj(msg) {
     body:      extractBody(msg),
     mediaType: type,
     timestamp: msg.messageTimestamp ? Number(msg.messageTimestamp) * 1000 : 0,
+    quoted:    extractQuoted(msg),
   };
 }
 

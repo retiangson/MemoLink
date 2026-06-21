@@ -21,6 +21,12 @@ export interface WhatsappChat {
   avatarUrl?: string;
 }
 
+export interface WhatsappQuotedMessage {
+  id: string | null;
+  senderName: string | null;
+  body: string | null;
+}
+
 export interface WhatsappMessage {
   id: string;
   chatId: string;
@@ -31,6 +37,7 @@ export interface WhatsappMessage {
   body: string;
   mediaType: "image" | "video" | "audio" | "document" | "sticker" | null;
   timestamp: number;
+  quoted?: WhatsappQuotedMessage | null;
 }
 
 // In Electron, WhatsApp calls go directly to the local bridge at 127.0.0.1:3797.

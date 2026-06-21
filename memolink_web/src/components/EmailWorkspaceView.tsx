@@ -23,6 +23,8 @@ export function EmailWorkspaceView({ emailAccounts }: EmailWorkspaceViewProps) {
     closeEmailTab,
     closeEmailTabById,
     updateEmailTab,
+    setEmailReplyDraft,
+    setComposeDraft,
   } = useEmailTabs();
 
   if (emailAccounts.length === 0) {
@@ -123,7 +125,12 @@ export function EmailWorkspaceView({ emailAccounts }: EmailWorkspaceViewProps) {
         )}
 
         {active && active.kind === "compose" ? (
-          <EmailComposeTabContent key={active.composeId} accounts={emailAccounts} />
+          <EmailComposeTabContent
+            key={active.composeId}
+            accounts={emailAccounts}
+            draft={active.draft}
+            onDraftChange={(patch) => setComposeDraft(active.composeId, patch)}
+          />
         ) : active ? (
           <EmailTabContent
             key={active.email.gmail_message_id}
@@ -132,6 +139,8 @@ export function EmailWorkspaceView({ emailAccounts }: EmailWorkspaceViewProps) {
             onArchive={handleArchive}
             onTrash={handleTrash}
             onTogglePin={handleTogglePin}
+            replyDraft={active.replyDraft}
+            onReplyDraftChange={setEmailReplyDraft}
           />
         ) : (
           <div className="flex-1 flex items-center justify-center text-gray-600 text-sm">

@@ -6,9 +6,14 @@ import { LANGUAGES } from "../utils/languages";
 import { VideoImportModal } from "./VideoImportModal";
 import { useEmailAttachments } from "../hooks/useEmailAttachments";
 import { EmailAttachmentList } from "./EmailAttachmentList";
+import type { ComposeDraft } from "../hooks/useEmailTabs";
 
 interface EmailComposeTabContentProps {
   accounts: EmailAccount[];
+  // Lifted into the caller's useEmailTabs state (never unmounted) so an in-progress
+  // compose survives switching to a different tab type and back.
+  draft: ComposeDraft;
+  onDraftChange: (patch: Partial<ComposeDraft>) => void;
 }
 
 function stripHtml(html: string): string {
@@ -32,11 +37,15 @@ function textToHtml(text: string): string {
     .join("");
 }
 
-export function EmailComposeTabContent({ accounts }: EmailComposeTabContentProps) {
-  const [fromAccountId, setFromAccountId] = useState<number | undefined>(accounts[0]?.id);
-  const [to, setTo] = useState("");
-  const [subject, setSubject] = useState("");
-  const [body, setBody] = useState("");
+export function EmailComposeTabContent({ accounts, draft, onDraftChange }: EmailComposeTabContentProps) {
+  const fromAccountId = draft.fromAccountId ?? accounts[0]?.id;
+  const setFromAccountId = (v: number | undefined) => onDraftChange({ fromAccountId: v });
+  const to = draft.to;
+  const setTo = (v: string) => onDraftChange({ to: v });
+  const subject = draft.subject;
+  const setSubject = (v: string) => onDraftChange({ subject: v });
+  const body = draft.body;
+  const setBody = (v: string) => onDraftChange({ body: v });
   const [sending, setSending] = useState(false);
   const [result, setResult] = useState<{ ok: boolean; msg: string } | null>(null);
   const [suggesting, setSuggesting] = useState(false);
@@ -49,12 +58,12 @@ export function EmailComposeTabContent({ accounts }: EmailComposeTabContentProps
   const attachments = useEmailAttachments();
 
   const recording = useRecording((text) => {
-    setBody((prev) => `${prev}<p>${escapeHtml(text)}</p>`);
+    setBody(`${body}<p>${escapeHtml(text)}</p>`);
   });
 
   function handleVideoImport(title: string, content: string) {
-    setBody((prev) => `${prev}${content}`);
-    setSubject((prev) => prev || title);
+    setBody(`${body}${content}`);
+    setSubject(subject || title);
     setShowVideoImport(false);
   }
 
