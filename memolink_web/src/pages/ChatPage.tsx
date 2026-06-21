@@ -340,6 +340,25 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
     requestAnimationFrame(() => convs.bottomRef.current?.scrollIntoView({ behavior: "smooth" }));
   }
 
+  // Stage chat/note tab restore on first mount (covers full page reload and a fresh
+  // login, where there's no onSwitchWorkspace click to populate these refs) — runs once,
+  // before the restore-consuming effects below, by virtue of declaration order within
+  // the same effect-commit when activeWorkspaceId first resolves.
+  const initialWsTabRestoreDoneRef = useRef(false);
+  useEffect(() => {
+    if (activeWorkspaceId == null || initialWsTabRestoreDoneRef.current) return;
+    initialWsTabRestoreDoneRef.current = true;
+    try {
+      const raw = localStorage.getItem(`memolink_tabs_ws_${activeWorkspaceId}`);
+      if (raw) {
+        const saved = JSON.parse(raw);
+        const savedTabType = saved.activeTabType === "note" ? "note" : "chat";
+        pendingChatRestoreRef.current = { chatIds: saved.chatIds ?? [], activeChatId: saved.activeChatId ?? null };
+        pendingNoteRestoreRef.current = { wsId: activeWorkspaceId, noteIds: saved.noteIds ?? [], activeNoteId: saved.activeNoteId ?? null, activeTabType: savedTabType };
+      }
+    } catch { /* ignore corrupt saved state */ }
+  }, [activeWorkspaceId]);
+
   useEffect(() => {
     const saved = pendingChatRestoreRef.current;
     pendingChatRestoreRef.current = null;
@@ -382,6 +401,61 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
       setActiveTabType("chat");
     }
   }, [whatsappTabs.openTabs.length]);
+
+  // Continuously snapshot chat/note tabs for the current workspace (not just on
+  // switch-away) so a plain reload also restores them, via the staging effect above.
+  useEffect(() => {
+    if (activeWorkspaceId == null) return;
+    const snapshot = {
+      chatIds: convs.openChats.filter((c) => c.id !== TEMP_ID).map((c) => c.id),
+      activeChatId: convs.activeConversation?.id !== TEMP_ID ? (convs.activeConversation?.id ?? null) : null,
+      noteIds: editor.openNotes.filter((t) => t.note.id !== null).map((t) => t.note.id as number),
+      activeNoteId: editor.active?.note.id ?? null,
+      activeTabType: activeTabType === "note" ? "note" : "chat",
+    };
+    localStorage.setItem(`memolink_tabs_ws_${activeWorkspaceId}`, JSON.stringify(snapshot));
+  }, [activeWorkspaceId, convs.openChats, convs.activeConversation?.id, editor.openNotes, editor.active?.note.id, activeTabType]);
+
+  // Email and WhatsApp tabs aren't tied to a workspace, so they're snapshotted under
+  // their own global keys and restored once on mount (reload or fresh login).
+  useEffect(() => {
+    localStorage.setItem("memolink_tabs_email", JSON.stringify({ tabs: emailTabs.openTabs, activeIndex: emailTabs.activeIndex }));
+  }, [emailTabs.openTabs, emailTabs.activeIndex]);
+
+  useEffect(() => {
+    localStorage.setItem("memolink_tabs_whatsapp", JSON.stringify({ tabs: whatsappTabs.openTabs, activeIndex: whatsappTabs.activeIndex }));
+  }, [whatsappTabs.openTabs, whatsappTabs.activeIndex]);
+
+  useEffect(() => {
+    localStorage.setItem("memolink_active_tab_type", activeTabType);
+  }, [activeTabType]);
+
+  const initialEmailWaRestoreDoneRef = useRef(false);
+  useEffect(() => {
+    if (initialEmailWaRestoreDoneRef.current) return;
+    initialEmailWaRestoreDoneRef.current = true;
+    const desiredTabType = localStorage.getItem("memolink_active_tab_type");
+    try {
+      const raw = localStorage.getItem("memolink_tabs_email");
+      if (raw) {
+        const saved = JSON.parse(raw);
+        if (Array.isArray(saved.tabs) && saved.tabs.length > 0) {
+          emailTabs.restoreTabs(saved.tabs, saved.activeIndex ?? 0);
+          if (desiredTabType === "email") setActiveTabType("email");
+        }
+      }
+    } catch { /* ignore corrupt saved state */ }
+    try {
+      const raw = localStorage.getItem("memolink_tabs_whatsapp");
+      if (raw) {
+        const saved = JSON.parse(raw);
+        if (Array.isArray(saved.tabs) && saved.tabs.length > 0) {
+          whatsappTabs.restoreTabs(saved.tabs, saved.activeIndex ?? 0);
+          if (desiredTabType === "whatsapp") setActiveTabType("whatsapp");
+        }
+      }
+    } catch { /* ignore corrupt saved state */ }
+  }, []);
 
   useEffect(() => {
     if (!spotifyTabOpen && activeTabType === "spotify") {
@@ -834,17 +908,8 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
         onSwitchWorkspace={async (ws: Workspace) => {
           const currentWsId = workspaceHook.activeWorkspace?.id;
           if (currentWsId && currentWsId !== ws.id) {
-            // Snapshot current tabs for the workspace we're leaving
-            const snapshot = {
-              chatIds: convs.openChats.filter((c) => c.id !== TEMP_ID).map((c) => c.id),
-              activeChatId: convs.activeConversation?.id !== TEMP_ID ? (convs.activeConversation?.id ?? null) : null,
-              noteIds: editor.openNotes.filter((t) => t.note.id !== null).map((t) => t.note.id as number),
-              activeNoteId: editor.active?.note.id ?? null,
-              activeTabType,
-            };
-            localStorage.setItem(`memolink_tabs_ws_${currentWsId}`, JSON.stringify(snapshot));
-
-            // Stage restores for the workspace we're entering
+            // Current workspace's tabs are already kept up to date in localStorage by the
+            // continuous snapshot effect above — just stage restores for the workspace we're entering.
             try {
               const raw = localStorage.getItem(`memolink_tabs_ws_${ws.id}`);
               if (raw) {
@@ -1339,25 +1404,35 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
             />
           ) : isEmailActive ? (
             <main className="flex-1 overflow-hidden flex flex-col">
-              {emailTabs.active && (
-                emailTabs.active.kind === "compose" ? (
-                  <EmailComposeTabContent accounts={emailAccounts} />
+              {(() => {
+                const activeEmailTab = emailTabs.active;
+                if (!activeEmailTab) return null;
+                return activeEmailTab.kind === "compose" ? (
+                  <EmailComposeTabContent
+                    accounts={emailAccounts}
+                    draft={activeEmailTab.draft}
+                    onDraftChange={(patch) => emailTabs.setComposeDraft(activeEmailTab.composeId, patch)}
+                  />
                 ) : (
                   <EmailTabContent
-                    email={emailTabs.active.email}
-                    actionLoading={emailActionLoadingId === emailTabs.active.email.gmail_message_id}
+                    email={activeEmailTab.email}
+                    actionLoading={emailActionLoadingId === activeEmailTab.email.gmail_message_id}
                     onArchive={handleEmailArchive}
                     onTrash={handleEmailTrash}
                     onTogglePin={handleEmailTogglePin}
+                    replyDraft={activeEmailTab.replyDraft}
+                    onReplyDraftChange={emailTabs.setEmailReplyDraft}
                   />
-                )
-              )}
+                );
+              })()}
             </main>
           ) : isWhatsappActive ? (
             <main className="flex-1 overflow-hidden flex flex-col">
               {whatsappTabs.active && (
                 <WhatsappTabContent
                   chat={whatsappTabs.active.chat}
+                  draft={whatsappTabs.active.draft}
+                  onDraftChange={whatsappTabs.setWhatsappDraft}
                   onChatDeleted={whatsappTabs.closeWhatsappTabById}
                 />
               )}

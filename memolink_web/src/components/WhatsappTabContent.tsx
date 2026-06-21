@@ -29,6 +29,8 @@ interface TranslationState {
 
 interface WhatsappTabContentProps {
   chat: WhatsappChat;
+  draft: string;
+  onDraftChange: (chatId: string, draft: string) => void;
   onChatDeleted: (chatId: string) => void;
 }
 
@@ -39,14 +41,17 @@ function waInitials(name: string): string {
   return clean.slice(0, 2).toUpperCase();
 }
 
-export function WhatsappTabContent({ chat, onChatDeleted }: WhatsappTabContentProps) {
+export function WhatsappTabContent({ chat, draft, onDraftChange, onChatDeleted }: WhatsappTabContentProps) {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(chat.avatarUrl ?? null);
   const [messages, setMessages] = useState<WhatsappMessage[]>([]);
   const [msgTotal, setMsgTotal] = useState(0);
   const [msgOffset, setMsgOffset] = useState(0);
   const [msgLoading, setMsgLoading] = useState(false);
   const [olderLoading, setOlderLoading] = useState(false);
-  const [reply, setReply] = useState("");
+  // Draft text lives in useWhatsappTabs (owned by ChatPage), not local state, so it
+  // survives this component unmounting when the user switches to a different tab type.
+  const reply = draft;
+  const setReply = (value: string) => onDraftChange(chat.id, value);
   const [sending, setSending] = useState(false);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [suggestLoading, setSuggestLoading] = useState(false);
@@ -69,7 +74,6 @@ export function WhatsappTabContent({ chat, onChatDeleted }: WhatsappTabContentPr
     setMsgTotal(0);
     setMsgOffset(0);
     setSuggestions([]);
-    setReply("");
     setError(null);
     setMsgLoading(true);
     try {
@@ -333,6 +337,14 @@ export function WhatsappTabContent({ chat, onChatDeleted }: WhatsappTabContentPr
                   )}
 
                   <div className="flex flex-col gap-1">
+                    {m.quoted && (
+                      <div className={`rounded-lg border-l-2 border-green-500/40 bg-black/15 px-2.5 py-1.5 max-w-full ${m.fromMe ? "self-end" : "self-start"}`}>
+                        <p className="text-[10px] text-green-400 font-medium truncate">
+                          {m.quoted.senderName === "me" ? "You" : (m.quoted.senderName || "Unknown")}
+                        </p>
+                        <p className="text-[11px] text-gray-500 truncate">{m.quoted.body || "[message]"}</p>
+                      </div>
+                    )}
                     <div className={`rounded-2xl overflow-hidden ${bubbleCls}`}>
                       {isPreviewableImage ? (
                         cachedImg ? (

@@ -17,9 +17,13 @@ interface EmailTabContentProps {
   onArchive: () => Promise<void>;
   onTrash: () => Promise<void>;
   onTogglePin: () => Promise<void>;
+  // Lifted reply draft (lives in the caller's useEmailTabs state, never unmounted) so an
+  // in-progress reply survives switching to a different tab type and back.
+  replyDraft?: string;
+  onReplyDraftChange?: (gmailMessageId: string, draft: string) => void;
 }
 
-export function EmailTabContent({ email, actionLoading, onArchive, onTrash, onTogglePin }: EmailTabContentProps) {
+export function EmailTabContent({ email, actionLoading, onArchive, onTrash, onTogglePin, replyDraft, onReplyDraftChange }: EmailTabContentProps) {
   const [noteResult, setNoteResult] = useState<string | null>(null);
   const [noteSaving, setNoteSaving] = useState(false);
   const tts = useTTS();
@@ -147,6 +151,12 @@ export function EmailTabContent({ email, actionLoading, onArchive, onTrash, onTo
           senderEmail={email.sender_email}
           subject={email.subject}
           defaultOpen={false}
+          value={replyDraft}
+          onChange={
+            onReplyDraftChange
+              ? (v) => onReplyDraftChange(email.gmail_message_id as string, v)
+              : undefined
+          }
         />
 
         {noteResult && (

@@ -1,9 +1,21 @@
 import { useState, useRef } from "react";
 import type { BrowseEmailResult } from "../api/emailApi";
 
+export interface ComposeDraft {
+  fromAccountId?: number;
+  to: string;
+  subject: string;
+  body: string;
+}
+
+const EMPTY_COMPOSE_DRAFT: ComposeDraft = { to: "", subject: "", body: "" };
+
 export type OpenEmailTab =
-  | { kind: "view"; email: BrowseEmailResult }
-  | { kind: "compose"; composeId: string };
+  // replyDraft lives here (in ChatPage's hook state, never unmounted) rather than as
+  // local state inside EmailReplyPanel, so an in-progress reply survives switching to a
+  // different tab type (Chat/WhatsApp/Note) and back, which unmounts/remounts EmailTabContent.
+  | { kind: "view"; email: BrowseEmailResult; replyDraft: string }
+  | { kind: "compose"; composeId: string; draft: ComposeDraft };
 
 export function useEmailTabs() {
   const [openTabs, setOpenTabs] = useState<OpenEmailTab[]>([]);
@@ -25,7 +37,7 @@ export function useEmailTabs() {
         setActiveIndex(existing);
         return prev;
       }
-      const next: OpenEmailTab[] = [...prev, { kind: "view", email }];
+      const next: OpenEmailTab[] = [...prev, { kind: "view", email, replyDraft: "" }];
       setActiveIndex(next.length - 1);
       return next;
     });
@@ -34,10 +46,22 @@ export function useEmailTabs() {
   function openComposeTab() {
     setOpenTabs((prev) => {
       const composeId = `compose-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-      const next: OpenEmailTab[] = [...prev, { kind: "compose", composeId }];
+      const next: OpenEmailTab[] = [...prev, { kind: "compose", composeId, draft: { ...EMPTY_COMPOSE_DRAFT } }];
       setActiveIndex(next.length - 1);
       return next;
     });
+  }
+
+  function setEmailReplyDraft(gmailMessageId: string, replyDraft: string) {
+    setOpenTabs((prev) =>
+      prev.map((t) => (t.kind === "view" && t.email.gmail_message_id === gmailMessageId ? { ...t, replyDraft } : t))
+    );
+  }
+
+  function setComposeDraft(composeId: string, patch: Partial<ComposeDraft>) {
+    setOpenTabs((prev) =>
+      prev.map((t) => (t.kind === "compose" && t.composeId === composeId ? { ...t, draft: { ...t.draft, ...patch } } : t))
+    );
   }
 
   function closeEmailTab(index?: number) {
@@ -76,6 +100,13 @@ export function useEmailTabs() {
     setActiveIndex(0);
   }
 
+  // Replaces the whole tab list at once — used to restore tabs saved to localStorage
+  // after a reload or a fresh login, as opposed to opening tabs one at a time.
+  function restoreTabs(tabs: OpenEmailTab[], activeIndex: number) {
+    setOpenTabs(tabs);
+    setActiveIndex(tabs.length > 0 ? Math.min(Math.max(activeIndex, 0), tabs.length - 1) : 0);
+  }
+
   function reorderEmailTabs(fromIndex: number, toIndex: number) {
     if (fromIndex === toIndex) return;
     setOpenTabs((prev) => {
@@ -102,5 +133,8 @@ export function useEmailTabs() {
     updateEmailTab,
     closeAllEmailTabs,
     reorderEmailTabs,
+    setEmailReplyDraft,
+    setComposeDraft,
+    restoreTabs,
   };
 }

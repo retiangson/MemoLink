@@ -13,11 +13,18 @@ interface EmailReplyPanelProps {
   senderEmail: string;
   subject: string;
   defaultOpen?: boolean;
+  // Optional controlled draft, lifted by callers that need the in-progress reply to
+  // survive this component unmounting (e.g. switching tabs in ChatPage/EmailWorkspaceView).
+  // Falls back to local state when omitted, for modal call sites that don't need this.
+  value?: string;
+  onChange?: (value: string) => void;
 }
 
-export function EmailReplyPanel({ emailRecordId, gmailMessageId, emailAccountId, senderName, senderEmail, subject, defaultOpen = false }: EmailReplyPanelProps) {
+export function EmailReplyPanel({ emailRecordId, gmailMessageId, emailAccountId, senderName, senderEmail, subject, defaultOpen = false, value, onChange }: EmailReplyPanelProps) {
   const [open, setOpen] = useState(defaultOpen);
-  const [replyBody, setReplyBody] = useState("");
+  const [localReplyBody, setLocalReplyBody] = useState("");
+  const replyBody = value !== undefined ? value : localReplyBody;
+  const setReplyBody = onChange ?? setLocalReplyBody;
   const [suggesting, setSuggesting] = useState(false);
   const [sending, setSending] = useState(false);
   const [result, setResult] = useState<{ ok: boolean; msg: string } | null>(null);
@@ -28,7 +35,7 @@ export function EmailReplyPanel({ emailRecordId, gmailMessageId, emailAccountId,
   const attachments = useEmailAttachments();
 
   const recording = useRecording((text) => {
-    setReplyBody((prev) => (prev ? `${prev}\n${text}` : text));
+    setReplyBody(replyBody ? `${replyBody}\n${text}` : text);
   });
 
   async function handleSuggest() {
