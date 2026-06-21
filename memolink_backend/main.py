@@ -41,6 +41,7 @@ from memolink_backend.api.v1 import (
     translate_controller,
     suggest_controller,
     reminder_controller,
+    calendar_controller,
     video_controller,
     workspace_controller,
     feedback_controller,
@@ -784,6 +785,7 @@ app.include_router(transcribe_controller.router, prefix="/api")
 app.include_router(translate_controller.router, prefix="/api")
 app.include_router(suggest_controller.router, prefix="/api")
 app.include_router(reminder_controller.router, prefix="/api")
+app.include_router(calendar_controller.router, prefix="/api")
 app.include_router(video_controller.router, prefix="/api")
 app.include_router(workspace_controller.router, prefix="/api")
 app.include_router(feedback_controller.router, prefix="/api")

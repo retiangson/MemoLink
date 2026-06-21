@@ -20,3 +20,4 @@ class EmailAccount(Base):
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     page_size = Column(Integer, nullable=False, default=25)
     display_name = Column(String(255), nullable=True)
+    granted_scope = Column(Text, nullable=True)  # raw space-separated OAuth scope string returned by Google

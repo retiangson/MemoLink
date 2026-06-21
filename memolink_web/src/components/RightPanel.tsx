@@ -2,7 +2,6 @@
 import type { SuggestionItem } from "../hooks/useSuggestions";
 import { ReminderDetailModal } from "./ReminderDetailModal";
 import { AddReminderModal } from "./AddReminderModal";
-import { buildGoogleCalendarUrl } from "../utils/reminderUtils";
 import { InsightsPanel } from "./InsightsPanel";
 import { listTeamsChats, getTeamsMessages, sendTeamsMessage, chatToNote } from "../api/teamsApi";
 import type { TeamsChat, TeamsMessage } from "../api/teamsApi";
@@ -14,6 +13,7 @@ import { listWhatsappChats, getWhatsappProfilePicture, getWhatsappStatus } from 
 import type { WhatsappChat } from "../api/whatsappApi";
 import { SpotifyMiniPlayer } from "./SpotifyPlayer";
 import type { SpotifyApiTrack, SpotifyRepeatMode } from "../api/connectorsApi";
+import type { CalendarOccurrence } from "../api/calendarApi";
 
 interface RightPanelProps {
   open: boolean;
@@ -61,6 +61,9 @@ interface RightPanelProps {
   onSpotifyCycleRepeat: () => void;
   onSpotifySeek: (positionMs: number) => void;
   onOpenSpotifyTab: () => void;
+  calendarEvents?: CalendarOccurrence[];
+  calendarLoading?: boolean;
+  onOpenCalendarTab?: () => void;
 }
 
 export function RightPanel({
@@ -77,12 +80,13 @@ export function RightPanel({
   spotifyTrack, spotifyQueueTracks, spotifyPlaying, spotifyConnected, spotifyProgressMs, spotifyDurationMs,
   spotifyShuffle, spotifyRepeatMode,
   onSpotifyPrevious, onSpotifyTogglePlay, onSpotifyStop, onSpotifyNext, onSpotifySelectTrack, onSpotifyShuffle, onSpotifyCycleRepeat, onSpotifySeek, onOpenSpotifyTab,
+  calendarEvents = [], calendarLoading, onOpenCalendarTab,
 }: RightPanelProps) {
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState<SuggestionItem | null>(null);
   const [showNoteReminders, setShowNoteReminders] = useState(false);
   const [showEmailReminders, setShowEmailReminders] = useState(false);
-  const [selectedMailTab, setSelectedMailTab] = useState<"all" | number | "calendar">("all");
+  const [selectedMailTab, setSelectedMailTab] = useState<"all" | number>("all");
   const [totalUnreadCount, setTotalUnreadCount] = useState(0);
   const [accountUnreadCounts, setAccountUnreadCounts] = useState<Record<number, number>>({});
   // Optimistic local overrides for account display names, keyed by account id.
@@ -359,19 +363,6 @@ export function RightPanel({
         </div>
 
         <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition">
-          {item.due_date && (
-            <a
-              href={buildGoogleCalendarUrl(item.text, item.description, item.due_date, item.due_time)}
-              target="_blank" rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()}
-              title="Add to Google Calendar"
-              className="w-5 h-5 flex items-center justify-center text-gray-700 hover:text-indigo-400 transition"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" fill="currentColor" viewBox="0 0 16 16">
-                <path d="M3.5 0a.5.5 0 0 1 .5.5V1h8V.5a.5.5 0 0 1 1 0V1h1a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2h1V.5a.5.5 0 0 1 .5-.5M1 4v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V4z"/>
-              </svg>
-            </a>
-          )}
           <button
             onClick={(e) => { e.stopPropagation(); onRemove(item.id); }}
             className="w-5 h-5 flex items-center justify-center text-gray-700 hover:text-red-400 transition text-sm leading-none"
@@ -492,6 +483,59 @@ export function RightPanel({
         )}
       </div>
 
+      {/* ── Section 1.5: Calendar mini-widget ── */}
+      {onOpenCalendarTab && (() => {
+        const now = new Date();
+        const todayISO = [now.getFullYear(), String(now.getMonth() + 1).padStart(2, "0"), String(now.getDate()).padStart(2, "0")].join("-");
+        const todayEvents = calendarEvents.filter((e) => e.occurrence_date === todayISO);
+        const upcoming = calendarEvents
+          .filter((e) => e.occurrence_date >= todayISO && !e.done)
+          .sort((a, b) => a.occurrence_date.localeCompare(b.occurrence_date) || (a.due_time ?? "").localeCompare(b.due_time ?? ""))
+          .slice(0, 3);
+        return (
+          <div className="border-b border-[var(--ml-bg-panel)] px-4 py-3">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={onOpenCalendarTab}
+                  title="Open Calendar"
+                  className="w-5 h-5 flex items-center justify-center rounded-md text-indigo-400 hover:text-white hover:bg-indigo-600/30 transition shrink-0"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 8V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-2m8-5h8m-4-4v8" />
+                  </svg>
+                </button>
+                <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Calendar</span>
+                {calendarLoading && (
+                  <svg className="w-3 h-3 animate-spin text-gray-600" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
+                )}
+              </div>
+              <span className="text-[10px] text-gray-600">
+                {todayEvents.length > 0 ? `${todayEvents.length} today` : "Nothing today"}
+              </span>
+            </div>
+            {upcoming.length === 0 ? (
+              <p className="text-[11px] text-gray-600">No upcoming events.</p>
+            ) : (
+              <div className="flex flex-col gap-1">
+                {upcoming.map((ev) => (
+                  <button
+                    key={`${ev.reminder_id}-${ev.occurrence_date}`}
+                    onClick={onOpenCalendarTab}
+                    className="w-full flex items-center gap-2 text-left px-2 py-1 rounded-lg hover:bg-[#1a1a24] transition"
+                  >
+                    <span className={`text-[10px] shrink-0 w-12 ${ev.occurrence_date === todayISO ? "text-indigo-400" : "text-gray-600"}`}>
+                      {ev.occurrence_date === todayISO ? "Today" : ev.occurrence_date.slice(5)}
+                    </span>
+                    <span className="text-[11px] text-gray-300 truncate">{ev.text}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
       {/* ── Section 2: Email (shown when connected or records exist) ── */}
       {hasEmail && (
         <div className="border-b border-[var(--ml-bg-panel)]">
@@ -582,9 +626,6 @@ export function RightPanel({
                         )}
                       </button>
                     ))}
-                    <button onClick={() => setSelectedMailTab("calendar")} className={mailNavButtonClass(selectedMailTab === "calendar")}>
-                      Calendar
-                    </button>
                   </div>
 
                   {/* All sub-views stay mounted (hidden via CSS, not unmounted) so switching
@@ -618,15 +659,6 @@ export function RightPanel({
                         )}
                       </div>
                     ))}
-
-                    <div style={{ display: selectedMailTab === "calendar" ? "block" : "none" }}>
-                      <div className="rounded-lg px-2.5 py-3 flex items-center gap-2 text-gray-600">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3 shrink-0" fill="currentColor" viewBox="0 0 16 16">
-                          <path d="M3.5 0a.5.5 0 0 1 .5.5V1h8V.5a.5.5 0 0 1 1 0V1h1a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2h1V.5a.5.5 0 0 1 .5-.5M1 4v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V4z"/>
-                        </svg>
-                        <span className="text-[11px]">Calendar — coming soon</span>
-                      </div>
-                    </div>
                   </div>
                 </>
               )}

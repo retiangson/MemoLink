@@ -77,6 +77,9 @@ class RequestContainer:
     def public_agent(self):
         return self.services.get_public_agent_service()
 
+    def calendar(self):
+        return self.services.get_calendar_service()
+
 
 def get_request_container(db: Session = Depends(get_db)) -> RequestContainer:
     return RequestContainer(db)

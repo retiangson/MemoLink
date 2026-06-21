@@ -20,6 +20,10 @@ def _serialize(r: Reminder) -> dict:
         "type": r.type, "done": r.done,
         "due_date": r.due_date, "due_time": r.due_time,
         "email_record_id": getattr(r, "email_record_id", None),
+        "recurrence_rule": getattr(r, "recurrence_rule", None),
+        "end_time": getattr(r, "end_time", None),
+        "all_day": getattr(r, "all_day", False),
+        "source": "google" if getattr(r, "google_event_id", None) else "local",
     }
 
 
@@ -28,6 +32,9 @@ class CreateReminderRequest(BaseModel):
     description: Optional[str] = None
     due_date: Optional[str] = None
     due_time: Optional[str] = None
+    end_time: Optional[str] = None
+    all_day: Optional[bool] = None
+    recurrence_rule: Optional[str] = None
     workspace_id: Optional[int] = None
 
 
@@ -37,6 +44,10 @@ class UpdateReminderRequest(BaseModel):
     description: Optional[str] = None
     due_date: Optional[str] = None
     due_time: Optional[str] = None
+    end_time: Optional[str] = None
+    all_day: Optional[bool] = None
+    recurrence_rule: Optional[str] = None
+    clear_recurrence: Optional[bool] = None
 
 
 @router.get("")
@@ -53,7 +64,7 @@ def list_reminders(
 
 
 @router.post("")
-def create_reminder(
+async def create_reminder(
     req: CreateReminderRequest,
     user_id: int = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -68,21 +79,26 @@ def create_reminder(
         done=False,
         due_date=req.due_date or None,
         due_time=req.due_time or None,
+        end_time=req.end_time or None,
+        all_day=bool(req.all_day),
+        recurrence_rule=req.recurrence_rule or None,
     )
     db.add(reminder)
     db.commit()
     db.refresh(reminder)
     container.evaluation().mark_task(user_id, "create_reminder", "Generate / create a reminder",
                                      "reminder", "reminder", reminder.id)
+    await container.calendar().sync_to_google(user_id, reminder)
     return _serialize(reminder)
 
 
 @router.patch("/{reminder_id}")
-def update_reminder(
+async def update_reminder(
     reminder_id: int,
     req: UpdateReminderRequest,
     user_id: int = Depends(get_current_user),
     db: Session = Depends(get_db),
+    container: RequestContainer = Depends(get_request_container),
 ):
     reminder = db.query(Reminder).filter(Reminder.id == reminder_id, Reminder.user_id == user_id).first()
     if not reminder:
@@ -97,7 +113,16 @@ def update_reminder(
         reminder.due_date = req.due_date or None
     if req.due_time is not None:
         reminder.due_time = req.due_time or None
+    if req.end_time is not None:
+        reminder.end_time = req.end_time or None
+    if req.all_day is not None:
+        reminder.all_day = req.all_day
+    if req.clear_recurrence:
+        reminder.recurrence_rule = None
+    elif req.recurrence_rule is not None:
+        reminder.recurrence_rule = req.recurrence_rule or None
     db.commit()
+    await container.calendar().sync_to_google(user_id, reminder)
     return _serialize(reminder)
 
 
@@ -146,14 +171,16 @@ def detect_reminder_from_message(
 
 
 @router.delete("/{reminder_id}")
-def delete_reminder(
+async def delete_reminder(
     reminder_id: int,
     user_id: int = Depends(get_current_user),
     db: Session = Depends(get_db),
+    container: RequestContainer = Depends(get_request_container),
 ):
     reminder = db.query(Reminder).filter(Reminder.id == reminder_id, Reminder.user_id == user_id).first()
     if not reminder:
         raise HTTPException(status_code=404, detail="Reminder not found")
+    await container.calendar().sync_to_google(user_id, reminder, deleted=True)
     db.delete(reminder)
     db.commit()
     return {"ok": True}

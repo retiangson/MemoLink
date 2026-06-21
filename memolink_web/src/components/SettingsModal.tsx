@@ -10,6 +10,8 @@ import { listConnectors, saveGitHubConnector, getGitHubConnectUrl, deleteGitHubC
 import type { ConnectorSummary } from "../api/connectorsApi";
 import { getWhatsappStatus, startWhatsapp, stopWhatsapp, resetWhatsappSession } from "../api/whatsappApi";
 import type { WhatsappStatus } from "../api/whatsappApi";
+import { getCalendarStatus } from "../api/calendarApi";
+import type { CalendarAccountStatus } from "../api/calendarApi";
 import { EmailReplyPanel } from "./EmailReplyPanel";
 import { PublicAgentsPanel } from "./PublicAgentsPanel";
 import { MODELS } from "../constants/models";
@@ -120,6 +122,7 @@ export function SettingsModal({
   const [actionLoading, setActionLoading] = useState<"note" | "reminder" | null>(null);
   const [actionResult, setActionResult] = useState<string | null>(null);
   const [pageSizeSavingId, setPageSizeSavingId] = useState<number | null>(null);
+  const [calendarAccounts, setCalendarAccounts] = useState<CalendarAccountStatus[]>([]);
   const [connectors, setConnectors] = useState<ConnectorSummary[]>([]);
   const [connectorsLoading, setConnectorsLoading] = useState(false);
   const [connectorsError, setConnectorsError] = useState<string | null>(null);
@@ -137,7 +140,7 @@ export function SettingsModal({
 
   useEffect(() => {
     if (show) {
-      loadProviders(); loadEmailStatus(); loadTeamsStatus(); loadConnectors();
+      loadProviders(); loadEmailStatus(); loadCalendarStatus(); loadTeamsStatus(); loadConnectors();
       getWhatsappStatus().then(setWaStatus).catch(() => {});
       const oauthErr = sessionStorage.getItem("email_oauth_error");
       if (oauthErr) { setEmailConnectError(oauthErr); sessionStorage.removeItem("email_oauth_error"); }
@@ -290,6 +293,13 @@ export function SettingsModal({
       setEmailStatus(status);
       if (status.connected) runAutoProcess();
     } catch { /* silently fail */ }
+  }
+
+  async function loadCalendarStatus() {
+    try {
+      const { accounts } = await getCalendarStatus();
+      setCalendarAccounts(accounts);
+    } catch { /* silently fail - calendar is non-critical */ }
   }
 
   async function loadConnectors() {
@@ -1261,8 +1271,12 @@ export function SettingsModal({
                   <>
                     {/* Connected accounts */}
                     <div className="space-y-1.5">
-                      {emailStatus.accounts.map((acct) => (
-                        <div key={acct.id} className="flex items-center justify-between gap-2">
+                      {emailStatus.accounts.map((acct) => {
+                        const calStatus = calendarAccounts.find((c) => c.id === acct.id);
+                        const calendarConnected = calStatus?.calendar_connected ?? false;
+                        return (
+                        <div key={acct.id} className="space-y-1">
+                        <div className="flex items-center justify-between gap-2">
                           <div className="flex items-center gap-2 min-w-0">
                             <span className="w-2 h-2 rounded-full bg-green-400 shrink-0" />
                             <span className="text-xs text-gray-400 truncate">{acct.email}</span>
@@ -1304,7 +1318,17 @@ export function SettingsModal({
                             </button>
                           </div>
                         </div>
-                      ))}
+                        {!calendarConnected && (
+                          <div className="flex items-center justify-between gap-2 pl-4">
+                            <span className="text-[11px] text-amber-400/80">Calendar access not granted</span>
+                            <button onClick={handleConnectEmail} disabled={emailConnecting} className="text-[11px] text-indigo-400 hover:text-indigo-300 underline underline-offset-2 transition disabled:opacity-50">
+                              {emailConnecting ? "Redirecting…" : "Reconnect for Calendar"}
+                            </button>
+                          </div>
+                        )}
+                        </div>
+                        );
+                      })}
                     </div>
 
                     {/* Sync bar */}

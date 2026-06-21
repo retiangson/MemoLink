@@ -9,6 +9,16 @@ export interface ReminderItem {
   due_date: string | null;
   due_time: string | null;
   email_record_id: number | null;
+  recurrence_rule: string | null;
+  end_time: string | null;
+  all_day: boolean;
+  source: "local" | "google";
+}
+
+export interface CreateReminderOptions {
+  endTime?: string | null;
+  allDay?: boolean;
+  recurrenceRule?: string | null;
 }
 
 export async function listReminders(workspace_id?: number | null): Promise<ReminderItem[]> {
@@ -16,8 +26,26 @@ export async function listReminders(workspace_id?: number | null): Promise<Remin
   return (await api.get("/reminders", { params })).data;
 }
 
-export async function createReminder(text: string, description?: string | null, due_date?: string | null, due_time?: string | null, workspace_id?: number | null): Promise<ReminderItem> {
-  return (await api.post("/reminders", { text, description: description ?? null, due_date: due_date ?? null, due_time: due_time ?? null, workspace_id: workspace_id ?? null })).data;
+export async function createReminder(
+  text: string,
+  description?: string | null,
+  due_date?: string | null,
+  due_time?: string | null,
+  workspace_id?: number | null,
+  options?: CreateReminderOptions
+): Promise<ReminderItem> {
+  return (
+    await api.post("/reminders", {
+      text,
+      description: description ?? null,
+      due_date: due_date ?? null,
+      due_time: due_time ?? null,
+      workspace_id: workspace_id ?? null,
+      end_time: options?.endTime ?? null,
+      all_day: options?.allDay ?? false,
+      recurrence_rule: options?.recurrenceRule ?? null,
+    })
+  ).data;
 }
 
 export async function updateReminderDone(id: number, done: boolean): Promise<ReminderItem> {
@@ -30,6 +58,10 @@ export interface ReminderUpdate {
   description?: string | null;
   due_date?: string | null;
   due_time?: string | null;
+  end_time?: string | null;
+  all_day?: boolean;
+  recurrence_rule?: string | null;
+  clear_recurrence?: boolean;
 }
 
 export async function updateReminder(id: number, fields: ReminderUpdate): Promise<ReminderItem> {

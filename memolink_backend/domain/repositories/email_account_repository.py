@@ -36,6 +36,7 @@ class EmailAccountRepository:
         refresh_token: str,
         token_expiry: Optional[datetime] = None,
         provider: str = "google",
+        granted_scope: Optional[str] = None,
     ) -> EmailAccount:
         row = self.get_by_email(user_id, email_address)
         if row:
@@ -43,6 +44,8 @@ class EmailAccountRepository:
             row.encrypted_refresh_token = encrypt_text(refresh_token)
             row.token_expiry = token_expiry
             row.provider = provider
+            if granted_scope is not None:
+                row.granted_scope = granted_scope
         else:
             row = EmailAccount(
                 user_id=user_id,
@@ -51,6 +54,7 @@ class EmailAccountRepository:
                 encrypted_access_token=encrypt_text(access_token),
                 encrypted_refresh_token=encrypt_text(refresh_token),
                 token_expiry=token_expiry,
+                granted_scope=granted_scope,
             )
             self.db.add(row)
         self.db.commit()

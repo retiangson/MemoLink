@@ -62,10 +62,12 @@ import { OnboardingTour } from "../components/OnboardingTour";
 import { CoreMemoryView } from "../components/CoreMemoryView";
 import { useTheme, THEMES, THEME_META, type Theme } from "../hooks/useTheme";
 import { SpotifyFullPlayer } from "../components/SpotifyPlayer";
+import { CalendarTabContent } from "../components/CalendarTabContent";
+import { useCalendar } from "../hooks/useCalendar";
 
 type WorkspaceHook = ReturnType<typeof useWorkspace>;
 type LayoutMode = "stacked" | "columns" | "rows";
-type TabType = "chat" | "note" | "email" | "spotify" | "whatsapp";
+type TabType = "chat" | "note" | "email" | "spotify" | "whatsapp" | "calendar";
 type DraggableTabType = "chat" | "note" | "email" | "whatsapp";
 
 function getSavedLayout(): LayoutMode {
@@ -122,6 +124,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
   const [whatsappConnected, setWhatsappConnected] = useState(false);
   const [whatsappAvailable, setWhatsappAvailable] = useState(false);
   const [spotifyTabOpen, setSpotifyTabOpen] = useState(false);
+  const [calendarTabOpen, setCalendarTabOpen] = useState(false);
   const [spotifyConnected, setSpotifyConnected] = useState(false);
   const [spotifyPlaybackError, setSpotifyPlaybackError] = useState<string | null>(null);
   const [spotifyShuffle, setSpotifyShuffle] = useState(false);
@@ -293,6 +296,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
 
   const { notes, setNotes, addNote, saveNote, removeNote, reloadNotes } = useNotes(user.id, activeWorkspaceId);
   const suggestions = useSuggestions(activeWorkspaceId);
+  const calendar = useCalendar(activeWorkspaceId);
   const { permission: notifPermission, requestPermission: requestNotifPermission } = useReminderNotifications(suggestions.items);
   const editor = useNoteEditor();
   const convs = useConversations(activeWorkspaceId);
@@ -455,6 +459,10 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
         }
       }
     } catch { /* ignore corrupt saved state */ }
+    if (localStorage.getItem("memolink_calendar_tab_open") === "true") {
+      setCalendarTabOpen(true);
+      if (desiredTabType === "calendar") setActiveTabType("calendar");
+    }
   }, []);
 
   useEffect(() => {
@@ -462,6 +470,16 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
       setActiveTabType("chat");
     }
   }, [spotifyTabOpen, activeTabType]);
+
+  useEffect(() => {
+    if (!calendarTabOpen && activeTabType === "calendar") {
+      setActiveTabType("chat");
+    }
+  }, [calendarTabOpen, activeTabType]);
+
+  useEffect(() => {
+    localStorage.setItem("memolink_calendar_tab_open", String(calendarTabOpen));
+  }, [calendarTabOpen]);
 
   useEffect(() => {
     const close = () => { setMenuData(null); setUserMenuOpen(false); };
@@ -676,6 +694,11 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
     setActiveTabType("spotify");
   }
 
+  function openCalendarInTab() {
+    setCalendarTabOpen(true);
+    setActiveTabType("calendar");
+  }
+
   function spotifyErrorMessage(err: any): string {
     return err?.response?.data?.detail ?? err?.message ?? "Spotify playback failed.";
   }
@@ -824,6 +847,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
   const isEmailActive = activeTabType === "email" && emailTabs.openTabs.length > 0;
   const isSpotifyActive = activeTabType === "spotify" && spotifyTabOpen;
   const isWhatsappActive = activeTabType === "whatsapp" && whatsappTabs.openTabs.length > 0;
+  const isCalendarActive = activeTabType === "calendar" && calendarTabOpen;
 
   const _LEVEL_ORDER: Record<string, number> = { regular: 0, plus: 1, pro: 2 };
   const _userLevel = user.access_level ?? "regular";
@@ -1095,6 +1119,27 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                 <span className="max-w-[120px] truncate">Spotify</span>
                 <button
                   onClick={(e) => { e.stopPropagation(); setSpotifyTabOpen(false); }}
+                  className="text-gray-600 hover:text-gray-300 w-3.5 h-3.5 flex items-center justify-center rounded-sm hover:bg-[var(--ml-bg-hover)] transition leading-none"
+                >
+                  ×
+                </button>
+              </div>
+            )}
+
+            {/* Calendar app tab */}
+            {layoutMode === "stacked" && calendarTabOpen && (
+              <div
+                onClick={() => setActiveTabType("calendar")}
+                className={`flex items-center gap-1.5 px-3 h-10 text-xs cursor-pointer border-b-2 transition shrink-0 select-none ${
+                  activeTabType === "calendar" ? "border-indigo-500 text-white bg-[var(--ml-bg-base)]" : "border-transparent text-gray-500 hover:text-gray-300 hover:bg-[var(--ml-bg-base)]"
+                }`}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3 shrink-0 text-indigo-400" fill="currentColor" viewBox="0 0 16 16">
+                  <path d="M3.5 0a.5.5 0 0 1 .5.5V1h8V.5a.5.5 0 0 1 1 0V1h1a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2h1V.5a.5.5 0 0 1 .5-.5M1 4v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V4z"/>
+                </svg>
+                <span className="max-w-[120px] truncate">Calendar</span>
+                <button
+                  onClick={(e) => { e.stopPropagation(); setCalendarTabOpen(false); }}
                   className="text-gray-600 hover:text-gray-300 w-3.5 h-3.5 flex items-center justify-center rounded-sm hover:bg-[var(--ml-bg-hover)] transition leading-none"
                 >
                   ×
@@ -1402,6 +1447,8 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
               playbackError={spotifyPlaybackError}
               onClearPlaybackError={() => setSpotifyPlaybackError(null)}
             />
+          ) : isCalendarActive ? (
+            <CalendarTabContent calendar={calendar} />
           ) : isEmailActive ? (
             <main className="flex-1 overflow-hidden flex flex-col">
               {(() => {
@@ -1867,6 +1914,9 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
         onSpotifyCycleRepeat={handleSpotifyCycleRepeat}
         onSpotifySeek={handleSpotifySeek}
         onOpenSpotifyTab={openSpotifyInTab}
+        calendarEvents={calendar.events}
+        calendarLoading={calendar.loading}
+        onOpenCalendarTab={openCalendarInTab}
       />
 
       <DeleteModal
