@@ -575,6 +575,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
     if (!title || tab.note.id === null || title === (tab.note.title ?? "")) return;
     const fresh = await updateNote(tab.note.id, title, null);
     editor.syncNoteTitle(tab.note.id, fresh.title ?? title);
+    setNotes((prev) => prev.map((n) => (n.id === tab.note.id ? { ...n, title: fresh.title ?? title } : n)));
   }
 
   // ── Note CRUD ─────────────────────────────────────────────────────────────
