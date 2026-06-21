@@ -317,7 +317,7 @@ export function RichNoteEditor({ value, onChange, noteKey, disabled, editorRef }
       </div>
 
       {/* ── Editor area ─────────────────────────────────────────────── */}
-      <div className="flex-1 overflow-y-auto px-2 py-3 cursor-text" onClick={() => e.commands.focus()}>
+      <div className="flex-1 overflow-y-auto py-3 cursor-text" onClick={() => e.commands.focus()}>
         <EditorContent editor={editor} />
       </div>
     </div>

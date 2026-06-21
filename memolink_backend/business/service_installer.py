@@ -188,6 +188,17 @@ class ServiceInstaller:
         from memolink_backend.business.services.desktop_command_service import DesktopCommandService
         return DesktopCommandService(repo=self._domain.get_desktop_command_repository())
 
+    def get_calendar_service(self):
+        from memolink_backend.business.services.calendar_service import CalendarService
+        from memolink_backend.business.services.calendar_connector import CalendarConnector
+        from memolink_backend.business.services.gmail_connector import GmailConnector
+        account_repo = self._domain.get_email_account_repository()
+        return CalendarService(
+            reminder_repo=self._domain.get_reminder_repository(),
+            account_repo=account_repo,
+            calendar_connector=CalendarConnector(GmailConnector(account_repo)),
+        )
+
     def get_public_agent_service(self):
         from memolink_backend.business.services.public_agent_service import PublicAgentService
         return PublicAgentService(

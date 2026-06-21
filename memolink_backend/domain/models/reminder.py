@@ -16,3 +16,12 @@ class Reminder(Base):
     due_time = Column(String(10), nullable=True)  # 24-h time string, e.g. "11:00"
     email_record_id = Column(Integer, ForeignKey("email_records.id", ondelete="SET NULL"), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    # Calendar fields
+    recurrence_rule = Column(Text, nullable=True)   # RRULE subset string, e.g. "FREQ=WEEKLY;BYDAY=MO;COUNT=10"
+    end_time = Column(String(10), nullable=True)    # 24-h time string, pairs with due_time as event start
+    all_day = Column(Boolean, nullable=False, default=False)
+    google_event_id = Column(String(255), nullable=True, index=True)
+    google_calendar_id = Column(String(255), nullable=True)
+    calendar_account_id = Column(Integer, ForeignKey("email_accounts.id", ondelete="SET NULL"), nullable=True)
+    last_synced_at = Column(DateTime(timezone=True), nullable=True)

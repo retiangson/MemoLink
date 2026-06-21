@@ -22,8 +22,7 @@ interface EmailMessageListProps {
 
 function selectionKey(selection: EmailTreeSelection): string {
   if (selection.kind === "all") return "all";
-  if (selection.kind === "folder") return `folder:${selection.accountId}:${selection.folder}`;
-  return `calendar:${selection.accountId}`;
+  return `folder:${selection.accountId}:${selection.folder}`;
 }
 
 export function EmailMessageList({
@@ -42,15 +41,7 @@ export function EmailMessageList({
   const [error, setError] = useState<string | null>(null);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
 
-  const isCalendar = selection.kind === "calendar";
-
   useEffect(() => {
-    if (isCalendar) {
-      setEmails([]);
-      setNextPageToken(null);
-      setError(null);
-      return;
-    }
     let cancelled = false;
     setLoading(true);
     setError(null);
@@ -77,7 +68,7 @@ export function EmailMessageList({
   }, [selectionKey(selection)]);
 
   async function loadMore() {
-    if (isCalendar || !nextPageToken || loadingMore) return;
+    if (!nextPageToken || loadingMore) return;
     setLoadingMore(true);
     setError(null);
     try {
@@ -143,14 +134,6 @@ export function EmailMessageList({
     } finally {
       setActionLoadingId(null);
     }
-  }
-
-  if (isCalendar) {
-    return (
-      <div className="flex-1 flex items-center justify-center text-gray-500 text-sm">
-        Calendar — coming soon
-      </div>
-    );
   }
 
   return (

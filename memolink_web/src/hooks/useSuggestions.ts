@@ -35,6 +35,10 @@ export function useSuggestions(workspaceId?: number | null) {
         due_date: s.due_date ?? null,
         due_time: s.due_time ?? null,
         email_record_id: null,
+        recurrence_rule: null,
+        end_time: null,
+        all_day: false,
+        source: "local" as const,
       }));
       setItems((prev) => [...newItems, ...prev]);
     } catch {

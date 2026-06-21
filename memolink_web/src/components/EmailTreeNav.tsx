@@ -3,8 +3,7 @@ import type { EmailAccount } from "../api/emailApi";
 
 export type EmailTreeSelection =
   | { kind: "all" }
-  | { kind: "folder"; accountId: number; folder: "inbox" | "outbox" | "drafts" | "trash" }
-  | { kind: "calendar"; accountId: number };
+  | { kind: "folder"; accountId: number; folder: "inbox" | "outbox" | "drafts" | "trash" };
 
 interface EmailTreeNavProps {
   emailAccounts: EmailAccount[];
@@ -19,7 +18,6 @@ function isSameSelection(a: EmailTreeSelection, b: EmailTreeSelection): boolean 
   if (a.kind !== b.kind) return false;
   if (a.kind === "all") return true;
   if (a.kind === "folder" && b.kind === "folder") return a.accountId === b.accountId && a.folder === b.folder;
-  if (a.kind === "calendar" && b.kind === "calendar") return a.accountId === b.accountId;
   return false;
 }
 
@@ -100,12 +98,6 @@ export function EmailTreeNav({ emailAccounts, selection, onSelect }: EmailTreeNa
                   className={rowClass(isSameSelection(selection, { kind: "folder", accountId: account.id, folder: "trash" }))}
                 >
                   Deleted
-                </button>
-                <button
-                  onClick={() => onSelect({ kind: "calendar", accountId: account.id })}
-                  className={rowClass(isSameSelection(selection, { kind: "calendar", accountId: account.id }))}
-                >
-                  Calendar
                 </button>
               </div>
             )}

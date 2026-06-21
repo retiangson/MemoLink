@@ -1,9 +1,9 @@
 ﻿import React, { useEffect, useState } from "react";
 import type { SuggestionItem } from "../hooks/useSuggestions";
-import { buildGoogleCalendarUrl } from "../utils/reminderUtils";
 import { getEmail } from "../api/emailApi";
 import type { EmailRecord } from "../api/emailApi";
 import { EmailReplyPanel } from "./EmailReplyPanel";
+import { describeRecurrence } from "../utils/recurrence";
 
 interface ReminderDetailModalProps {
   item: SuggestionItem | null;
@@ -208,6 +208,26 @@ export function ReminderDetailModal({ item, onClose, onSave, onDelete, onToggleD
             </div>
           )}
 
+          {/* Recurrence / Google sync info */}
+          {(item.recurrence_rule || item.source === "google") && (
+            <div className="flex items-center gap-2 flex-wrap text-xs">
+              {item.recurrence_rule && (
+                <span className="flex items-center gap-1.5 bg-[var(--ml-bg-surface)] border border-[var(--ml-bg-hover)] text-gray-400 px-2.5 py-1 rounded-lg">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3 shrink-0" fill="currentColor" viewBox="0 0 16 16">
+                    <path fillRule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2z"/>
+                    <path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466"/>
+                  </svg>
+                  {describeRecurrence(item.recurrence_rule)}
+                </span>
+              )}
+              {item.source === "google" && (
+                <span className="text-[10px] text-blue-300 bg-blue-500/10 border border-blue-500/20 px-2 py-1 rounded-lg">
+                  Synced with Google Calendar
+                </span>
+              )}
+            </div>
+          )}
+
           {/* Email reply - shown when reminder was created from an email */}
           {linkedEmail && (
             <div className="space-y-2">
@@ -274,20 +294,6 @@ export function ReminderDetailModal({ item, onClose, onSave, onDelete, onToggleD
           </button>
 
           <div className="flex items-center gap-2">
-            {item.due_date && (
-              <a
-                href={buildGoogleCalendarUrl(item.text, item.description, item.due_date, item.due_time)}
-                target="_blank"
-                rel="noopener noreferrer"
-                title="Add to Google Calendar"
-                className="flex items-center gap-1.5 px-3 py-2 text-xs text-gray-400 hover:text-indigo-300 hover:bg-indigo-500/10 rounded-xl transition"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 16 16">
-                  <path d="M3.5 0a.5.5 0 0 1 .5.5V1h8V.5a.5.5 0 0 1 1 0V1h1a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2h1V.5a.5.5 0 0 1 .5-.5M1 4v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V4z"/>
-                </svg>
-                Add to Calendar
-              </a>
-            )}
             <button
               onClick={onClose}
               className="px-4 py-2 text-xs text-gray-400 hover:text-gray-200 hover:bg-[var(--ml-bg-hover)] rounded-xl transition"

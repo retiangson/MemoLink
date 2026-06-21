@@ -94,6 +94,7 @@ SCOPES = " ".join([
     "https://www.googleapis.com/auth/gmail.readonly",
     "https://www.googleapis.com/auth/gmail.send",
     "https://www.googleapis.com/auth/gmail.modify",
+    "https://www.googleapis.com/auth/calendar",
 ])
 
 
@@ -169,6 +170,7 @@ async def oauth_callback(
     token_data = token_resp.json()
     access_token = token_data.get("access_token", "")
     refresh_token = token_data.get("refresh_token", "")
+    granted_scope = token_data.get("scope", "")
     expires_in = token_data.get("expires_in", 3600)
     expiry = datetime.fromtimestamp(time.time() + expires_in, tz=timezone.utc)
 
@@ -186,6 +188,7 @@ async def oauth_callback(
         access_token=access_token,
         refresh_token=refresh_token,
         token_expiry=expiry,
+        granted_scope=granted_scope,
     )
 
     return RedirectResponse(url=f"{settings.frontend_url}?email_connected=1")
@@ -196,13 +199,18 @@ def email_status(
     user_id: int = Depends(get_current_user),
     c: RequestContainer = Depends(get_request_container),
 ):
+    from memolink_backend.business.services.calendar_connector import has_calendar_scope
+
     accounts = c.domain.get_email_account_repository().list_by_user(user_id)
     if not accounts:
         return {"connected": False, "accounts": []}
     return {
         "connected": True,
         "accounts": [
-            {"id": a.id, "email": a.email_address, "provider": a.provider, "page_size": a.page_size, "display_name": a.display_name}
+            {
+                "id": a.id, "email": a.email_address, "provider": a.provider, "page_size": a.page_size,
+                "display_name": a.display_name, "calendar_connected": has_calendar_scope(a.granted_scope),
+            }
             for a in accounts
         ],
     }
