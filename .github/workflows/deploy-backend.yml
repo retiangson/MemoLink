@@ -103,6 +103,13 @@ jobs:
           TEAMS_CLIENT_SECRET: ${{ secrets.TEAMS_CLIENT_SECRET }}
           TEAMS_TENANT_ID: ${{ secrets.TEAMS_TENANT_ID }}
           TEAMS_REDIRECT_URI: ${{ secrets.TEAMS_REDIRECT_URI }}
+          MICROSOFT_CLIENT_ID: ${{ secrets.MICROSOFT_CLIENT_ID }}
+          MICROSOFT_CLIENT_SECRET: ${{ secrets.MICROSOFT_CLIENT_SECRET }}
+          MICROSOFT_TENANT_ID: ${{ secrets.MICROSOFT_TENANT_ID }}
+          MICROSOFT_REDIRECT_URI: ${{ secrets.MICROSOFT_REDIRECT_URI }}
+          ONEDRIVE_BOOKS_FOLDER_ID: ${{ secrets.ONEDRIVE_BOOKS_FOLDER_ID }}
+          ONEDRIVE_BOOKS_FOLDER_PATH: ${{ secrets.ONEDRIVE_BOOKS_FOLDER_PATH }}
+          ONEDRIVE_SYNC_ENABLED: ${{ secrets.ONEDRIVE_SYNC_ENABLED }}
           SPOTIFY_CLIENT_ID: ${{ secrets.SPOTIFY_CLIENT_ID }}
           SPOTIFY_CLIENT_SECRET: ${{ secrets.SPOTIFY_CLIENT_SECRET }}
           SPOTIFY_REDIRECT_URI: ${{ secrets.SPOTIFY_REDIRECT_URI }}
@@ -137,6 +144,13 @@ jobs:
             'TEAMS_CLIENT_SECRET': os.environ.get('TEAMS_CLIENT_SECRET', ''),
             'TEAMS_TENANT_ID': os.environ.get('TEAMS_TENANT_ID', ''),
             'TEAMS_REDIRECT_URI': os.environ.get('TEAMS_REDIRECT_URI', ''),
+            'MICROSOFT_CLIENT_ID': os.environ.get('MICROSOFT_CLIENT_ID') or os.environ.get('TEAMS_CLIENT_ID', ''),
+            'MICROSOFT_CLIENT_SECRET': os.environ.get('MICROSOFT_CLIENT_SECRET') or os.environ.get('TEAMS_CLIENT_SECRET', ''),
+            'MICROSOFT_TENANT_ID': os.environ.get('MICROSOFT_TENANT_ID', ''),
+            'MICROSOFT_REDIRECT_URI': os.environ.get('MICROSOFT_REDIRECT_URI', ''),
+            'ONEDRIVE_BOOKS_FOLDER_ID': os.environ.get('ONEDRIVE_BOOKS_FOLDER_ID', ''),
+            'ONEDRIVE_BOOKS_FOLDER_PATH': os.environ.get('ONEDRIVE_BOOKS_FOLDER_PATH', ''),
+            'ONEDRIVE_SYNC_ENABLED': os.environ.get('ONEDRIVE_SYNC_ENABLED') or 'true',
             'SPOTIFY_CLIENT_ID': os.environ.get('SPOTIFY_CLIENT_ID', ''),
             'SPOTIFY_CLIENT_SECRET': os.environ.get('SPOTIFY_CLIENT_SECRET', ''),
             'SPOTIFY_REDIRECT_URI': os.environ.get('SPOTIFY_REDIRECT_URI', ''),
