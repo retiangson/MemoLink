@@ -92,6 +92,8 @@ def generate_quiz(
         workspace_id=body.workspace_id,
         note_id=body.note_id,
         count=max(1, min(body.count, 30)),
+        quiz_type=body.quiz_type,
+        custom_focus=body.custom_focus,
     )
 
 

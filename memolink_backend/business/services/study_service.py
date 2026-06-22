@@ -287,12 +287,37 @@ class StudyService:
 
     # ── 5. Quiz ────────────────────────────────────────────────────────────────
 
+    QUIZ_TYPE_INSTRUCTIONS = {
+        "reading_comprehension": (
+            "Focus on reading comprehension: ask about main ideas, themes, sequence of events, "
+            "cause and effect, and the meaning of the story/text - not just isolated facts."
+        ),
+        "math_problem_solving": (
+            "Focus on math problem-solving: ask questions that require working through a calculation "
+            "or applying a formula step-by-step, not just recalling a definition."
+        ),
+        "logic_reasoning": (
+            "Focus on logic and reasoning: ask questions that test inference, cause-and-effect, "
+            "and the relationships between ideas in the notes."
+        ),
+        "vocabulary": (
+            "Focus on vocabulary: ask questions that test understanding of key terms and their "
+            "correct meaning or usage in context."
+        ),
+        "critical_thinking": (
+            "Focus on critical thinking: ask questions that require evaluating arguments, comparing "
+            "ideas, or forming a judgment based on the notes."
+        ),
+    }
+
     def generate_quiz(
         self,
         user_id: int,
         workspace_id: int,
         note_id: Optional[int],
         count: int,
+        quiz_type: str = "default",
+        custom_focus: Optional[str] = None,
     ) -> QuizResponse:
         if note_id:
             note = self._notes.get_by_id(note_id)
@@ -313,6 +338,16 @@ class StudyService:
                 for n in notes[:10]
             )
 
+        if quiz_type == "other" and custom_focus:
+            focus_instruction = (
+                f'Focus area requested by the user: "{custom_focus.strip()[:200]}". '
+                'Tailor the question style and explanations to this focus, while still following '
+                'the JSON format above and basing all questions only on the provided notes.\n'
+            )
+        else:
+            focus_instruction = self.QUIZ_TYPE_INSTRUCTIONS.get(quiz_type, "")
+            focus_instruction = f"{focus_instruction}\n" if focus_instruction else ""
+
         client = OpenAI(api_key=settings.openai_api_key)
         sys_prompt = (
             f'Generate a quiz with exactly {count} questions based on the given notes.\n'
@@ -331,6 +366,7 @@ class StudyService:
             '  ]\n'
             '}\n'
             'Use "single" for one correct answer (radio), "multi" for multiple correct answers (checkbox).\n'
+            f'{focus_instruction}'
             'Base questions ONLY on the provided notes. Do not invent facts not in the notes.'
         )
         resp = client.chat.completions.create(

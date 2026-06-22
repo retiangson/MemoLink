@@ -94,6 +94,8 @@ class QuizRequest(BaseModel):
     workspace_id: int
     note_id: Optional[int] = None   # None = all notes
     count: int = 10
+    quiz_type: str = "default"      # "default" | "reading_comprehension" | "math_problem_solving" | "logic_reasoning" | "vocabulary" | "critical_thinking" | "other"
+    custom_focus: Optional[str] = None  # used when quiz_type == "other"
 
 
 class QuizQuestion(BaseModel):

@@ -59,9 +59,21 @@ function SaveNoteButton({ content, title, workspaceId }: { content: string; titl
 
 // ── Quiz tab ──────────────────────────────────────────────────────────────────
 
+const QUIZ_TYPES: { id: string; label: string }[] = [
+  { id: "default",               label: "Default" },
+  { id: "reading_comprehension", label: "Reading Comprehension" },
+  { id: "math_problem_solving",  label: "Math / Problem Solving" },
+  { id: "logic_reasoning",       label: "Logic & Reasoning" },
+  { id: "vocabulary",            label: "Vocabulary" },
+  { id: "critical_thinking",     label: "Critical Thinking" },
+  { id: "other",                 label: "Other (custom)" },
+];
+
 function QuizTab({ workspaceId, notes }: { workspaceId: number | null; notes: Note[] }) {
   const [noteId, setNoteId] = useState<string>("all");
   const [count, setCount] = useState(10);
+  const [quizType, setQuizType] = useState("default");
+  const [customFocus, setCustomFocus] = useState("");
   const [quiz, setQuiz] = useState<QuizData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -70,7 +82,13 @@ function QuizTab({ workspaceId, notes }: { workspaceId: number | null; notes: No
     if (!workspaceId) return;
     setLoading(true); setError(null); setQuiz(null);
     try {
-      const res = await generateQuiz(workspaceId, noteId === "all" ? null : Number(noteId), count);
+      const res = await generateQuiz(
+        workspaceId,
+        noteId === "all" ? null : Number(noteId),
+        count,
+        quizType,
+        quizType === "other" ? customFocus.trim() : undefined,
+      );
       if (!res.questions.length) { setError("No questions generated. Try adding more notes to this workspace."); return; }
       setQuiz(res);
     } catch { setError("Failed to generate quiz. Please try again."); }
@@ -106,9 +124,32 @@ function QuizTab({ workspaceId, notes }: { workspaceId: number | null; notes: No
             {[5, 10, 15, 20, 30].map(n => <option key={n} value={n}>{n} questions</option>)}
           </select>
         </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-[10px] text-gray-600 uppercase tracking-wider">Quiz type</label>
+          <select
+            value={quizType}
+            onChange={e => { setQuizType(e.target.value); setQuiz(null); }}
+            className="bg-[var(--ml-bg-surface)] border border-[var(--ml-bg-hover)] rounded-lg px-2.5 py-1.5 text-xs text-gray-300 focus:outline-none focus:border-indigo-500/50 min-w-[170px]"
+          >
+            {QUIZ_TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
+          </select>
+        </div>
+        {quizType === "other" && (
+          <div className="flex flex-col gap-1 flex-1 min-w-[200px]">
+            <label className="text-[10px] text-gray-600 uppercase tracking-wider">Describe the focus</label>
+            <input
+              type="text"
+              value={customFocus}
+              onChange={e => setCustomFocus(e.target.value)}
+              placeholder="e.g. understand the meaning of the story"
+              maxLength={200}
+              className="bg-[var(--ml-bg-surface)] border border-[var(--ml-bg-hover)] rounded-lg px-2.5 py-1.5 text-xs text-gray-300 placeholder-gray-600 focus:outline-none focus:border-indigo-500/50"
+            />
+          </div>
+        )}
         <button
           onClick={handleGenerate}
-          disabled={loading || !workspaceId}
+          disabled={loading || !workspaceId || (quizType === "other" && !customFocus.trim())}
           className="px-4 py-1.5 text-xs font-medium bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white rounded-lg transition"
         >
           Generate Quiz
