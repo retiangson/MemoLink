@@ -66,7 +66,7 @@ export interface QuizQuestion { id: number; type: "single" | "multi"; question: 
 export interface QuizData { title: string; questions: QuizQuestion[]; }
 
 export async function generateQuiz(workspace_id: number, note_id: number | null, count: number): Promise<QuizData> {
-  const res = await api.post("/study/quiz", { workspace_id, note_id, count });
+  const res = await api.post("/study/quiz", { workspace_id, note_id, count }, { timeout: 60000 });
   return res.data;
 }
 
