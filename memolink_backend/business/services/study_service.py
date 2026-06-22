@@ -139,7 +139,7 @@ class StudyService:
                 "formulas, and testable information. Return JSON: "
                 '{"cards": [{"question": "...", "answer": "..."}, ...]}'
             ),
-            max_tokens=2500,
+            max_tokens=min(4096, 600 + count * 150),
         )
         raw_cards = data.get("cards", [])
         cards = [FlashcardItem(question=c.get("question",""), answer=c.get("answer","")) for c in raw_cards if c.get("question")]
