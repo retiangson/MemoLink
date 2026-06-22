@@ -206,3 +206,31 @@ class ServiceInstaller:
             note_repo=self._domain.get_note_repository(),
             embedding_service=self._domain.get_embedding_service(),
         )
+
+    def get_onedrive_service(self):
+        from memolink_backend.business.services.onedrive_service import OneDriveService
+        return OneDriveService(account_repo=self._domain.get_onedrive_account_repository())
+
+    def get_book_sync_service(self):
+        from memolink_backend.business.services.book_sync_service import BookSyncService
+        return BookSyncService(
+            book_repo=self._domain.get_book_repository(),
+            onedrive_service=self.get_onedrive_service(),
+        )
+
+    def get_book_service(self):
+        from memolink_backend.business.services.book_service import BookService
+        return BookService(
+            book_repo=self._domain.get_book_repository(),
+            user_book_repo=self._domain.get_user_book_repository(),
+        )
+
+    def get_book_note_source_service(self):
+        from memolink_backend.business.services.book_note_source_service import BookNoteSourceService
+        return BookNoteSourceService(
+            book_repo=self._domain.get_book_repository(),
+            user_book_repo=self._domain.get_user_book_repository(),
+            note_repo=self._domain.get_note_repository(),
+            embedding_service=self._domain.get_embedding_service(),
+            onedrive_service=self.get_onedrive_service(),
+        )

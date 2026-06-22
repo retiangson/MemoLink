@@ -61,4 +61,12 @@ class Settings(BaseSettings):
     spotify_client_secret: str = ""
     spotify_redirect_uri: str = "http://127.0.0.1:8000/api/connectors/spotify/callback"
 
+    microsoft_client_id: str = ""
+    microsoft_client_secret: str = ""
+    microsoft_tenant_id: str = ""
+    microsoft_redirect_uri: str = "http://localhost:8000/api/admin/books/onedrive/callback"
+    onedrive_books_folder_id: str = ""
+    onedrive_books_folder_path: str = ""
+    onedrive_sync_enabled: bool = True
+
 settings = Settings()

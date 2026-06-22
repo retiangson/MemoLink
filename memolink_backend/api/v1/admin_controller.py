@@ -34,10 +34,12 @@ DEFAULT_FLAGS: Dict[str, str] = {
     "evaluation_analytics_enabled": "true",
     "evaluation_admin_export_enabled": "true",
     "public_portfolio_agent_enabled": "false",
+    "books_library_enabled": "true",
     "default_model": "gpt-4o-mini",
     "default_language": "English",
     # Minimum access level required per feature
     "web_search_min_level": "regular",
+    "books_library_min_level": "regular",
     "model_selection_min_level": "regular",
     "image_generation_min_level": "regular",
     "translation_min_level": "regular",

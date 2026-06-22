@@ -32,7 +32,11 @@
       {
         "from": "../memolink_backend/whatsapp_bridge",
         "to": "whatsapp_bridge",
-        "filter": ["bridge.js", "package.json", "node_modules/**"]
+        "filter": [
+          "bridge.js",
+          "package.json",
+          "node_modules/**"
+        ]
       },
       {
         "from": "extraResources/node.exe",
@@ -43,7 +47,9 @@
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ]
     },
@@ -80,11 +86,13 @@
     "d3-force": "^3.0.0",
     "docx": "^9.6.1",
     "electron-updater": "^6.8.9",
+    "epubjs": "^0.3.93",
     "highlight.js": "^11.11.1",
     "html-to-docx": "^1.8.0",
     "html2pdf.js": "^0.14.0",
     "katex": "^0.16.25",
     "marked": "^17.0.0",
+    "pdfjs-dist": "^6.0.227",
     "playwright-core": "^1.60.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
