@@ -107,6 +107,18 @@ html, body {
   50% { opacity: 0; }
 }
 
+/* ── Book reader page-turn transition ──────────────────────────────────────── */
+@keyframes ml-page-slide-in-right {
+  from { transform: translateX(36px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+@keyframes ml-page-slide-in-left {
+  from { transform: translateX(-36px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+.ml-page-anim-next { animation: ml-page-slide-in-right 220ms ease-out; }
+.ml-page-anim-prev { animation: ml-page-slide-in-left 220ms ease-out; }
+
 /* ── Custom scrollbars ──────────────────────────────────────────────────────── */
 ::-webkit-scrollbar {
   width: 5px;

@@ -14,6 +14,7 @@ import type { WhatsappChat } from "../api/whatsappApi";
 import { SpotifyMiniPlayer } from "./SpotifyPlayer";
 import type { SpotifyApiTrack, SpotifyRepeatMode } from "../api/connectorsApi";
 import type { CalendarOccurrence } from "../api/calendarApi";
+import type { UserBook } from "../api/booksApi";
 
 interface RightPanelProps {
   open: boolean;
@@ -64,10 +65,15 @@ interface RightPanelProps {
   calendarEvents?: CalendarOccurrence[];
   calendarLoading?: boolean;
   onOpenCalendarTab?: () => void;
+  booksEnabled?: boolean;
+  myBooks?: UserBook[];
+  onOpenBrowseBooks?: () => void;
+  onOpenMyBooks?: () => void;
+  onOpenBookReader?: (bookId: number) => void;
 }
 
-type PanelSectionKey = "reminders" | "calendar" | "email" | "teams" | "whatsapp";
-const DEFAULT_SECTION_ORDER: PanelSectionKey[] = ["reminders", "calendar", "email", "teams", "whatsapp"];
+type PanelSectionKey = "reminders" | "calendar" | "email" | "teams" | "whatsapp" | "books";
+const DEFAULT_SECTION_ORDER: PanelSectionKey[] = ["reminders", "calendar", "email", "teams", "whatsapp", "books"];
 const SECTION_ORDER_STORAGE_KEY = "memolink_panel_section_order";
 
 function loadSectionOrder(): PanelSectionKey[] {
@@ -107,6 +113,7 @@ export function RightPanel({
   spotifyShuffle, spotifyRepeatMode,
   onSpotifyPrevious, onSpotifyTogglePlay, onSpotifyStop, onSpotifyNext, onSpotifySelectTrack, onSpotifyShuffle, onSpotifyCycleRepeat, onSpotifySeek, onOpenSpotifyTab,
   calendarEvents = [], calendarLoading, onOpenCalendarTab,
+  booksEnabled, myBooks = [], onOpenBrowseBooks, onOpenMyBooks, onOpenBookReader,
 }: RightPanelProps) {
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState<SuggestionItem | null>(null);
@@ -123,6 +130,7 @@ export function RightPanel({
   const [editingAccountTabId, setEditingAccountTabId] = useState<number | null>(null);
   const [editingAccountLabel, setEditingAccountLabel] = useState("");
   const [showSpotifyList, setShowSpotifyList] = useState(false);
+  const [showBooks, setShowBooks] = useState(false);
 
   const [sectionOrder, setSectionOrder] = useState<PanelSectionKey[]>(loadSectionOrder);
   const sectionDragRef = useRef<PanelSectionKey | null>(null);
@@ -978,6 +986,79 @@ export function RightPanel({
                   </button>
                 );
               })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Section 4.5: Books ── */}
+      {booksEnabled && (
+        <div
+          draggable
+          onDragStart={() => handleSectionDragStart("books")}
+          onDragOver={(e) => { e.preventDefault(); if (sectionDragOver !== "books") setSectionDragOver("books"); }}
+          onDrop={(e) => { e.preventDefault(); handleSectionDrop("books"); }}
+          onDragEnd={handleSectionDragEnd}
+          style={{ order: sectionOrder.indexOf("books") }}
+          className={`border-b border-[var(--ml-bg-panel)] cursor-grab active:cursor-grabbing ${sectionDragOver === "books" ? "ring-1 ring-inset ring-indigo-500/50 bg-indigo-500/5" : ""}`}
+        >
+          <button
+            onClick={() => setShowBooks((v) => !v)}
+            className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-[#1a1a24] transition text-left"
+          >
+            <div className="flex items-center gap-2">
+              <SectionDragHandle />
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 text-indigo-400 shrink-0" fill="currentColor" viewBox="0 0 16 16">
+                <path d="M1 2.828c.885-.37 2.154-.769 3.388-.893 1.33-.134 2.458.063 3.112.752v9.746c-.935-.53-2.12-.603-3.213-.493-1.18.12-2.37.461-3.287.811zm7.5-.141c.654-.689 1.782-.886 3.112-.752 1.234.124 2.503.523 3.388.893v9.923c-.918-.35-2.107-.692-3.287-.81-1.094-.111-2.278-.039-3.213.492z"/>
+              </svg>
+              <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Books</span>
+              {myBooks.length > 0 && (
+                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-400">
+                  {myBooks.length}
+                </span>
+              )}
+            </div>
+            <svg xmlns="http://www.w3.org/2000/svg" className={`w-3 h-3 text-gray-600 transition-transform ${showBooks ? "" : "-rotate-90"}`} fill="currentColor" viewBox="0 0 16 16">
+              <path d="M7.247 11.14 2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z"/>
+            </svg>
+          </button>
+
+          {showBooks && (
+            <div className="px-4 pb-3 flex flex-col gap-2">
+              <div className="flex gap-2">
+                <button
+                  onClick={onOpenBrowseBooks}
+                  className="flex-1 px-2.5 py-1.5 text-[11px] rounded-lg bg-indigo-600/20 text-indigo-300 hover:bg-indigo-600/30 transition"
+                >
+                  Browse Books
+                </button>
+                <button
+                  onClick={onOpenMyBooks}
+                  className="flex-1 px-2.5 py-1.5 text-[11px] rounded-lg text-gray-400 border border-[var(--ml-bg-hover)] hover:bg-[var(--ml-bg-hover)] transition"
+                >
+                  My Books
+                </button>
+              </div>
+
+              {myBooks.filter((ub) => ub.current_page > 0).length > 0 && (
+                <div className="flex flex-col gap-1 mt-1">
+                  <span className="text-[10px] text-gray-600 uppercase tracking-wider px-0.5">Continue Reading</span>
+                  {myBooks
+                    .filter((ub) => ub.current_page > 0)
+                    .sort((a, b) => (b.last_read_at ?? "").localeCompare(a.last_read_at ?? ""))
+                    .slice(0, 4)
+                    .map((ub) => (
+                      <button
+                        key={ub.id}
+                        onClick={() => onOpenBookReader?.(ub.book_id)}
+                        className="w-full flex items-center gap-2 text-left px-2 py-1 rounded-lg hover:bg-[#1a1a24] transition"
+                      >
+                        <span className="text-[11px] text-gray-300 truncate flex-1">{ub.book?.title ?? `Book #${ub.book_id}`}</span>
+                        <span className="text-[10px] text-gray-600 shrink-0">{Math.round(ub.progress_percent)}%</span>
+                      </button>
+                    ))}
+                </div>
+              )}
             </div>
           )}
         </div>

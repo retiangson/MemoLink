@@ -45,9 +45,11 @@ export type FeatureFlags = {
   evaluation_admin_export_enabled: boolean;
   core_memory_notes_enabled: boolean;
   public_portfolio_agent_enabled: boolean;
+  books_library_enabled: boolean;
   default_model: string;
   default_language: string;
   web_search_min_level: AccessLevel;
+  books_library_min_level: AccessLevel;
   model_selection_min_level: AccessLevel;
   image_generation_min_level: AccessLevel;
   translation_min_level: AccessLevel;
@@ -87,9 +89,11 @@ export function parseFlags(raw: Record<string, string>): FeatureFlags {
     evaluation_admin_export_enabled: raw.evaluation_admin_export_enabled !== "false",
     core_memory_notes_enabled: raw.core_memory_notes_enabled !== "false",
     public_portfolio_agent_enabled: raw.public_portfolio_agent_enabled !== "false",
+    books_library_enabled: raw.books_library_enabled !== "false",
     default_model: raw.default_model ?? "gpt-4o-mini",
     default_language: raw.default_language ?? "English",
     web_search_min_level: (raw.web_search_min_level ?? "regular") as AccessLevel,
+    books_library_min_level: (raw.books_library_min_level ?? "regular") as AccessLevel,
     model_selection_min_level: (raw.model_selection_min_level ?? "regular") as AccessLevel,
     image_generation_min_level: (raw.image_generation_min_level ?? "regular") as AccessLevel,
     translation_min_level: (raw.translation_min_level ?? "regular") as AccessLevel,
@@ -157,9 +161,11 @@ export async function updateAdminFeatures(flags: FeatureFlags): Promise<FeatureF
     evaluation_admin_export_enabled: String(flags.evaluation_admin_export_enabled),
     core_memory_notes_enabled: String(flags.core_memory_notes_enabled),
     public_portfolio_agent_enabled: String(flags.public_portfolio_agent_enabled),
+    books_library_enabled: String(flags.books_library_enabled),
     default_model: flags.default_model,
     default_language: flags.default_language,
     web_search_min_level: flags.web_search_min_level,
+    books_library_min_level: flags.books_library_min_level,
     model_selection_min_level: flags.model_selection_min_level,
     image_generation_min_level: flags.image_generation_min_level,
     translation_min_level: flags.translation_min_level,

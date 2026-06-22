@@ -80,6 +80,18 @@ class RequestContainer:
     def calendar(self):
         return self.services.get_calendar_service()
 
+    def onedrive(self):
+        return self.services.get_onedrive_service()
+
+    def book_sync(self):
+        return self.services.get_book_sync_service()
+
+    def books(self):
+        return self.services.get_book_service()
+
+    def book_note_source(self):
+        return self.services.get_book_note_source_service()
+
 
 def get_request_container(db: Session = Depends(get_db)) -> RequestContainer:
     return RequestContainer(db)

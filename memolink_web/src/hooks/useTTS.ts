@@ -22,6 +22,8 @@ export function useTTS() {
   const cursor = useRef(0);
   const rateRef = useRef<number>(parseFloat(localStorage.getItem(LS_RATE) ?? "1.0"));
   const voiceRef = useRef<SpeechSynthesisVoice | null>(null);
+  // Fired once when the whole sentence queue finishes playing (not on manual stop/pause).
+  const queueEndRef = useRef<(() => void) | null>(null);
 
   // Load voices and restore saved voice - async in some browsers
   useEffect(() => {
@@ -91,24 +93,33 @@ export function useTTS() {
         _speak(cursor.current + 1);
       } else {
         setPlaying(false); setPaused(false); setCurrentSentenceIdx(-1);
+        const cb = queueEndRef.current;
+        queueEndRef.current = null;
+        cb?.();
       }
     };
     u.onerror = () => { setPlaying(false); setPaused(false); setCurrentWord(null); };
     window.speechSynthesis.speak(u);
   }
 
-  function speak(text: string) {
+  /** startIndex lets callers (e.g. "click a sentence to read from here") skip ahead.
+   *  onQueueEnd fires once after the last sentence finishes naturally - used to
+   *  auto-advance to the next page and keep reading. */
+  function speak(text: string, startIndex = 0, onQueueEnd?: () => void) {
     window.speechSynthesis.cancel();
     const sents = splitSentences(text);
     sentences.current = sents;
     setSentencesList(sents);
-    cursor.current = 0;
-    _speak(0);
+    const start = sents.length === 0 ? 0 : Math.min(Math.max(0, startIndex), sents.length - 1);
+    cursor.current = start;
+    queueEndRef.current = onQueueEnd ?? null;
+    _speak(start);
   }
 
   function stop() {
     window.speechSynthesis.cancel();
     sentences.current = []; cursor.current = 0;
+    queueEndRef.current = null;
     setPlaying(false); setPaused(false);
     setCurrentSentenceIdx(-1);
     setCurrentWord(null);

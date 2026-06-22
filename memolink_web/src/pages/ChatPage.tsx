@@ -64,11 +64,16 @@ import { useTheme, THEMES, THEME_META, type Theme } from "../hooks/useTheme";
 import { SpotifyFullPlayer } from "../components/SpotifyPlayer";
 import { CalendarTabContent } from "../components/CalendarTabContent";
 import { useCalendar } from "../hooks/useCalendar";
+import { BooksLibraryModal } from "../components/BooksLibraryModal";
+import { BookReader } from "../components/BookReader";
+import { useBookTabs } from "../hooks/useBookTabs";
+import { listMyBooks, type Book } from "../api/booksApi";
 
 type WorkspaceHook = ReturnType<typeof useWorkspace>;
 type LayoutMode = "stacked" | "columns" | "rows";
-type TabType = "chat" | "note" | "email" | "spotify" | "whatsapp" | "calendar";
+type TabType = "chat" | "note" | "email" | "spotify" | "whatsapp" | "calendar" | "books" | "book";
 type DraggableTabType = "chat" | "note" | "email" | "whatsapp";
+type AdminTab = "feedback" | "features" | "users" | "logs" | "survey" | "evaluation" | "books";
 
 function getSavedLayout(): LayoutMode {
   return (localStorage.getItem("memolink_layout") as LayoutMode) ?? "stacked";
@@ -105,7 +110,12 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
   const prevStreamingRef = useRef(false);
   const [showWorkspaceManager, setShowWorkspaceManager] = useState(false);
   const [showAdmin, setShowAdmin] = useState(false);
+  const [adminInitialTab, setAdminInitialTab] = useState<AdminTab>("feedback");
   const [showFeedback, setShowFeedback] = useState(false);
+  const [booksTabOpen, setBooksTabOpen] = useState(false);
+  const [booksInitialView, setBooksInitialView] = useState<"browse" | "my">("browse");
+  const bookTabs = useBookTabs();
+  const [myBooks, setMyBooks] = useState<import("../api/booksApi").UserBook[]>([]);
   const [chatReminderSuggestion, setChatReminderSuggestion] = useState<{
     text: string; due_date: string | null; due_time: string | null; messageId: number;
   } | null>(null);
@@ -193,6 +203,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
   useEffect(() => {
     loadEmailData();
     getTeamsStatus().then(s => setTeamsConnected(s.connected)).catch(() => {});
+    listMyBooks().then(setMyBooks).catch(() => {});
     listConnectors()
       .then((rows) => setSpotifyConnected(Boolean(rows.find((item) => item.id === "spotify")?.connected)))
       .catch(() => {});
@@ -254,9 +265,17 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
     return () => { cancelled = true; };
   }, [spotifyConnected]);
 
-  // Open Settings after OAuth redirects
+  // Open the relevant modal after OAuth redirects
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+    if (params.get("onedrive_connected") === "1" || params.get("admin") === "books") {
+      if (user.is_admin) {
+        setAdminInitialTab("books");
+        setShowAdmin(true);
+      }
+      window.history.replaceState({}, "", window.location.pathname);
+      return;
+    }
     if (
       params.get("email_connected") === "1" ||
       params.get("teams_connected") === "1" ||
@@ -463,6 +482,10 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
       setCalendarTabOpen(true);
       if (desiredTabType === "calendar") setActiveTabType("calendar");
     }
+    if (localStorage.getItem("memolink_books_tab_open") === "true") {
+      setBooksTabOpen(true);
+      if (desiredTabType === "books") setActiveTabType("books");
+    }
   }, []);
 
   useEffect(() => {
@@ -480,6 +503,23 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
   useEffect(() => {
     localStorage.setItem("memolink_calendar_tab_open", String(calendarTabOpen));
   }, [calendarTabOpen]);
+
+  useEffect(() => {
+    if (!booksTabOpen && activeTabType === "books") {
+      setActiveTabType("chat");
+    }
+  }, [booksTabOpen, activeTabType]);
+
+  useEffect(() => {
+    localStorage.setItem("memolink_books_tab_open", String(booksTabOpen));
+  }, [booksTabOpen]);
+
+  // When all book reader tabs are closed, switch back to chat
+  useEffect(() => {
+    if (bookTabs.openTabs.length === 0 && activeTabType === "book") {
+      setActiveTabType("chat");
+    }
+  }, [bookTabs.openTabs.length, activeTabType]);
 
   useEffect(() => {
     const close = () => { setMenuData(null); setUserMenuOpen(false); };
@@ -709,6 +749,35 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
     setActiveTabType("calendar");
   }
 
+  function openBrowseBooks() {
+    setBooksInitialView("browse");
+    setBooksTabOpen(true);
+    setActiveTabType("books");
+  }
+
+  function openMyBooks() {
+    setBooksInitialView("my");
+    setBooksTabOpen(true);
+    setActiveTabType("books");
+  }
+
+  function openBookTab(book: Book, page: number) {
+    bookTabs.openBookTab(book, page || 1);
+    setActiveTabType("book");
+  }
+
+  function openBookReader(bookId: number) {
+    const ub = myBooks.find((m) => m.book_id === bookId);
+    if (!ub?.book) return;
+    openBookTab(ub.book, ub.current_page || 1);
+  }
+
+  function closeActiveBookTab() {
+    bookTabs.closeBookTab();
+    setBooksTabOpen(true);
+    setActiveTabType("books");
+  }
+
   function spotifyErrorMessage(err: any): string {
     return err?.response?.data?.detail ?? err?.message ?? "Spotify playback failed.";
   }
@@ -858,6 +927,8 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
   const isSpotifyActive = activeTabType === "spotify" && spotifyTabOpen;
   const isWhatsappActive = activeTabType === "whatsapp" && whatsappTabs.openTabs.length > 0;
   const isCalendarActive = activeTabType === "calendar" && calendarTabOpen;
+  const isBooksActive = activeTabType === "books" && booksTabOpen;
+  const isBookReaderActive = activeTabType === "book" && bookTabs.openTabs.length > 0;
 
   const _LEVEL_ORDER: Record<string, number> = { regular: 0, plus: 1, pro: 2 };
   const _userLevel = user.access_level ?? "regular";
@@ -1157,6 +1228,52 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
               </div>
             )}
 
+            {/* Books app tab */}
+            {layoutMode === "stacked" && booksTabOpen && (
+              <div
+                onClick={() => setActiveTabType("books")}
+                className={`flex items-center gap-1.5 px-3 h-10 text-xs cursor-pointer border-b-2 transition shrink-0 select-none ${
+                  activeTabType === "books" ? "border-amber-500 text-white bg-[var(--ml-bg-base)]" : "border-transparent text-gray-500 hover:text-gray-300 hover:bg-[var(--ml-bg-base)]"
+                }`}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3 shrink-0 text-amber-400" fill="currentColor" viewBox="0 0 16 16">
+                  <path d="M1 2.828c.885-.37 2.154-.769 3.388-.893 1.33-.134 2.458.063 3.112.752v9.746c-.935-.53-2.12-.603-3.213-.493-1.18.12-2.37.461-3.287.811zm7.5-.141c.654-.689 1.782-.886 3.112-.752 1.234.124 2.503.523 3.388.893v9.923c-.918-.35-2.107-.692-3.287-.81-1.094-.111-2.278-.039-3.213.492zM8 1.783C7.015.936 5.587.81 4.287.94c-1.514.153-3.042.672-3.994 1.105A.5.5 0 0 0 0 2.5v11a.5.5 0 0 0 .707.455c.882-.4 2.303-.881 3.68-1.02 1.409-.142 2.59.087 3.223.877a.5.5 0 0 0 .78 0c.633-.79 1.814-1.019 3.222-.877 1.378.139 2.8.62 3.681 1.02A.5.5 0 0 0 16 13.5v-11a.5.5 0 0 0-.293-.455c-.952-.433-2.48-.952-3.994-1.105C10.413.809 8.985.936 8 1.783"/>
+                </svg>
+                <span className="max-w-[120px] truncate">Books</span>
+                <button
+                  onClick={(e) => { e.stopPropagation(); setBooksTabOpen(false); }}
+                  className="text-gray-600 hover:text-gray-300 w-3.5 h-3.5 flex items-center justify-center rounded-sm hover:bg-[var(--ml-bg-hover)] transition leading-none"
+                >
+                  ×
+                </button>
+              </div>
+            )}
+
+            {/* Book reader tabs — each opened book gets its own tab */}
+            {layoutMode === "stacked" && bookTabs.openTabs.map((tab, i) => {
+              const isActive = activeTabType === "book" && bookTabs.activeIndex === i;
+              return (
+                <div
+                  key={tab.book.id}
+                  onClick={() => { bookTabs.setActiveIndex(i); setActiveTabType("book"); }}
+                  className={`flex items-center gap-1.5 px-3 h-10 text-xs cursor-pointer border-b-2 transition shrink-0 select-none ${
+                    isActive ? "border-amber-500 text-white bg-[var(--ml-bg-base)]" : "border-transparent text-gray-500 hover:text-gray-300 hover:bg-[var(--ml-bg-base)]"
+                  }`}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3 shrink-0 text-amber-400" fill="currentColor" viewBox="0 0 16 16">
+                    <path d="M1 2.828c.885-.37 2.154-.769 3.388-.893 1.33-.134 2.458.063 3.112.752v9.746c-.935-.53-2.12-.603-3.213-.493-1.18.12-2.37.461-3.287.811zm7.5-.141c.654-.689 1.782-.886 3.112-.752 1.234.124 2.503.523 3.388.893v9.923c-.918-.35-2.107-.692-3.287-.81-1.094-.111-2.278-.039-3.213.492zM8 1.783C7.015.936 5.587.81 4.287.94c-1.514.153-3.042.672-3.994 1.105A.5.5 0 0 0 0 2.5v11a.5.5 0 0 0 .707.455c.882-.4 2.303-.881 3.68-1.02 1.409-.142 2.59.087 3.223.877a.5.5 0 0 0 .78 0c.633-.79 1.814-1.019 3.222-.877 1.378.139 2.8.62 3.681 1.02A.5.5 0 0 0 16 13.5v-11a.5.5 0 0 0-.293-.455c-.952-.433-2.48-.952-3.994-1.105C10.413.809 8.985.936 8 1.783"/>
+                  </svg>
+                  <span className="max-w-[120px] truncate">{tab.book.title}</span>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); bookTabs.closeBookTab(i); }}
+                    className="text-gray-600 hover:text-gray-300 w-3.5 h-3.5 flex items-center justify-center rounded-sm hover:bg-[var(--ml-bg-hover)] transition leading-none"
+                  >
+                    ×
+                  </button>
+                </div>
+              );
+            })}
+
           </div>{/* end scrollable tabs */}
 
           {/* User info - outside overflow so the bell tooltip can extend below freely */}
@@ -1363,7 +1480,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                   {user.is_admin && (
                     <button
                       id="tour-admin-menu"
-                      onClick={() => { setUserMenuOpen(false); setShowAdmin(true); }}
+                      onClick={() => { setUserMenuOpen(false); setAdminInitialTab("feedback"); setShowAdmin(true); }}
                       className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-indigo-400 hover:bg-indigo-500/10 hover:text-indigo-300 transition"
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="currentColor" viewBox="0 0 16 16">
@@ -1459,6 +1576,24 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
             />
           ) : isCalendarActive ? (
             <CalendarTabContent calendar={calendar} />
+          ) : isBooksActive ? (
+            <BooksLibraryModal
+              show
+              onClose={() => setBooksTabOpen(false)}
+              initialView={booksInitialView}
+              onMyBooksChanged={setMyBooks}
+              onOpenBook={openBookTab}
+            />
+          ) : isBookReaderActive ? (
+            bookTabs.active && (
+              <BookReader
+                key={bookTabs.active.book.id}
+                book={bookTabs.active.book}
+                initialPage={bookTabs.active.initialPage}
+                onClose={closeActiveBookTab}
+                onProgress={(page) => bookTabs.updateBookTabPage(bookTabs.active!.book.id, page)}
+              />
+            )
           ) : isEmailActive ? (
             <main className="flex-1 overflow-hidden flex flex-col">
               {(() => {
@@ -1927,6 +2062,11 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
         calendarEvents={calendar.events}
         calendarLoading={calendar.loading}
         onOpenCalendarTab={openCalendarInTab}
+        booksEnabled={flags.books_library_enabled}
+        myBooks={myBooks}
+        onOpenBrowseBooks={openBrowseBooks}
+        onOpenMyBooks={openMyBooks}
+        onOpenBookReader={openBookReader}
       />
 
       <DeleteModal
@@ -1997,7 +2137,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
         />
       )}
 
-      {showAdmin && <AdminPage onClose={() => { setShowAdmin(false); refreshFeedbackCount(); }} currentUserId={user.id} onResetWalkthrough={() => { localStorage.removeItem("memolink_walkthrough_done"); setShowTour(true); setShowAdmin(false); }} />}
+      {showAdmin && <AdminPage initialTab={adminInitialTab} onClose={() => { setShowAdmin(false); refreshFeedbackCount(); }} currentUserId={user.id} onResetWalkthrough={() => { localStorage.removeItem("memolink_walkthrough_done"); setShowTour(true); setShowAdmin(false); }} />}
 
       <OnboardingTour
         run={showTour}

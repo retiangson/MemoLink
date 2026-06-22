@@ -23,9 +23,11 @@ DEFAULT_FLAGS: Dict[str, str] = {
     "evaluation_admin_export_enabled": "true",
     "core_memory_notes_enabled": "true",
     "public_portfolio_agent_enabled": "false",
+    "books_library_enabled": "true",
     "default_model": "gpt-4o-mini",
     "default_language": "English",
     "web_search_min_level": "regular",
+    "books_library_min_level": "regular",
     "model_selection_min_level": "regular",
     "image_generation_min_level": "regular",
     "translation_min_level": "regular",
@@ -42,7 +44,7 @@ _LEVEL_GATED = [
     "web_search", "model_selection",
     "image_generation", "translation", "file_upload", "research_mode",
     "tts", "slash_commands", "custom_api_keys", "video_import",
-    "public_portfolio_agent",
+    "public_portfolio_agent", "books_library",
 ]
 
 

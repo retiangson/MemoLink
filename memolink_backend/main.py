@@ -67,6 +67,8 @@ from memolink_backend.api.v1 import (
     shell_processes_controller,
     whatsapp_controller,
     public_agent_controller,
+    admin_books_controller,
+    books_controller,
 )
 
 # Register all models so SQLAlchemy sees them
@@ -93,6 +95,11 @@ import memolink_backend.domain.models.survey              # noqa: F401
 import memolink_backend.domain.models.evaluation          # noqa: F401
 import memolink_backend.domain.models.desktop_command     # noqa: F401
 import memolink_backend.domain.models.public_agent         # noqa: F401
+import memolink_backend.domain.models.onedrive_account     # noqa: F401
+import memolink_backend.domain.models.book                  # noqa: F401
+import memolink_backend.domain.models.user_book              # noqa: F401
+import memolink_backend.domain.models.book_bookmark           # noqa: F401
+import memolink_backend.domain.models.book_note_source         # noqa: F401
 
 if os.getenv("MEMOLINK_SKIP_DB_BOOTSTRAP") != "1":
     with engine.connect() as _conn:
@@ -642,6 +649,98 @@ if os.getenv("MEMOLINK_SKIP_DB_BOOTSTRAP") != "1":
         _conn.execute(text("INSERT INTO feature_flags (key, value) VALUES ('public_portfolio_agent_enabled', 'false') ON CONFLICT (key) DO NOTHING"))
         _conn.execute(text("INSERT INTO feature_flags (key, value) VALUES ('public_portfolio_agent_min_level', 'regular') ON CONFLICT (key) DO NOTHING"))
         _conn.execute(text("ALTER TABLE public_agents ADD COLUMN IF NOT EXISTS avatar_url TEXT"))
+        # ── Books Library (OneDrive-synced) ─────────────────────────────────
+        _conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS onedrive_accounts (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+                ms_user_id VARCHAR(255) NOT NULL DEFAULT '',
+                display_name VARCHAR(255) NOT NULL DEFAULT '',
+                email VARCHAR(255) NOT NULL DEFAULT '',
+                encrypted_access_token TEXT NOT NULL,
+                encrypted_refresh_token TEXT NOT NULL,
+                token_expiry TIMESTAMPTZ,
+                connected_at TIMESTAMPTZ DEFAULT now(),
+                updated_at TIMESTAMPTZ DEFAULT now()
+            )
+        """))
+        _conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS books (
+                id SERIAL PRIMARY KEY,
+                title VARCHAR(500) NOT NULL,
+                author VARCHAR(255),
+                description TEXT,
+                category VARCHAR(100),
+                tags VARCHAR(500),
+                file_name VARCHAR(500) NOT NULL,
+                file_extension VARCHAR(20),
+                mime_type VARCHAR(150),
+                file_size BIGINT,
+                cover_image_url TEXT,
+                onedrive_drive_id VARCHAR(255) NOT NULL DEFAULT '',
+                onedrive_item_id VARCHAR(255) NOT NULL UNIQUE,
+                onedrive_web_url TEXT,
+                onedrive_share_link TEXT,
+                last_modified TIMESTAMPTZ,
+                is_published BOOLEAN NOT NULL DEFAULT FALSE,
+                sync_status VARCHAR(20) NOT NULL DEFAULT 'synced',
+                sync_error TEXT,
+                created_by_admin_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                created_at TIMESTAMPTZ DEFAULT now(),
+                updated_at TIMESTAMPTZ DEFAULT now()
+            )
+        """))
+        _conn.execute(text("CREATE INDEX IF NOT EXISTS ix_books_onedrive_item_id ON books(onedrive_item_id)"))
+        _conn.execute(text("CREATE INDEX IF NOT EXISTS ix_books_is_published ON books(is_published)"))
+        _conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS user_books (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                book_id INTEGER NOT NULL REFERENCES books(id) ON DELETE CASCADE,
+                status VARCHAR(20) NOT NULL DEFAULT 'borrowed',
+                current_page INTEGER NOT NULL DEFAULT 0,
+                total_pages INTEGER,
+                progress_percent FLOAT NOT NULL DEFAULT 0.0,
+                borrowed_at TIMESTAMPTZ DEFAULT now(),
+                last_read_at TIMESTAMPTZ,
+                completed_at TIMESTAMPTZ,
+                UNIQUE(user_id, book_id)
+            )
+        """))
+        _conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS book_bookmarks (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                book_id INTEGER NOT NULL REFERENCES books(id) ON DELETE CASCADE,
+                page_number INTEGER NOT NULL,
+                note TEXT,
+                created_at TIMESTAMPTZ DEFAULT now()
+            )
+        """))
+        _conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS book_note_sources (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                book_id INTEGER NOT NULL REFERENCES books(id) ON DELETE CASCADE,
+                status VARCHAR(20) NOT NULL DEFAULT 'pending',
+                error_message TEXT,
+                created_at TIMESTAMPTZ DEFAULT now(),
+                updated_at TIMESTAMPTZ DEFAULT now(),
+                UNIQUE(user_id, book_id)
+            )
+        """))
+        _conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS book_note_chunks (
+                id SERIAL PRIMARY KEY,
+                book_note_source_id INTEGER NOT NULL REFERENCES book_note_sources(id) ON DELETE CASCADE,
+                note_id INTEGER NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
+                book_id INTEGER NOT NULL REFERENCES books(id) ON DELETE CASCADE,
+                page_number INTEGER,
+                created_at TIMESTAMPTZ DEFAULT now()
+            )
+        """))
+        _conn.execute(text("CREATE INDEX IF NOT EXISTS ix_book_note_chunks_source ON book_note_chunks(book_note_source_id)"))
+        _conn.execute(text("INSERT INTO feature_flags (key, value) VALUES ('books_library_enabled', 'true') ON CONFLICT (key) DO NOTHING"))
         # Auto-promote first user as admin if none exists
         _conn.execute(text("""
             UPDATE users SET is_admin = TRUE
@@ -812,6 +911,8 @@ app.include_router(shell_processes_controller.router, prefix="/api")
 app.include_router(whatsapp_controller.router, prefix="/api")
 app.include_router(public_agent_controller.router, prefix="/api")
 app.include_router(public_agent_controller.public_router, prefix="/api")
+app.include_router(admin_books_controller.router, prefix="/api")
+app.include_router(books_controller.router, prefix="/api")
 
 # AWS Lambda handler - only active when running inside Lambda
 if os.getenv("AWS_LAMBDA_FUNCTION_NAME"):

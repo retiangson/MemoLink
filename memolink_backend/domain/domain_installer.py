@@ -73,3 +73,15 @@ class DomainInstaller:
     def get_public_agent_repository(self):
         from memolink_backend.domain.repositories.public_agent_repository import PublicAgentRepository
         return PublicAgentRepository(self._db)
+
+    def get_book_repository(self):
+        from memolink_backend.domain.repositories.book_repository import BookRepository
+        return BookRepository(self._db)
+
+    def get_user_book_repository(self):
+        from memolink_backend.domain.repositories.user_book_repository import UserBookRepository
+        return UserBookRepository(self._db)
+
+    def get_onedrive_account_repository(self):
+        from memolink_backend.domain.repositories.onedrive_account_repository import OneDriveAccountRepository
+        return OneDriveAccountRepository(self._db)

@@ -7,6 +7,7 @@ import {
 import { MODELS } from "../constants/models";
 import { AdminSurveyPanel } from "../components/AdminSurveyPanel";
 import { AdminEvaluationPanel } from "../components/AdminEvaluationPanel";
+import { AdminBooksPanel } from "../components/AdminBooksPanel";
 import { getEvaluationParticipants, setUserBudget, resetEvaluationBudget, type ParticipantBudget } from "../api/evaluationApi";
 
 function fmtMMSS(s: number): string {
@@ -14,23 +15,35 @@ function fmtMMSS(s: number): string {
   return `${m}:${String(sec).padStart(2, "0")}`;
 }
 
-type Tab = "feedback" | "features" | "users" | "logs" | "survey" | "evaluation";
+type Tab = "feedback" | "features" | "users" | "logs" | "survey" | "evaluation" | "books";
 
-const _LEVEL_ORDER: Record<string, number> = { regular: 0, plus: 1, pro: 2 };
+type FeatureRow = { key: keyof FeatureFlags; label: string; desc: string; minKey?: keyof FeatureFlags };
 
-const LEVEL_FEATURES: { minKey: keyof FeatureFlags; label: string }[] = [
-  { minKey: "web_search_min_level",       label: "Web Search" },
-  { minKey: "research_mode_min_level",    label: "Research Mode" },
-  { minKey: "image_generation_min_level", label: "Image Generation" },
-  { minKey: "model_selection_min_level",  label: "Model Selection" },
-  { minKey: "translation_min_level",      label: "Translation" },
-  { minKey: "file_upload_min_level",          label: "File Upload" },
-  { minKey: "model_attribution_min_level",    label: "Model Attribution" },
-  { minKey: "tts_min_level",                  label: "Text-to-Speech" },
-  { minKey: "slash_commands_min_level",       label: "Slash Commands" },
-  { minKey: "custom_api_keys_min_level",      label: "Custom API Keys" },
-  { minKey: "video_import_min_level",         label: "Video Import" },
-  { minKey: "public_portfolio_agent_min_level", label: "Public Portfolio Agent" },
+const FEATURES: FeatureRow[] = [
+  { key: "web_search_enabled", label: "Web Search", desc: "Allow users to enable web search in chat", minKey: "web_search_min_level" },
+  { key: "research_mode_enabled", label: "Research Mode", desc: "Allow users to run deep multi-source research analysis", minKey: "research_mode_min_level" },
+  { key: "model_attribution_enabled", label: "Model Attribution", desc: "Show 'replied by [model]' label on each AI message", minKey: "model_attribution_min_level" },
+  { key: "model_selection_enabled", label: "Model Selection", desc: "Allow users to choose the AI model", minKey: "model_selection_min_level" },
+  { key: "image_generation_enabled", label: "Image Generation", desc: "Allow AI image generation in chat", minKey: "image_generation_min_level" },
+  { key: "translation_enabled", label: "Translation", desc: "Show the translate button on chat messages", minKey: "translation_min_level" },
+  { key: "file_upload_enabled", label: "File Upload", desc: "Allow users to attach files to chat", minKey: "file_upload_min_level" },
+  { key: "tts_enabled", label: "Text-to-Speech", desc: "Allow users to read notes and chat aloud with TTS", minKey: "tts_min_level" },
+  { key: "slash_commands_enabled", label: "Slash Commands", desc: "Show the / command autocomplete picker in chat", minKey: "slash_commands_min_level" },
+  { key: "custom_api_keys_enabled", label: "Custom API Keys", desc: "Allow users to add their own AI provider API keys", minKey: "custom_api_keys_min_level" },
+  { key: "video_import_enabled", label: "Video Import", desc: "Allow importing note content from a video URL", minKey: "video_import_min_level" },
+  { key: "books_library_enabled", label: "Books Library", desc: "Browse, borrow, and read OneDrive-synced books, with optional on-demand AI note-source extraction", minKey: "books_library_min_level" },
+  { key: "email_enabled", label: "Email Integration", desc: "Allow users to connect Gmail and sync emails as reminders" },
+  { key: "memograph_enabled", label: "AI Memory Graph", desc: "Show the MemoGraph button to visualize entity relationships across notes" },
+  { key: "proactive_insights_enabled", label: "Proactive Insights", desc: "Enable AI scanning of notes for missed deadlines, action items, and urgency signals" },
+  { key: "confidence_enabled", label: "Answer Confidence", desc: "Show HIGH / MEDIUM / LOW confidence badge on each AI response" },
+  { key: "autopilot_enabled", label: "AutoPilot Routing", desc: "Automatically select the best AI model based on the user's intent" },
+  { key: "study_mode_enabled", label: "Study Mode", desc: "Enable AI Study Mode - flashcards, exam review, study plans, weak topic detection, and summaries" },
+  { key: "timeline_enabled", label: "Meeting/Lecture Timeline", desc: "Show Timeline tab in note editor - chapters, action items, and important moments with timestamps" },
+  { key: "workflow_enabled", label: "Workflow Agent", desc: "Enable Workflow mode - AI proposes actions for user approval before executing" },
+  { key: "evaluation_survey_enabled", label: "Evaluation Survey", desc: "Show \"Take Evaluation Survey\" in the profile menu - research data collection, separate from feedback" },
+  { key: "evaluation_analytics_enabled", label: "Evaluation Analytics", desc: "Collect quantitative evaluation telemetry (session/task timings, AI metrics, ratings). Disabling stops all collection" },
+  { key: "evaluation_admin_export_enabled", label: "Evaluation Export", desc: "Allow admins to export evaluation analytics as CSV/JSON" },
+  { key: "public_portfolio_agent_enabled", label: "Public Portfolio Agent", desc: "Enable embeddable public chat agents that answer visitor questions from notes explicitly marked public. Off by default — no public access until enabled here.", minKey: "public_portfolio_agent_min_level" },
 ];
 
 const TRANSLATE_LANGUAGES = [
@@ -44,11 +57,12 @@ type FbStatus = "all" | "open" | "read" | "resolved";
 interface Props {
   onClose: () => void;
   currentUserId: number;
+  initialTab?: Tab;
   onResetWalkthrough?: () => void;
 }
 
-export function AdminPage({ onClose, currentUserId, onResetWalkthrough }: Props) {
-  const [tab, setTab] = useState<Tab>("feedback");
+export function AdminPage({ onClose, currentUserId, initialTab = "feedback", onResetWalkthrough }: Props) {
+  const [tab, setTab] = useState<Tab>(initialTab);
 
   // Feedback state
   const [feedback, setFeedback] = useState<FeedbackItem[]>([]);
@@ -82,7 +96,6 @@ export function AdminPage({ onClose, currentUserId, onResetWalkthrough }: Props)
   const [flagsLoading, setFlagsLoading] = useState(false);
   const [flagsSaved, setFlagsSaved] = useState(false);
   const [flagsError, setFlagsError] = useState<string | null>(null);
-  const [levelTab, setLevelTab] = useState<AccessLevel>("regular");
 
   const loadLogs = useCallback(async (page = 1) => {
     setLogsLoading(true);
@@ -249,6 +262,7 @@ export function AdminPage({ onClose, currentUserId, onResetWalkthrough }: Props)
           { key: "logs", label: "System Logs", icon: <><path d="M5 0h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h2zm-1 1H3a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H6v2.5a.5.5 0 0 1-.5.5h-2A.5.5 0 0 1 3 4.5V1.5A.5.5 0 0 1 3.5 1H4z"/><path d="M4.5 12.5A.5.5 0 0 1 5 12h6a.5.5 0 0 1 0 1H5a.5.5 0 0 1-.5-.5zm0-2A.5.5 0 0 1 5 10h6a.5.5 0 0 1 0 1H5a.5.5 0 0 1-.5-.5zm0-2A.5.5 0 0 1 5 8h6a.5.5 0 0 1 0 1H5a.5.5 0 0 1-.5-.5z"/></> },
             { key: "survey", label: "Evaluation Survey", icon: <><path d="M9.5 0a.5.5 0 0 1 .5.5.5.5 0 0 0 .5.5.5.5 0 0 1 .5.5V2a.5.5 0 0 1-.5.5h-5A.5.5 0 0 1 5 2v-.5a.5.5 0 0 1 .5-.5.5.5 0 0 0 .5-.5.5.5 0 0 1 .5-.5z"/><path d="M3 2.5a.5.5 0 0 1 .5-.5H4a.5.5 0 0 0 0-1h-.5A1.5 1.5 0 0 0 2 2.5v12A1.5 1.5 0 0 0 3.5 16h9a1.5 1.5 0 0 0 1.5-1.5v-12A1.5 1.5 0 0 0 12.5 1H12a.5.5 0 0 0 0 1h.5a.5.5 0 0 1 .5.5v12a.5.5 0 0 1-.5.5h-9a.5.5 0 0 1-.5-.5z"/></> },
             { key: "evaluation", label: "Evaluation Analytics", icon: <path d="M0 0h1v15h15v1H0zm14.817 3.113a.5.5 0 0 1 .07.704l-4.5 5.5a.5.5 0 0 1-.74.037L7.06 6.767l-3.656 5.027a.5.5 0 0 1-.808-.588l4-5.5a.5.5 0 0 1 .758-.06l2.609 2.61 4.15-5.073a.5.5 0 0 1 .704-.07"/> },
+            { key: "books", label: "Books Library", icon: <path d="M1 2.828c.885-.37 2.154-.769 3.388-.893 1.33-.134 2.458.063 3.112.752v9.746c-.935-.53-2.12-.603-3.213-.493-1.18.12-2.37.461-3.287.811zm7.5-.141c.654-.689 1.782-.886 3.112-.752 1.234.124 2.503.523 3.388.893v9.923c-.918-.35-2.107-.692-3.287-.81-1.094-.111-2.278-.039-3.213.492zM8 1.783C7.015.936 5.587.81 4.287.94c-1.514.153-3.042.672-3.994 1.105A.5.5 0 0 0 0 2.5v11a.5.5 0 0 0 .707.455c.882-.4 2.303-.881 3.68-1.02 1.395-.142 2.59.087 3.223.877a.5.5 0 0 0 .78 0c.633-.79 1.828-1.019 3.223-.877 1.377.139 2.798.62 3.68 1.02A.5.5 0 0 0 16 13.5v-11a.5.5 0 0 0-.293-.455c-.952-.433-2.48-.952-3.994-1.105C10.413.809 8.985.936 8 1.783"/> },
           ] as { key: Tab; label: string; icon: React.ReactNode }[]).map(({ key, label, icon }) => (
             <button
               key={key}
@@ -280,6 +294,9 @@ export function AdminPage({ onClose, currentUserId, onResetWalkthrough }: Props)
 
           {/* EVALUATION ANALYTICS TAB */}
           {tab === "evaluation" && <AdminEvaluationPanel />}
+
+          {/* BOOKS LIBRARY TAB */}
+          {tab === "books" && <AdminBooksPanel />}
 
           {/* FEEDBACK TAB */}
           {tab === "feedback" && (
@@ -474,150 +491,87 @@ export function AdminPage({ onClose, currentUserId, onResetWalkthrough }: Props)
                 <div className="flex items-center justify-center py-12 text-gray-600 text-sm">Loading…</div>
               ) : (
                 <>
-                <div className="space-y-3">
-                  {([
-                    { key: "web_search_enabled", label: "Web Search", desc: "Allow users to enable web search in chat" },
-                    { key: "research_mode_enabled", label: "Research Mode", desc: "Allow users to run deep multi-source research analysis" },
-                    { key: "model_attribution_enabled", label: "Model Attribution", desc: "Show 'replied by [model]' label on each AI message" },
-                    { key: "model_selection_enabled", label: "Model Selection", desc: "Allow users to choose the AI model" },
-                    { key: "image_generation_enabled", label: "Image Generation", desc: "Allow AI image generation in chat" },
-                    { key: "translation_enabled", label: "Translation", desc: "Show the translate button on chat messages" },
-                    { key: "file_upload_enabled", label: "File Upload", desc: "Allow users to attach files to chat" },
-                    { key: "tts_enabled", label: "Text-to-Speech", desc: "Allow users to read notes and chat aloud with TTS" },
-                    { key: "slash_commands_enabled", label: "Slash Commands", desc: "Show the / command autocomplete picker in chat" },
-                    { key: "custom_api_keys_enabled", label: "Custom API Keys", desc: "Allow users to add their own AI provider API keys" },
-                    { key: "video_import_enabled", label: "Video Import", desc: "Allow importing note content from a video URL" },
-                    { key: "email_enabled", label: "Email Integration", desc: "Allow users to connect Gmail and sync emails as reminders" },
-                    { key: "memograph_enabled", label: "AI Memory Graph", desc: "Show the MemoGraph button to visualize entity relationships across notes" },
-                    { key: "proactive_insights_enabled", label: "Proactive Insights", desc: "Enable AI scanning of notes for missed deadlines, action items, and urgency signals" },
-                    { key: "confidence_enabled", label: "Answer Confidence", desc: "Show HIGH / MEDIUM / LOW confidence badge on each AI response" },
-                    { key: "autopilot_enabled", label: "AutoPilot Routing", desc: "Automatically select the best AI model based on the user's intent" },
-                    { key: "study_mode_enabled", label: "Study Mode", desc: "Enable AI Study Mode - flashcards, exam review, study plans, weak topic detection, and summaries" },
-                    { key: "timeline_enabled", label: "Meeting/Lecture Timeline", desc: "Show Timeline tab in note editor - chapters, action items, and important moments with timestamps" },
-                    { key: "workflow_enabled", label: "Workflow Agent", desc: "Enable Workflow mode - AI proposes actions for user approval before executing" },
-                    { key: "evaluation_survey_enabled", label: "Evaluation Survey", desc: "Show \"Take Evaluation Survey\" in the profile menu - research data collection, separate from feedback" },
-                    { key: "evaluation_analytics_enabled", label: "Evaluation Analytics", desc: "Collect quantitative evaluation telemetry (session/task timings, AI metrics, ratings). Disabling stops all collection" },
-                    { key: "evaluation_admin_export_enabled", label: "Evaluation Export", desc: "Allow admins to export evaluation analytics as CSV/JSON" },
-                    { key: "public_portfolio_agent_enabled", label: "Public Portfolio Agent", desc: "Enable embeddable public chat agents that answer visitor questions from notes explicitly marked public. Off by default — no public access until enabled here." },
-                  ] as { key: keyof FeatureFlags; label: string; desc: string }[]).map(({ key, label, desc }) => (
-                    <div key={key} className="flex items-center justify-between px-4 py-3.5 bg-[#1a1a24] border border-[var(--ml-bg-hover)] rounded-xl">
-                      <div>
-                        <p className="text-sm font-medium text-gray-200">{label}</p>
-                        <p className="text-xs text-gray-500 mt-0.5">{desc}</p>
+                <div>
+                  {/* 3-column header: Feature | Enabled | Access Level */}
+                  <div className="hidden sm:grid grid-cols-[1fr_90px_140px] gap-4 px-4 pb-2 text-[10px] font-semibold text-gray-600 uppercase tracking-wider">
+                    <span>Feature</span>
+                    <span className="text-center">Enabled</span>
+                    <span>Access Level</span>
+                  </div>
+
+                  <div className="space-y-2">
+                    {FEATURES.map(({ key, label, desc, minKey }) => (
+                      <div key={key} className="grid grid-cols-[1fr_auto_auto] sm:grid-cols-[1fr_90px_140px] items-center gap-4 px-4 py-3.5 bg-[#1a1a24] border border-[var(--ml-bg-hover)] rounded-xl">
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-gray-200">{label}</p>
+                          <p className="text-xs text-gray-500 mt-0.5">{desc}</p>
+                        </div>
+
+                        <button
+                          onClick={() => setFlags((f) => f ? { ...f, [key]: !f[key as keyof FeatureFlags] } : f)}
+                          className={`relative w-11 h-6 rounded-full transition-colors shrink-0 justify-self-center ${
+                            flags[key] ? "bg-indigo-600" : "bg-[#252533]"
+                          }`}
+                        >
+                          <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
+                            flags[key] ? "translate-x-5" : "translate-x-0"
+                          }`} />
+                        </button>
+
+                        {minKey ? (
+                          <select
+                            value={(flags[minKey] as string) ?? "regular"}
+                            onChange={(e) => setFlags((f) => f ? { ...f, [minKey]: e.target.value as AccessLevel } : f)}
+                            className="bg-[var(--ml-bg-surface)] border border-[var(--ml-bg-hover)] rounded-lg px-2 py-1.5 text-xs text-gray-300 focus:outline-none focus:border-indigo-500/50 shrink-0"
+                          >
+                            <option value="regular">Regular+</option>
+                            <option value="plus">Plus+</option>
+                            <option value="pro">Pro only</option>
+                          </select>
+                        ) : (
+                          <span className="text-xs text-gray-600 shrink-0">All levels</span>
+                        )}
                       </div>
-                      <button
-                        onClick={() => setFlags((f) => f ? { ...f, [key]: !f[key as keyof FeatureFlags] } : f)}
-                        className={`relative w-11 h-6 rounded-full transition-colors shrink-0 ${
-                          flags[key] ? "bg-indigo-600" : "bg-[#252533]"
-                        }`}
-                      >
-                        <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
-                          flags[key] ? "translate-x-5" : "translate-x-0"
-                        }`} />
-                      </button>
-                    </div>
-                  ))}
-
-                  {/* Default model dropdown */}
-                  <div className="flex items-center justify-between px-4 py-3.5 bg-[#1a1a24] border border-[var(--ml-bg-hover)] rounded-xl">
-                    <div>
-                      <p className="text-sm font-medium text-gray-200">Default Model</p>
-                      <p className="text-xs text-gray-500 mt-0.5">The model used when model selection is disabled, or as the default</p>
-                    </div>
-                    <select
-                      value={flags.default_model}
-                      onChange={(e) => setFlags((f) => f ? { ...f, default_model: e.target.value } : f)}
-                      className="bg-[var(--ml-bg-surface)] border border-[var(--ml-bg-hover)] rounded-lg px-2.5 py-1.5 text-xs text-gray-300 focus:outline-none focus:border-indigo-500/50 max-w-[200px]"
-                    >
-                      {MODELS.map((m) => (
-                        <option key={m.id} value={m.id}>{m.label}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Default language dropdown */}
-                  <div className="flex items-center justify-between px-4 py-3.5 bg-[#1a1a24] border border-[var(--ml-bg-hover)] rounded-xl">
-                    <div>
-                      <p className="text-sm font-medium text-gray-200">Default Translation Language</p>
-                      <p className="text-xs text-gray-500 mt-0.5">Pre-selected language in the translate picker</p>
-                    </div>
-                    <select
-                      value={flags.default_language}
-                      onChange={(e) => setFlags((f) => f ? { ...f, default_language: e.target.value } : f)}
-                      className="bg-[var(--ml-bg-surface)] border border-[var(--ml-bg-hover)] rounded-lg px-2.5 py-1.5 text-xs text-gray-300 focus:outline-none focus:border-indigo-500/50"
-                    >
-                      {TRANSLATE_LANGUAGES.map((l) => (
-                        <option key={l} value={l}>{l}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                {/* Access Level Requirements - tabbed */}
-                <div className="mt-8">
-                  <h3 className="text-sm font-semibold text-gray-200 mb-1">Access Level Requirements</h3>
-                  <p className="text-xs text-gray-500 mb-4">Configure which features each tier can access. Pro always inherits everything enabled for Plus and Regular.</p>
-
-                  {/* Level tab bar */}
-                  <div className="flex gap-1 mb-4 bg-[var(--ml-bg-surface)] p-1 rounded-xl w-fit border border-[var(--ml-bg-hover)]">
-                    {(["regular", "plus", "pro"] as const).map((lvl) => (
-                      <button
-                        key={lvl}
-                        onClick={() => setLevelTab(lvl)}
-                        className={`px-5 py-1.5 rounded-lg text-xs font-medium transition capitalize ${
-                          levelTab === lvl
-                            ? lvl === "pro"
-                              ? "bg-purple-600 text-white"
-                              : lvl === "plus"
-                                ? "bg-sky-600 text-white"
-                                : "bg-indigo-600 text-white"
-                            : "text-gray-400 hover:text-gray-200"
-                        }`}
-                      >
-                        {lvl.charAt(0).toUpperCase() + lvl.slice(1)}
-                      </button>
                     ))}
+
+                    {/* Default model dropdown */}
+                    <div className="flex items-center justify-between px-4 py-3.5 bg-[#1a1a24] border border-[var(--ml-bg-hover)] rounded-xl">
+                      <div>
+                        <p className="text-sm font-medium text-gray-200">Default Model</p>
+                        <p className="text-xs text-gray-500 mt-0.5">The model used when model selection is disabled, or as the default</p>
+                      </div>
+                      <select
+                        value={flags.default_model}
+                        onChange={(e) => setFlags((f) => f ? { ...f, default_model: e.target.value } : f)}
+                        className="bg-[var(--ml-bg-surface)] border border-[var(--ml-bg-hover)] rounded-lg px-2.5 py-1.5 text-xs text-gray-300 focus:outline-none focus:border-indigo-500/50 max-w-[200px]"
+                      >
+                        {MODELS.map((m) => (
+                          <option key={m.id} value={m.id}>{m.label}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Default language dropdown */}
+                    <div className="flex items-center justify-between px-4 py-3.5 bg-[#1a1a24] border border-[var(--ml-bg-hover)] rounded-xl">
+                      <div>
+                        <p className="text-sm font-medium text-gray-200">Default Translation Language</p>
+                        <p className="text-xs text-gray-500 mt-0.5">Pre-selected language in the translate picker</p>
+                      </div>
+                      <select
+                        value={flags.default_language}
+                        onChange={(e) => setFlags((f) => f ? { ...f, default_language: e.target.value } : f)}
+                        className="bg-[var(--ml-bg-surface)] border border-[var(--ml-bg-hover)] rounded-lg px-2.5 py-1.5 text-xs text-gray-300 focus:outline-none focus:border-indigo-500/50"
+                      >
+                        {TRANSLATE_LANGUAGES.map((l) => (
+                          <option key={l} value={l}>{l}</option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
 
-                  {levelTab === "pro" ? (
-                    <div className="flex items-center gap-2 px-4 py-3 bg-purple-500/5 border border-purple-500/20 rounded-xl text-xs text-purple-300">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 shrink-0" fill="currentColor" viewBox="0 0 16 16">
-                        <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16"/>
-                        <path d="m8.93 6.588-2.29.287-.082.38.45.083c.294.07.352.176.288.469l-.738 3.468c-.194.897.105 1.319.808 1.319.545 0 1.178-.252 1.465-.598l.088-.416c-.2.176-.492.246-.686.246-.275 0-.375-.193-.304-.533zM9 4.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0"/>
-                      </svg>
-                      Pro tier always has access to all features enabled for Regular and Plus. Use the global toggles above to disable a feature for everyone.
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      {LEVEL_FEATURES.map(({ minKey, label }) => {
-                        const minLevel = (flags[minKey] as string) ?? "regular";
-                        const isOn = _LEVEL_ORDER[levelTab] >= _LEVEL_ORDER[minLevel];
-                        return (
-                          <div key={minKey} className="flex items-center justify-between px-4 py-3 bg-[#1a1a24] border border-[var(--ml-bg-hover)] rounded-xl">
-                            <div>
-                              <p className="text-sm text-gray-300">{label}</p>
-                              {!isOn && (
-                                <p className="text-[10px] text-gray-600 mt-0.5">
-                                  Requires {minLevel} or higher
-                                </p>
-                              )}
-                            </div>
-                            <button
-                              onClick={() => {
-                                const nextMinLevel = isOn
-                                  ? (levelTab === "regular" ? "plus" : "pro")
-                                  : levelTab;
-                                setFlags((f) => f ? { ...f, [minKey]: nextMinLevel } : f);
-                              }}
-                              className={`relative w-10 h-5 rounded-full transition-colors shrink-0 ${isOn ? "bg-indigo-600" : "bg-[#252533]"}`}
-                            >
-                              <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${isOn ? "translate-x-5" : "translate-x-0"}`} />
-                            </button>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
+                  <p className="text-[11px] text-gray-600 mt-3">
+                    Access Level sets the minimum tier required to use a feature (Pro always includes everything Plus/Regular have). Features with no tier requirement show "All levels".
+                  </p>
                 </div>
                 </>
               )}
