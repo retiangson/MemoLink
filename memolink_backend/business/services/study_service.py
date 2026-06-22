@@ -339,7 +339,8 @@ class StudyService:
                 {"role": "system", "content": sys_prompt},
                 {"role": "user",   "content": context},
             ],
-            max_tokens=3000,
+            max_tokens=min(4096, 800 + count * 220),
+            response_format={"type": "json_object"},
         )
         raw = (resp.choices[0].message.content or "").strip()
         raw = re.sub(r"^```(?:json)?\s*", "", raw)
