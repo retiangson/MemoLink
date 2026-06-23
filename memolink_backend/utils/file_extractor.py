@@ -367,11 +367,14 @@ def _pdf_to_html(file_bytes: bytes) -> str:
     return "".join(parts)
 
 
-def _pptx_to_html(file_bytes: bytes) -> str:
+def extract_pptx_slides(file_bytes: bytes) -> list[str]:
+    """Returns one HTML fragment per slide (title + bullet text + embedded images).
+    Used both for the book-style HTML export below and for the Books Library's
+    slide-by-slide PPTX reader, since there's no LibreOffice-free way to render
+    PPTX visually — this is the practical, Lambda-compatible alternative."""
     from pptx import Presentation
     prs = Presentation(io.BytesIO(file_bytes))
-    parts = []
-    total = len(prs.slides)
+    slides_html: list[str] = []
     for slide_num, slide in enumerate(prs.slides, 1):
         title_text = None
         content_items: list[tuple[int, str]] = []
@@ -398,7 +401,7 @@ def _pptx_to_html(file_bytes: bytes) -> str:
                     text = para.text.strip()
                     if text:
                         content_items.append((para.level, text))
-        parts.append(f"<h2>{_html.escape(title_text or f'Slide {slide_num}')}</h2>")
+        parts = [f"<h2>{_html.escape(title_text or f'Slide {slide_num}')}</h2>"]
         if content_items:
             items_html = "".join(
                 f"<li>{'&nbsp;&nbsp;' * level}{_html.escape(text)}</li>"
@@ -406,9 +409,12 @@ def _pptx_to_html(file_bytes: bytes) -> str:
             )
             parts.append(f"<ul>{items_html}</ul>")
         parts.extend(slide_images)
-        if slide_num < total:
-            parts.append("<hr>")
-    return "".join(parts)
+        slides_html.append("".join(parts))
+    return slides_html
+
+
+def _pptx_to_html(file_bytes: bytes) -> str:
+    return "<hr>".join(extract_pptx_slides(file_bytes))
 
 
 def extract_formatted_html(file_bytes: bytes, filename: str) -> str:

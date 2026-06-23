@@ -1,9 +1,14 @@
 import React, { useEffect, useState } from "react";
 import { saveAsNoteSource, getNoteSourceStatus, type Book, type BookNoteSourceStatus } from "../api/booksApi";
-import { getBookFormat } from "./book-readers/format";
+import { getBookFormat, type HighlightAnchor } from "./book-readers/format";
 import { PdfReaderView } from "./book-readers/PdfReaderView";
 import { EpubReaderView } from "./book-readers/EpubReaderView";
+import { PptxReaderView } from "./book-readers/PptxReaderView";
 import { AudioReaderView } from "./book-readers/AudioReaderView";
+import { TxtReaderView } from "./book-readers/TxtReaderView";
+import { CaptionReaderView } from "./book-readers/CaptionReaderView";
+import { ComicReaderView } from "./book-readers/ComicReaderView";
+import { MobiReaderView } from "./book-readers/MobiReaderView";
 import { ColorModePicker } from "./ColorModePicker";
 import { useReaderColorMode } from "../hooks/useReaderColorMode";
 
@@ -13,9 +18,11 @@ interface Props {
   onClose: () => void;
   onProgress?: (currentPage: number, totalPages: number) => void;
   onAskAI?: (book: Book) => void;
+  jumpToHighlight?: HighlightAnchor | null;
+  onJumpToHighlightHandled?: () => void;
 }
 
-export function BookReader({ book, initialPage, onClose, onProgress, onAskAI }: Props) {
+export function BookReader({ book, initialPage, onClose, onProgress, onAskAI, jumpToHighlight, onJumpToHighlightHandled }: Props) {
   const [noteStatus, setNoteStatus] = useState<BookNoteSourceStatus | null>(null);
   const [noteStatusLoaded, setNoteStatusLoaded] = useState(false);
   const [savingNoteSource, setSavingNoteSource] = useState(false);
@@ -50,7 +57,9 @@ export function BookReader({ book, initialPage, onClose, onProgress, onAskAI }: 
     }
   }
 
-  const canExtractNotes = format === "pdf" || format === "epub";
+  const canExtractNotes =
+    format === "pdf" || format === "epub" || format === "pptx" ||
+    format === "txt" || format === "srt" || format === "vtt";
 
   const noteSourceProps = canExtractNotes
     ? { noteStatus, noteStatusLoaded, savingNoteSource, onSaveAsNoteSource: handleSaveAsNoteSource }
@@ -90,9 +99,14 @@ export function BookReader({ book, initialPage, onClose, onProgress, onAskAI }: 
         </div>
       )}
 
-      {format === "pdf" && <PdfReaderView book={book} initialPage={initialPage} colorMode={colorMode} onProgress={onProgress} {...noteSourceProps} />}
-      {format === "epub" && <EpubReaderView book={book} initialPage={initialPage} colorMode={colorMode} onProgress={onProgress} {...noteSourceProps} />}
+      {format === "pdf" && <PdfReaderView book={book} initialPage={initialPage} colorMode={colorMode} onProgress={onProgress} jumpToHighlight={jumpToHighlight} onJumpToHighlightHandled={onJumpToHighlightHandled} {...noteSourceProps} />}
+      {format === "epub" && <EpubReaderView book={book} initialPage={initialPage} colorMode={colorMode} onProgress={onProgress} jumpToHighlight={jumpToHighlight} onJumpToHighlightHandled={onJumpToHighlightHandled} {...noteSourceProps} />}
+      {format === "pptx" && <PptxReaderView book={book} initialPage={initialPage} colorMode={colorMode} onProgress={onProgress} jumpToHighlight={jumpToHighlight} onJumpToHighlightHandled={onJumpToHighlightHandled} {...noteSourceProps} />}
       {format === "audio" && <AudioReaderView book={book} initialPage={initialPage} colorMode={colorMode} onProgress={onProgress} />}
+      {format === "txt" && <TxtReaderView book={book} initialPage={initialPage} colorMode={colorMode} onProgress={onProgress} jumpToHighlight={jumpToHighlight} onJumpToHighlightHandled={onJumpToHighlightHandled} {...noteSourceProps} />}
+      {(format === "srt" || format === "vtt") && <CaptionReaderView book={book} initialPage={initialPage} colorMode={colorMode} onProgress={onProgress} jumpToHighlight={jumpToHighlight} onJumpToHighlightHandled={onJumpToHighlightHandled} {...noteSourceProps} />}
+      {(format === "cbz" || format === "cbr") && <ComicReaderView book={book} initialPage={initialPage} colorMode={colorMode} onProgress={onProgress} />}
+      {format === "mobi" && <MobiReaderView book={book} initialPage={initialPage} colorMode={colorMode} onProgress={onProgress} jumpToHighlight={jumpToHighlight} onJumpToHighlightHandled={onJumpToHighlightHandled} />}
       {format === "unsupported" && (
         <div className="flex-1 flex items-center justify-center text-gray-500 text-sm">
           This file type ({book.file_extension || book.mime_type || "unknown"}) isn't supported by the reader yet.

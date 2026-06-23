@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from memolink_backend.domain.models.user_book import UserBook
 from memolink_backend.domain.models.book_bookmark import BookBookmark
 from memolink_backend.domain.models.book_note_source import BookNoteSource, BookNoteChunk
+from memolink_backend.domain.models.book_highlight import BookHighlight
 
 
 class UserBookRepository:
@@ -93,6 +94,47 @@ class UserBookRepository:
         )
         self.db.commit()
         return deleted > 0
+
+    # ── Highlights ────────────────────────────────────────────────────────────
+
+    def add_highlight(
+        self,
+        user_id: int,
+        book_id: int,
+        note_id: int,
+        format: str,
+        page_number: int,
+        start_offset: int,
+        end_offset: int,
+        snippet: str,
+        color: str = "yellow",
+    ) -> BookHighlight:
+        row = BookHighlight(
+            user_id=user_id,
+            book_id=book_id,
+            note_id=note_id,
+            format=format,
+            page_number=page_number,
+            start_offset=start_offset,
+            end_offset=end_offset,
+            snippet=snippet,
+            color=color,
+        )
+        self.db.add(row)
+        self.db.commit()
+        self.db.refresh(row)
+        return row
+
+    def get_highlight(self, highlight_id: int) -> Optional[BookHighlight]:
+        return self.db.query(BookHighlight).filter(BookHighlight.id == highlight_id).first()
+
+    def list_highlights(self, user_id: int, book_id: int) -> List[BookHighlight]:
+        return (
+            self.db.query(BookHighlight)
+            .filter(BookHighlight.user_id == user_id, BookHighlight.book_id == book_id)
+            .order_by(BookHighlight.page_number.asc(), BookHighlight.start_offset.asc())
+            .all()
+        )
 
     # ── Note source (Save as Note Source) ───────────────────────────────────
 

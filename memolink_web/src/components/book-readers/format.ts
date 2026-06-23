@@ -1,8 +1,25 @@
 import type { Book } from "../../api/booksApi";
 import type { BookNoteSourceStatus } from "../../api/booksApi";
 
-export type BookFormat = "pdf" | "epub" | "audio" | "unsupported";
+export type BookFormat =
+  | "pdf"
+  | "epub"
+  | "pptx"
+  | "audio"
+  | "txt"
+  | "srt"
+  | "vtt"
+  | "cbz"
+  | "cbr"
+  | "mobi"
+  | "unsupported";
 export type ReaderColorMode = "dark" | "light" | "sepia";
+
+export interface HighlightAnchor {
+  page: number;
+  start: number;
+  end: number;
+}
 
 export interface ReaderViewProps {
   book: Book;
@@ -13,6 +30,8 @@ export interface ReaderViewProps {
   noteStatusLoaded?: boolean;
   savingNoteSource?: boolean;
   onSaveAsNoteSource?: () => void;
+  jumpToHighlight?: HighlightAnchor | null;
+  onJumpToHighlightHandled?: () => void;
 }
 
 export const READER_COLOR_MODE_LABELS: Record<ReaderColorMode, string> = {
@@ -70,11 +89,25 @@ export function getBookFormat(book: Pick<Book, "file_extension" | "mime_type">):
   const ext = (book.file_extension || "").toLowerCase();
   if (ext === ".pdf") return "pdf";
   if (ext === ".epub") return "epub";
+  if (ext === ".pptx") return "pptx";
+  if (ext === ".txt") return "txt";
+  if (ext === ".srt") return "srt";
+  if (ext === ".vtt") return "vtt";
+  if (ext === ".cbz") return "cbz";
+  if (ext === ".cbr") return "cbr";
+  if (ext === ".mobi") return "mobi";
   if (AUDIO_EXTENSIONS.has(ext)) return "audio";
 
   const mime = (book.mime_type || "").toLowerCase();
   if (mime === "application/pdf") return "pdf";
   if (mime === "application/epub+zip") return "epub";
+  if (mime === "application/vnd.openxmlformats-officedocument.presentationml.presentation") return "pptx";
+  if (mime === "text/plain") return "txt";
+  if (mime === "application/x-subrip") return "srt";
+  if (mime === "text/vtt") return "vtt";
+  if (mime === "application/vnd.comicbook+zip") return "cbz";
+  if (mime === "application/vnd.comicbook-rar") return "cbr";
+  if (mime === "application/x-mobipocket-ebook") return "mobi";
   if (mime.startsWith("audio/")) return "audio";
 
   return "unsupported";

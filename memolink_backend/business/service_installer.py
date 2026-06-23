@@ -234,3 +234,11 @@ class ServiceInstaller:
             embedding_service=self._domain.get_embedding_service(),
             onedrive_service=self.get_onedrive_service(),
         )
+
+    def get_book_highlight_service(self):
+        from memolink_backend.business.services.book_highlight_service import BookHighlightService
+        return BookHighlightService(
+            book_repo=self._domain.get_book_repository(),
+            user_book_repo=self._domain.get_user_book_repository(),
+            note_repo=self._domain.get_note_repository(),
+        )

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 import logging
+import re
 from typing import Optional
 
 from memolink_backend.domain.repositories.book_repository import BookRepository
@@ -15,6 +16,10 @@ from memolink_backend.contracts.book_dtos import BookNoteSourceResponseDTO
 logger = logging.getLogger(__name__)
 
 AUDIO_EXTENSIONS = {".mp3", ".m4a", ".m4b", ".aac", ".wav", ".ogg"}
+NO_TEXT_EXTENSIONS = {".cbz", ".cbr"}
+
+_TIMESTAMP_LINE = re.compile(r"-->")
+_INDEX_LINE = re.compile(r"^\d+$")
 
 
 def _extract_pages_pdf(content: bytes) -> list[str]:
@@ -24,6 +29,11 @@ def _extract_pages_pdf(content: bytes) -> list[str]:
         for page in pdf.pages:
             pages_text.append(page.extract_text() or "")
     return pages_text
+
+
+def _extract_pages_pptx(content: bytes) -> list[str]:
+    from memolink_backend.utils.file_extractor import extract_text_local  # local import: heavy dependency
+    return [extract_text_local(content, "book.pptx")]
 
 
 def _extract_pages_epub(content: bytes) -> list[str]:
@@ -39,6 +49,44 @@ def _extract_pages_epub(content: bytes) -> list[str]:
         if text:
             pages_text.append(text)
     return pages_text
+
+
+def _extract_pages_txt(content: bytes) -> list[str]:
+    text = content.decode("utf-8", errors="replace")
+    paragraphs = text.split("\n\n")
+    chunks: list[str] = []
+    current = ""
+    for para in paragraphs:
+        if current and len(current) + len(para) + 2 > 3000:
+            chunks.append(current)
+            current = para
+        else:
+            current = f"{current}\n\n{para}" if current else para
+    if current:
+        chunks.append(current)
+    return chunks
+
+
+def _extract_pages_captions(content: bytes, ext: str) -> list[str]:
+    text = content.decode("utf-8", errors="replace")
+    blocks = re.split(r"\r?\n\r?\n+", text.strip())
+    cues: list[str] = []
+    for block in blocks:
+        lines = [ln.strip() for ln in block.splitlines() if ln.strip()]
+        if not lines:
+            continue
+        first_upper = lines[0].upper()
+        if first_upper.startswith(("WEBVTT", "NOTE", "STYLE", "REGION")):
+            continue
+        text_lines = [ln for ln in lines if not _TIMESTAMP_LINE.search(ln) and not _INDEX_LINE.match(ln)]
+        cue_text = " ".join(text_lines).strip()
+        if cue_text:
+            cues.append(cue_text)
+
+    chunks: list[str] = []
+    for i in range(0, len(cues), 25):
+        chunks.append("\n".join(cues[i : i + 25]))
+    return chunks
 
 
 class BookNoteSourceService:
@@ -90,12 +138,25 @@ class BookNoteSourceService:
             ext = (book.file_extension or "").lower()
             if ext in AUDIO_EXTENSIONS:
                 raise ValueError("Note extraction is not supported for audiobooks — there is no text to extract")
+            if ext in NO_TEXT_EXTENSIONS:
+                raise ValueError("Note extraction is not supported for comic books — there is no text to extract")
+            if ext == ".mobi":
+                raise ValueError("Note extraction for MOBI books isn't supported yet")
 
             content = await self._onedrive.download_file_bytes(
                 drive_id=book.onedrive_drive_id, item_id=book.onedrive_item_id
             )
 
-            pages_text = _extract_pages_epub(content) if ext == ".epub" else _extract_pages_pdf(content)
+            if ext == ".epub":
+                pages_text = _extract_pages_epub(content)
+            elif ext == ".pptx":
+                pages_text = _extract_pages_pptx(content)
+            elif ext == ".txt":
+                pages_text = _extract_pages_txt(content)
+            elif ext in (".srt", ".vtt"):
+                pages_text = _extract_pages_captions(content, ext)
+            else:
+                pages_text = _extract_pages_pdf(content)
             full_text = "\n\n".join(t.strip() for t in pages_text if t and t.strip())
             if not full_text:
                 raise ValueError("No extractable text found — this file may be a scanned image without text")

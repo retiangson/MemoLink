@@ -163,6 +163,45 @@ export async function fetchBookBlob(bookOrId: Book | number): Promise<Blob> {
   return r.data;
 }
 
+export async function fetchBookSlides(bookId: number): Promise<string[]> {
+  return (await api.get(`/books/${bookId}/slides`)).data.slides;
+}
+
+export interface BookHighlight {
+  id: number;
+  user_id: number;
+  book_id: number;
+  note_id: number;
+  format: string;
+  page_number: number;
+  start_offset: number;
+  end_offset: number;
+  snippet: string;
+  color: string;
+  created_at?: string | null;
+}
+
+export interface BookHighlightCreate {
+  format: string;
+  page_number: number;
+  start_offset: number;
+  end_offset: number;
+  snippet: string;
+  color: string;
+}
+
+export async function addBookHighlight(bookId: number, payload: BookHighlightCreate): Promise<BookHighlight> {
+  return (await api.post(`/books/${bookId}/highlights`, payload)).data;
+}
+
+export async function getBookHighlight(highlightId: number): Promise<BookHighlight> {
+  return (await api.get(`/books/highlights/${highlightId}`)).data;
+}
+
+export async function listBookHighlights(bookId: number): Promise<BookHighlight[]> {
+  return (await api.get(`/books/${bookId}/highlights`)).data;
+}
+
 export async function saveAsNoteSource(bookId: number): Promise<BookNoteSourceStatus> {
   return (await api.post(`/books/${bookId}/save-as-note-source`)).data;
 }

@@ -22,9 +22,12 @@ MEMOLINK_CALLBACK_PATH = "/api/admin/books/onedrive/callback"
 ONEDRIVE_SCOPES = "Files.Read.All User.Read offline_access"
 
 SUPPORTED_EXTENSIONS = {
-    ".pdf", ".epub",
+    ".pdf", ".epub", ".pptx",
     ".mp3", ".m4a", ".m4b", ".aac", ".wav", ".ogg",
+    ".txt", ".srt", ".vtt", ".cbz", ".cbr", ".mobi",
 }
+# Legacy binary .ppt is intentionally excluded — python-pptx (used by the reader and
+# note extraction) cannot parse it, matching the existing rejection in file_extractor.py.
 
 
 class OneDriveServiceError(Exception):
