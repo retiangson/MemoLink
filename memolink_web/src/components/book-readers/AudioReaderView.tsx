@@ -4,17 +4,19 @@ import {
   type Bookmark,
 } from "../../api/booksApi";
 import type { ReaderViewProps } from "./format";
-import { formatTimestamp } from "./format";
+import { formatTimestamp, readerSurfaceClass } from "./format";
+import { ReaderLoadingState } from "./ReaderLoadingState";
 
 const SPEEDS = [1, 1.25, 1.5, 1.75, 2];
 
-export function AudioReaderView({ book, initialPage, onProgress }: ReaderViewProps) {
+export function AudioReaderView({ book, initialPage, colorMode, onProgress }: ReaderViewProps) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const objectUrlRef = useRef<string | null>(null);
   const seekedToInitialRef = useRef(false);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [src, setSrc] = useState<string | null>(null);
   const [playing, setPlaying] = useState(false);
   const [duration, setDuration] = useState(0);
   const [currentTime, setCurrentTime] = useState(Math.max(0, initialPage || 0));
@@ -26,14 +28,15 @@ export function AudioReaderView({ book, initialPage, onProgress }: ReaderViewPro
     let cancelled = false;
     setLoading(true);
     setError(null);
+    setSrc(null);
     seekedToInitialRef.current = false;
     (async () => {
       try {
-        const blob = await fetchBookBlob(book.id);
+        const blob = await fetchBookBlob(book);
         if (cancelled) return;
         const url = URL.createObjectURL(blob);
         objectUrlRef.current = url;
-        if (audioRef.current) audioRef.current.src = url;
+        setSrc(url);
         setLoading(false);
       } catch {
         if (!cancelled) {
@@ -116,9 +119,19 @@ export function AudioReaderView({ book, initialPage, onProgress }: ReaderViewPro
 
   return (
     <>
-      <div className="flex-1 overflow-auto flex items-center justify-center px-4">
+      <audio
+        ref={audioRef}
+        src={src ?? undefined}
+        onLoadedMetadata={handleLoadedMetadata}
+        onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
+        onPlay={() => setPlaying(true)}
+        onPause={() => setPlaying(false)}
+        onEnded={() => setPlaying(false)}
+        className="hidden"
+      />
+      <div className={`flex-1 overflow-auto flex items-center justify-center px-4 transition-colors ${readerSurfaceClass(colorMode)}`}>
         {loading ? (
-          <div className="text-gray-500 text-sm">Loading audiobook…</div>
+          <ReaderLoadingState book={book} label="Loading audiobook, please wait" colorMode={colorMode} />
         ) : error ? (
           <div className="text-red-400 text-sm">{error}</div>
         ) : (
@@ -128,16 +141,6 @@ export function AudioReaderView({ book, initialPage, onProgress }: ReaderViewPro
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 19V6l12-2v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-2c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2z" />
               </svg>
             </div>
-
-            <audio
-              ref={audioRef}
-              onLoadedMetadata={handleLoadedMetadata}
-              onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
-              onPlay={() => setPlaying(true)}
-              onPause={() => setPlaying(false)}
-              onEnded={() => setPlaying(false)}
-              className="hidden"
-            />
 
             <div className="w-full flex flex-col gap-1.5">
               <input

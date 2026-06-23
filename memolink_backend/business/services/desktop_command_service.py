@@ -55,6 +55,10 @@ class DesktopCommandService:
         result_json = json.dumps({"ok": dto.ok, "output": dto.output, "error": dto.error})
         return self._repo.set_result_for_user(command_id, user_id, dto.ok, result_json)
 
+    def report_progress(self, command_id: int, user_id: int, message: str) -> bool:
+        result_json = json.dumps({"ok": None, "output": message, "error": None})
+        return self._repo.set_progress_for_user(command_id, user_id, result_json)
+
     # ── SSE stream (Electron app connects here on startup) ───────────────────
 
     async def desktop_event_stream(self, user_id: int):

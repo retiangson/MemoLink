@@ -13,6 +13,10 @@ class DesktopCommandResultDTO(BaseModel):
     error: Optional[str] = None
 
 
+class DesktopCommandProgressDTO(BaseModel):
+    message: str
+
+
 class DesktopCommandResponseDTO(BaseModel):
     id: int
     command_type: str

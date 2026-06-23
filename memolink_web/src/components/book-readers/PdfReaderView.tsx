@@ -7,17 +7,18 @@ import {
   type Bookmark,
 } from "../../api/booksApi";
 import type { ReaderViewProps } from "./format";
-import { currentHighlightRange, findSentenceIndexForOffset } from "./format";
+import { currentHighlightRange, findSentenceIndexForOffset, pdfCanvasFilter, readerSurfaceClass } from "./format";
 import { useTTS, splitSentences } from "../../hooks/useTTS";
 import { usePageSwipe } from "../../hooks/usePageSwipe";
 import { TTSPlayerBar } from "../TTSPlayerBar";
 import { NoteSourceButton } from "./NoteSourceButton";
 import { PageNavArrows } from "./PageNavArrows";
+import { ReaderLoadingState } from "./ReaderLoadingState";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
 
 export function PdfReaderView({
-  book, initialPage, onProgress,
+  book, initialPage, colorMode, onProgress,
   noteStatus, noteStatusLoaded, savingNoteSource, onSaveAsNoteSource,
 }: ReaderViewProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -46,7 +47,7 @@ export function PdfReaderView({
     setError(null);
     (async () => {
       try {
-        const blob = await fetchBookBlob(book.id);
+        const blob = await fetchBookBlob(book);
         const buf = await blob.arrayBuffer();
         const doc = await pdfjsLib.getDocument({ data: buf }).promise;
         if (cancelled) return;
@@ -201,11 +202,11 @@ export function PdfReaderView({
   return (
     <>
       <div
-        className="flex-1 overflow-auto flex justify-center py-6 px-4 relative"
+        className={`flex-1 overflow-auto flex justify-center py-6 px-4 relative transition-colors ${readerSurfaceClass(colorMode)}`}
         {...swipeHandlers}
       >
         {loading ? (
-          <div className="flex items-center justify-center text-gray-500 text-sm">Loading book…</div>
+          <ReaderLoadingState book={book} colorMode={colorMode} />
         ) : error ? (
           <div className="flex items-center justify-center text-red-400 text-sm">{error}</div>
         ) : (
@@ -215,7 +216,11 @@ export function PdfReaderView({
               className={`relative shadow-lg rounded bg-white max-w-full h-fit overflow-hidden ${pageAnim === "next" ? "ml-page-anim-next" : pageAnim === "prev" ? "ml-page-anim-prev" : ""}`}
               style={{ width: viewportSize.width || undefined, height: viewportSize.height || undefined }}
             >
-              <canvas ref={canvasRef} className="block w-full h-full" />
+              <canvas
+                ref={canvasRef}
+                className="block w-full h-full transition-[filter]"
+                style={{ filter: pdfCanvasFilter(colorMode) }}
+              />
               <div
                 ref={textLayerRef}
                 className="textLayer absolute inset-0 cursor-text"

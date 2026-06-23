@@ -53,6 +53,17 @@ class DesktopCommandRepository:
         self._db.commit()
         return updated > 0
 
+    def set_progress_for_user(self, command_id: int, user_id: int, result: str) -> bool:
+        """Updates only the result text of a still-running command, leaving status
+        untouched, so long-running commands can report interim progress."""
+        updated = (
+            self._db.query(DesktopCommand)
+            .filter(DesktopCommand.id == command_id, DesktopCommand.user_id == user_id, DesktopCommand.status == "running")
+            .update({"result": result})
+        )
+        self._db.commit()
+        return updated > 0
+
     def list_pending(self, user_id: int) -> list[DesktopCommand]:
         return (
             self._db.query(DesktopCommand)

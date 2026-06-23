@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useRef, useState } from "react";
+﻿import React, { useCallback, useEffect, useRef, useState } from "react";
 import { saveUser, type User } from "../utils/auth";
 import { useNotes } from "../hooks/useNotes";
 import { useNoteEditor } from "../hooks/useNoteEditor";
@@ -777,6 +777,36 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
     setBooksTabOpen(true);
     setActiveTabType("books");
   }
+
+  // bookTabs is a freshly-built object every render (useBookTabs isn't memoized), so a
+  // ref is needed to read its latest value from a stable callback below — the readers'
+  // own debounce effects depend on onProgress's identity, so a new function each render
+  // would keep resetting their save timer and progress would rarely persist.
+  const bookTabsRef = useRef(bookTabs);
+  bookTabsRef.current = bookTabs;
+
+  // Readers persist progress to the backend themselves; this just mirrors it into the
+  // local myBooks list immediately so the right panel's Continue Reading list (and any
+  // other UI reading from myBooks) updates without waiting for the Books tab to reopen
+  // and refetch /books/my.
+  const handleBookProgress = useCallback((page: number, totalPages: number) => {
+    const bookId = bookTabsRef.current.active?.book.id;
+    if (bookId == null) return;
+    bookTabsRef.current.updateBookTabPage(bookId, page);
+    setMyBooks((prev) =>
+      prev.map((ub) =>
+        ub.book_id === bookId
+          ? {
+              ...ub,
+              current_page: page,
+              total_pages: totalPages || ub.total_pages,
+              progress_percent: totalPages > 0 ? Math.min(100, (page / totalPages) * 100) : ub.progress_percent,
+              last_read_at: new Date().toISOString(),
+            }
+          : ub
+      )
+    );
+  }, []);
 
   function spotifyErrorMessage(err: any): string {
     return err?.response?.data?.detail ?? err?.message ?? "Spotify playback failed.";
@@ -1591,7 +1621,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                 book={bookTabs.active.book}
                 initialPage={bookTabs.active.initialPage}
                 onClose={closeActiveBookTab}
-                onProgress={(page) => bookTabs.updateBookTabPage(bookTabs.active!.book.id, page)}
+                onProgress={handleBookProgress}
               />
             )
           ) : isEmailActive ? (

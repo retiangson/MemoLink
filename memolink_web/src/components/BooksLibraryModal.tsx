@@ -3,6 +3,46 @@ import {
   listBooks, listMyBooks, borrowBook, removeFromMyBooks,
   type Book, type UserBook,
 } from "../api/booksApi";
+import { getBookFormat } from "./book-readers/format";
+import { BookFormatIcon, getFormatStyle } from "./BookFormatIcon";
+
+const COVER_PALETTES = [
+  "from-indigo-400 to-indigo-950",
+  "from-rose-400 to-rose-950",
+  "from-amber-400 to-amber-950",
+  "from-emerald-400 to-emerald-950",
+  "from-sky-400 to-sky-950",
+  "from-purple-400 to-purple-950",
+  "from-teal-400 to-teal-950",
+  "from-orange-400 to-orange-950",
+];
+
+function paletteFor(seed: string): string {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
+  return COVER_PALETTES[h % COVER_PALETTES.length];
+}
+
+function BookCover({ book }: { book: Book }) {
+  const format = getBookFormat(book);
+  const style = getFormatStyle(format);
+  return (
+    <div className="relative aspect-[2/3] w-full rounded-md overflow-hidden shadow-lg shadow-black/50 border border-white/10 transition-transform duration-200 ease-out group-hover:scale-[1.06] group-hover:-translate-y-1 will-change-transform">
+      {book.cover_image_url ? (
+        <img src={book.cover_image_url} alt="" className="w-full h-full object-cover" />
+      ) : (
+        <div className={`w-full h-full bg-gradient-to-br ${paletteFor(book.title || String(book.id))} flex flex-col items-center justify-center p-2.5 text-center`}>
+          <BookFormatIcon format={format} className="w-7 h-7 text-white/35 mb-1.5 shrink-0" />
+          <p className="text-[10.5px] font-semibold text-white leading-snug line-clamp-4 drop-shadow-sm">{book.title}</p>
+        </div>
+      )}
+      <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-black/25" />
+      <div className={`absolute top-1.5 right-1.5 inline-flex items-center justify-center w-5 h-5 rounded-md ${style.bg} ${style.fg} backdrop-blur-sm`} title={style.label}>
+        <BookFormatIcon format={format} className="w-3 h-3" />
+      </div>
+    </div>
+  );
+}
 
 interface Props {
   show: boolean;
@@ -151,22 +191,18 @@ export function BooksLibraryModal({ show, onClose, initialView = "browse", onMyB
 
   function renderBookCard(book: Book, actions: React.ReactNode, footer?: React.ReactNode) {
     return (
-      <div className="bg-[var(--ml-bg-surface)] border border-[var(--ml-bg-hover)] rounded-xl p-4 flex flex-col gap-2 min-h-[190px]">
-        <div className="flex items-start gap-3">
-          <div className="w-12 h-16 rounded-md bg-gradient-to-br from-indigo-500/30 to-slate-700 border border-indigo-400/20 shadow-sm shrink-0 flex items-center justify-center">
-            <span className="text-[10px] font-semibold text-indigo-200 uppercase">{book.file_extension?.replace(".", "") || "Book"}</span>
-          </div>
-          <div className="min-w-0">
-            <p className="text-sm font-medium text-gray-200 line-clamp-2">{book.title}</p>
-            <p className="text-xs text-gray-500 truncate mt-0.5">{book.author || "Unknown author"}</p>
-          </div>
+      <div className="group flex flex-col gap-2">
+        <BookCover book={book} />
+        <div className="h-1.5 mx-2 -mt-0.5 bg-black/35 rounded-full blur-[2px] transition group-hover:bg-black/50" />
+        <div className="flex flex-col gap-1 px-0.5">
+          <p className="text-xs font-medium text-gray-200 line-clamp-2" title={book.title}>{book.title}</p>
+          <p className="text-[10.5px] text-gray-500 truncate">{book.author || "Unknown author"}</p>
+          {book.category && (
+            <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-indigo-500/15 text-indigo-400 w-fit">{book.category}</span>
+          )}
+          {footer}
         </div>
-        {book.description && <p className="text-xs text-gray-600 line-clamp-3">{book.description}</p>}
-        {book.category && (
-          <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/15 text-indigo-400 w-fit">{book.category}</span>
-        )}
-        {footer}
-        <div className="mt-auto pt-2">{actions}</div>
+        <div className="mt-auto pt-1">{actions}</div>
       </div>
     );
   }
@@ -210,7 +246,7 @@ export function BooksLibraryModal({ show, onClose, initialView = "browse", onMyB
               <p className="text-sm text-gray-500">No published books found.</p>
             ) : (
               <>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-x-4 gap-y-6">
                   {pagedBooks.map((book) => (
                     <React.Fragment key={book.id}>
                       {renderBookCard(
@@ -218,7 +254,7 @@ export function BooksLibraryModal({ show, onClose, initialView = "browse", onMyB
                         isBorrowed(book.id) ? (
                           <button
                             onClick={() => openReader(book, myBooks.find((m) => m.book_id === book.id)?.current_page ?? 1)}
-                            className="w-full px-3 py-1.5 text-xs rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white transition"
+                            className="w-full px-2 py-1.5 text-[10.5px] rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white transition"
                           >
                             Read
                           </button>
@@ -226,9 +262,9 @@ export function BooksLibraryModal({ show, onClose, initialView = "browse", onMyB
                           <button
                             onClick={() => handleBorrow(book)}
                             disabled={borrowingId === book.id}
-                            className="w-full px-3 py-1.5 text-xs rounded-lg bg-indigo-600/20 text-indigo-300 hover:bg-indigo-600/30 transition disabled:opacity-50"
+                            className="w-full px-2 py-1.5 text-[10.5px] rounded-lg bg-indigo-600/20 text-indigo-300 hover:bg-indigo-600/30 transition disabled:opacity-50"
                           >
-                            {borrowingId === book.id ? "Adding…" : "Add to My Books"}
+                            {borrowingId === book.id ? "Adding…" : "Add"}
                           </button>
                         )
                       )}
@@ -251,24 +287,27 @@ export function BooksLibraryModal({ show, onClose, initialView = "browse", onMyB
               </p>
             ) : (
               <>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-x-4 gap-y-6">
                   {pagedMyBooks.map((ub) => (
                     ub.book ? (
                       <React.Fragment key={ub.id}>
                         {renderBookCard(
                           ub.book,
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1.5">
                             <button
                               onClick={() => openReader(ub.book!, ub.current_page || 1)}
-                              className="flex-1 px-3 py-1.5 text-xs rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white transition"
+                              className="flex-1 px-2 py-1.5 text-[10.5px] rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white transition"
                             >
                               {ub.current_page > 0 ? "Continue" : "Read"}
                             </button>
                             <button
                               onClick={() => handleRemove(ub.book!)}
-                              className="px-3 py-1.5 text-xs rounded-lg border border-red-500/40 text-red-400 hover:bg-red-500/10 transition"
+                              title="Remove from My Books"
+                              className="shrink-0 p-1.5 rounded-lg border border-red-500/40 text-red-400 hover:bg-red-500/10 transition"
                             >
-                              Remove
+                              <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M6 7h12M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2m-8 0 1 13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1l1-13" />
+                              </svg>
                             </button>
                           </div>,
                           <div>

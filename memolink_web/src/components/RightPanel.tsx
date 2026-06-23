@@ -15,6 +15,8 @@ import { SpotifyMiniPlayer } from "./SpotifyPlayer";
 import type { SpotifyApiTrack, SpotifyRepeatMode } from "../api/connectorsApi";
 import type { CalendarOccurrence } from "../api/calendarApi";
 import type { UserBook } from "../api/booksApi";
+import { getBookFormat } from "./book-readers/format";
+import { BookFormatIcon, getFormatStyle } from "./BookFormatIcon";
 
 interface RightPanelProps {
   open: boolean;
@@ -1040,23 +1042,30 @@ export function RightPanel({
                 </button>
               </div>
 
-              {myBooks.filter((ub) => ub.current_page > 0).length > 0 && (
+              {myBooks.length > 0 && (
                 <div className="flex flex-col gap-1 mt-1">
                   <span className="text-[10px] text-gray-600 uppercase tracking-wider px-0.5">Continue Reading</span>
                   {myBooks
-                    .filter((ub) => ub.current_page > 0)
-                    .sort((a, b) => (b.last_read_at ?? "").localeCompare(a.last_read_at ?? ""))
+                    .slice()
+                    .sort((a, b) => (b.last_read_at ?? b.borrowed_at ?? "").localeCompare(a.last_read_at ?? a.borrowed_at ?? ""))
                     .slice(0, 4)
-                    .map((ub) => (
-                      <button
-                        key={ub.id}
-                        onClick={() => onOpenBookReader?.(ub.book_id)}
-                        className="w-full flex items-center gap-2 text-left px-2 py-1 rounded-lg hover:bg-[#1a1a24] transition"
-                      >
-                        <span className="text-[11px] text-gray-300 truncate flex-1">{ub.book?.title ?? `Book #${ub.book_id}`}</span>
-                        <span className="text-[10px] text-gray-600 shrink-0">{Math.round(ub.progress_percent)}%</span>
-                      </button>
-                    ))}
+                    .map((ub) => {
+                      const format = ub.book ? getBookFormat(ub.book) : "unsupported";
+                      const style = getFormatStyle(format);
+                      return (
+                        <button
+                          key={ub.id}
+                          onClick={() => onOpenBookReader?.(ub.book_id)}
+                          className="w-full flex items-center gap-2 text-left px-2 py-1 rounded-lg hover:bg-[#1a1a24] transition"
+                        >
+                          <span className={`shrink-0 inline-flex items-center justify-center w-5 h-5 rounded-md ${style.bg} ${style.fg}`} title={style.label}>
+                            <BookFormatIcon format={format} className="w-3 h-3" />
+                          </span>
+                          <span className="text-[11px] text-gray-300 truncate flex-1">{ub.book?.title ?? `Book #${ub.book_id}`}</span>
+                          <span className="text-[10px] text-gray-600 shrink-0">{ub.current_page > 0 ? `${Math.round(ub.progress_percent)}%` : "New"}</span>
+                        </button>
+                      );
+                    })}
                 </div>
               )}
             </div>

@@ -90,6 +90,18 @@ class OneDriveSyncResultDTO(BaseModel):
     updated: int
 
 
+class OneDriveSyncPageRequestDTO(BaseModel):
+    cursor: Optional[str] = None
+
+
+class OneDriveSyncPageResultDTO(BaseModel):
+    cursor: Optional[str] = None
+    done: bool
+    scanned: int
+    created: int
+    updated: int
+
+
 class BookIdsDTO(BaseModel):
     book_ids: List[int]
 

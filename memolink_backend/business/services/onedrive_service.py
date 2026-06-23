@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import time
 from datetime import datetime, timezone
 from typing import Optional
@@ -178,12 +179,78 @@ class OneDriveService:
         path = self._children_path()
         return await self._list_supported_files_recursive(token=token, children_path=path)
 
+    # ── Paginated listing (one Graph call per invocation) ───────────────────
+    # Lets a caller (e.g. the desktop app's sync loop) drive an arbitrarily long
+    # folder walk by repeatedly resuming from an opaque cursor, instead of one
+    # request having to walk the entire tree before returning.
+
+    async def list_folder_files_page(self, *, admin_user_id: int, cursor: Optional[str]) -> tuple[list[dict], Optional[str]]:
+        token = await self._get_valid_access_token(for_admin_user_id=admin_user_id)
+        state = self._decode_cursor(cursor) if cursor else {"url": None, "pending_paths": [self._children_path()], "visited": []}
+
+        if state["url"]:
+            url = state["url"]
+            params = None
+        else:
+            if not state["pending_paths"]:
+                return [], None
+            path = state["pending_paths"].pop()
+            url = f"{GRAPH_BASE}{path}"
+            params = {"$select": "id,name,file,folder,size,webUrl,lastModifiedDateTime,parentReference"}
+
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            try:
+                resp = await client.get(url, headers={"Authorization": f"Bearer {token}"}, params=params)
+            except httpx.TimeoutException as exc:
+                raise OneDriveServiceError(504, "Microsoft Graph timed out listing the OneDrive folder page.") from exc
+        if resp.status_code != 200:
+            raise OneDriveServiceError(resp.status_code, f"Microsoft Graph error listing OneDrive folder: {resp.text[:300]}")
+
+        data = resp.json()
+        visited: set[str] = set(state["visited"])
+        files: list[dict] = []
+        for item in data.get("value", []):
+            if "folder" in item:
+                item_id = item.get("id")
+                if item_id and item_id not in visited:
+                    visited.add(item_id)
+                    state["pending_paths"].append(f"/me/drive/items/{item_id}/children")
+                continue
+            if "file" not in item:
+                continue
+            file = self._supported_file_from_item(item)
+            if file:
+                files.append(file)
+
+        state["visited"] = list(visited)
+        state["url"] = data.get("@odata.nextLink")
+        done = not state["url"] and not state["pending_paths"]
+        return files, (None if done else self._encode_cursor(state))
+
+    def _encode_cursor(self, state: dict) -> str:
+        import base64
+        return base64.urlsafe_b64encode(json.dumps(state).encode()).decode()
+
+    def _decode_cursor(self, cursor: str) -> dict:
+        import base64
+        try:
+            state = json.loads(base64.urlsafe_b64decode(cursor.encode()).decode())
+        except Exception as exc:
+            raise OneDriveServiceError(400, "Invalid or expired sync cursor") from exc
+        # The cursor round-trips through the caller; reject anything whose "url" doesn't
+        # point back at Graph so a tampered cursor can't make this server send the
+        # OneDrive bearer token to an attacker-controlled host (SSRF).
+        url = state.get("url")
+        if url is not None and not str(url).startswith(GRAPH_BASE):
+            raise OneDriveServiceError(400, "Invalid or expired sync cursor")
+        return state
+
     async def _list_supported_files_recursive(self, *, token: str, children_path: str) -> list[dict]:
         files: list[dict] = []
         pending_paths = [children_path]
         visited_folder_ids: set[str] = set()
 
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=30.0) as client:
             while pending_paths:
                 path = pending_paths.pop()
                 items = await self._list_children(client=client, token=token, children_path=path)
@@ -210,11 +277,14 @@ class OneDriveService:
         params = {"$select": "id,name,file,folder,size,webUrl,lastModifiedDateTime,parentReference"}
         items: list[dict] = []
         while url:
-            resp = await client.get(
-                url,
-                headers={"Authorization": f"Bearer {token}"},
-                params=params,
-            )
+            try:
+                resp = await client.get(
+                    url,
+                    headers={"Authorization": f"Bearer {token}"},
+                    params=params,
+                )
+            except httpx.TimeoutException as exc:
+                raise OneDriveServiceError(504, "Microsoft Graph timed out listing the OneDrive folder. Try again, or narrow ONEDRIVE_BOOKS_FOLDER_PATH/ID to a smaller folder.") from exc
             if resp.status_code != 200:
                 raise OneDriveServiceError(resp.status_code, f"Microsoft Graph error listing OneDrive folder: {resp.text[:300]}")
 
