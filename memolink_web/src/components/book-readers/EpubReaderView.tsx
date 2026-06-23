@@ -124,7 +124,7 @@ function applyEpubContentsTheme(list: Contents[], mode: ReaderViewProps["colorMo
 export function EpubReaderView({
   book, initialPage, colorMode, onProgress,
   noteStatus, noteStatusLoaded, savingNoteSource, onSaveAsNoteSource,
-  jumpToHighlight, onJumpToHighlightHandled,
+  jumpToHighlight, onJumpToHighlightHandled, onHighlightAdded,
 }: ReaderViewProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const epubBookRef = useRef<Book | null>(null);
@@ -564,6 +564,7 @@ export function EpubReaderView({
       color: highlightColor,
     });
     setHighlights((prev) => [...prev, created]);
+    onHighlightAdded?.();
     const contents = renditionRef.current?.getContents();
     const list = (Array.isArray(contents) ? contents : contents ? [contents] : []) as Contents[];
     list.forEach((c: any) => c?.window?.getSelection?.()?.removeAllRanges());

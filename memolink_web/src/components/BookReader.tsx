@@ -20,9 +20,10 @@ interface Props {
   onAskAI?: (book: Book) => void;
   jumpToHighlight?: HighlightAnchor | null;
   onJumpToHighlightHandled?: () => void;
+  onHighlightAdded?: () => void;
 }
 
-export function BookReader({ book, initialPage, onClose, onProgress, onAskAI, jumpToHighlight, onJumpToHighlightHandled }: Props) {
+export function BookReader({ book, initialPage, onClose, onProgress, onAskAI, jumpToHighlight, onJumpToHighlightHandled, onHighlightAdded }: Props) {
   const [noteStatus, setNoteStatus] = useState<BookNoteSourceStatus | null>(null);
   const [noteStatusLoaded, setNoteStatusLoaded] = useState(false);
   const [savingNoteSource, setSavingNoteSource] = useState(false);
@@ -99,14 +100,14 @@ export function BookReader({ book, initialPage, onClose, onProgress, onAskAI, ju
         </div>
       )}
 
-      {format === "pdf" && <PdfReaderView book={book} initialPage={initialPage} colorMode={colorMode} onProgress={onProgress} jumpToHighlight={jumpToHighlight} onJumpToHighlightHandled={onJumpToHighlightHandled} {...noteSourceProps} />}
-      {format === "epub" && <EpubReaderView book={book} initialPage={initialPage} colorMode={colorMode} onProgress={onProgress} jumpToHighlight={jumpToHighlight} onJumpToHighlightHandled={onJumpToHighlightHandled} {...noteSourceProps} />}
-      {format === "pptx" && <PptxReaderView book={book} initialPage={initialPage} colorMode={colorMode} onProgress={onProgress} jumpToHighlight={jumpToHighlight} onJumpToHighlightHandled={onJumpToHighlightHandled} {...noteSourceProps} />}
+      {format === "pdf" && <PdfReaderView book={book} initialPage={initialPage} colorMode={colorMode} onProgress={onProgress} jumpToHighlight={jumpToHighlight} onJumpToHighlightHandled={onJumpToHighlightHandled} onHighlightAdded={onHighlightAdded} {...noteSourceProps} />}
+      {format === "epub" && <EpubReaderView book={book} initialPage={initialPage} colorMode={colorMode} onProgress={onProgress} jumpToHighlight={jumpToHighlight} onJumpToHighlightHandled={onJumpToHighlightHandled} onHighlightAdded={onHighlightAdded} {...noteSourceProps} />}
+      {format === "pptx" && <PptxReaderView book={book} initialPage={initialPage} colorMode={colorMode} onProgress={onProgress} jumpToHighlight={jumpToHighlight} onJumpToHighlightHandled={onJumpToHighlightHandled} onHighlightAdded={onHighlightAdded} {...noteSourceProps} />}
       {format === "audio" && <AudioReaderView book={book} initialPage={initialPage} colorMode={colorMode} onProgress={onProgress} />}
-      {format === "txt" && <TxtReaderView book={book} initialPage={initialPage} colorMode={colorMode} onProgress={onProgress} jumpToHighlight={jumpToHighlight} onJumpToHighlightHandled={onJumpToHighlightHandled} {...noteSourceProps} />}
-      {(format === "srt" || format === "vtt") && <CaptionReaderView book={book} initialPage={initialPage} colorMode={colorMode} onProgress={onProgress} jumpToHighlight={jumpToHighlight} onJumpToHighlightHandled={onJumpToHighlightHandled} {...noteSourceProps} />}
+      {format === "txt" && <TxtReaderView book={book} initialPage={initialPage} colorMode={colorMode} onProgress={onProgress} jumpToHighlight={jumpToHighlight} onJumpToHighlightHandled={onJumpToHighlightHandled} onHighlightAdded={onHighlightAdded} {...noteSourceProps} />}
+      {(format === "srt" || format === "vtt") && <CaptionReaderView book={book} initialPage={initialPage} colorMode={colorMode} onProgress={onProgress} jumpToHighlight={jumpToHighlight} onJumpToHighlightHandled={onJumpToHighlightHandled} onHighlightAdded={onHighlightAdded} {...noteSourceProps} />}
       {(format === "cbz" || format === "cbr") && <ComicReaderView book={book} initialPage={initialPage} colorMode={colorMode} onProgress={onProgress} />}
-      {format === "mobi" && <MobiReaderView book={book} initialPage={initialPage} colorMode={colorMode} onProgress={onProgress} jumpToHighlight={jumpToHighlight} onJumpToHighlightHandled={onJumpToHighlightHandled} />}
+      {format === "mobi" && <MobiReaderView book={book} initialPage={initialPage} colorMode={colorMode} onProgress={onProgress} jumpToHighlight={jumpToHighlight} onJumpToHighlightHandled={onJumpToHighlightHandled} onHighlightAdded={onHighlightAdded} />}
       {format === "unsupported" && (
         <div className="flex-1 flex items-center justify-center text-gray-500 text-sm">
           This file type ({book.file_extension || book.mime_type || "unknown"}) isn't supported by the reader yet.
