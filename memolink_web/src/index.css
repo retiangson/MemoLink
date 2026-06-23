@@ -1,5 +1,12 @@
 @import "tailwindcss";
 
+/* Counter-invert media inside a [data-rc-mode] panel whose whole subtree is flipped via
+   richContentFilter() (light/sepia reader color modes), so images/video render normally. */
+[data-rc-mode="light"] img, [data-rc-mode="light"] video,
+[data-rc-mode="sepia"] img, [data-rc-mode="sepia"] video {
+  filter: invert(1) hue-rotate(180deg);
+}
+
 /* ── Theme tokens ──────────────────────────────────────────────────────────── */
 :root {
   --ml-bg-base:    #0f0f13;

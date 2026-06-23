@@ -1043,12 +1043,11 @@ export function RightPanel({
               </div>
 
               {myBooks.length > 0 && (
-                <div className="flex flex-col gap-1 mt-1">
-                  <span className="text-[10px] text-gray-600 uppercase tracking-wider px-0.5">Continue Reading</span>
+                <div className="flex flex-col gap-1 mt-1 max-h-64 overflow-y-auto pr-0.5">
+                  <span className="text-[10px] text-gray-600 uppercase tracking-wider px-0.5">My Books</span>
                   {myBooks
                     .slice()
                     .sort((a, b) => (b.last_read_at ?? b.borrowed_at ?? "").localeCompare(a.last_read_at ?? a.borrowed_at ?? ""))
-                    .slice(0, 4)
                     .map((ub) => {
                       const format = ub.book ? getBookFormat(ub.book) : "unsupported";
                       const style = getFormatStyle(format);

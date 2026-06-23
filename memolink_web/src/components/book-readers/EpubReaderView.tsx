@@ -8,7 +8,7 @@ import {
   type Bookmark,
 } from "../../api/booksApi";
 import type { ReaderViewProps } from "./format";
-import { currentHighlightRange, epubThemeColors, findSentenceIndexForOffset, readerSurfaceClass } from "./format";
+import { currentHighlightRange, readerThemeColors, findSentenceIndexForOffset, readerSurfaceClass } from "./format";
 import { useTTS, splitSentences } from "../../hooks/useTTS";
 import { usePageSwipe, computeSwipeDirection } from "../../hooks/usePageSwipe";
 import { TTSPlayerBar } from "../TTSPlayerBar";
@@ -56,7 +56,7 @@ function ensureHighlightStyle(doc: Document) {
 }
 
 function applyEpubContentsTheme(list: Contents[], mode: ReaderViewProps["colorMode"]) {
-  const colors = epubThemeColors(mode);
+  const colors = readerThemeColors(mode);
   list.forEach((c: any) => {
     const doc: Document | undefined = c?.document;
     if (!doc) return;
@@ -468,7 +468,7 @@ export function EpubReaderView({
               onAnimationEnd={() => setPageAnim(null)}
               className={`w-full h-full ${pageAnim === "next" ? "ml-page-anim-next" : pageAnim === "prev" ? "ml-page-anim-prev" : ""}`}
             >
-              <div ref={containerRef} className="w-full h-full" style={{ backgroundColor: epubThemeColors(colorMode).background }} />
+              <div ref={containerRef} className="w-full h-full" style={{ backgroundColor: readerThemeColors(colorMode).background }} />
             </div>
             <PageNavArrows
               onPrev={() => goToPage(currentPage - 1)}

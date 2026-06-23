@@ -1,17 +1,11 @@
 import React, { useEffect, useState } from "react";
 import { saveAsNoteSource, getNoteSourceStatus, type Book, type BookNoteSourceStatus } from "../api/booksApi";
-import {
-  getBookFormat,
-  isReaderColorMode,
-  READER_COLOR_MODE_LABELS,
-  READER_COLOR_MODES,
-  type ReaderColorMode,
-} from "./book-readers/format";
+import { getBookFormat } from "./book-readers/format";
 import { PdfReaderView } from "./book-readers/PdfReaderView";
 import { EpubReaderView } from "./book-readers/EpubReaderView";
 import { AudioReaderView } from "./book-readers/AudioReaderView";
-
-const READER_COLOR_MODE_KEY = "memolink_reader_color_mode";
+import { ColorModePicker } from "./ColorModePicker";
+import { useReaderColorMode } from "../hooks/useReaderColorMode";
 
 interface Props {
   book: Book;
@@ -25,16 +19,8 @@ export function BookReader({ book, initialPage, onClose, onProgress, onAskAI }: 
   const [noteStatus, setNoteStatus] = useState<BookNoteSourceStatus | null>(null);
   const [noteStatusLoaded, setNoteStatusLoaded] = useState(false);
   const [savingNoteSource, setSavingNoteSource] = useState(false);
-  const [colorMode, setColorMode] = useState<ReaderColorMode>(() => {
-    const saved = localStorage.getItem(READER_COLOR_MODE_KEY);
-    return isReaderColorMode(saved) ? saved : "dark";
-  });
+  const [colorMode, setColorMode] = useReaderColorMode();
   const format = getBookFormat(book);
-
-  function handleColorModeChange(next: ReaderColorMode) {
-    setColorMode(next);
-    localStorage.setItem(READER_COLOR_MODE_KEY, next);
-  }
 
   useEffect(() => {
     getNoteSourceStatus(book.id)
@@ -86,35 +72,7 @@ export function BookReader({ book, initialPage, onClose, onProgress, onAskAI }: 
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <div className="hidden sm:flex items-center gap-1 rounded-lg bg-[var(--ml-bg-surface)] p-1 border border-[var(--ml-bg-hover)]" aria-label="Reading mode">
-            {READER_COLOR_MODES.map((mode) => (
-              <button
-                key={mode}
-                type="button"
-                onClick={() => handleColorModeChange(mode)}
-                className={`px-2.5 py-1 text-[11px] rounded-md transition ${
-                  colorMode === mode
-                    ? "bg-indigo-600 text-white"
-                    : "text-gray-500 hover:text-gray-200 hover:bg-[var(--ml-bg-hover)]"
-                }`}
-              >
-                {READER_COLOR_MODE_LABELS[mode]}
-              </button>
-            ))}
-          </div>
-          <select
-            aria-label="Reading mode"
-            value={colorMode}
-            onChange={(e) => {
-              const next = e.target.value;
-              if (isReaderColorMode(next)) handleColorModeChange(next);
-            }}
-            className="sm:hidden bg-[var(--ml-bg-surface)] border border-[var(--ml-bg-hover)] rounded-lg px-2 py-1.5 text-xs text-gray-300"
-          >
-            {READER_COLOR_MODES.map((mode) => (
-              <option key={mode} value={mode}>{READER_COLOR_MODE_LABELS[mode]}</option>
-            ))}
-          </select>
+          <ColorModePicker value={colorMode} onChange={setColorMode} />
           {onAskAI && (
             <button
               onClick={() => onAskAI(book)}

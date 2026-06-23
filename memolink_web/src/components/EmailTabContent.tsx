@@ -4,6 +4,9 @@ import { emailToNote, gmailEmailToNote, getAttachmentDownloadUrl } from "../api/
 import { EmailReplyPanel } from "./EmailReplyPanel";
 import { EmailHtmlBody } from "./EmailHtmlBody";
 import { useTTS } from "../hooks/useTTS";
+import { ColorModePicker } from "./ColorModePicker";
+import { useReaderColorMode } from "../hooks/useReaderColorMode";
+import { readerSurfaceClass } from "./book-readers/format";
 
 function formatAttachmentSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -26,6 +29,7 @@ interface EmailTabContentProps {
 export function EmailTabContent({ email, actionLoading, onArchive, onTrash, onTogglePin, replyDraft, onReplyDraftChange }: EmailTabContentProps) {
   const [noteResult, setNoteResult] = useState<string | null>(null);
   const [noteSaving, setNoteSaving] = useState(false);
+  const [colorMode, setColorMode] = useReaderColorMode();
   const tts = useTTS();
 
   useEffect(() => {
@@ -74,37 +78,17 @@ export function EmailTabContent({ email, actionLoading, onArchive, onTrash, onTo
           </p>
           {dateLabel && <p className="text-[11px] text-gray-600 mt-0.5">{dateLabel}</p>}
         </div>
-        <button
-          onClick={handleReadAloud}
-          title={tts.playing ? "Stop reading" : "Read aloud"}
-          className={`shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs border transition ${
-            tts.playing
-              ? "border-indigo-500/40 text-indigo-400 bg-indigo-500/10"
-              : "border-[var(--ml-bg-hover)] text-gray-500 hover:text-indigo-300 hover:border-indigo-500/30"
-          }`}
-        >
-          {tts.playing ? (
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" fill="currentColor" viewBox="0 0 16 16">
-              <path d="M5 3.5a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v9a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5zm4 0a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v9a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5z"/>
-            </svg>
-          ) : (
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" fill="currentColor" viewBox="0 0 16 16">
-              <path d="M11.536 14.01A8.47 8.47 0 0 0 14.026 8a8.47 8.47 0 0 0-2.49-6.01l-.708.707A7.48 7.48 0 0 1 13.025 8c0 2.071-.84 3.946-2.197 5.303z"/>
-              <path d="M10.121 12.596A6.48 6.48 0 0 0 12.025 8a6.48 6.48 0 0 0-1.904-4.596l-.707.707A5.48 5.48 0 0 1 11.025 8a5.48 5.48 0 0 1-1.61 3.89z"/>
-              <path d="M8.707 11.182A4.5 4.5 0 0 0 10.025 8a4.5 4.5 0 0 0-1.318-3.182L8 5.525A3.5 3.5 0 0 1 9.025 8 3.5 3.5 0 0 1 8 10.475zM6.717 3.55A.5.5 0 0 1 7 4v8a.5.5 0 0 1-.812.39L3.825 10.5H1.5A.5.5 0 0 1 1 10V6a.5.5 0 0 1 .5-.5h2.325l2.363-1.89a.5.5 0 0 1 .529-.06"/>
-            </svg>
-          )}
-          {tts.playing ? "Stop" : "Read aloud"}
-        </button>
+        <ColorModePicker value={colorMode} onChange={setColorMode} />
       </div>
 
-      <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+      <div className={`flex-1 overflow-y-auto px-5 py-4 space-y-4 transition-colors ${readerSurfaceClass(colorMode)}`}>
         {email.body_html ? (
           <EmailHtmlBody
             bodyHtml={email.body_html}
             attachments={email.attachments || []}
             gmailMessageId={(email.gmail_message_id as string) ?? ""}
             emailAccountId={email.email_account_id}
+            colorMode={colorMode}
           />
         ) : (
           <div className="bg-[var(--ml-bg-surface)] rounded-xl px-4 py-3">
@@ -185,6 +169,29 @@ export function EmailTabContent({ email, actionLoading, onArchive, onTrash, onTo
           className="text-xs px-3 py-2 rounded-xl border border-indigo-500/25 text-indigo-400 hover:bg-indigo-500/10 transition disabled:opacity-40"
         >
           {noteSaving ? "Saving…" : "Save as Note"}
+        </button>
+
+        <button
+          onClick={handleReadAloud}
+          title={tts.playing ? "Stop reading" : "Read aloud"}
+          className={`flex items-center gap-1.5 text-xs px-3 py-2 rounded-xl border transition ${
+            tts.playing
+              ? "border-indigo-500/40 text-indigo-400 bg-indigo-500/10"
+              : "border-[var(--ml-bg-hover)] text-gray-500 hover:text-indigo-300 hover:border-indigo-500/30"
+          }`}
+        >
+          {tts.playing ? (
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" fill="currentColor" viewBox="0 0 16 16">
+              <path d="M5 3.5a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v9a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5zm4 0a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v9a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5z"/>
+            </svg>
+          ) : (
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" fill="currentColor" viewBox="0 0 16 16">
+              <path d="M11.536 14.01A8.47 8.47 0 0 0 14.026 8a8.47 8.47 0 0 0-2.49-6.01l-.708.707A7.48 7.48 0 0 1 13.025 8c0 2.071-.84 3.946-2.197 5.303z"/>
+              <path d="M10.121 12.596A6.48 6.48 0 0 0 12.025 8a6.48 6.48 0 0 0-1.904-4.596l-.707.707A5.48 5.48 0 0 1 11.025 8a5.48 5.48 0 0 1-1.61 3.89z"/>
+              <path d="M8.707 11.182A4.5 4.5 0 0 0 10.025 8a4.5 4.5 0 0 0-1.318-3.182L8 5.525A3.5 3.5 0 0 1 9.025 8 3.5 3.5 0 0 1 8 10.475zM6.717 3.55A.5.5 0 0 1 7 4v8a.5.5 0 0 1-.812.39L3.825 10.5H1.5A.5.5 0 0 1 1 10V6a.5.5 0 0 1 .5-.5h2.325l2.363-1.89a.5.5 0 0 1 .529-.06"/>
+            </svg>
+          )}
+          {tts.playing ? "Stop" : "Read aloud"}
         </button>
 
         <button

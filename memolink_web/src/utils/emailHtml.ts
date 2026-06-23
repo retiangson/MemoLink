@@ -1,4 +1,5 @@
 import { getAttachmentDownloadUrl, type EmailAttachmentMeta } from "../api/emailApi";
+import { readerThemeColors, type ReaderColorMode } from "../components/book-readers/format";
 
 function rewriteCidImages(
   bodyHtml: string,
@@ -24,14 +25,15 @@ function rewriteCidImages(
 export function buildEmailIframeDocument(
   bodyHtml: string,
   attachments: EmailAttachmentMeta[],
-  opts: { gmailMessageId: string; emailAccountId?: number | null }
+  opts: { gmailMessageId: string; emailAccountId?: number | null; colorMode?: ReaderColorMode }
 ): string {
   const rewritten = attachments.length ? rewriteCidImages(bodyHtml, attachments, opts) : bodyHtml;
+  const colors = readerThemeColors(opts.colorMode ?? "dark");
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><base target="_blank"><style>
-    html, body { margin: 0; padding: 0; background: transparent; }
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 13px; line-height: 1.5; color: #e5e7eb; padding: 2px 4px; word-wrap: break-word; overflow-wrap: anywhere; }
+    html, body { margin: 0; padding: 0; background: ${colors.background}; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 13px; line-height: 1.5; color: ${colors.foreground}; padding: 2px 4px; word-wrap: break-word; overflow-wrap: anywhere; }
     img { max-width: 100%; height: auto; }
-    a { color: #818cf8; }
+    a { color: ${colors.link}; }
     table { max-width: 100%; }
   </style></head><body>${rewritten}</body></html>`;
 }

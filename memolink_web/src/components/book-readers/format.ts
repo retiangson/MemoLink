@@ -39,7 +39,7 @@ export function pdfCanvasFilter(mode: ReaderColorMode): string {
   return "none";
 }
 
-export function epubThemeColors(mode: ReaderColorMode): { background: string; foreground: string; muted: string; link: string } {
+export function readerThemeColors(mode: ReaderColorMode): { background: string; foreground: string; muted: string; link: string } {
   if (mode === "light") {
     return { background: "#f8fafc", foreground: "#111827", muted: "#475569", link: "#4338ca" };
   }
@@ -47,6 +47,21 @@ export function epubThemeColors(mode: ReaderColorMode): { background: string; fo
     return { background: "#efe4cf", foreground: "#332719", muted: "#705f4a", link: "#8b5e20" };
   }
   return { background: "#0f0f13", foreground: "#e5e7eb", muted: "#9ca3af", link: "#a5b4fc" };
+}
+
+export function readerTextColor(mode: ReaderColorMode): string {
+  return readerThemeColors(mode).foreground;
+}
+
+// Flips a panel that's only ever been styled for the dark theme (e.g. the rich-text
+// note editor, with dozens of hardcoded heading/link/etc. colors) into a light or sepia
+// look without re-deriving every nested color — same trick as pdfCanvasFilter above.
+// Pair with the [data-rc-mode] img/video correction rule in index.css so embedded
+// images don't get inverted along with the surrounding chrome.
+export function richContentFilter(mode: ReaderColorMode): string {
+  if (mode === "light") return "invert(1) hue-rotate(180deg)";
+  if (mode === "sepia") return "invert(1) hue-rotate(180deg) sepia(0.45) saturate(1.15) brightness(0.97)";
+  return "none";
 }
 
 const AUDIO_EXTENSIONS = new Set([".mp3", ".m4a", ".m4b", ".aac", ".wav", ".ogg"]);
