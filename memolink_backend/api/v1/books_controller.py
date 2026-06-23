@@ -11,6 +11,8 @@ from memolink_backend.di.request_container import RequestContainer, get_request_
 from memolink_backend.business.services.book_service import BookAccessError
 from memolink_backend.business.services.onedrive_service import OneDriveServiceError
 from memolink_backend.business.services.book_note_source_service import run_book_note_source_job
+from memolink_backend.business.services.book_highlight_service import BookHighlightError
+from memolink_backend.utils.file_extractor import extract_pptx_slides
 from memolink_backend.contracts.book_dtos import (
     BookResponseDTO,
     UserBookResponseDTO,
@@ -18,6 +20,9 @@ from memolink_backend.contracts.book_dtos import (
     BookmarkCreateDTO,
     BookmarkResponseDTO,
     BookNoteSourceResponseDTO,
+    BookSlidesResponseDTO,
+    BookHighlightCreateDTO,
+    BookHighlightResponseDTO,
 )
 
 router = APIRouter(prefix="/books", tags=["books"])
@@ -25,12 +30,19 @@ router = APIRouter(prefix="/books", tags=["books"])
 _EXTENSION_MIME_FALLBACK = {
     ".pdf": "application/pdf",
     ".epub": "application/epub+zip",
+    ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
     ".mp3": "audio/mpeg",
     ".m4a": "audio/mp4",
     ".m4b": "audio/mp4",
     ".aac": "audio/aac",
     ".wav": "audio/wav",
     ".ogg": "audio/ogg",
+    ".txt": "text/plain",
+    ".srt": "application/x-subrip",
+    ".vtt": "text/vtt",
+    ".cbz": "application/vnd.comicbook+zip",
+    ".cbr": "application/vnd.comicbook-rar",
+    ".mobi": "application/x-mobipocket-ebook",
 }
 
 
@@ -139,6 +151,45 @@ def list_bookmarks(
     return c.books().list_bookmarks(user_id, book_id)
 
 
+@router.post("/{book_id}/highlights", response_model=BookHighlightResponseDTO)
+def add_highlight(
+    book_id: int,
+    body: BookHighlightCreateDTO,
+    user_id: int = Depends(require_books_access),
+    c: RequestContainer = Depends(get_request_container),
+):
+    try:
+        c.books().get_book_for_reading(user_id, book_id, is_admin=False)
+    except BookAccessError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail)
+
+    try:
+        return c.book_highlights().add_highlight(user_id, book_id, body)
+    except BookHighlightError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail)
+
+
+@router.get("/highlights/{highlight_id}", response_model=BookHighlightResponseDTO)
+def get_highlight(
+    highlight_id: int,
+    user_id: int = Depends(require_books_access),
+    c: RequestContainer = Depends(get_request_container),
+):
+    try:
+        return c.book_highlights().get_highlight(user_id, highlight_id)
+    except BookHighlightError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail)
+
+
+@router.get("/{book_id}/highlights", response_model=list[BookHighlightResponseDTO])
+def list_highlights(
+    book_id: int,
+    user_id: int = Depends(require_books_access),
+    c: RequestContainer = Depends(get_request_container),
+):
+    return c.book_highlights().list_highlights(user_id, book_id)
+
+
 @router.get("/{book_id}/read")
 async def read_book(
     book_id: int,
@@ -166,6 +217,38 @@ async def read_book(
         media_type=book.mime_type or fallback_mime,
         headers={"Content-Disposition": f'inline; filename="{book.file_name or "book"}"'},
     )
+
+
+@router.get("/{book_id}/slides", response_model=BookSlidesResponseDTO)
+async def read_book_slides(
+    book_id: int,
+    info: UserInfo = Depends(get_current_user_info),
+    _access: int = Depends(require_books_access),
+    c: RequestContainer = Depends(get_request_container),
+):
+    """Extracts PPTX slide content (title, bullet text, embedded images) server-side via
+    python-pptx, since there's no LibreOffice-free way to render the OOXML format visually."""
+    try:
+        book = c.books().get_book_for_reading(info.id, book_id, is_admin=info.is_admin)
+    except BookAccessError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail)
+
+    if (book.file_extension or "").lower() != ".pptx":
+        raise HTTPException(status_code=400, detail="Slide extraction is only available for .pptx books")
+
+    try:
+        content = await c.onedrive().download_file_bytes(
+            drive_id=book.onedrive_drive_id, item_id=book.onedrive_item_id
+        )
+    except OneDriveServiceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail)
+
+    try:
+        slides = extract_pptx_slides(content)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to parse PPTX: {exc}")
+
+    return BookSlidesResponseDTO(slides=slides)
 
 
 @router.post("/{book_id}/save-as-note-source", response_model=BookNoteSourceResponseDTO)

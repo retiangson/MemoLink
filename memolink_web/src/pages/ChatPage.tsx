@@ -67,7 +67,7 @@ import { useCalendar } from "../hooks/useCalendar";
 import { BooksLibraryModal } from "../components/BooksLibraryModal";
 import { BookReader } from "../components/BookReader";
 import { useBookTabs } from "../hooks/useBookTabs";
-import { listMyBooks, type Book } from "../api/booksApi";
+import { listMyBooks, getBook, getBookHighlight, type Book } from "../api/booksApi";
 
 type WorkspaceHook = ReturnType<typeof useWorkspace>;
 type LayoutMode = "stacked" | "columns" | "rows";
@@ -770,6 +770,23 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
     const ub = myBooks.find((m) => m.book_id === bookId);
     if (!ub?.book) return;
     openBookTab(ub.book, ub.current_page || 1);
+  }
+
+  // Double-clicking a highlight blockquote inside a Note jumps back into the book it
+  // came from, scrolled to and flashed at the exact highlighted text.
+  async function openBookHighlight(highlightId: number) {
+    try {
+      const highlight = await getBookHighlight(highlightId);
+      const book = await getBook(highlight.book_id);
+      bookTabs.openBookTab(book, highlight.page_number, {
+        page: highlight.page_number,
+        start: highlight.start_offset,
+        end: highlight.end_offset,
+      });
+      setActiveTabType("book");
+    } catch {
+      // ignore — book may no longer be available
+    }
   }
 
   function closeActiveBookTab() {
@@ -1622,6 +1639,8 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                 initialPage={bookTabs.active.initialPage}
                 onClose={closeActiveBookTab}
                 onProgress={handleBookProgress}
+                jumpToHighlight={bookTabs.active.pendingHighlight}
+                onJumpToHighlightHandled={() => bookTabs.clearPendingHighlight(bookTabs.active!.book.id)}
               />
             )
           ) : isEmailActive ? (
@@ -1692,6 +1711,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                 publicAgentFeatureEnabled={flags.public_portfolio_agent_enabled}
                 publicAgentEnabled={editor.active?.note.public_agent_enabled ?? false}
                 onTogglePublicAgent={handleTogglePublicAgent}
+                onOpenHighlight={openBookHighlight}
               />
             </main>
           ) : (
@@ -2017,6 +2037,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                       publicAgentFeatureEnabled={flags.public_portfolio_agent_enabled}
                       publicAgentEnabled={editor.active?.note.public_agent_enabled ?? false}
                       onTogglePublicAgent={handleTogglePublicAgent}
+                      onOpenHighlight={openBookHighlight}
                     />
                   </main>
                 ) : (

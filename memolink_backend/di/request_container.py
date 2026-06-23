@@ -92,6 +92,9 @@ class RequestContainer:
     def book_note_source(self):
         return self.services.get_book_note_source_service()
 
+    def book_highlights(self):
+        return self.services.get_book_highlight_service()
+
 
 def get_request_container(db: Session = Depends(get_db)) -> RequestContainer:
     return RequestContainer(db)

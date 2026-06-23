@@ -43,6 +43,7 @@ interface NoteEditorViewProps {
   publicAgentFeatureEnabled?: boolean;
   publicAgentEnabled?: boolean;
   onTogglePublicAgent?: () => void;
+  onOpenHighlight?: (highlightId: number) => void;
 }
 
 export function NoteEditorView({
@@ -57,6 +58,7 @@ export function NoteEditorView({
   ttsEnabled = true, videoImportEnabled = true,
   timelineEnabled = true, noteId = null,
   publicAgentFeatureEnabled = false, publicAgentEnabled = false, onTogglePublicAgent,
+  onOpenHighlight,
 }: NoteEditorViewProps) {
   const [showPicker, setShowPicker] = useState(false);
   const [colorMode, setColorMode] = useReaderColorMode();
@@ -304,6 +306,7 @@ export function NoteEditorView({
           value={noteContentDraft}
           onChange={(html) => setNoteContentDraft(html)}
           editorRef={editorRef}
+          onOpenHighlight={onOpenHighlight}
         />
       </div>
 

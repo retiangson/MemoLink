@@ -44,8 +44,15 @@
       "Bash(git check-ignore *)",
       "Bash(echo \"exit:$?\")",
       "Bash(grep -rniE \"client_secret\\\\s*=\\\\s*[\\\\\"'][^\\\\\"']+[\\\\\"']|api_key\\\\s*=\\\\s*[\\\\\"'][^\\\\\"']+[\\\\\"']|password\\\\s*=\\\\s*[\\\\\"'][^\\\\\"']+[\\\\\"']|sk-[a-zA-Z0-9]{20,}\" memolink_backend/business/services/onedrive_service.py memolink_backend/api/v1/admin_books_controller.py memolink_backend/api/v1/books_controller.py)",
-      "Bash(git add *)"
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(npx esbuild *)",
+      "Bash(python -m py_compile memolink_backend/business/services/onedrive_service.py memolink_backend/business/services/book_sync_service.py memolink_backend/contracts/book_dtos.py memolink_backend/api/v1/admin_books_controller.py memolink_backend/domain/repositories/desktop_command_repository.py memolink_backend/business/services/desktop_command_service.py memolink_backend/contracts/desktop_command_contracts.py memolink_backend/api/v1/desktop_commands_controller.py)",
+      "Bash(python -m py_compile memolink_backend/api/v1/admin_books_controller.py memolink_backend/api/v1/desktop_commands_controller.py memolink_backend/business/services/book_sync_service.py memolink_backend/business/services/desktop_command_service.py memolink_backend/business/services/onedrive_service.py memolink_backend/contracts/book_dtos.py memolink_backend/contracts/desktop_command_contracts.py memolink_backend/domain/repositories/desktop_command_repository.py)",
+      "Bash(python -m py_compile memolink_backend/business/services/onedrive_service.py)",
+      "Bash(python -m py_compile memolink_backend/utils/file_extractor.py memolink_backend/business/services/onedrive_service.py memolink_backend/contracts/book_dtos.py memolink_backend/api/v1/books_controller.py memolink_backend/business/services/book_note_source_service.py)"
     ],
-    "defaultMode": "acceptEdits"
+    "defaultMode": "bypassPermissions"
   }
 }

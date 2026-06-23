@@ -1,6 +1,7 @@
 ﻿import React, { useEffect, useRef } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
+import { Blockquote } from "@tiptap/extension-blockquote";
 import Underline from "@tiptap/extension-underline";
 import Highlight from "@tiptap/extension-highlight";
 import TextAlign from "@tiptap/extension-text-align";
@@ -24,7 +25,25 @@ interface RichNoteEditorProps {
   noteKey: string | number;  // changes when a different note is opened
   disabled?: boolean;
   editorRef?: React.MutableRefObject<any>;
+  onOpenHighlight?: (highlightId: number) => void;
 }
+
+// Book highlights are appended to their "{Title} - Highlights" note as
+// <blockquote data-hl-id="..."> fragments (see book_highlight_service.py). The default
+// Blockquote node doesn't persist custom attributes, so this extends it to keep
+// data-hl-id intact across getHTML()/setContent() round-trips.
+const BookHighlightBlockquote = Blockquote.extend({
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      "data-hl-id": {
+        default: null,
+        parseHTML: (el: HTMLElement) => el.getAttribute("data-hl-id"),
+        renderHTML: (attrs: any) => (attrs["data-hl-id"] ? { "data-hl-id": attrs["data-hl-id"] } : {}),
+      },
+    };
+  },
+});
 
 function isHtml(s: string) {
   return /^\s*</.test(s);
@@ -113,13 +132,14 @@ const ttsHighlightPlugin = new Plugin({
   },
 });
 
-export function RichNoteEditor({ value, onChange, noteKey, disabled, editorRef }: RichNoteEditorProps) {
+export function RichNoteEditor({ value, onChange, noteKey, disabled, editorRef, onOpenHighlight }: RichNoteEditorProps) {
   const lastSent = useRef<string>("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const editor = useEditor({
     extensions: [
-      StarterKit.configure({ heading: { levels: [1, 2, 3, 4] } }),
+      StarterKit.configure({ heading: { levels: [1, 2, 3, 4] }, blockquote: false }),
+      BookHighlightBlockquote,
       Underline,
       Highlight.configure({ multicolor: false }),
       TextAlign.configure({ types: ["heading", "paragraph"] }),
@@ -186,6 +206,20 @@ export function RichNoteEditor({ value, onChange, noteKey, disabled, editorRef }
 
   // Expose editor instance to parent via ref
   useEffect(() => { if (editorRef) editorRef.current = editor; }, [editor]);
+
+  // Double-clicking a highlight blockquote jumps back into the source book.
+  useEffect(() => {
+    if (!editor || !onOpenHighlight) return;
+    const dom = editor.view.dom;
+    const handler = (ev: MouseEvent) => {
+      const el = (ev.target as HTMLElement).closest("blockquote[data-hl-id]") as HTMLElement | null;
+      if (!el) return;
+      const id = parseInt(el.getAttribute("data-hl-id") || "", 10);
+      if (!Number.isNaN(id)) onOpenHighlight(id);
+    };
+    dom.addEventListener("dblclick", handler);
+    return () => dom.removeEventListener("dblclick", handler);
+  }, [editor, onOpenHighlight]);
 
   // Reinitialise when noteKey changes (switching notes)
   useEffect(() => {

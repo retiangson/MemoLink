@@ -740,6 +740,21 @@ if os.getenv("MEMOLINK_SKIP_DB_BOOTSTRAP") != "1":
             )
         """))
         _conn.execute(text("CREATE INDEX IF NOT EXISTS ix_book_note_chunks_source ON book_note_chunks(book_note_source_id)"))
+        _conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS book_highlights (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                book_id INTEGER NOT NULL REFERENCES books(id) ON DELETE CASCADE,
+                note_id INTEGER NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
+                format VARCHAR(10) NOT NULL,
+                page_number INTEGER NOT NULL,
+                start_offset INTEGER NOT NULL,
+                end_offset INTEGER NOT NULL,
+                snippet TEXT NOT NULL,
+                created_at TIMESTAMPTZ DEFAULT now()
+            )
+        """))
+        _conn.execute(text("CREATE INDEX IF NOT EXISTS ix_book_highlights_book ON book_highlights(user_id, book_id)"))
         _conn.execute(text("INSERT INTO feature_flags (key, value) VALUES ('books_library_enabled', 'true') ON CONFLICT (key) DO NOTHING"))
         # Auto-promote first user as admin if none exists
         _conn.execute(text("""

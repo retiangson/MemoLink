@@ -4,19 +4,30 @@ import type Book from "epubjs/types/book";
 import type Rendition from "epubjs/types/rendition";
 import type Contents from "epubjs/types/contents";
 import {
-  fetchBookBlob, updateBookProgress, addBookmark, listBookmarks,
-  type Bookmark,
+  fetchBookBlob, updateBookProgress, addBookmark, listBookmarks, addBookHighlight, listBookHighlights,
+  type Bookmark, type BookHighlight,
 } from "../../api/booksApi";
-import type { ReaderViewProps } from "./format";
+import type { ReaderViewProps, HighlightAnchor } from "./format";
 import { currentHighlightRange, readerThemeColors, findSentenceIndexForOffset, readerSurfaceClass } from "./format";
 import { useTTS, splitSentences } from "../../hooks/useTTS";
 import { usePageSwipe, computeSwipeDirection } from "../../hooks/usePageSwipe";
+import { useHighlightColor } from "../../hooks/useHighlightColor";
 import { TTSPlayerBar } from "../TTSPlayerBar";
 import { NoteSourceButton } from "./NoteSourceButton";
+import { HighlightColorPicker } from "./HighlightColorPicker";
 import { PageNavArrows } from "./PageNavArrows";
 import { ReaderLoadingState } from "./ReaderLoadingState";
+import { HighlightActionButton } from "./HighlightActionButton";
+import { HIGHLIGHT_COLORS, highlightColorMark } from "./highlightColors";
 
 const HIGHLIGHT_NAME = "ml-tts";
+const JUMP_HIGHLIGHT_NAME = "ml-jump";
+
+function persistHighlightName(colorId: string): string {
+  return `ml-persist-${colorId}`;
+}
+
+interface PendingSelection { x: number; y: number; start: number; end: number; }
 
 interface TextNodeEntry {
   node: Text;
@@ -52,6 +63,23 @@ function ensureHighlightStyle(doc: Document) {
   const style = doc.createElement("style");
   style.id = "ml-tts-highlight-style";
   style.textContent = `::highlight(${HIGHLIGHT_NAME}) { background-color: rgba(99,102,241,0.45); }`;
+  doc.head?.appendChild(style);
+}
+
+function ensureJumpHighlightStyle(doc: Document) {
+  if (doc.getElementById("ml-jump-highlight-style")) return;
+  const style = doc.createElement("style");
+  style.id = "ml-jump-highlight-style";
+  style.textContent = `::highlight(${JUMP_HIGHLIGHT_NAME}) { background-color: rgba(250,204,21,0.6); }`;
+  doc.head?.appendChild(style);
+}
+
+function ensurePersistHighlightStyle(doc: Document, colorId: string) {
+  const styleId = `ml-persist-highlight-style-${colorId}`;
+  if (doc.getElementById(styleId)) return;
+  const style = doc.createElement("style");
+  style.id = styleId;
+  style.textContent = `::highlight(${persistHighlightName(colorId)}) { background-color: ${highlightColorMark(colorId)}; }`;
   doc.head?.appendChild(style);
 }
 
@@ -96,6 +124,7 @@ function applyEpubContentsTheme(list: Contents[], mode: ReaderViewProps["colorMo
 export function EpubReaderView({
   book, initialPage, colorMode, onProgress,
   noteStatus, noteStatusLoaded, savingNoteSource, onSaveAsNoteSource,
+  jumpToHighlight, onJumpToHighlightHandled,
 }: ReaderViewProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const epubBookRef = useRef<Book | null>(null);
@@ -103,7 +132,10 @@ export function EpubReaderView({
   const pageTextRef = useRef<string>("");
   const textNodesRef = useRef<TextNodeEntry[]>([]);
   const activeHighlightWinsRef = useRef<Set<any>>(new Set());
+  const activeJumpWinsRef = useRef<Set<any>>(new Set());
+  const persistentWinsRef = useRef<Set<any>>(new Set());
   const clickListenersRef = useRef<{ doc: Document; fn: (e: MouseEvent) => void }[]>([]);
+  const selectionListenersRef = useRef<{ doc: Document; fn: () => void }[]>([]);
   const swipeListenersRef = useRef<{ doc: Document; start: (e: TouchEvent) => void; end: (e: TouchEvent) => void }[]>([]);
   const autoContinueRef = useRef(false);
   // epub.js callbacks (rendition.on("relocated", ...), iframe doc listeners) are registered
@@ -120,6 +152,11 @@ export function EpubReaderView({
   // display() resolves last wins and fires "relocated" last, snapping the page back even though
   // the user already saw it flip forward.
   const navigatingRef = useRef(false);
+  // Same stale-closure problem as above: the highlights fetch and the epub.js "relocated"
+  // listener (registered once at mount) race independently, so applyPersistentHighlights
+  // must always read the latest fetched highlights rather than whatever was bound when its
+  // caller's closure was created.
+  const highlightsRef = useRef<BookHighlight[]>([]);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -130,8 +167,11 @@ export function EpubReaderView({
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
   const [showBookmarks, setShowBookmarks] = useState(false);
   const [pageAnim, setPageAnim] = useState<"next" | "prev" | null>(null);
+  const [pendingSelection, setPendingSelection] = useState<PendingSelection | null>(null);
+  const [highlights, setHighlights] = useState<BookHighlight[]>([]);
 
   const tts = useTTS();
+  const [highlightColor, setHighlightColor] = useHighlightColor();
 
   useEffect(() => {
     colorModeRef.current = colorMode;
@@ -201,13 +241,15 @@ export function EpubReaderView({
         setMoveBounds((rendition as any).currentLocation?.());
 
         rendition.on("relocated", (location: any) => {
+          // Every controlled navigation path (initial load, next/prev, CFI jump in
+          // navigateTo) already sets currentPage explicitly right after it runs. epub.js
+          // can fire a *second*, delayed "relocated" for the same navigation once the
+          // iframe's content reflows (fonts/images loading async) — by then navigatingRef
+          // has already been reset to false, so deriving the page from this event's own
+          // CFI->location lookup would silently snap the page number to a drifted value
+          // (location-index granularity is content-dependent, so the drift isn't constant).
+          // Only use this event for move-bounds/text-map bookkeeping, never for the page #.
           setMoveBounds(location);
-          const idx = typeof location?.start?.location === "number"
-            ? location.start.location
-            : epubBook.locations.locationFromCfi(location?.start?.cfi);
-          if (!navigatingRef.current && typeof idx === "number" && idx >= 0) {
-            setCurrentPageValue(idx + 1);
-          }
           refreshTextMap();
           if (autoContinueRef.current) {
             autoContinueRef.current = false;
@@ -227,7 +269,10 @@ export function EpubReaderView({
     return () => {
       cancelled = true;
       clearHighlight();
+      clearJumpHighlight();
+      clearPersistentHighlights();
       clearClickListeners();
+      clearSelectionListeners();
       clearSwipeListeners();
       renditionRef.current?.destroy();
       epubBookRef.current?.destroy();
@@ -239,6 +284,19 @@ export function EpubReaderView({
   useEffect(() => {
     listBookmarks(book.id).then(setBookmarks).catch(() => {});
   }, [book.id]);
+
+  useEffect(() => {
+    listBookHighlights(book.id).then(setHighlights).catch(() => {});
+  }, [book.id]);
+
+  // Re-paints whenever the highlights list changes (initial fetch resolving, or a highlight
+  // just added) — the page-change case is covered by refreshTextMap calling this directly,
+  // since textNodesRef is only fresh once that rebuild runs.
+  useEffect(() => {
+    highlightsRef.current = highlights;
+    applyPersistentHighlights();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [highlights]);
 
   useEffect(() => {
     if (loading || numPages === 0) return;
@@ -292,9 +350,116 @@ export function EpubReaderView({
     applyHighlight(range);
   }, [tts.playing, tts.currentSentenceIdx, tts.currentWord, tts.sentencesList]);
 
+  function clearJumpHighlight() {
+    activeJumpWinsRef.current.forEach((win) => {
+      try { win?.CSS?.highlights?.delete(JUMP_HIGHLIGHT_NAME); } catch { /* ignore */ }
+    });
+    activeJumpWinsRef.current.clear();
+  }
+
+  function applyJumpHighlight(range: { start: number; end: number }) {
+    clearJumpHighlight();
+    const byWin = new Map<any, Range[]>();
+    for (const n of textNodesRef.current) {
+      if (n.end <= range.start || n.start >= range.end) continue;
+      if (!n.win?.CSS?.highlights || !n.win?.Highlight) continue;
+      const s = Math.max(0, range.start - n.start);
+      const e = Math.min(n.node.length, range.end - n.start);
+      if (e <= s) continue;
+      const r = n.doc.createRange();
+      r.setStart(n.node, s);
+      r.setEnd(n.node, e);
+      ensureJumpHighlightStyle(n.doc);
+      const arr = byWin.get(n.win) ?? [];
+      arr.push(r);
+      byWin.set(n.win, arr);
+    }
+    byWin.forEach((ranges, win) => {
+      const hl = new win.Highlight(...ranges);
+      win.CSS.highlights.set(JUMP_HIGHLIGHT_NAME, hl);
+      activeJumpWinsRef.current.add(win);
+    });
+  }
+
+  function flashJumpHighlight(anchor: HighlightAnchor) {
+    applyJumpHighlight({ start: anchor.start, end: anchor.end });
+    const entry = textNodesRef.current.find((n) => n.end > anchor.start && n.start < anchor.end);
+    entry?.node.parentElement?.scrollIntoView?.({ behavior: "smooth", block: "center" });
+    // The jump overlay paints on top of (without erasing) any persistent highlight already
+    // drawn for this range — clearing it after the flash reveals the persistent color underneath.
+    setTimeout(() => clearJumpHighlight(), 2500);
+  }
+
+  function clearPersistentHighlights() {
+    persistentWinsRef.current.forEach((win) => {
+      HIGHLIGHT_COLORS.forEach((c) => {
+        try { win?.CSS?.highlights?.delete(persistHighlightName(c.id)); } catch { /* ignore */ }
+      });
+    });
+    persistentWinsRef.current.clear();
+  }
+
+  // Paints every saved highlight on the currently displayed page as a permanent
+  // CSS Custom Highlight, one named highlight per distinct color present — this is what
+  // makes highlights visible again on revisit, not just flash briefly.
+  function applyPersistentHighlights() {
+    clearPersistentHighlights();
+    const onThisPage = highlightsRef.current.filter((h) => h.page_number === currentPageRef.current);
+    if (onThisPage.length === 0) return;
+    const byColorWin = new Map<string, Map<any, Range[]>>();
+    for (const h of onThisPage) {
+      for (const n of textNodesRef.current) {
+        if (n.end <= h.start_offset || n.start >= h.end_offset) continue;
+        if (!n.win?.CSS?.highlights || !n.win?.Highlight) continue;
+        const s = Math.max(0, h.start_offset - n.start);
+        const e = Math.min(n.node.length, h.end_offset - n.start);
+        if (e <= s) continue;
+        const r = n.doc.createRange();
+        r.setStart(n.node, s);
+        r.setEnd(n.node, e);
+        ensurePersistHighlightStyle(n.doc, h.color);
+        const winMap = byColorWin.get(h.color) ?? new Map<any, Range[]>();
+        const arr = winMap.get(n.win) ?? [];
+        arr.push(r);
+        winMap.set(n.win, arr);
+        byColorWin.set(h.color, winMap);
+      }
+    }
+    byColorWin.forEach((winMap, colorId) => {
+      const name = persistHighlightName(colorId);
+      winMap.forEach((ranges, win) => {
+        const hl = new win.Highlight(...ranges);
+        win.CSS.highlights.set(name, hl);
+        persistentWinsRef.current.add(win);
+      });
+    });
+  }
+
+  // Arrival from a Note double-click: jump to the highlight's page if we're not already
+  // there; once textNodesRef is rebuilt for that page (refreshTextMap, called from
+  // navigateTo/relocated), flash the matching range.
+  useEffect(() => {
+    if (loading || !jumpToHighlight) return;
+    if (jumpToHighlight.page !== currentPage) {
+      void goToPage(jumpToHighlight.page);
+      return;
+    }
+    const raf = requestAnimationFrame(() => {
+      flashJumpHighlight(jumpToHighlight);
+      onJumpToHighlightHandled?.();
+    });
+    return () => cancelAnimationFrame(raf);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [jumpToHighlight, currentPage, loading]);
+
   function clearClickListeners() {
     clickListenersRef.current.forEach(({ doc, fn }) => doc.removeEventListener("dblclick", fn));
     clickListenersRef.current = [];
+  }
+
+  function clearSelectionListeners() {
+    selectionListenersRef.current.forEach(({ doc, fn }) => doc.removeEventListener("selectionchange", fn));
+    selectionListenersRef.current = [];
   }
 
   function clearSwipeListeners() {
@@ -315,7 +480,9 @@ export function EpubReaderView({
     pageTextRef.current = text;
     textNodesRef.current = nodes;
     attachClickListeners(list);
+    attachSelectionListeners(list);
     attachSwipeListeners(list);
+    applyPersistentHighlights();
   }
 
   function attachClickListeners(list: Contents[]) {
@@ -340,6 +507,67 @@ export function EpubReaderView({
       doc.addEventListener("dblclick", fn);
       clickListenersRef.current.push({ doc, fn });
     });
+  }
+
+  function attachSelectionListeners(list: Contents[]) {
+    clearSelectionListeners();
+    list.forEach((c: any) => {
+      const doc: Document | undefined = c?.document;
+      const win: any = c?.window;
+      if (!doc || !win) return;
+      const fn = () => {
+        const sel = doc.getSelection?.() ?? win.getSelection?.();
+        if (!sel || sel.isCollapsed || sel.rangeCount === 0) {
+          setPendingSelection(null);
+          return;
+        }
+        const range = sel.getRangeAt(0);
+        const startEntry = textNodesRef.current.find((n) => n.node === range.startContainer);
+        const endEntry = textNodesRef.current.find((n) => n.node === range.endContainer);
+        if (!startEntry || !endEntry) {
+          setPendingSelection(null);
+          return;
+        }
+        const start = startEntry.start + range.startOffset;
+        const end = endEntry.start + range.endOffset;
+        if (end <= start) {
+          setPendingSelection(null);
+          return;
+        }
+        const rect = range.getBoundingClientRect();
+        const frameEl = win.frameElement as HTMLIFrameElement | null;
+        const frameRect = frameEl?.getBoundingClientRect();
+        setPendingSelection({
+          x: (frameRect?.left ?? 0) + rect.left + rect.width / 2,
+          y: (frameRect?.top ?? 0) + rect.top,
+          start,
+          end,
+        });
+      };
+      doc.addEventListener("selectionchange", fn);
+      selectionListenersRef.current.push({ doc, fn });
+    });
+  }
+
+  async function handleAddHighlight() {
+    if (!pendingSelection) return;
+    const snippet = pageTextRef.current.slice(pendingSelection.start, pendingSelection.end);
+    const created = await addBookHighlight(book.id, {
+      format: "epub",
+      // currentPageRef, not the currentPage state — pendingSelection is set from a native
+      // selectionchange listener on the iframe document (outside React's render cycle), so
+      // if a page navigation just landed, the state value can still lag one render behind.
+      page_number: currentPageRef.current,
+      start_offset: pendingSelection.start,
+      end_offset: pendingSelection.end,
+      snippet,
+      color: highlightColor,
+    });
+    setHighlights((prev) => [...prev, created]);
+    const contents = renditionRef.current?.getContents();
+    const list = (Array.isArray(contents) ? contents : contents ? [contents] : []) as Contents[];
+    list.forEach((c: any) => c?.window?.getSelection?.()?.removeAllRanges());
+    setTimeout(() => setPendingSelection(null), 900);
   }
 
   // The rendered page content lives inside epub.js's own iframe per chapter, which is a
@@ -386,6 +614,7 @@ export function EpubReaderView({
     try {
       tts.stop();
       clearHighlight();
+      setPendingSelection(null);
       setPageAnim(p > curPage ? "next" : "prev");
       if (p === curPage + 1) {
         await rendition.next();
@@ -480,6 +709,10 @@ export function EpubReaderView({
         )}
       </div>
 
+      {pendingSelection && (
+        <HighlightActionButton x={pendingSelection.x} y={pendingSelection.y} onHighlight={handleAddHighlight} />
+      )}
+
       {tts.playing && (
         <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50">
           <TTSPlayerBar
@@ -543,6 +776,7 @@ export function EpubReaderView({
             >
               {tts.playing ? (tts.paused ? "Resume" : "Pause") : "Read Aloud"}
             </button>
+            <HighlightColorPicker value={highlightColor} onChange={setHighlightColor} />
           </div>
 
           <div className="flex items-center gap-2">

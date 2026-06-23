@@ -118,6 +118,16 @@ class NoteRepository:
         note.undo_available = False
         self.db.commit()
 
+    def get_by_source_for_user(self, user_id: int, source: str, workspace_id: int | None = None) -> Optional[Note]:
+        q = self.db.query(Note).filter(
+            Note.user_id == user_id,
+            Note.source == source,
+            Note.deleted_at == None,
+        )
+        if workspace_id is not None:
+            q = q.filter(or_(Note.workspace_id == workspace_id, Note.workspace_id == None))
+        return q.first()
+
     def find_by_title_for_user(self, user_id: int, name: str, workspace_id: int | None = None) -> Optional[Note]:
         """Fuzzy title search: exact → starts-with → contains."""
         notes = self.get_for_user(user_id, workspace_id)

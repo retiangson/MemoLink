@@ -72,6 +72,31 @@ class BookmarkResponseDTO(BaseModel):
     created_at: Optional[datetime] = None
 
 
+class BookHighlightCreateDTO(BaseModel):
+    format: str
+    page_number: int
+    start_offset: int
+    end_offset: int
+    snippet: str
+    color: str = "yellow"
+
+
+class BookHighlightResponseDTO(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    user_id: int
+    book_id: int
+    note_id: int
+    format: str
+    page_number: int
+    start_offset: int
+    end_offset: int
+    snippet: str
+    color: str = "yellow"
+    created_at: Optional[datetime] = None
+
+
 class BookNoteSourceResponseDTO(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -100,6 +125,10 @@ class OneDriveSyncPageResultDTO(BaseModel):
     scanned: int
     created: int
     updated: int
+
+
+class BookSlidesResponseDTO(BaseModel):
+    slides: List[str]
 
 
 class BookIdsDTO(BaseModel):
