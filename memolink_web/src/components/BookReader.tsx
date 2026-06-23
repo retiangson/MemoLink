@@ -4,6 +4,8 @@ import { getBookFormat } from "./book-readers/format";
 import { PdfReaderView } from "./book-readers/PdfReaderView";
 import { EpubReaderView } from "./book-readers/EpubReaderView";
 import { AudioReaderView } from "./book-readers/AudioReaderView";
+import { ColorModePicker } from "./ColorModePicker";
+import { useReaderColorMode } from "../hooks/useReaderColorMode";
 
 interface Props {
   book: Book;
@@ -17,6 +19,7 @@ export function BookReader({ book, initialPage, onClose, onProgress, onAskAI }: 
   const [noteStatus, setNoteStatus] = useState<BookNoteSourceStatus | null>(null);
   const [noteStatusLoaded, setNoteStatusLoaded] = useState(false);
   const [savingNoteSource, setSavingNoteSource] = useState(false);
+  const [colorMode, setColorMode] = useReaderColorMode();
   const format = getBookFormat(book);
 
   useEffect(() => {
@@ -69,6 +72,7 @@ export function BookReader({ book, initialPage, onClose, onProgress, onAskAI }: 
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          <ColorModePicker value={colorMode} onChange={setColorMode} />
           {onAskAI && (
             <button
               onClick={() => onAskAI(book)}
@@ -86,9 +90,9 @@ export function BookReader({ book, initialPage, onClose, onProgress, onAskAI }: 
         </div>
       )}
 
-      {format === "pdf" && <PdfReaderView book={book} initialPage={initialPage} onProgress={onProgress} {...noteSourceProps} />}
-      {format === "epub" && <EpubReaderView book={book} initialPage={initialPage} onProgress={onProgress} {...noteSourceProps} />}
-      {format === "audio" && <AudioReaderView book={book} initialPage={initialPage} onProgress={onProgress} />}
+      {format === "pdf" && <PdfReaderView book={book} initialPage={initialPage} colorMode={colorMode} onProgress={onProgress} {...noteSourceProps} />}
+      {format === "epub" && <EpubReaderView book={book} initialPage={initialPage} colorMode={colorMode} onProgress={onProgress} {...noteSourceProps} />}
+      {format === "audio" && <AudioReaderView book={book} initialPage={initialPage} colorMode={colorMode} onProgress={onProgress} />}
       {format === "unsupported" && (
         <div className="flex-1 flex items-center justify-center text-gray-500 text-sm">
           This file type ({book.file_extension || book.mime_type || "unknown"}) isn't supported by the reader yet.

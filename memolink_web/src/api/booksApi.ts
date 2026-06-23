@@ -54,6 +54,72 @@ export interface BookNoteSourceStatus {
   updated_at?: string | null;
 }
 
+interface CachedBookBlob {
+  bookId: number;
+  signature: string;
+  blob: Blob;
+  savedAt: number;
+}
+
+const BOOK_CACHE_DB = "memolink-book-cache";
+const BOOK_CACHE_STORE = "books";
+const BOOK_CACHE_VERSION = 1;
+
+function bookCacheSignature(book: Book): string {
+  return [
+    book.onedrive_web_url ?? "",
+    book.last_modified ?? "",
+    book.file_size ?? "",
+    book.file_name ?? "",
+  ].join("|");
+}
+
+function openBookCache(): Promise<IDBDatabase | null> {
+  if (typeof indexedDB === "undefined") return Promise.resolve(null);
+  return new Promise((resolve) => {
+    const request = indexedDB.open(BOOK_CACHE_DB, BOOK_CACHE_VERSION);
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains(BOOK_CACHE_STORE)) {
+        db.createObjectStore(BOOK_CACHE_STORE, { keyPath: "bookId" });
+      }
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => resolve(null);
+    request.onblocked = () => resolve(null);
+  });
+}
+
+async function getCachedBookBlob(bookId: number, signature: string): Promise<Blob | null> {
+  const db = await openBookCache();
+  if (!db) return null;
+  return new Promise((resolve) => {
+    const tx = db.transaction(BOOK_CACHE_STORE, "readonly");
+    const store = tx.objectStore(BOOK_CACHE_STORE);
+    const request = store.get(bookId);
+    request.onsuccess = () => {
+      const cached = request.result as CachedBookBlob | undefined;
+      resolve(cached?.signature === signature ? cached.blob : null);
+    };
+    request.onerror = () => resolve(null);
+    tx.oncomplete = () => db.close();
+    tx.onerror = () => db.close();
+    tx.onabort = () => db.close();
+  });
+}
+
+async function putCachedBookBlob(bookId: number, signature: string, blob: Blob): Promise<void> {
+  const db = await openBookCache();
+  if (!db) return;
+  await new Promise<void>((resolve) => {
+    const tx = db.transaction(BOOK_CACHE_STORE, "readwrite");
+    tx.objectStore(BOOK_CACHE_STORE).put({ bookId, signature, blob, savedAt: Date.now() } satisfies CachedBookBlob);
+    tx.oncomplete = () => { db.close(); resolve(); };
+    tx.onerror = () => { db.close(); resolve(); };
+    tx.onabort = () => { db.close(); resolve(); };
+  });
+}
+
 export async function listBooks(params?: { search?: string; category?: string; tag?: string }): Promise<Book[]> {
   return (await api.get("/books", { params })).data;
 }
@@ -86,8 +152,14 @@ export async function listBookmarks(bookId: number): Promise<Bookmark[]> {
   return (await api.get(`/books/${bookId}/bookmarks`)).data;
 }
 
-export async function fetchBookBlob(bookId: number): Promise<Blob> {
+export async function fetchBookBlob(bookOrId: Book | number): Promise<Blob> {
+  const bookId = typeof bookOrId === "number" ? bookOrId : bookOrId.id;
+  const signature = typeof bookOrId === "number" ? "" : bookCacheSignature(bookOrId);
+  const cached = await getCachedBookBlob(bookId, signature);
+  if (cached) return cached;
+
   const r = await api.get(`/books/${bookId}/read`, { responseType: "blob" });
+  await putCachedBookBlob(bookId, signature, r.data);
   return r.data;
 }
 

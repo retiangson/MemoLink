@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   listAdminBooks, getOneDriveStatus, getOneDriveAuthUrl, disconnectOneDrive,
   syncBooks, updateBookMetadata, publishBook, unpublishBook,
   publishAllBooks, unpublishAllBooks, publishSelectedBooks, unpublishSelectedBooks,
   type OneDriveStatus, type BookSyncResult,
 } from "../api/adminBooksApi";
+import { createDesktopCommand, getDesktopCommand, isDesktopOnline } from "../api/desktopApi";
 import type { Book } from "../api/booksApi";
 
 const OFFICE_CLIENT_ID = "4765445b-32c6-49b0-83e6-1d93765276ca";
@@ -17,6 +18,8 @@ export function AdminBooksPanel() {
   const [connecting, setConnecting] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<BookSyncResult | null>(null);
+  const [desktopSync, setDesktopSync] = useState<{ status: "running" | "done" | "failed"; message: string } | null>(null);
+  const desktopSyncStopRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editForm, setEditForm] = useState<{ title: string; author: string; description: string; category: string; tags: string }>({
@@ -36,6 +39,7 @@ export function AdminBooksPanel() {
       window.history.replaceState({}, "", window.location.pathname);
       loadStatusAndBooks(1);
     }
+    return () => { desktopSyncStopRef.current = true; };
   }, []);
 
   async function loadStatusAndBooks(targetPage: number) {
@@ -104,6 +108,37 @@ export function AdminBooksPanel() {
       setError(err?.response?.data?.detail ?? "Sync failed.");
     } finally {
       setSyncing(false);
+    }
+  }
+
+  async function handleDesktopSync() {
+    setError(null);
+    const online = await isDesktopOnline();
+    if (!online) {
+      setError("MemoLink desktop app isn't connected. Open the desktop app and sign in as this admin, then try again.");
+      return;
+    }
+    desktopSyncStopRef.current = false;
+    setDesktopSync({ status: "running", message: "Starting…" });
+    try {
+      const cmd = await createDesktopCommand("onedrive-sync", {});
+      while (!desktopSyncStopRef.current) {
+        await new Promise((r) => setTimeout(r, 2000));
+        const updated = await getDesktopCommand(cmd.id);
+        const parsed = updated.result ? JSON.parse(updated.result) : null;
+        if (updated.status === "done") {
+          setDesktopSync({ status: "done", message: parsed?.output ?? "Sync complete." });
+          await loadStatusAndBooks(1);
+          return;
+        }
+        if (updated.status === "failed") {
+          setDesktopSync({ status: "failed", message: parsed?.error ?? "Sync failed." });
+          return;
+        }
+        setDesktopSync({ status: "running", message: parsed?.output ?? "Syncing…" });
+      }
+    } catch (err: any) {
+      setDesktopSync({ status: "failed", message: err?.response?.data?.detail ?? "Could not start desktop sync." });
     }
   }
 
@@ -221,19 +256,38 @@ export function AdminBooksPanel() {
         </div>
 
         {status?.connected && (
-          <div className="mt-3 pt-3 border-t border-[var(--ml-bg-hover)] flex items-center gap-3">
-            <button
-              onClick={handleSync}
-              disabled={syncing}
-              className="px-3 py-1.5 text-xs rounded-lg bg-indigo-600/20 text-indigo-300 hover:bg-indigo-600/30 transition disabled:opacity-50"
-            >
-              {syncing ? "Syncing…" : "Sync Books from OneDrive"}
-            </button>
-            {syncResult && (
-              <p className="text-xs text-gray-500">
-                Scanned {syncResult.scanned} · {syncResult.created} new · {syncResult.updated} updated
-              </p>
-            )}
+          <div className="mt-3 pt-3 border-t border-[var(--ml-bg-hover)] flex flex-col gap-2">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleSync}
+                disabled={syncing}
+                className="px-3 py-1.5 text-xs rounded-lg bg-indigo-600/20 text-indigo-300 hover:bg-indigo-600/30 transition disabled:opacity-50"
+              >
+                {syncing ? "Syncing…" : "Sync Books from OneDrive"}
+              </button>
+              {syncResult && (
+                <p className="text-xs text-gray-500">
+                  Scanned {syncResult.scanned} · {syncResult.created} new · {syncResult.updated} updated
+                </p>
+              )}
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleDesktopSync}
+                disabled={desktopSync?.status === "running"}
+                className="px-3 py-1.5 text-xs rounded-lg border border-amber-500/40 text-amber-400 hover:bg-amber-500/10 transition disabled:opacity-50"
+              >
+                {desktopSync?.status === "running" ? "Syncing via desktop app…" : "Sync via Desktop App (any folder size)"}
+              </button>
+              {desktopSync && (
+                <p className={`text-xs ${desktopSync.status === "failed" ? "text-red-400" : "text-gray-500"}`}>
+                  {desktopSync.message}
+                </p>
+              )}
+            </div>
+            <p className="text-[10px] text-gray-600">
+              Use the desktop sync for very large OneDrive folders — it runs the walk from the MemoLink desktop app on your machine, with no request timeout, so it can take as long as needed.
+            </p>
           </div>
         )}
 

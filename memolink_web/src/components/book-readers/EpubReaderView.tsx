@@ -8,12 +8,13 @@ import {
   type Bookmark,
 } from "../../api/booksApi";
 import type { ReaderViewProps } from "./format";
-import { currentHighlightRange, findSentenceIndexForOffset } from "./format";
+import { currentHighlightRange, readerThemeColors, findSentenceIndexForOffset, readerSurfaceClass } from "./format";
 import { useTTS, splitSentences } from "../../hooks/useTTS";
 import { usePageSwipe, computeSwipeDirection } from "../../hooks/usePageSwipe";
 import { TTSPlayerBar } from "../TTSPlayerBar";
 import { NoteSourceButton } from "./NoteSourceButton";
 import { PageNavArrows } from "./PageNavArrows";
+import { ReaderLoadingState } from "./ReaderLoadingState";
 
 const HIGHLIGHT_NAME = "ml-tts";
 
@@ -54,8 +55,46 @@ function ensureHighlightStyle(doc: Document) {
   doc.head?.appendChild(style);
 }
 
+function applyEpubContentsTheme(list: Contents[], mode: ReaderViewProps["colorMode"]) {
+  const colors = readerThemeColors(mode);
+  list.forEach((c: any) => {
+    const doc: Document | undefined = c?.document;
+    if (!doc) return;
+    doc.documentElement.style.backgroundColor = colors.background;
+    if (doc.body) {
+      doc.body.style.backgroundColor = colors.background;
+      doc.body.style.color = colors.foreground;
+    }
+
+    let style = doc.getElementById("ml-reader-color-mode") as HTMLStyleElement | null;
+    if (!style) {
+      style = doc.createElement("style");
+      style.id = "ml-reader-color-mode";
+      doc.head?.appendChild(style);
+    }
+    style.textContent = `
+      html, body {
+        background: ${colors.background} !important;
+        color: ${colors.foreground} !important;
+      }
+      p, li, blockquote, div, section, article, span, td, th, h1, h2, h3, h4, h5, h6 {
+        color: ${colors.foreground} !important;
+      }
+      small, figcaption, caption {
+        color: ${colors.muted} !important;
+      }
+      a {
+        color: ${colors.link} !important;
+      }
+      ::selection {
+        background: rgba(99, 102, 241, 0.35) !important;
+      }
+    `;
+  });
+}
+
 export function EpubReaderView({
-  book, initialPage, onProgress,
+  book, initialPage, colorMode, onProgress,
   noteStatus, noteStatusLoaded, savingNoteSource, onSaveAsNoteSource,
 }: ReaderViewProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -73,16 +112,55 @@ export function EpubReaderView({
   // state setters so imperative code always sees the latest values.
   const currentPageRef = useRef(Math.max(1, initialPage || 1));
   const numPagesRef = useRef(0);
+  const canMovePrevRef = useRef(false);
+  const canMoveNextRef = useRef(true);
+  const colorModeRef = useRef(colorMode);
+  // rendition.display() is async; without this guard, a second navigateTo() fired before the
+  // first resolves (e.g. two quick swipes, or a double-tap on Prev/Next) can race it — whichever
+  // display() resolves last wins and fires "relocated" last, snapping the page back even though
+  // the user already saw it flip forward.
+  const navigatingRef = useRef(false);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [numPages, setNumPages] = useState(0);
   const [currentPage, setCurrentPage] = useState(Math.max(1, initialPage || 1));
+  const [canMovePrev, setCanMovePrev] = useState(false);
+  const [canMoveNext, setCanMoveNext] = useState(true);
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
   const [showBookmarks, setShowBookmarks] = useState(false);
   const [pageAnim, setPageAnim] = useState<"next" | "prev" | null>(null);
 
   const tts = useTTS();
+
+  useEffect(() => {
+    colorModeRef.current = colorMode;
+    const rendition = renditionRef.current;
+    if (!rendition) return;
+    const contents = rendition.getContents();
+    const list = (Array.isArray(contents) ? contents : [contents]) as Contents[];
+    applyEpubContentsTheme(list, colorMode);
+  }, [colorMode]);
+
+  function setCurrentPageValue(page: number) {
+    currentPageRef.current = page;
+    setCurrentPage(page);
+    if (page > numPagesRef.current) setNumPagesValue(page);
+  }
+
+  function setNumPagesValue(total: number) {
+    const safeTotal = Math.max(1, total);
+    numPagesRef.current = safeTotal;
+    setNumPages(safeTotal);
+  }
+
+  function setMoveBounds(location: any) {
+    if (!location) return;
+    canMovePrevRef.current = !location.atStart;
+    canMoveNextRef.current = !location.atEnd;
+    setCanMovePrev(!location.atStart);
+    setCanMoveNext(!location.atEnd);
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -91,7 +169,7 @@ export function EpubReaderView({
 
     (async () => {
       try {
-        const blob = await fetchBookBlob(book.id);
+        const blob = await fetchBookBlob(book);
         const buf = await blob.arrayBuffer();
         if (cancelled || !containerRef.current) return;
 
@@ -107,24 +185,28 @@ export function EpubReaderView({
         });
         renditionRef.current = rendition;
 
-        await epubBook.locations.generate(1000);
+        await epubBook.locations.generate(150);
         if (cancelled) return;
         const total = epubBook.locations.length();
-        numPagesRef.current = total;
-        setNumPages(total);
+        setNumPagesValue(total);
 
         const startLoc = Math.min(Math.max(0, (initialPage || 1) - 1), Math.max(0, total - 1));
-        currentPageRef.current = startLoc + 1;
+        setCurrentPageValue(startLoc + 1);
+        canMovePrevRef.current = startLoc > 0;
+        setCanMovePrev(startLoc > 0);
         const startCfi = total > 0 ? epubBook.locations.cfiFromLocation(startLoc) : undefined;
         await rendition.display(startCfi);
         if (cancelled) return;
         refreshTextMap();
+        setMoveBounds((rendition as any).currentLocation?.());
 
         rendition.on("relocated", (location: any) => {
-          const idx = epubBook.locations.locationFromCfi(location.start.cfi);
-          if (typeof idx === "number" && idx >= 0) {
-            currentPageRef.current = idx + 1;
-            setCurrentPage(idx + 1);
+          setMoveBounds(location);
+          const idx = typeof location?.start?.location === "number"
+            ? location.start.location
+            : epubBook.locations.locationFromCfi(location?.start?.cfi);
+          if (!navigatingRef.current && typeof idx === "number" && idx >= 0) {
+            setCurrentPageValue(idx + 1);
           }
           refreshTextMap();
           if (autoContinueRef.current) {
@@ -228,6 +310,7 @@ export function EpubReaderView({
     if (!rendition) return;
     const contents = rendition.getContents();
     const list = (Array.isArray(contents) ? contents : [contents]) as Contents[];
+    applyEpubContentsTheme(list, colorModeRef.current);
     const { text, nodes } = buildCombinedTextMap(list);
     pageTextRef.current = text;
     textNodesRef.current = nodes;
@@ -294,11 +377,30 @@ export function EpubReaderView({
     const rendition = renditionRef.current;
     const numPagesNow = numPagesRef.current;
     const curPage = currentPageRef.current;
-    if (!epubBook || !rendition || p < 1 || p > numPagesNow || p === curPage) return;
-    tts.stop();
-    clearHighlight();
-    setPageAnim(p > curPage ? "next" : "prev");
-    await rendition.display(epubBook.locations.cfiFromLocation(p - 1));
+    if (!epubBook || !rendition || p < 1 || p === curPage) return;
+    if (p < curPage && !canMovePrevRef.current) return;
+    if (p > curPage && p === curPage + 1 && !canMoveNextRef.current) return;
+    if (p > curPage + 1 && p > numPagesNow) return;
+    if (navigatingRef.current) return;
+    navigatingRef.current = true;
+    try {
+      tts.stop();
+      clearHighlight();
+      setPageAnim(p > curPage ? "next" : "prev");
+      if (p === curPage + 1) {
+        await rendition.next();
+      } else if (p === curPage - 1) {
+        await rendition.prev();
+      } else {
+        await rendition.display(epubBook.locations.cfiFromLocation(p - 1));
+      }
+      setCurrentPageValue(p);
+      canMovePrevRef.current = p > 1;
+      setCanMovePrev(p > 1);
+      refreshTextMap();
+    } finally {
+      navigatingRef.current = false;
+    }
   }
 
   async function goToPage(p: number) {
@@ -321,7 +423,7 @@ export function EpubReaderView({
   }
 
   function handleAutoAdvanceRead() {
-    if (currentPageRef.current >= numPagesRef.current) return;
+    if (!canMoveNextRef.current) return;
     autoContinueRef.current = true;
     void navigateTo(currentPageRef.current + 1);
   }
@@ -352,9 +454,11 @@ export function EpubReaderView({
 
   return (
     <>
-      <div className="flex-1 overflow-hidden relative" {...swipeHandlers}>
+      <div className={`flex-1 overflow-hidden relative transition-colors ${readerSurfaceClass(colorMode)}`} {...swipeHandlers}>
         {loading && (
-          <div className="absolute inset-0 flex items-center justify-center text-gray-500 text-sm">Loading book…</div>
+          <div className={`absolute inset-0 z-10 ${readerSurfaceClass(colorMode)}`}>
+            <ReaderLoadingState book={book} colorMode={colorMode} />
+          </div>
         )}
         {error ? (
           <div className="absolute inset-0 flex items-center justify-center text-red-400 text-sm">{error}</div>
@@ -364,13 +468,13 @@ export function EpubReaderView({
               onAnimationEnd={() => setPageAnim(null)}
               className={`w-full h-full ${pageAnim === "next" ? "ml-page-anim-next" : pageAnim === "prev" ? "ml-page-anim-prev" : ""}`}
             >
-              <div ref={containerRef} className="w-full h-full bg-white" />
+              <div ref={containerRef} className="w-full h-full" style={{ backgroundColor: readerThemeColors(colorMode).background }} />
             </div>
             <PageNavArrows
               onPrev={() => goToPage(currentPage - 1)}
               onNext={() => goToPage(currentPage + 1)}
-              canPrev={currentPage > 1}
-              canNext={currentPage < numPages}
+              canPrev={canMovePrev}
+              canNext={canMoveNext}
             />
           </>
         )}
@@ -444,7 +548,7 @@ export function EpubReaderView({
           <div className="flex items-center gap-2">
             <button
               onClick={() => goToPage(currentPage - 1)}
-              disabled={currentPage <= 1}
+              disabled={!canMovePrev}
               className="px-2.5 py-1.5 text-xs rounded-lg text-gray-400 border border-[var(--ml-bg-hover)] hover:bg-[var(--ml-bg-hover)] transition disabled:opacity-30"
             >
               Prev
@@ -454,7 +558,7 @@ export function EpubReaderView({
             </span>
             <button
               onClick={() => goToPage(currentPage + 1)}
-              disabled={currentPage >= numPages}
+              disabled={!canMoveNext}
               className="px-2.5 py-1.5 text-xs rounded-lg text-gray-400 border border-[var(--ml-bg-hover)] hover:bg-[var(--ml-bg-hover)] transition disabled:opacity-30"
             >
               Next

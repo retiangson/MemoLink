@@ -16,6 +16,8 @@ from memolink_backend.contracts.book_dtos import (
     BookResponseDTO,
     BookUpdateDTO,
     OneDriveSyncResultDTO,
+    OneDriveSyncPageRequestDTO,
+    OneDriveSyncPageResultDTO,
     BookIdsDTO,
     BulkPublishResultDTO,
 )
@@ -120,6 +122,25 @@ async def sync_books(
         raise HTTPException(status_code=503, detail="OneDrive sync is disabled (ONEDRIVE_SYNC_ENABLED=false)")
     try:
         result = await c.book_sync().sync(admin_id)
+    except OneDriveServiceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail)
+    return result
+
+
+@router.post("/sync/page", response_model=OneDriveSyncPageResultDTO)
+async def sync_books_page(
+    body: OneDriveSyncPageRequestDTO,
+    admin_id: int = Depends(get_current_admin),
+    c: RequestContainer = Depends(get_request_container),
+):
+    """One resumable step of a sync — lists and upserts a single OneDrive folder page.
+    Intended to be called in a loop by a long-running local client (e.g. the desktop
+    app), which can drive a sync of any size without any single request needing to
+    walk the whole OneDrive folder tree."""
+    if not settings.onedrive_sync_enabled:
+        raise HTTPException(status_code=503, detail="OneDrive sync is disabled (ONEDRIVE_SYNC_ENABLED=false)")
+    try:
+        result = await c.book_sync().sync_page(admin_id, body.cursor)
     except OneDriveServiceError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail)
     return result

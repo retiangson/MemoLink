@@ -28,6 +28,19 @@ class BookSyncService:
 
     async def sync(self, admin_user_id: int) -> dict:
         files = await self._onedrive.list_folder_files(admin_user_id=admin_user_id)
+        created, updated = self._apply_files(files, admin_user_id)
+        return {"scanned": len(files), "created": created, "updated": updated}
+
+    async def sync_page(self, admin_user_id: int, cursor: Optional[str]) -> dict:
+        """One step of a resumable sync: lists a single OneDrive folder page (one Graph
+        call) and upserts it, returning a cursor the caller passes back in to continue.
+        Lets a long-running local loop (e.g. the desktop app) drive an arbitrarily large
+        sync without any single request needing to walk the whole tree."""
+        files, next_cursor = await self._onedrive.list_folder_files_page(admin_user_id=admin_user_id, cursor=cursor)
+        created, updated = self._apply_files(files, admin_user_id)
+        return {"cursor": next_cursor, "done": next_cursor is None, "scanned": len(files), "created": created, "updated": updated}
+
+    def _apply_files(self, files: list[dict], admin_user_id: int) -> tuple[int, int]:
         created = 0
         updated = 0
         for f in files:
@@ -48,4 +61,4 @@ class BookSyncService:
                 updated += 1
             else:
                 created += 1
-        return {"scanned": len(files), "created": created, "updated": updated}
+        return created, updated

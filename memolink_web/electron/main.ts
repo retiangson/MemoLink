@@ -309,51 +309,95 @@ async function executeRemoteCommand(commandType: string, payload: any): Promise<
   }
 }
 
+function bridgeRequest(baseUrl: string, token: string, method: string, path: string, body?: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const url = new URL(path, baseUrl);
+    const lib = url.protocol === "https:" ? https : http;
+    const bodyBuf = body ? Buffer.from(body) : Buffer.alloc(0);
+    const req = lib.request(url, {
+      method,
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", "Content-Length": bodyBuf.length },
+    }, (res) => {
+      let data = "";
+      res.on("data", (c: Buffer) => { data += c.toString(); });
+      res.on("end", () => resolve(data));
+    });
+    req.on("error", reject);
+    if (bodyBuf.length) req.write(bodyBuf);
+    req.end();
+  });
+}
+
 function postResult(baseUrl: string, token: string, commandId: number, result: { ok: boolean; output?: string; error?: string }) {
   const body = JSON.stringify({ ok: result.ok, output: result.output ?? null, error: result.error ?? null });
-  const url = new URL(`/api/desktop/commands/${commandId}/result`, baseUrl);
-  const lib = url.protocol === "https:" ? https : http;
-  const req = lib.request(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}`, "Content-Length": Buffer.byteLength(body) },
-  });
-  req.write(body);
-  req.end();
+  bridgeRequest(baseUrl, token, "POST", `/api/desktop/commands/${commandId}/result`, body).catch(() => {});
+}
+
+function postProgress(baseUrl: string, token: string, commandId: number, message: string) {
+  bridgeRequest(baseUrl, token, "POST", `/api/desktop/commands/${commandId}/progress`, JSON.stringify({ message })).catch(() => {});
+}
+
+// ── OneDrive book sync: runs an unbounded local loop, one small backend call at a
+// time, so syncing any number of books is never subject to a serverless request
+// timeout. Resumable via an opaque cursor the backend hands back each call.
+async function runOneDriveSync(baseUrl: string, token: string, commandId: number) {
+  let cursor: string | null = null;
+  let scanned = 0, created = 0, updated = 0;
+  let backoffMs = 1000;
+  const MAX_BACKOFF_MS = 30_000;
+  let lastProgressAt = 0;
+
+  while (true) {
+    try {
+      const raw = await bridgeRequest(baseUrl, token, "POST", "/api/admin/books/sync/page", JSON.stringify({ cursor }));
+      const page = JSON.parse(raw);
+      scanned += page.scanned ?? 0;
+      created += page.created ?? 0;
+      updated += page.updated ?? 0;
+      cursor = page.cursor ?? null;
+      backoffMs = 1000;
+
+      const now = Date.now();
+      if (now - lastProgressAt > 2000) {
+        lastProgressAt = now;
+        postProgress(baseUrl, token, commandId, `Scanned ${scanned} · ${created} new · ${updated} updated…`);
+      }
+
+      if (page.done) {
+        postResult(baseUrl, token, commandId, { ok: true, output: `Sync complete — scanned ${scanned}, ${created} new, ${updated} updated.` });
+        return;
+      }
+    } catch {
+      await new Promise((r) => setTimeout(r, backoffMs));
+      backoffMs = Math.min(backoffMs * 2, MAX_BACKOFF_MS);
+    }
+  }
 }
 
 function startDesktopBridge(baseUrl: string, token: string) {
   if (bridgeHeartbeatTimer) clearInterval(bridgeHeartbeatTimer);
   if (bridgePollTimer) clearInterval(bridgePollTimer);
 
-  const authHeaders = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
-
   function request(method: string, path: string, body?: string): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const url = new URL(path, baseUrl);
-      const lib = url.protocol === "https:" ? https : http;
-      const bodyBuf = body ? Buffer.from(body) : Buffer.alloc(0);
-      const req = lib.request(url, {
-        method,
-        headers: { ...authHeaders, "Content-Length": bodyBuf.length },
-      }, (res) => {
-        let data = "";
-        res.on("data", (c: Buffer) => { data += c.toString(); });
-        res.on("end", () => resolve(data));
-      });
-      req.on("error", reject);
-      if (bodyBuf.length) req.write(bodyBuf);
-      req.end();
-    });
+    return bridgeRequest(baseUrl, token, method, path, body);
   }
 
   function sendHeartbeat() {
     request("POST", "/api/desktop/heartbeat").catch(() => {});
   }
 
+  const syncRunning = new Set<number>();
+
   function pollCommands() {
     request("GET", "/api/desktop/pending").then((body) => {
       const commands: Array<{ id: number; command_type: string; payload: Record<string, unknown> }> = JSON.parse(body);
       for (const cmd of commands) {
+        if (cmd.command_type === "onedrive-sync") {
+          if (syncRunning.has(cmd.id)) continue;
+          syncRunning.add(cmd.id);
+          runOneDriveSync(baseUrl, token, cmd.id).finally(() => syncRunning.delete(cmd.id));
+          continue;
+        }
         executeRemoteCommand(cmd.command_type, cmd.payload).then((result) => {
           postResult(baseUrl, token, cmd.id, result);
         });

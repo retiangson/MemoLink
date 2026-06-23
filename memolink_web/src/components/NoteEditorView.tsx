@@ -8,6 +8,9 @@ import type { ExportFormat } from "../utils/noteExport";
 import { VideoImportModal } from "./VideoImportModal";
 import { TimelinePanel } from "./TimelinePanel";
 import { TTSPlayerBar } from "./TTSPlayerBar";
+import { ColorModePicker } from "./ColorModePicker";
+import { useReaderColorMode } from "../hooks/useReaderColorMode";
+import { richContentFilter } from "./book-readers/format";
 
 interface NoteEditorViewProps {
   noteKey: string | number;
@@ -56,6 +59,7 @@ export function NoteEditorView({
   publicAgentFeatureEnabled = false, publicAgentEnabled = false, onTogglePublicAgent,
 }: NoteEditorViewProps) {
   const [showPicker, setShowPicker] = useState(false);
+  const [colorMode, setColorMode] = useReaderColorMode();
   const [showExport, setShowExport] = useState(false);
   const [showVideoImport, setShowVideoImport] = useState(false);
   const [language, setLanguage] = useState("en");
@@ -258,35 +262,42 @@ export function NoteEditorView({
       )}
 
       {/* Tabs */}
-      <div className="flex items-center gap-1 mb-2 shrink-0">
-        <button
-          onClick={() => setActiveTab("editor")}
-          className={`px-3 py-1 rounded-lg text-xs font-medium transition ${activeTab === "editor" ? "bg-indigo-600 text-white" : "text-gray-500 hover:text-gray-300"}`}
-        >
-          Editor
-        </button>
-        <button
-          onClick={() => setActiveTab("source")}
-          className={`px-3 py-1 rounded-lg text-xs font-medium transition ${activeTab === "source" ? "bg-indigo-600 text-white" : "text-gray-500 hover:text-gray-300"}`}
-        >
-          Source
-        </button>
-        {timelineEnabled && noteId && (
+      <div className="flex items-center justify-between gap-1 mb-2 shrink-0">
+        <div className="flex items-center gap-1">
           <button
-            onClick={() => setActiveTab("timeline")}
-            className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium transition ${activeTab === "timeline" ? "bg-indigo-600 text-white" : "text-gray-500 hover:text-gray-300"}`}
+            onClick={() => setActiveTab("editor")}
+            className={`px-3 py-1 rounded-lg text-xs font-medium transition ${activeTab === "editor" ? "bg-indigo-600 text-white" : "text-gray-500 hover:text-gray-300"}`}
           >
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" fill="currentColor" viewBox="0 0 16 16">
-              <path d="M8 3.5a.5.5 0 0 0-1 0V9a.5.5 0 0 0 .252.434l3.5 2a.5.5 0 0 0 .496-.868L8 8.71z"/>
-              <path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16m7-8A7 7 0 1 1 1 8a7 7 0 0 1 14 0"/>
-            </svg>
-            Timeline
+            Editor
           </button>
-        )}
+          <button
+            onClick={() => setActiveTab("source")}
+            className={`px-3 py-1 rounded-lg text-xs font-medium transition ${activeTab === "source" ? "bg-indigo-600 text-white" : "text-gray-500 hover:text-gray-300"}`}
+          >
+            Source
+          </button>
+          {timelineEnabled && noteId && (
+            <button
+              onClick={() => setActiveTab("timeline")}
+              className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium transition ${activeTab === "timeline" ? "bg-indigo-600 text-white" : "text-gray-500 hover:text-gray-300"}`}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" fill="currentColor" viewBox="0 0 16 16">
+                <path d="M8 3.5a.5.5 0 0 0-1 0V9a.5.5 0 0 0 .252.434l3.5 2a.5.5 0 0 0 .496-.868L8 8.71z"/>
+                <path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16m7-8A7 7 0 1 1 1 8a7 7 0 0 1 14 0"/>
+              </svg>
+              Timeline
+            </button>
+          )}
+        </div>
+        <ColorModePicker value={colorMode} onChange={setColorMode} />
       </div>
 
       {/* Rich editor */}
-      <div className={`flex-1 overflow-hidden flex flex-col border border-[var(--ml-bg-panel)] rounded-xl bg-[var(--ml-bg-bar)] ${activeTab !== "editor" ? "hidden" : ""}`}>
+      <div
+        data-rc-mode={colorMode}
+        style={{ filter: richContentFilter(colorMode) }}
+        className={`flex-1 overflow-hidden flex flex-col border border-[var(--ml-bg-panel)] rounded-xl bg-[var(--ml-bg-bar)] transition-[filter] ${activeTab !== "editor" ? "hidden" : ""}`}
+      >
         <RichNoteEditor
           key={String(noteKey)}
           noteKey={noteKey}
@@ -298,7 +309,11 @@ export function NoteEditorView({
 
       {/* Source view */}
       {activeTab === "source" && (
-        <div className="flex-1 overflow-hidden border border-[var(--ml-bg-panel)] rounded-xl bg-[var(--ml-bg-bar)]">
+        <div
+          data-rc-mode={colorMode}
+          style={{ filter: richContentFilter(colorMode) }}
+          className="flex-1 overflow-hidden border border-[var(--ml-bg-panel)] rounded-xl bg-[var(--ml-bg-bar)]"
+        >
           <textarea
             readOnly
             value={rawContent}
@@ -309,7 +324,11 @@ export function NoteEditorView({
 
       {/* Timeline tab */}
       {activeTab === "timeline" && noteId && (
-        <div className="flex-1 min-h-0 overflow-y-auto border border-[var(--ml-bg-panel)] rounded-xl bg-[var(--ml-bg-bar)] p-4">
+        <div
+          data-rc-mode={colorMode}
+          style={{ filter: richContentFilter(colorMode) }}
+          className="flex-1 min-h-0 overflow-y-auto border border-[var(--ml-bg-panel)] rounded-xl bg-[var(--ml-bg-bar)] p-4"
+        >
           <TimelinePanel noteId={noteId} onJump={jumpToText} />
         </div>
       )}

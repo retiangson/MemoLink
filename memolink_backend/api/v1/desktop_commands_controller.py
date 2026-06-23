@@ -17,6 +17,7 @@ from memolink_backend.contracts.desktop_command_contracts import (
     DesktopCommandCreateDTO,
     DesktopCommandResultDTO,
     DesktopCommandResponseDTO,
+    DesktopCommandProgressDTO,
 )
 
 router = APIRouter(prefix="/desktop", tags=["desktop"])
@@ -53,6 +54,21 @@ def submit_result(
     updated = c.desktop().submit_result(command_id, current_user_id, dto)
     if not updated:
         raise HTTPException(status_code=404, detail="Command not found")
+    return {"ok": True}
+
+
+@router.post("/commands/{command_id}/progress")
+def submit_progress(
+    command_id: int,
+    dto: DesktopCommandProgressDTO,
+    current_user_id: int = Depends(get_current_user),
+    c: RequestContainer = Depends(get_request_container),
+):
+    """Electron app calls this to report interim progress on a still-running command
+    (e.g. a long OneDrive sync), without marking it done."""
+    updated = c.desktop().report_progress(command_id, current_user_id, dto.message)
+    if not updated:
+        raise HTTPException(status_code=404, detail="Command not found or not running")
     return {"ok": True}
 
 
