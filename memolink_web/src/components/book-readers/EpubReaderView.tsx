@@ -51,6 +51,19 @@ async function generateEpubLocations(epubBook: Book): Promise<"normal" | "fallba
   }
 }
 
+const BOOK_LOAD_MAX_ATTEMPTS = 3;
+const BOOK_LOAD_RETRY_DELAYS_MS = [1200, 3000];
+
+// 403/404/410 mean the book isn't accessible or no longer exists on OneDrive — retrying
+// just repeats the same failure. Everything else (network blips, timeouts, 5xx, a
+// corrupt/short partial download) is worth another attempt on a flaky mobile connection.
+function isRetryableBookError(error: unknown): boolean {
+  if (error instanceof BookDownloadError) {
+    return error.status !== 403 && error.status !== 404 && error.status !== 410;
+  }
+  return true;
+}
+
 function describeEpubLoadError(error: unknown): string {
   if (error instanceof BookDownloadError) {
     if (error.status === 403) return "Add this book to My Books before opening it.";
@@ -300,8 +313,12 @@ export function EpubReaderView({
       try {
         const signature = bookCacheSignature(book);
 
-        async function openBook(forceRefresh: boolean): Promise<Book> {
-          setLoadingLabel(forceRefresh ? "Refreshing local book copy" : "Loading book, please wait");
+        async function openBook(forceRefresh: boolean, attempt: number): Promise<Book> {
+          setLoadingLabel(
+            attempt === 0
+              ? "Loading book, please wait"
+              : `Retrying download (attempt ${attempt + 1} of ${BOOK_LOAD_MAX_ATTEMPTS})`,
+          );
           const blob = await fetchBookBlob(
             book,
             (loaded, total) => { if (!cancelled) setProgress({ loaded, total }); },
@@ -317,20 +334,29 @@ export function EpubReaderView({
           return loadedBook;
         }
 
-        let epubBook: Book;
-        try {
-          epubBook = await openBook(false);
-        } catch (firstError) {
-          await Promise.all([
-            clearCachedBookBlob(book.id),
-            clearCachedEpubLocations(book.id),
-          ]);
-          epubBookRef.current?.destroy();
-          epubBookRef.current = null;
-          epubBook = await openBook(true).catch((secondError) => {
-            throw secondError || firstError;
-          });
+        let epubBook: Book | undefined;
+        let openError: unknown;
+        for (let attempt = 0; attempt < BOOK_LOAD_MAX_ATTEMPTS; attempt++) {
+          if (attempt > 0) {
+            await Promise.all([
+              clearCachedBookBlob(book.id),
+              clearCachedEpubLocations(book.id),
+            ]);
+            epubBookRef.current?.destroy();
+            epubBookRef.current = null;
+            await new Promise((resolve) => setTimeout(resolve, BOOK_LOAD_RETRY_DELAYS_MS[attempt - 1]));
+            if (cancelled) return;
+          }
+          try {
+            epubBook = await openBook(attempt > 0, attempt);
+            openError = undefined;
+            break;
+          } catch (err) {
+            openError = err;
+            if (!isRetryableBookError(err) || attempt === BOOK_LOAD_MAX_ATTEMPTS - 1) break;
+          }
         }
+        if (openError || !epubBook) throw openError;
 
         if (cancelled || !containerRef.current) {
           epubBook.destroy();
