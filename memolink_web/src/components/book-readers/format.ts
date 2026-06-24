@@ -15,6 +15,7 @@ export type BookFormat =
   | "mobi"
   | "unsupported";
 export type ReaderColorMode = "dark" | "light" | "sepia";
+export type ReaderFontSize = "sm" | "md" | "lg" | "xl";
 
 export interface HighlightAnchor {
   page: number;
@@ -26,6 +27,7 @@ export interface ReaderViewProps {
   book: Book;
   initialPage: number;
   colorMode: ReaderColorMode;
+  fontSize: ReaderFontSize;
   onProgress?: (currentPage: number, totalPages: number) => void;
   noteStatus?: BookNoteSourceStatus | null;
   noteStatusLoaded?: boolean;
@@ -46,6 +48,39 @@ export const READER_COLOR_MODES: ReaderColorMode[] = ["dark", "light", "sepia"];
 
 export function isReaderColorMode(value: string | null): value is ReaderColorMode {
   return value === "dark" || value === "light" || value === "sepia";
+}
+
+export const READER_FONT_SIZES: ReaderFontSize[] = ["sm", "md", "lg", "xl"];
+
+export const READER_FONT_SIZE_LABELS: Record<ReaderFontSize, string> = {
+  sm: "Small text",
+  md: "Medium text",
+  lg: "Large text",
+  xl: "Extra large text",
+};
+
+export function isReaderFontSize(value: string | null): value is ReaderFontSize {
+  return value === "sm" || value === "md" || value === "lg" || value === "xl";
+}
+
+// Multiplier applied on top of each reader's own base font size (15-16px, or the
+// PDF render scale) — kept as one shared scale so "one step bigger" feels the same
+// across every format instead of each reader inventing its own step sizes.
+export function readerFontScale(size: ReaderFontSize): number {
+  if (size === "sm") return 0.875;
+  if (size === "lg") return 1.15;
+  if (size === "xl") return 1.3;
+  return 1;
+}
+
+export function readerFontSizePx(size: ReaderFontSize, basePx: number): number {
+  return Math.round(basePx * readerFontScale(size));
+}
+
+export function nextReaderFontSize(size: ReaderFontSize, direction: 1 | -1): ReaderFontSize {
+  const idx = READER_FONT_SIZES.indexOf(size);
+  const next = Math.min(READER_FONT_SIZES.length - 1, Math.max(0, idx + direction));
+  return READER_FONT_SIZES[next];
 }
 
 export function readerSurfaceClass(mode: ReaderColorMode): string {

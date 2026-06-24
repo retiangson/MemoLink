@@ -4,7 +4,7 @@ import {
   type Bookmark, type BookHighlight,
 } from "../../api/booksApi";
 import type { ReaderViewProps } from "./format";
-import { readerSurfaceClass, readerThemeColors, findSentenceIndexForOffset } from "./format";
+import { readerSurfaceClass, readerThemeColors, readerFontSizePx, findSentenceIndexForOffset } from "./format";
 import { useTTS, splitSentences } from "../../hooks/useTTS";
 import { usePageSwipe } from "../../hooks/usePageSwipe";
 import { useHighlightColor } from "../../hooks/useHighlightColor";
@@ -40,7 +40,7 @@ function paginateText(text: string, pageSize: number): string[] {
 }
 
 export function TxtReaderView({
-  book, initialPage, colorMode, onProgress,
+  book, initialPage, colorMode, fontSize, onProgress,
   noteStatus, noteStatusLoaded, savingNoteSource, onSaveAsNoteSource,
   jumpToHighlight, onJumpToHighlightHandled, onHighlightAdded,
 }: ReaderViewProps) {
@@ -219,8 +219,8 @@ export function TxtReaderView({
               onMouseUp={handleMouseUp}
               onDoubleClick={handleDoubleClick}
               title="Double-click a sentence to start reading from there"
-              className={`relative shadow-lg rounded-xl max-w-2xl w-full h-fit p-10 whitespace-pre-wrap leading-relaxed text-[15px] cursor-text ${pageAnim === "next" ? "ml-page-anim-next" : pageAnim === "prev" ? "ml-page-anim-prev" : ""}`}
-              style={{ backgroundColor: colors.background, color: colors.foreground }}
+              className={`relative shadow-lg rounded-xl max-w-2xl w-full h-fit p-10 whitespace-pre-wrap leading-relaxed cursor-text ${pageAnim === "next" ? "ml-page-anim-next" : pageAnim === "prev" ? "ml-page-anim-prev" : ""}`}
+              style={{ backgroundColor: colors.background, color: colors.foreground, fontSize: `${readerFontSizePx(fontSize, 15)}px` }}
             >
               {pages[currentPage - 1] || ""}
             </div>

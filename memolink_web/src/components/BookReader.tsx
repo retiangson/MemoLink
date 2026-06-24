@@ -11,7 +11,9 @@ import { CaptionReaderView } from "./book-readers/CaptionReaderView";
 import { ComicReaderView } from "./book-readers/ComicReaderView";
 import { MobiReaderView } from "./book-readers/MobiReaderView";
 import { ColorModePicker } from "./ColorModePicker";
+import { FontSizePicker } from "./FontSizePicker";
 import { useReaderColorMode } from "../hooks/useReaderColorMode";
+import { useReaderFontSize } from "../hooks/useReaderFontSize";
 
 interface Props {
   book: Book;
@@ -29,6 +31,7 @@ export function BookReader({ book, initialPage, onClose, onProgress, onAskAI, ju
   const [noteStatusLoaded, setNoteStatusLoaded] = useState(false);
   const [savingNoteSource, setSavingNoteSource] = useState(false);
   const [colorMode, setColorMode] = useReaderColorMode();
+  const [fontSize, setFontSize] = useReaderFontSize();
   const format = getBookFormat(book);
 
   useEffect(() => {
@@ -83,6 +86,7 @@ export function BookReader({ book, initialPage, onClose, onProgress, onAskAI, ju
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          <FontSizePicker value={fontSize} onChange={setFontSize} />
           <ColorModePicker value={colorMode} onChange={setColorMode} />
           {onAskAI && (
             <button
@@ -101,15 +105,15 @@ export function BookReader({ book, initialPage, onClose, onProgress, onAskAI, ju
         </div>
       )}
 
-      {format === "pdf" && <PdfReaderView book={book} initialPage={initialPage} colorMode={colorMode} onProgress={onProgress} jumpToHighlight={jumpToHighlight} onJumpToHighlightHandled={onJumpToHighlightHandled} onHighlightAdded={onHighlightAdded} {...noteSourceProps} />}
-      {format === "epub" && <EpubReaderView book={book} initialPage={initialPage} colorMode={colorMode} onProgress={onProgress} jumpToHighlight={jumpToHighlight} onJumpToHighlightHandled={onJumpToHighlightHandled} onHighlightAdded={onHighlightAdded} {...noteSourceProps} />}
-      {format === "pptx" && <PptxReaderView book={book} initialPage={initialPage} colorMode={colorMode} onProgress={onProgress} jumpToHighlight={jumpToHighlight} onJumpToHighlightHandled={onJumpToHighlightHandled} onHighlightAdded={onHighlightAdded} {...noteSourceProps} />}
-      {format === "audio" && <AudioReaderView book={book} initialPage={initialPage} colorMode={colorMode} onProgress={onProgress} />}
-      {format === "video" && <VideoReaderView book={book} initialPage={initialPage} colorMode={colorMode} onProgress={onProgress} />}
-      {format === "txt" && <TxtReaderView book={book} initialPage={initialPage} colorMode={colorMode} onProgress={onProgress} jumpToHighlight={jumpToHighlight} onJumpToHighlightHandled={onJumpToHighlightHandled} onHighlightAdded={onHighlightAdded} {...noteSourceProps} />}
-      {(format === "srt" || format === "vtt") && <CaptionReaderView book={book} initialPage={initialPage} colorMode={colorMode} onProgress={onProgress} jumpToHighlight={jumpToHighlight} onJumpToHighlightHandled={onJumpToHighlightHandled} onHighlightAdded={onHighlightAdded} {...noteSourceProps} />}
-      {(format === "cbz" || format === "cbr") && <ComicReaderView book={book} initialPage={initialPage} colorMode={colorMode} onProgress={onProgress} />}
-      {format === "mobi" && <MobiReaderView book={book} initialPage={initialPage} colorMode={colorMode} onProgress={onProgress} jumpToHighlight={jumpToHighlight} onJumpToHighlightHandled={onJumpToHighlightHandled} onHighlightAdded={onHighlightAdded} />}
+      {format === "pdf" && <PdfReaderView book={book} initialPage={initialPage} colorMode={colorMode} fontSize={fontSize} onProgress={onProgress} jumpToHighlight={jumpToHighlight} onJumpToHighlightHandled={onJumpToHighlightHandled} onHighlightAdded={onHighlightAdded} {...noteSourceProps} />}
+      {format === "epub" && <EpubReaderView book={book} initialPage={initialPage} colorMode={colorMode} fontSize={fontSize} onProgress={onProgress} jumpToHighlight={jumpToHighlight} onJumpToHighlightHandled={onJumpToHighlightHandled} onHighlightAdded={onHighlightAdded} {...noteSourceProps} />}
+      {format === "pptx" && <PptxReaderView book={book} initialPage={initialPage} colorMode={colorMode} fontSize={fontSize} onProgress={onProgress} jumpToHighlight={jumpToHighlight} onJumpToHighlightHandled={onJumpToHighlightHandled} onHighlightAdded={onHighlightAdded} {...noteSourceProps} />}
+      {format === "audio" && <AudioReaderView book={book} initialPage={initialPage} colorMode={colorMode} fontSize={fontSize} onProgress={onProgress} />}
+      {format === "video" && <VideoReaderView book={book} initialPage={initialPage} colorMode={colorMode} fontSize={fontSize} onProgress={onProgress} />}
+      {format === "txt" && <TxtReaderView book={book} initialPage={initialPage} colorMode={colorMode} fontSize={fontSize} onProgress={onProgress} jumpToHighlight={jumpToHighlight} onJumpToHighlightHandled={onJumpToHighlightHandled} onHighlightAdded={onHighlightAdded} {...noteSourceProps} />}
+      {(format === "srt" || format === "vtt") && <CaptionReaderView book={book} initialPage={initialPage} colorMode={colorMode} fontSize={fontSize} onProgress={onProgress} jumpToHighlight={jumpToHighlight} onJumpToHighlightHandled={onJumpToHighlightHandled} onHighlightAdded={onHighlightAdded} {...noteSourceProps} />}
+      {(format === "cbz" || format === "cbr") && <ComicReaderView book={book} initialPage={initialPage} colorMode={colorMode} fontSize={fontSize} onProgress={onProgress} />}
+      {format === "mobi" && <MobiReaderView book={book} initialPage={initialPage} colorMode={colorMode} fontSize={fontSize} onProgress={onProgress} jumpToHighlight={jumpToHighlight} onJumpToHighlightHandled={onJumpToHighlightHandled} onHighlightAdded={onHighlightAdded} />}
       {format === "unsupported" && (
         <div className="flex-1 flex items-center justify-center text-gray-500 text-sm">
           This file type ({book.file_extension || book.mime_type || "unknown"}) isn't supported by the reader yet.

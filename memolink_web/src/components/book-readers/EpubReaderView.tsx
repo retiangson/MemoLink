@@ -10,7 +10,7 @@ import {
   type Bookmark, type BookHighlight,
 } from "../../api/booksApi";
 import type { ReaderViewProps, HighlightAnchor } from "./format";
-import { currentHighlightRange, readerThemeColors, findSentenceIndexForOffset, readerSurfaceClass } from "./format";
+import { currentHighlightRange, readerThemeColors, readerFontScale, findSentenceIndexForOffset, readerSurfaceClass } from "./format";
 import { useTTS, splitSentences } from "../../hooks/useTTS";
 import { usePageSwipe, computeSwipeDirection } from "../../hooks/usePageSwipe";
 import { useHighlightColor } from "../../hooks/useHighlightColor";
@@ -179,8 +179,9 @@ function ensurePersistHighlightStyle(doc: Document, colorId: string) {
   doc.head?.appendChild(style);
 }
 
-function applyEpubContentsTheme(list: Contents[], mode: ReaderViewProps["colorMode"]) {
+function applyEpubContentsTheme(list: Contents[], mode: ReaderViewProps["colorMode"], fontSize: ReaderViewProps["fontSize"]) {
   const colors = readerThemeColors(mode);
+  const fontSizePct = Math.round(readerFontScale(fontSize) * 100);
   list.forEach((c: any) => {
     const doc: Document | undefined = c?.document;
     if (!doc) return;
@@ -197,6 +198,9 @@ function applyEpubContentsTheme(list: Contents[], mode: ReaderViewProps["colorMo
       doc.head?.appendChild(style);
     }
     style.textContent = `
+      html {
+        font-size: ${fontSizePct}% !important;
+      }
       html, body {
         background: ${colors.background} !important;
         color: ${colors.foreground} !important;
@@ -218,7 +222,7 @@ function applyEpubContentsTheme(list: Contents[], mode: ReaderViewProps["colorMo
 }
 
 export function EpubReaderView({
-  book, initialPage, colorMode, onProgress,
+  book, initialPage, colorMode, fontSize, onProgress,
   noteStatus, noteStatusLoaded, savingNoteSource, onSaveAsNoteSource,
   jumpToHighlight, onJumpToHighlightHandled, onHighlightAdded,
 }: ReaderViewProps) {
@@ -243,6 +247,7 @@ export function EpubReaderView({
   const canMovePrevRef = useRef(false);
   const canMoveNextRef = useRef(true);
   const colorModeRef = useRef(colorMode);
+  const fontSizeRef = useRef(fontSize);
   // rendition.display() is async; without this guard, a second navigateTo() fired before the
   // first resolves (e.g. two quick swipes, or a double-tap on Prev/Next) can race it — whichever
   // display() resolves last wins and fires "relocated" last, snapping the page back even though
@@ -274,12 +279,13 @@ export function EpubReaderView({
 
   useEffect(() => {
     colorModeRef.current = colorMode;
+    fontSizeRef.current = fontSize;
     const rendition = renditionRef.current;
     if (!rendition) return;
     const contents = rendition.getContents();
     const list = (Array.isArray(contents) ? contents : [contents]) as Contents[];
-    applyEpubContentsTheme(list, colorMode);
-  }, [colorMode]);
+    applyEpubContentsTheme(list, colorMode, fontSize);
+  }, [colorMode, fontSize]);
 
   function setCurrentPageValue(page: number) {
     currentPageRef.current = page;
@@ -656,7 +662,7 @@ export function EpubReaderView({
     if (!rendition) return;
     const contents = rendition.getContents();
     const list = (Array.isArray(contents) ? contents : [contents]) as Contents[];
-    applyEpubContentsTheme(list, colorModeRef.current);
+    applyEpubContentsTheme(list, colorModeRef.current, fontSizeRef.current);
     const { text, nodes } = buildCombinedTextMap(list);
     pageTextRef.current = text;
     textNodesRef.current = nodes;

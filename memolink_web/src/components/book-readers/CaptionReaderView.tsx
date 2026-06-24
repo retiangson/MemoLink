@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { fetchBookBlob, updateBookProgress, addBookHighlight, listBookHighlights, type BookHighlight } from "../../api/booksApi";
 import type { ReaderViewProps, HighlightAnchor } from "./format";
-import { readerSurfaceClass, readerThemeColors, formatTimestamp } from "./format";
+import { readerSurfaceClass, readerThemeColors, readerFontSizePx, formatTimestamp } from "./format";
 import { useTTS } from "../../hooks/useTTS";
 import { usePageSwipe } from "../../hooks/usePageSwipe";
 import { useHighlightColor } from "../../hooks/useHighlightColor";
@@ -145,7 +145,7 @@ function flashOrPulseCueRange(container: HTMLElement, anchor: Pick<HighlightAnch
 }
 
 export function CaptionReaderView({
-  book, initialPage, colorMode, onProgress,
+  book, initialPage, colorMode, fontSize, onProgress,
   noteStatus, noteStatusLoaded, savingNoteSource, onSaveAsNoteSource,
   jumpToHighlight, onJumpToHighlightHandled, onHighlightAdded,
 }: ReaderViewProps) {
@@ -304,7 +304,7 @@ export function CaptionReaderView({
               style={{ backgroundColor: colors.background, color: colors.foreground }}
             >
               {pageCues.map((cue) => (
-                <div key={cue.index} className="mb-3 flex gap-3 leading-relaxed text-[15px]">
+                <div key={cue.index} className="mb-3 flex gap-3 leading-relaxed" style={{ fontSize: `${readerFontSizePx(fontSize, 15)}px` }}>
                   <span className="select-none shrink-0 w-20 pt-0.5 text-xs" style={{ color: colors.muted }}>
                     {formatTimestamp(cue.startSeconds)}
                   </span>

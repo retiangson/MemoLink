@@ -7,7 +7,7 @@ import {
   type Bookmark, type BookHighlight,
 } from "../../api/booksApi";
 import type { ReaderViewProps, HighlightAnchor } from "./format";
-import { currentHighlightRange, findSentenceIndexForOffset, pdfCanvasFilter, readerSurfaceClass } from "./format";
+import { currentHighlightRange, findSentenceIndexForOffset, pdfCanvasFilter, readerFontScale, readerSurfaceClass } from "./format";
 import { useTTS, splitSentences } from "../../hooks/useTTS";
 import { usePageSwipe } from "../../hooks/usePageSwipe";
 import { useHighlightColor } from "../../hooks/useHighlightColor";
@@ -23,7 +23,7 @@ interface PendingSelection { start: number; end: number; }
 pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
 
 export function PdfReaderView({
-  book, initialPage, colorMode, onProgress,
+  book, initialPage, colorMode, fontSize, onProgress,
   noteStatus, noteStatusLoaded, savingNoteSource, onSaveAsNoteSource,
   jumpToHighlight, onJumpToHighlightHandled, onHighlightAdded,
 }: ReaderViewProps) {
@@ -121,7 +121,7 @@ export function PdfReaderView({
     if (!doc || !canvas) return;
     renderTaskRef.current?.cancel();
     const page = await doc.getPage(pageNum);
-    const viewport = page.getViewport({ scale: 1.4 });
+    const viewport = page.getViewport({ scale: 1.4 * readerFontScale(fontSize) });
     canvas.width = viewport.width;
     canvas.height = viewport.height;
     setViewportSize({ width: viewport.width, height: viewport.height });
@@ -163,7 +163,7 @@ export function PdfReaderView({
       await textLayer.render();
       textDivsRef.current = textLayer.textDivs as HTMLElement[];
     }
-  }, []);
+  }, [fontSize]);
 
   useEffect(() => {
     if (loading || !pdfDocRef.current) return;

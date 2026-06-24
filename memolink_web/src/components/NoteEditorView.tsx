@@ -9,8 +9,10 @@ import { VideoImportModal } from "./VideoImportModal";
 import { TimelinePanel } from "./TimelinePanel";
 import { TTSPlayerBar } from "./TTSPlayerBar";
 import { ColorModePicker } from "./ColorModePicker";
+import { FontSizePicker } from "./FontSizePicker";
 import { useReaderColorMode } from "../hooks/useReaderColorMode";
-import { richContentFilter } from "./book-readers/format";
+import { useReaderFontSize } from "../hooks/useReaderFontSize";
+import { richContentFilter, readerFontScale } from "./book-readers/format";
 
 interface NoteEditorViewProps {
   noteKey: string | number;
@@ -62,6 +64,8 @@ export function NoteEditorView({
 }: NoteEditorViewProps) {
   const [showPicker, setShowPicker] = useState(false);
   const [colorMode, setColorMode] = useReaderColorMode();
+  const [fontSize, setFontSize] = useReaderFontSize();
+  const noteFontSizeVar = { "--ml-note-font-size": `${Math.round(16 * readerFontScale(fontSize))}px` } as React.CSSProperties;
   const [showExport, setShowExport] = useState(false);
   const [showVideoImport, setShowVideoImport] = useState(false);
   const [language, setLanguage] = useState("en");
@@ -301,13 +305,16 @@ export function NoteEditorView({
             </button>
           )}
         </div>
-        <ColorModePicker value={colorMode} onChange={setColorMode} />
+        <div className="flex items-center gap-2 shrink-0">
+          <FontSizePicker value={fontSize} onChange={setFontSize} />
+          <ColorModePicker value={colorMode} onChange={setColorMode} />
+        </div>
       </div>
 
       {/* Rich editor */}
       <div
         data-rc-mode={colorMode}
-        style={{ filter: richContentFilter(colorMode) }}
+        style={{ filter: richContentFilter(colorMode), ...noteFontSizeVar }}
         className={`flex-1 overflow-hidden flex flex-col border border-[var(--ml-bg-panel)] rounded-xl bg-[var(--ml-bg-bar)] transition-[filter] ${activeTab !== "editor" ? "hidden" : ""}`}
       >
         <RichNoteEditor
@@ -330,7 +337,8 @@ export function NoteEditorView({
           <textarea
             readOnly
             value={rawContent}
-            className="w-full h-full bg-transparent text-gray-400 text-xs font-mono p-4 resize-none focus:outline-none"
+            style={{ fontSize: `${Math.round(12 * readerFontScale(fontSize))}px` }}
+            className="w-full h-full bg-transparent text-gray-400 font-mono p-4 resize-none focus:outline-none"
           />
         </div>
       )}

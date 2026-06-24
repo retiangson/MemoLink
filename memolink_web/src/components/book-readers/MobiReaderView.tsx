@@ -3,7 +3,7 @@ import { initMobiFile } from "@lingo-reader/mobi-parser";
 import type { Mobi } from "@lingo-reader/mobi-parser";
 import { fetchBookBlob, updateBookProgress, addBookHighlight, listBookHighlights, type BookHighlight } from "../../api/booksApi";
 import type { ReaderViewProps } from "./format";
-import { readerSurfaceClass, readerThemeColors } from "./format";
+import { readerSurfaceClass, readerThemeColors, readerFontSizePx } from "./format";
 import { useTTS } from "../../hooks/useTTS";
 import { usePageSwipe } from "../../hooks/usePageSwipe";
 import { useHighlightColor } from "../../hooks/useHighlightColor";
@@ -22,7 +22,7 @@ interface PendingSelection { x: number; y: number; start: number; end: number; }
 // is deferred since it would need a new backend Python MOBI dependency; highlight-to-note
 // still works fully since it only needs this browser-side parse.
 export function MobiReaderView({
-  book, initialPage, colorMode, onProgress,
+  book, initialPage, colorMode, fontSize, onProgress,
   jumpToHighlight, onJumpToHighlightHandled, onHighlightAdded,
 }: ReaderViewProps) {
   const [loading, setLoading] = useState(true);
@@ -186,8 +186,8 @@ export function MobiReaderView({
               ref={chapterRef}
               onAnimationEnd={() => setPageAnim(null)}
               onMouseUp={handleMouseUp}
-              className={`relative shadow-lg rounded-xl max-w-2xl w-full h-fit p-10 leading-relaxed text-[15px] ${pageAnim === "next" ? "ml-page-anim-next" : pageAnim === "prev" ? "ml-page-anim-prev" : ""}`}
-              style={{ backgroundColor: colors.background, color: colors.foreground }}
+              className={`relative shadow-lg rounded-xl max-w-2xl w-full h-fit p-10 leading-relaxed ${pageAnim === "next" ? "ml-page-anim-next" : pageAnim === "prev" ? "ml-page-anim-prev" : ""}`}
+              style={{ backgroundColor: colors.background, color: colors.foreground, fontSize: `${readerFontSizePx(fontSize, 15)}px` }}
               dangerouslySetInnerHTML={{ __html: chapterHtml }}
             />
             <PageNavArrows

@@ -3,7 +3,7 @@
 
 .tiptap-content {
   font-family: 'Lora', Georgia, 'Times New Roman', serif;
-  font-size: 16px;
+  font-size: var(--ml-note-font-size, 16px);
   line-height: 1.85;
   color: #dde0e8;
   word-break: break-word;
