@@ -393,7 +393,7 @@ class ConnectorsService:
 
         method, url = action_map[action]
         target_device_id = await self._resolve_spotify_device_id(user_id, device_id)
-        if target_device_id:
+        if target_device_id and action in {"previous", "play", "pause", "stop", "next"}:
             await self._activate_spotify_device(user_id, target_device_id)
         body: dict[str, Any] | None = None
         if action == "play":
