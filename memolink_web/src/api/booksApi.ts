@@ -1,5 +1,19 @@
 import { api } from "./client";
 
+export class BookDownloadError extends Error {
+  status?: number;
+  detail?: unknown;
+  code?: string;
+
+  constructor(message: string, options?: { status?: number; detail?: unknown; code?: string }) {
+    super(message);
+    this.name = "BookDownloadError";
+    this.status = options?.status;
+    this.detail = options?.detail;
+    this.code = options?.code;
+  }
+}
+
 export interface Book {
   id: number;
   title: string;
@@ -165,6 +179,47 @@ export async function getCachedEpubLocations(bookId: number, signature: string):
   });
 }
 
+async function readBlobErrorDetail(data: unknown): Promise<unknown> {
+  if (!(data instanceof Blob)) return data;
+  const text = await data.text().catch(() => "");
+  if (!text) return null;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text;
+  }
+}
+
+function detailMessage(detail: unknown): string | null {
+  if (!detail) return null;
+  if (typeof detail === "string") return detail;
+  if (typeof detail !== "object") return String(detail);
+  const root = detail as Record<string, unknown>;
+  const nested = root.detail;
+  if (typeof nested === "string") return nested;
+  if (nested && typeof nested === "object") {
+    const nestedMessage = (nested as Record<string, unknown>).message;
+    if (typeof nestedMessage === "string") return nestedMessage;
+  }
+  const message = root.message;
+  return typeof message === "string" ? message : null;
+}
+
+async function normalizeBookDownloadError(error: any): Promise<BookDownloadError> {
+  const status = error?.response?.status;
+  const code = error?.code;
+  const detail = await readBlobErrorDetail(error?.response?.data);
+  const backendMessage = detailMessage(detail);
+
+  if (code === "ECONNABORTED") {
+    return new BookDownloadError("Book download timed out before the file finished loading.", { status, detail, code });
+  }
+  if (!error?.response) {
+    return new BookDownloadError("Network error while downloading the book.", { status, detail, code });
+  }
+  return new BookDownloadError(backendMessage || `Book download failed with HTTP ${status}.`, { status, detail, code });
+}
+
 export async function clearCachedEpubLocations(bookId: number): Promise<void> {
   const db = await openBookCache();
   if (!db) return;
@@ -235,13 +290,18 @@ export async function fetchBookBlob(
 
   // Large audio/video files can take a while on slow connections — give downloads
   // much more headroom than the client's default 15s JSON-request timeout.
-  const r = await api.get(`/books/${bookId}/read`, {
-    responseType: "blob",
-    timeout: 300000,
-    onDownloadProgress: onProgress
-      ? (evt) => onProgress(evt.loaded, evt.total ?? null)
-      : undefined,
-  });
+  let r;
+  try {
+    r = await api.get(`/books/${bookId}/read`, {
+      responseType: "blob",
+      timeout: 300000,
+      onDownloadProgress: onProgress
+        ? (evt) => onProgress(evt.loaded, evt.total ?? null)
+        : undefined,
+    });
+  } catch (error) {
+    throw await normalizeBookDownloadError(error);
+  }
   await putCachedBookBlob(bookId, signature, r.data);
   return r.data;
 }

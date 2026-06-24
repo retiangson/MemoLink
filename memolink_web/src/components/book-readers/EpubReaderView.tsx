@@ -6,6 +6,7 @@ import type Contents from "epubjs/types/contents";
 import {
   fetchBookBlob, updateBookProgress, addBookmark, listBookmarks, addBookHighlight, listBookHighlights,
   bookCacheSignature, clearCachedBookBlob, clearCachedEpubLocations, getCachedEpubLocations, putCachedEpubLocations,
+  BookDownloadError,
   type Bookmark, type BookHighlight,
 } from "../../api/booksApi";
 import type { ReaderViewProps, HighlightAnchor } from "./format";
@@ -51,6 +52,15 @@ async function generateEpubLocations(epubBook: Book): Promise<"normal" | "fallba
 }
 
 function describeEpubLoadError(error: unknown): string {
+  if (error instanceof BookDownloadError) {
+    if (error.status === 403) return "Add this book to My Books before opening it.";
+    if (error.status === 404 || error.status === 410) {
+      return "Could not download this book from OneDrive. It may no longer be available in the library.";
+    }
+    if (error.code === "ECONNABORTED") return "The book download timed out. Please try again on a stronger connection.";
+    if (!error.status) return "Network error while downloading this book. Please check your connection and try again.";
+    return error.message;
+  }
   const message = error instanceof Error ? error.message : String(error || "");
   if (/403|add this book|my books/i.test(message)) {
     return "Add this book to My Books before opening it.";
@@ -59,6 +69,29 @@ function describeEpubLoadError(error: unknown): string {
     return "Could not download this book from OneDrive. It may no longer be available in the library.";
   }
   return "Could not open this EPUB on this device. I refreshed the local cache, but the reader still could not parse or render it.";
+}
+
+function flattenDetail(detail: unknown): string | null {
+  if (!detail) return null;
+  if (typeof detail === "string") return detail;
+  try {
+    return JSON.stringify(detail);
+  } catch {
+    return String(detail);
+  }
+}
+
+function technicalEpubLoadDetail(error: unknown): string | null {
+  if (error instanceof BookDownloadError) {
+    const parts = [
+      error.status ? `HTTP ${error.status}` : null,
+      error.code ? `code=${error.code}` : null,
+      flattenDetail(error.detail),
+    ].filter(Boolean);
+    return parts.length ? parts.join(" | ") : null;
+  }
+  if (error instanceof Error) return `${error.name}: ${error.message}`;
+  return error ? String(error) : null;
 }
 
 interface TextNodeEntry {
@@ -193,6 +226,7 @@ export function EpubReaderView({
   const [loading, setLoading] = useState(true);
   const [loadingLabel, setLoadingLabel] = useState("Loading book, please wait");
   const [error, setError] = useState<string | null>(null);
+  const [errorDetail, setErrorDetail] = useState<string | null>(null);
   const [progress, setProgress] = useState<{ loaded: number; total: number | null } | null>(null);
   const [numPages, setNumPages] = useState(0);
   const [currentPage, setCurrentPage] = useState(Math.max(1, initialPage || 1));
@@ -241,6 +275,7 @@ export function EpubReaderView({
     setLoading(true);
     setLoadingLabel("Loading book, please wait");
     setError(null);
+    setErrorDetail(null);
     setProgress(null);
 
     (async () => {
@@ -349,6 +384,7 @@ export function EpubReaderView({
         if (!cancelled) {
           console.error("EPUB reader failed", loadError);
           setError(describeEpubLoadError(loadError));
+          setErrorDetail(technicalEpubLoadDetail(loadError));
           setLoading(false);
         }
       }
@@ -771,7 +807,18 @@ export function EpubReaderView({
           </div>
         )}
         {error ? (
-          <div className="absolute inset-0 flex items-center justify-center text-red-400 text-sm">{error}</div>
+          <div className="absolute inset-0 flex items-center justify-center px-5 py-8">
+            <div className="max-w-md rounded-lg border border-red-500/30 bg-red-950/20 p-4 text-sm text-red-200 shadow-lg">
+              <p className="font-semibold text-red-100">EPUB could not open</p>
+              <p className="mt-2 leading-relaxed">{error}</p>
+              {errorDetail && (
+                <details className="mt-3 rounded-md border border-red-500/20 bg-black/20 p-3 text-xs text-red-100/80">
+                  <summary className="cursor-pointer font-medium text-red-100">Technical detail</summary>
+                  <p className="mt-2 whitespace-pre-wrap break-words">{errorDetail}</p>
+                </details>
+              )}
+            </div>
+          </div>
         ) : (
           <>
             <div

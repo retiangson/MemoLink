@@ -50,6 +50,31 @@ _EXTENSION_MIME_FALLBACK = {
 }
 
 
+def _short_id(value: Optional[str]) -> Optional[str]:
+    if not value:
+        return None
+    return value if len(value) <= 12 else f"...{value[-12:]}"
+
+
+def _book_audit_details(book, *, user: UserInfo) -> dict:
+    return {
+        "user_id": user.id,
+        "is_admin": user.is_admin,
+        "book_id": book.id,
+        "title": book.title,
+        "file_name": book.file_name,
+        "file_extension": book.file_extension,
+        "mime_type": book.mime_type,
+        "file_size": book.file_size,
+        "is_published": book.is_published,
+        "sync_status": book.sync_status,
+        "sync_error": book.sync_error,
+        "onedrive_drive_id": _short_id(book.onedrive_drive_id),
+        "onedrive_item_id": _short_id(book.onedrive_item_id),
+        "last_modified": book.last_modified.isoformat() if book.last_modified else None,
+    }
+
+
 def require_books_access(
     user: UserInfo = Depends(get_current_user_info),
     db: Session = Depends(get_db),
@@ -206,14 +231,61 @@ async def read_book(
     try:
         book = c.books().get_book_for_reading(info.id, book_id, is_admin=info.is_admin)
     except BookAccessError as exc:
+        c.logs().warning(
+            "books.read",
+            f"Book read denied for book #{book_id}: {exc.detail}",
+            {
+                "user_id": info.id,
+                "is_admin": info.is_admin,
+                "book_id": book_id,
+                "status_code": exc.status_code,
+                "error": exc.detail,
+            },
+            info.id,
+        )
         raise HTTPException(status_code=exc.status_code, detail=exc.detail)
 
+    audit_details = _book_audit_details(book, user=info)
     try:
         content = await c.onedrive().download_file_bytes(
             drive_id=book.onedrive_drive_id, item_id=book.onedrive_item_id
         )
     except OneDriveServiceError as exc:
-        raise HTTPException(status_code=exc.status_code, detail=exc.detail)
+        details = {
+            **audit_details,
+            "status_code": exc.status_code,
+            "error": exc.detail,
+        }
+        c.logs().error(
+            "books.read",
+            f"OneDrive download failed for book #{book.id}: {exc.detail}",
+            details,
+            info.id,
+        )
+        raise HTTPException(
+            status_code=exc.status_code,
+            detail={
+                "message": exc.detail,
+                "book_id": book.id,
+                "title": book.title,
+                "file_name": book.file_name,
+                "file_extension": book.file_extension,
+                "file_size": book.file_size,
+                "sync_status": book.sync_status,
+                "sync_error": book.sync_error,
+            },
+        )
+
+    c.logs().info(
+        "books.read",
+        f"Book downloaded for reading: {book.title}",
+        {
+            **audit_details,
+            "downloaded_bytes": len(content),
+            "size_matches_database": book.file_size is None or len(content) == book.file_size,
+        },
+        info.id,
+    )
 
     fallback_mime = _EXTENSION_MIME_FALLBACK.get((book.file_extension or "").lower(), "application/octet-stream")
     return StreamingResponse(
