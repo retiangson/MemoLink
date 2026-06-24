@@ -119,6 +119,18 @@ async function getCachedBookBlob(bookId: number, signature: string): Promise<Blo
   });
 }
 
+export async function clearCachedBookBlob(bookId: number): Promise<void> {
+  const db = await openBookCache();
+  if (!db) return;
+  await new Promise<void>((resolve) => {
+    const tx = db.transaction(BOOK_CACHE_STORE, "readwrite");
+    tx.objectStore(BOOK_CACHE_STORE).delete(bookId);
+    tx.oncomplete = () => { db.close(); resolve(); };
+    tx.onerror = () => { db.close(); resolve(); };
+    tx.onabort = () => { db.close(); resolve(); };
+  });
+}
+
 async function putCachedBookBlob(bookId: number, signature: string, blob: Blob): Promise<void> {
   const db = await openBookCache();
   if (!db) return;
@@ -150,6 +162,18 @@ export async function getCachedEpubLocations(bookId: number, signature: string):
     tx.oncomplete = () => db.close();
     tx.onerror = () => db.close();
     tx.onabort = () => db.close();
+  });
+}
+
+export async function clearCachedEpubLocations(bookId: number): Promise<void> {
+  const db = await openBookCache();
+  if (!db) return;
+  await new Promise<void>((resolve) => {
+    const tx = db.transaction(EPUB_LOCATIONS_STORE, "readwrite");
+    tx.objectStore(EPUB_LOCATIONS_STORE).delete(bookId);
+    tx.oncomplete = () => { db.close(); resolve(); };
+    tx.onerror = () => { db.close(); resolve(); };
+    tx.onabort = () => { db.close(); resolve(); };
   });
 }
 
@@ -200,11 +224,14 @@ export async function listBookmarks(bookId: number): Promise<Bookmark[]> {
 export async function fetchBookBlob(
   bookOrId: Book | number,
   onProgress?: (loaded: number, total: number | null) => void,
+  options?: { forceRefresh?: boolean },
 ): Promise<Blob> {
   const bookId = typeof bookOrId === "number" ? bookOrId : bookOrId.id;
   const signature = typeof bookOrId === "number" ? "" : bookCacheSignature(bookOrId);
-  const cached = await getCachedBookBlob(bookId, signature);
-  if (cached) return cached;
+  if (!options?.forceRefresh) {
+    const cached = await getCachedBookBlob(bookId, signature);
+    if (cached) return cached;
+  }
 
   // Large audio/video files can take a while on slow connections — give downloads
   // much more headroom than the client's default 15s JSON-request timeout.

@@ -5,7 +5,7 @@ import type Rendition from "epubjs/types/rendition";
 import type Contents from "epubjs/types/contents";
 import {
   fetchBookBlob, updateBookProgress, addBookmark, listBookmarks, addBookHighlight, listBookHighlights,
-  bookCacheSignature, getCachedEpubLocations, putCachedEpubLocations,
+  bookCacheSignature, clearCachedBookBlob, clearCachedEpubLocations, getCachedEpubLocations, putCachedEpubLocations,
   type Bookmark, type BookHighlight,
 } from "../../api/booksApi";
 import type { ReaderViewProps, HighlightAnchor } from "./format";
@@ -28,6 +28,38 @@ function persistHighlightName(colorId: string): string {
 }
 
 interface PendingSelection { start: number; end: number; }
+
+const EPUB_LOCATION_STEP = 150;
+const EPUB_TOUCH_FALLBACK_LOCATION_STEP = 600;
+
+function isLikelyTouchDevice(): boolean {
+  if (typeof window === "undefined") return false;
+  return window.matchMedia?.("(hover: none), (pointer: coarse)")?.matches || navigator.maxTouchPoints > 0;
+}
+
+async function generateEpubLocations(epubBook: Book): Promise<"normal" | "fallback"> {
+  try {
+    await epubBook.locations.generate(EPUB_LOCATION_STEP);
+    return "normal";
+  } catch (error) {
+    if (!isLikelyTouchDevice()) throw error;
+    // Last-resort fallback for memory-constrained mobile browsers. It is less
+    // granular, but opening the book is better than failing after cache refresh.
+    await epubBook.locations.generate(EPUB_TOUCH_FALLBACK_LOCATION_STEP);
+    return "fallback";
+  }
+}
+
+function describeEpubLoadError(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error || "");
+  if (/403|add this book|my books/i.test(message)) {
+    return "Add this book to My Books before opening it.";
+  }
+  if (/404|410|not found|failed to download/i.test(message)) {
+    return "Could not download this book from OneDrive. It may no longer be available in the library.";
+  }
+  return "Could not open this EPUB on this device. I refreshed the local cache, but the reader still could not parse or render it.";
+}
 
 interface TextNodeEntry {
   node: Text;
@@ -159,6 +191,7 @@ export function EpubReaderView({
   const highlightsRef = useRef<BookHighlight[]>([]);
 
   const [loading, setLoading] = useState(true);
+  const [loadingLabel, setLoadingLabel] = useState("Loading book, please wait");
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState<{ loaded: number; total: number | null } | null>(null);
   const [numPages, setNumPages] = useState(0);
@@ -206,19 +239,53 @@ export function EpubReaderView({
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
+    setLoadingLabel("Loading book, please wait");
     setError(null);
     setProgress(null);
 
     (async () => {
       try {
-        const blob = await fetchBookBlob(book, (loaded, total) => { if (!cancelled) setProgress({ loaded, total }); });
-        const buf = await blob.arrayBuffer();
-        if (cancelled || !containerRef.current) return;
+        const signature = bookCacheSignature(book);
 
-        const epubBook = ePub(buf);
+        async function openBook(forceRefresh: boolean): Promise<Book> {
+          setLoadingLabel(forceRefresh ? "Refreshing local book copy" : "Loading book, please wait");
+          const blob = await fetchBookBlob(
+            book,
+            (loaded, total) => { if (!cancelled) setProgress({ loaded, total }); },
+            { forceRefresh },
+          );
+          if (!blob.size) throw new Error("Downloaded EPUB is empty.");
+          if (book.file_size && blob.size !== book.file_size) {
+            throw new Error(`Downloaded EPUB size mismatch: expected ${book.file_size}, got ${blob.size}.`);
+          }
+          const buf = await blob.arrayBuffer();
+          const loadedBook = ePub(buf);
+          await loadedBook.ready;
+          return loadedBook;
+        }
+
+        let epubBook: Book;
+        try {
+          epubBook = await openBook(false);
+        } catch (firstError) {
+          await Promise.all([
+            clearCachedBookBlob(book.id),
+            clearCachedEpubLocations(book.id),
+          ]);
+          epubBookRef.current?.destroy();
+          epubBookRef.current = null;
+          epubBook = await openBook(true).catch((secondError) => {
+            throw secondError || firstError;
+          });
+        }
+
+        if (cancelled || !containerRef.current) {
+          epubBook.destroy();
+          return;
+        }
         epubBookRef.current = epubBook;
-        await epubBook.ready;
 
+        setLoadingLabel("Preparing EPUB reader");
         const rendition = epubBook.renderTo(containerRef.current, {
           width: "100%",
           height: "100%",
@@ -227,13 +294,23 @@ export function EpubReaderView({
         });
         renditionRef.current = rendition;
 
-        const signature = bookCacheSignature(book);
+        setLoadingLabel("Preparing book pages");
+        let locationsLoaded = false;
         const cachedLocations = await getCachedEpubLocations(book.id, signature);
-        if (cachedLocations) {
-          epubBook.locations.load(cachedLocations);
-        } else {
-          await epubBook.locations.generate(150);
-          putCachedEpubLocations(book.id, signature, epubBook.locations.save()).catch(() => {});
+        if (cachedLocations && cachedLocations.trim()) {
+          try {
+            epubBook.locations.load(cachedLocations);
+            locationsLoaded = epubBook.locations.length() > 0;
+          } catch {
+            await clearCachedEpubLocations(book.id);
+          }
+        }
+        if (!locationsLoaded) {
+          const locationQuality = await generateEpubLocations(epubBook);
+          const savedLocations = epubBook.locations.save();
+          if (savedLocations && locationQuality === "normal") {
+            putCachedEpubLocations(book.id, signature, savedLocations).catch(() => {});
+          }
         }
         if (cancelled) return;
         const total = epubBook.locations.length();
@@ -244,6 +321,7 @@ export function EpubReaderView({
         canMovePrevRef.current = startLoc > 0;
         setCanMovePrev(startLoc > 0);
         const startCfi = total > 0 ? epubBook.locations.cfiFromLocation(startLoc) : undefined;
+        setLoadingLabel("Opening book");
         await rendition.display(startCfi);
         if (cancelled) return;
         refreshTextMap();
@@ -267,9 +345,10 @@ export function EpubReaderView({
         });
 
         setLoading(false);
-      } catch {
+      } catch (loadError) {
         if (!cancelled) {
-          setError("Could not load this book. It may no longer be available in the library.");
+          console.error("EPUB reader failed", loadError);
+          setError(describeEpubLoadError(loadError));
           setLoading(false);
         }
       }
@@ -688,7 +767,7 @@ export function EpubReaderView({
       <div className={`flex-1 overflow-hidden relative transition-colors ${readerSurfaceClass(colorMode)}`} {...swipeHandlers}>
         {loading && (
           <div className={`absolute inset-0 z-10 ${readerSurfaceClass(colorMode)}`}>
-            <ReaderLoadingState book={book} colorMode={colorMode} progress={progress} />
+            <ReaderLoadingState book={book} colorMode={colorMode} label={loadingLabel} progress={progress} />
           </div>
         )}
         {error ? (
