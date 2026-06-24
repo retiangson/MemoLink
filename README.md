@@ -34,6 +34,9 @@ MemoLink lets you capture notes and documents, then ask an AI questions grounded
 - Admin panel - manage users, feature flags, and feedback reports (admin-only)
 - Feature flags system - admins toggle feature availability and set defaults app-wide
 - Bug reporting and suggestions - users submit reports via Help modal; admins manage status
+- Books Library - admin-managed OneDrive book sync with a built-in multi-format reader (PDF, EPUB, PPTX, audio, TXT, SRT/VTT, CBZ/CBR, MOBI), reading progress, bookmarks, color modes (light/dark/sepia), text-to-speech, and in-book text highlighting
+- Highlight-to-note - selecting text in a supported book format appends it to a per-book "{Title} - Highlights" note, with double-click jump-back from the note to the exact highlighted passage; the Notes list updates instantly on highlight
+- "Save as Note Source" - extract a book's full text (PDF/EPUB/PPTX/TXT/SRT/VTT) into searchable, RAG-retrievable notes
 
 ---
 
@@ -53,6 +56,7 @@ MemoLink/
 │   └── src/
 │       ├── api/              Axios API clients
 │       ├── components/       Reusable UI components
+│       │   └── book-readers/ Per-format book reader views (PDF, EPUB, PPTX, audio, TXT, captions, comic, MOBI)
 │       └── pages/            LoginPage, ChatPage
 │
 ├── Overview.html             Project overview (standalone HTML)
@@ -205,6 +209,9 @@ python -m uvicorn memolink_backend.main:app --reload
 | `CORE_API_KEY` | Enables CORE full-text academic paper retrieval |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM` | Enables forgot-password email delivery and feedback notifications |
 | `FRONTEND_URL` | Reset-password link base URL in emails |
+| `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET`, `MICROSOFT_TENANT_ID`, `MICROSOFT_REDIRECT_URI` | Enables the Books Library's OneDrive sync (admin connects a OneDrive account via OAuth) |
+| `ONEDRIVE_BOOKS_FOLDER_ID` / `ONEDRIVE_BOOKS_FOLDER_PATH` | Which OneDrive folder to sync books from (ID takes priority over path) |
+| `ONEDRIVE_SYNC_ENABLED` | Toggles the Books Library sync feature on/off |
 
 ### Frontend
 
@@ -245,6 +252,22 @@ Users can submit bug reports or feature suggestions via **Help → Report Bug / 
 
 ---
 
+## Books Library
+
+Admins connect a OneDrive account (OAuth via `MICROSOFT_CLIENT_ID`/`MICROSOFT_CLIENT_SECRET`) and sync a chosen OneDrive folder into a shared **Books Library** that all users can browse, borrow, and read in-app.
+
+**Supported formats:** PDF, EPUB, PPTX, audio, TXT, SRT/VTT (captions), CBZ/CBR (comics), MOBI.
+
+- **Reader** - paginated reading view per format with light/dark/sepia color modes, text-to-speech, bookmarks, and reading-progress tracking (resumes where you left off)
+- **Highlighting** - select text (PDF, EPUB, PPTX, TXT, captions, MOBI) and save it as a highlight with a color tag; each highlight is appended to an auto-generated "{Title} - Highlights" note, and the Notes list refreshes instantly when a highlight is added
+- **Jump-back** - double-clicking a highlight inside its note jumps the reader straight to that exact passage
+- **Save as Note Source** - extracts a book's full text (PDF, EPUB, PPTX, TXT, SRT/VTT) into chunked, embedded notes so it becomes part of the RAG knowledge base and is citable in chat
+- **Admin management** - publish/unpublish books (individually, selected, or all), trigger manual or paginated OneDrive sync, and monitor sync status/errors from the Admin Panel's **Books** tab
+
+New domain tables: `books`, `user_books`, `book_bookmarks`, `book_highlights`, `book_note_sources`, `book_note_chunks`, `onedrive_accounts`.
+
+---
+
 ## Database Setup
 
 MemoLink requires PostgreSQL with the **pgvector** extension. Supabase provides this out of the box.
@@ -281,6 +304,7 @@ MemoLink requires PostgreSQL with the **pgvector** extension. Supabase provides 
 | Bug reporting | Not available | In-app form + DB storage + SMTP notification |
 | Feature flags | Not available | Per-feature toggles with admin UI |
 | Token overflow | Base64 in context | Base64 stripped before OpenAI calls |
+| Book reading | Not available | OneDrive-synced Books Library with multi-format reader, highlights, bookmarks, and RAG note extraction |
 
 ---
 
@@ -310,6 +334,39 @@ Recent documentation updates also cover the Gmail connector cleanup: token refre
 | `PATCH` | `/api/admin/users/{id}/role` | Promote or demote user admin status | Admin |
 | `GET` | `/api/admin/features` | Get all feature flags (admin view) | Admin |
 | `PUT` | `/api/admin/features` | Update one or more feature flags | Admin |
+
+---
+
+## Books Library API Endpoints
+
+| Method | Path | Description | Auth |
+|---|---|---|---|
+| `GET` | `/api/books` | List published books | User |
+| `GET` | `/api/books/my` | List the current user's borrowed books | User |
+| `GET` | `/api/books/{id}` | Get a single book | User |
+| `POST` | `/api/books/{id}/borrow` | Borrow a book into "My Books" | User |
+| `DELETE` | `/api/books/{id}/my` | Remove a book from "My Books" | User |
+| `POST` | `/api/books/{id}/progress` | Update reading progress (page/percent) | User |
+| `POST` | `/api/books/{id}/bookmark` | Add a bookmark | User |
+| `GET` | `/api/books/{id}/bookmarks` | List bookmarks | User |
+| `POST` | `/api/books/{id}/highlights` | Add a highlight (appends to the book's Highlights note) | User |
+| `GET` | `/api/books/highlights/{highlight_id}` | Get a single highlight | User |
+| `GET` | `/api/books/{id}/highlights` | List highlights for a book | User |
+| `GET` | `/api/books/{id}/read` | Stream the book file | User |
+| `GET` | `/api/books/{id}/slides` | Get extracted PPTX slide content | User |
+| `POST` | `/api/books/{id}/save-as-note-source` | Extract book text into searchable notes | User |
+| `GET` | `/api/books/{id}/note-source-status` | Poll note-extraction job status | User |
+| `GET` | `/api/admin/books` | List all books (admin view) | Admin |
+| `GET` | `/api/admin/books/onedrive/status` | Check OneDrive connection status | Admin |
+| `GET` | `/api/admin/books/onedrive/auth-url` | Get OneDrive OAuth consent URL | Admin |
+| `GET` | `/api/admin/books/onedrive/callback` | OneDrive OAuth callback | Admin |
+| `DELETE` | `/api/admin/books/onedrive/disconnect` | Disconnect the OneDrive account | Admin |
+| `POST` | `/api/admin/books/sync` | Sync all books from OneDrive | Admin |
+| `POST` | `/api/admin/books/sync/page` | Sync one page of books from OneDrive | Admin |
+| `PATCH` | `/api/admin/books/{id}` | Update book metadata | Admin |
+| `POST` | `/api/admin/books/{id}/publish` / `/unpublish` | Publish or unpublish a book | Admin |
+| `POST` | `/api/admin/books/publish-all` / `/unpublish-all` | Bulk publish/unpublish all books | Admin |
+| `POST` | `/api/admin/books/publish-selected` / `/unpublish-selected` | Bulk publish/unpublish selected books | Admin |
 
 ---
 

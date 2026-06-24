@@ -123,6 +123,11 @@ Inside the Lambda function → **Configuration → Environment variables → Edi
 | `SMTP_PASSWORD` | Your Gmail app password |
 | `SMTP_FROM` | Your Gmail address |
 | `FRONTEND_URL` | Your Azure Static Web App URL (after Part 2) |
+| `MICROSOFT_CLIENT_ID` / `MICROSOFT_CLIENT_SECRET` | Optional - enables Books Library OneDrive sync |
+| `MICROSOFT_TENANT_ID` | Optional - leave blank for `common` |
+| `MICROSOFT_REDIRECT_URI` | `https://<your-api-domain>/api/admin/books/onedrive/callback` |
+| `ONEDRIVE_BOOKS_FOLDER_ID` / `ONEDRIVE_BOOKS_FOLDER_PATH` | Optional - which OneDrive folder to sync books from |
+| `ONEDRIVE_SYNC_ENABLED` | `true` |
 
 > **JWT_SECRET_KEY tip:** Generate one with `python -c "import secrets; print(secrets.token_hex(32))"`
 
@@ -294,4 +299,11 @@ SMTP_USER
 SMTP_PASSWORD
 SMTP_FROM
 FRONTEND_URL
+MICROSOFT_CLIENT_ID
+MICROSOFT_CLIENT_SECRET
+MICROSOFT_TENANT_ID
+MICROSOFT_REDIRECT_URI
+ONEDRIVE_BOOKS_FOLDER_ID
+ONEDRIVE_BOOKS_FOLDER_PATH
+ONEDRIVE_SYNC_ENABLED
 ```

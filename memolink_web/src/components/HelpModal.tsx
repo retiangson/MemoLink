@@ -17,6 +17,7 @@ const NAV: Section[] = [
   { id: "chat",       label: "AI Chat",           icon: <path d="M14 1a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H4.414A2 2 0 0 0 3 11.586l-2 2V2a1 1 0 0 1 1-1zM2 0a2 2 0 0 0-2 2v12.793a.5.5 0 0 0 .854.353l2.853-2.853A1 1 0 0 1 4.414 12H14a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2z"/> },
   { id: "notes",      label: "Notes",             icon: <path d="M2.5 1A1.5 1.5 0 0 0 1 2.5v11A1.5 1.5 0 0 0 2.5 15h6.086a1.5 1.5 0 0 0 1.06-.44l4.915-4.914A1.5 1.5 0 0 0 15 8.586V2.5A1.5 1.5 0 0 0 13.5 1zm6 8.5a1 1 0 0 1 1-1h4.396l-5.396 5.397z"/> },
   { id: "import",     label: "File & Video",      icon: <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5M7.646 1.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 2.707V11.5a.5.5 0 0 1-1 0V2.707L5.354 4.854a.5.5 0 1 1-.708-.708z"/> },
+  { id: "books",      label: "Books Library",     icon: <path d="M1 2.828c.885-.37 2.154-.769 3.388-.893 1.33-.134 2.458.063 3.112.752v9.746c-.935-.53-2.12-.603-3.213-.493-1.18.12-2.37.461-3.287.811zm7.5-.141c.654-.689 1.782-.886 3.112-.752 1.234.124 2.503.523 3.388.893v9.923c-.918-.35-2.107-.692-3.287-.81-1.094-.111-2.278-.039-3.213.492zM8 1.783C7.015.936 5.587.81 4.287.94c-1.514.153-3.042.672-3.994 1.105A.5.5 0 0 0 0 2.5v11a.5.5 0 0 0 .707.455c.882-.4 2.303-.881 3.68-1.02 1.409-.142 2.59.087 3.223.877a.5.5 0 0 0 .78 0c.633-.79 1.814-1.019 3.223-.877 1.377.139 2.798.62 3.68 1.02A.5.5 0 0 0 16 13.5v-11a.5.5 0 0 0-.293-.455c-.952-.433-2.48-.952-3.994-1.105C10.413.809 8.985.936 8 1.783"/> },
   { id: "aitools",    label: "AI Tools",          icon: <><path d="M6 12.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 0 1h-3a.5.5 0 0 1-.5-.5M3 8.062C3 6.76 4.235 5.765 5.53 5.886a26.6 26.6 0 0 0 4.94 0C11.765 5.765 13 6.76 13 8.062v1.157a.93.93 0 0 1-.765.935c-.845.147-2.34.346-4.235.346s-3.39-.2-4.235-.346A.93.93 0 0 1 3 9.219zm4.542-.827a.25.25 0 0 0-.217.068l-.92.9a25 25 0 0 1-1.871-.183.25.25 0 0 0-.068.495c.55.076 1.232.149 2.02.193a.25.25 0 0 0 .189-.071l.754-.736.847 1.71a.25.25 0 0 0 .404.062l.932-.97a25 25 0 0 0 1.922-.188.25.25 0 0 0-.068-.495c-.538.074-1.207.145-1.98.189a.25.25 0 0 0-.166.076l-.754.785-.842-1.7a.25.25 0 0 0-.182-.134"/><path d="M8.5 1.866a1 1 0 1 0-1 0V3h-2A4.5 4.5 0 0 0 1 7.5V8a1 1 0 0 0-1 1v2a1 1 0 0 0 1 1v1a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-1a1 1 0 0 0 1-1V9a1 1 0 0 0-1-1v-.5A4.5 4.5 0 0 0 10.5 3h-2zM14 7.5V13a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V7.5A3.5 3.5 0 0 1 5.5 4h5A3.5 3.5 0 0 1 14 7.5"/></> },
   { id: "reminders",  label: "Reminders",         icon: <path d="M8 16a2 2 0 0 0 2-2H6a2 2 0 0 0 2 2M8 1.918l-.797.161A4 4 0 0 0 4 6c0 .628-.134 2.197-.459 3.742-.16.767-.376 1.566-.663 2.258h10.244c-.287-.692-.502-1.49-.663-2.258C12.134 8.197 12 6.628 12 6a4 4 0 0 0-3.203-3.92zM14.22 12c.223.447.481.801.78 1H1c.299-.199.557-.553.78-1C2.68 10.2 3 6.88 3 6c0-2.42 1.72-4.44 4.005-4.901a1 1 0 1 1 1.99 0A5 5 0 0 1 13 6c0 .88.32 4.2 1.22 6"/> },
   { id: "models",     label: "AI Models",         icon: <path d="M6 12.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 0 1h-3a.5.5 0 0 1-.5-.5M3 8.062C3 6.76 4.235 5.765 5.53 5.886a26.6 26.6 0 0 0 4.94 0C11.765 5.765 13 6.76 13 8.062v1.157a.93.93 0 0 1-.765.935c-.845.147-2.34.346-4.235.346s-3.39-.2-4.235-.346A.93.93 0 0 1 3 9.219zm4.542-.827a.25.25 0 0 0-.217.068l-.92.9a25 25 0 0 1-1.871-.183.25.25 0 0 0-.068.495c.55.076 1.232.149 2.02.193a.25.25 0 0 0 .189-.071l.754-.736.847 1.71a.25.25 0 0 0 .404.062l.932-.97a25 25 0 0 0 1.922-.188.25.25 0 0 0-.068-.495c-.538.074-1.207.145-1.98.189a.25.25 0 0 0-.166.076l-.754.785-.842-1.7a.25.25 0 0 0-.182-.134"/> },
@@ -46,6 +47,7 @@ const CONTENT: Record<string, React.ReactNode> = {
           { label: "AI Chat", desc: "Grounded answers routed through MemoLink's Smart Response Engine" },
           { label: "Smart Notes", desc: "Rich editor with voice, images, and formatting" },
           { label: "File & Video", desc: "Import PDFs, DOCX, PPTX, YouTube, and recordings" },
+          { label: "Books Library", desc: "Read PDF, EPUB, PPTX, audio, TXT, captions, comics, and MOBI books with highlights, bookmarks, and TTS" },
           { label: "AI Tools", desc: "Web search, smart actions, research, image generation, and long academic drafting" },
           { label: "Reminders", desc: "Auto-detected from notes or set manually" },
           { label: "Slash Commands", desc: "14 commands - /Improve, /Quiz, /Discuss and more" },
@@ -147,6 +149,43 @@ const CONTENT: Record<string, React.ReactNode> = {
             "Paste a YouTube URL - the transcript is extracted via YouTube Caption API and saved as a note.",
             "Upload a video or audio file (MP4, M4A, WebM, MOV, MP3, WAV - max 200 MB) - files ≤25 MB use Whisper, larger files use Deepgram Nova-2.",
             "Upload a Zoom recording or lecture capture; the transcript is saved as a searchable note.",
+          ].map((item, i) => (
+            <li key={i} className="flex gap-2"><span className="text-indigo-500 shrink-0 mt-0.5">•</span><span>{item}</span></li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  ),
+
+  books: (
+    <div className="space-y-4 text-sm text-gray-400 leading-relaxed">
+      <p>The Books Library is a shared collection synced by an admin from OneDrive. Open it from the top bar to browse, borrow, and read books in-app.</p>
+      <div>
+        <p className="text-xs font-semibold text-indigo-300 mb-2 uppercase tracking-wider">Supported Formats</p>
+        <p>PDF, EPUB, PPTX, audio, TXT, SRT/VTT (captions), CBZ/CBR (comics), and MOBI.</p>
+      </div>
+      <div>
+        <p className="text-xs font-semibold text-indigo-300 mb-2 uppercase tracking-wider">Reading</p>
+        <ul className="space-y-2">
+          {[
+            "Borrow a book to add it to \"My Books\" - your reading progress and current page are saved automatically.",
+            "Switch between light, dark, and sepia color modes from the reader toolbar.",
+            "Use Read Aloud for text-to-speech with play/pause and speed controls.",
+            "Add a bookmark on any page to jump back to it later.",
+          ].map((item, i) => (
+            <li key={i} className="flex gap-2"><span className="text-indigo-500 shrink-0 mt-0.5">•</span><span>{item}</span></li>
+          ))}
+        </ul>
+      </div>
+      <div>
+        <p className="text-xs font-semibold text-indigo-300 mb-2 uppercase tracking-wider">Highlights & Notes</p>
+        <ul className="space-y-2">
+          {[
+            "Select text in PDF, EPUB, PPTX, TXT, captions, or MOBI books, then click Highlight - pick a color to tag it.",
+            "Every highlight is appended to an auto-generated \"{Book Title} - Highlights\" note, and the Notes list updates instantly.",
+            "Double-click a highlight inside that note to jump the reader straight back to the exact passage.",
+            "\"Save as Note Source\" extracts a book's full text (PDF, EPUB, PPTX, TXT, SRT/VTT) into searchable notes so it becomes part of AI Chat's grounded answers.",
+            "Deleting the highlights note permanently (from the Recycle Bin) also permanently deletes all highlights saved for that book.",
           ].map((item, i) => (
             <li key={i} className="flex gap-2"><span className="text-indigo-500 shrink-0 mt-0.5">•</span><span>{item}</span></li>
           ))}

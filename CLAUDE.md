@@ -10,6 +10,11 @@ The software is a full-stack RAG application:
 - PostgreSQL + pgvector (Supabase) database
 - OpenAI GPT for chat, text-embedding-3-small for embeddings
 
+It also includes a **Books Library**: admin-managed OneDrive book sync (PDF, EPUB, PPTX,
+audio, TXT, SRT/VTT, CBZ/CBR, MOBI) with an in-app multi-format reader, bookmarks, color
+modes, text-to-speech, in-book highlighting (highlights are appended to a per-book
+"{Title} - Highlights" note), and optional "Save as Note Source" full-text RAG extraction.
+
 Documentation pages (standalone HTML) are in the `MemoLink/` root folder:
 - `Overview.html`
 - `Requirements Analysis.html`
@@ -21,7 +26,9 @@ Documentation pages (standalone HTML) are in the `MemoLink/` root folder:
 ```
 MemoLink/
 ├── memolink_backend/    FastAPI backend (Clean Architecture + DI)
+│   └── ...              Includes Books Library (OneDrive sync, books/highlights/bookmarks)
 ├── memolink_web/        React/Vite frontend
+│   └── src/components/book-readers/   Per-format book reader views
 ├── Overview.html        Project overview doc
 ├── Requirements Analysis.html
 ├── Database Design.html
