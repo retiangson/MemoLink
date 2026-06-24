@@ -133,6 +133,18 @@ async function getCachedBookBlob(bookId: number, signature: string): Promise<Blo
   });
 }
 
+export interface BookReaderErrorReport {
+  book_id: number;
+  format: string;
+  stage: string;
+  message: string;
+  technical_detail?: string | null;
+  user_agent?: string | null;
+  url?: string | null;
+  online?: boolean | null;
+  connection?: Record<string, unknown> | null;
+}
+
 export async function clearCachedBookBlob(bookId: number): Promise<void> {
   const db = await openBookCache();
   if (!db) return;
@@ -304,6 +316,10 @@ export async function fetchBookBlob(
   }
   await putCachedBookBlob(bookId, signature, r.data);
   return r.data;
+}
+
+export async function reportBookReaderError(payload: BookReaderErrorReport): Promise<void> {
+  await api.post("/books/reader-error", payload, { timeout: 10000 });
 }
 
 export async function fetchBookSlides(bookId: number): Promise<string[]> {

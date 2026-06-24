@@ -6,7 +6,7 @@ import type Contents from "epubjs/types/contents";
 import {
   fetchBookBlob, updateBookProgress, addBookmark, listBookmarks, addBookHighlight, listBookHighlights,
   bookCacheSignature, clearCachedBookBlob, clearCachedEpubLocations, getCachedEpubLocations, putCachedEpubLocations,
-  BookDownloadError,
+  reportBookReaderError, BookDownloadError,
   type Bookmark, type BookHighlight,
 } from "../../api/booksApi";
 import type { ReaderViewProps, HighlightAnchor } from "./format";
@@ -92,6 +92,24 @@ function technicalEpubLoadDetail(error: unknown): string | null {
   }
   if (error instanceof Error) return `${error.name}: ${error.message}`;
   return error ? String(error) : null;
+}
+
+function browserConnectionDetail(): Record<string, unknown> | null {
+  const nav = navigator as Navigator & {
+    connection?: {
+      effectiveType?: string;
+      downlink?: number;
+      rtt?: number;
+      saveData?: boolean;
+    };
+  };
+  if (!nav.connection) return null;
+  return {
+    effectiveType: nav.connection.effectiveType,
+    downlink: nav.connection.downlink,
+    rtt: nav.connection.rtt,
+    saveData: nav.connection.saveData,
+  };
 }
 
 interface TextNodeEntry {
@@ -383,8 +401,21 @@ export function EpubReaderView({
       } catch (loadError) {
         if (!cancelled) {
           console.error("EPUB reader failed", loadError);
-          setError(describeEpubLoadError(loadError));
-          setErrorDetail(technicalEpubLoadDetail(loadError));
+          const message = describeEpubLoadError(loadError);
+          const detail = technicalEpubLoadDetail(loadError);
+          setError(message);
+          setErrorDetail(detail);
+          reportBookReaderError({
+            book_id: book.id,
+            format: "epub",
+            stage: "epub-load",
+            message,
+            technical_detail: detail,
+            user_agent: navigator.userAgent,
+            url: window.location.pathname,
+            online: navigator.onLine,
+            connection: browserConnectionDetail(),
+          }).catch(() => {});
           setLoading(false);
         }
       }

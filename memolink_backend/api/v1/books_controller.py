@@ -2,6 +2,7 @@ from typing import Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 
@@ -26,6 +27,18 @@ from memolink_backend.contracts.book_dtos import (
 )
 
 router = APIRouter(prefix="/books", tags=["books"])
+
+
+class BookReaderErrorDTO(BaseModel):
+    book_id: int
+    format: str = Field(default="unknown", max_length=30)
+    stage: str = Field(default="unknown", max_length=80)
+    message: str = Field(default="", max_length=1000)
+    technical_detail: Optional[str] = Field(default=None, max_length=3000)
+    user_agent: Optional[str] = Field(default=None, max_length=500)
+    url: Optional[str] = Field(default=None, max_length=1000)
+    online: Optional[bool] = None
+    connection: Optional[dict] = None
 
 _EXTENSION_MIME_FALLBACK = {
     ".pdf": "application/pdf",
@@ -217,6 +230,47 @@ def list_highlights(
     c: RequestContainer = Depends(get_request_container),
 ):
     return c.book_highlights().list_highlights(user_id, book_id)
+
+
+@router.post("/reader-error")
+def log_reader_error(
+    body: BookReaderErrorDTO,
+    info: UserInfo = Depends(get_current_user_info),
+    _access: int = Depends(require_books_access),
+    c: RequestContainer = Depends(get_request_container),
+):
+    book = None
+    try:
+        book = c.books().get_book_for_reading(info.id, body.book_id, is_admin=info.is_admin)
+    except BookAccessError:
+        try:
+            book = c.books().get_published_book(body.book_id)
+        except BookAccessError:
+            book = None
+
+    details = {
+        "user_id": info.id,
+        "is_admin": info.is_admin,
+        "book_id": body.book_id,
+        "format": body.format,
+        "stage": body.stage,
+        "message": body.message,
+        "technical_detail": body.technical_detail,
+        "user_agent": body.user_agent,
+        "url": body.url,
+        "online": body.online,
+        "connection": body.connection,
+    }
+    if book:
+        details.update(_book_audit_details(book, user=info))
+
+    c.logs().error(
+        "books.reader.client",
+        f"Book reader failed on client for book #{body.book_id}: {body.message or body.stage}",
+        details,
+        info.id,
+    )
+    return {"ok": True}
 
 
 @router.get("/{book_id}/read")
