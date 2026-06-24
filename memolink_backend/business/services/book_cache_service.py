@@ -69,9 +69,15 @@ class BookCacheService:
             s3.head_object(Bucket=bucket, Key=key)
             cache_hit = True
         except ClientError as exc:
-            if exc.response.get("Error", {}).get("Code") != "404":
+            error_code = exc.response.get("Error", {}).get("Code")
+            # Without s3:ListBucket, S3 returns 403 instead of 404 for a missing key — there's
+            # no way to tell "doesn't exist" apart from "no permission" without that extra grant,
+            # so both are treated as a cache miss here. A genuine permission problem still surfaces
+            # clearly below, from the put_object call that actually has to write the object.
+            if error_code in ("404", "403", "AccessDenied"):
+                cache_hit = False
+            else:
                 raise BookCacheServiceError(500, f"Could not check S3 book cache: {exc}")
-            cache_hit = False
 
         if not cache_hit:
             content = await self._onedrive.download_file_bytes(
