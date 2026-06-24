@@ -11,7 +11,6 @@ import { TTSPlayerBar } from "../TTSPlayerBar";
 import { HighlightColorPicker } from "./HighlightColorPicker";
 import { PageNavArrows } from "./PageNavArrows";
 import { ReaderLoadingState } from "./ReaderLoadingState";
-import { HighlightActionButton } from "./HighlightActionButton";
 import { captureSelectionInContainer, applyPersistentMarks, flashOrPulseRange } from "./domTextHighlight";
 
 interface PendingSelection { x: number; y: number; start: number; end: number; }
@@ -34,6 +33,7 @@ export function MobiReaderView({
   const [pendingSelection, setPendingSelection] = useState<PendingSelection | null>(null);
   const [chapterHtml, setChapterHtml] = useState("");
   const [highlights, setHighlights] = useState<BookHighlight[]>([]);
+  const [progress, setProgress] = useState<{ loaded: number; total: number | null } | null>(null);
 
   const mobiRef = useRef<Mobi | null>(null);
   const spineRef = useRef<{ id: string }[]>([]);
@@ -46,9 +46,10 @@ export function MobiReaderView({
     let cancelled = false;
     setLoading(true);
     setError(null);
+    setProgress(null);
     (async () => {
       try {
-        const blob = await fetchBookBlob(book);
+        const blob = await fetchBookBlob(book, (loaded, total) => { if (!cancelled) setProgress({ loaded, total }); });
         const buf = new Uint8Array(await blob.arrayBuffer());
         const mobi = await initMobiFile(buf);
         if (cancelled) {
@@ -61,7 +62,7 @@ export function MobiReaderView({
         setChapterCount(spine.length);
         setCurrentPage((p) => Math.min(Math.max(1, p), Math.max(1, spine.length)));
       } catch {
-        if (!cancelled) setError("Could not load this book. It may no longer be available in OneDrive.");
+        if (!cancelled) setError("Could not load this book. It may no longer be available in the library.");
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -125,7 +126,7 @@ export function MobiReaderView({
     setPendingSelection(captureSelectionInContainer(container));
   }
 
-  async function handleAddHighlight() {
+  async function handleAddHighlight(colorId: string) {
     if (!pendingSelection || !chapterRef.current) return;
     const snippet = (chapterRef.current.textContent || "").slice(pendingSelection.start, pendingSelection.end);
     const created = await addBookHighlight(book.id, {
@@ -134,12 +135,12 @@ export function MobiReaderView({
       start_offset: pendingSelection.start,
       end_offset: pendingSelection.end,
       snippet,
-      color: highlightColor,
+      color: colorId,
     });
     setHighlights((prev) => [...prev, created]);
     onHighlightAdded?.();
     window.getSelection()?.removeAllRanges();
-    setTimeout(() => setPendingSelection(null), 900);
+    setPendingSelection(null);
   }
 
   // Arrival from a Note double-click: switch to the highlight's chapter if needed, then pulse
@@ -176,7 +177,7 @@ export function MobiReaderView({
         {...swipeHandlers}
       >
         {loading ? (
-          <ReaderLoadingState book={book} colorMode={colorMode} />
+          <ReaderLoadingState book={book} colorMode={colorMode} progress={progress} />
         ) : error ? (
           <div className="flex items-center justify-center text-red-400 text-sm">{error}</div>
         ) : (
@@ -198,10 +199,6 @@ export function MobiReaderView({
           </>
         )}
       </div>
-
-      {pendingSelection && (
-        <HighlightActionButton x={pendingSelection.x} y={pendingSelection.y} onHighlight={handleAddHighlight} />
-      )}
 
       {tts.playing && (
         <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50">
@@ -229,7 +226,7 @@ export function MobiReaderView({
             >
               {tts.playing ? (tts.paused ? "Resume" : "Pause") : "Read Aloud"}
             </button>
-            <HighlightColorPicker value={highlightColor} onChange={setHighlightColor} />
+            <HighlightColorPicker value={highlightColor} onChange={setHighlightColor} disabled={!pendingSelection} onApply={handleAddHighlight} />
           </div>
 
           <div className="flex items-center gap-2">

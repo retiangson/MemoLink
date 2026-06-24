@@ -61,11 +61,19 @@ interface CachedBookBlob {
   savedAt: number;
 }
 
+interface CachedEpubLocations {
+  bookId: number;
+  signature: string;
+  locations: string;
+  savedAt: number;
+}
+
 const BOOK_CACHE_DB = "memolink-book-cache";
 const BOOK_CACHE_STORE = "books";
-const BOOK_CACHE_VERSION = 1;
+const EPUB_LOCATIONS_STORE = "epubLocations";
+const BOOK_CACHE_VERSION = 2;
 
-function bookCacheSignature(book: Book): string {
+export function bookCacheSignature(book: Book): string {
   return [
     book.onedrive_web_url ?? "",
     book.last_modified ?? "",
@@ -82,6 +90,9 @@ function openBookCache(): Promise<IDBDatabase | null> {
       const db = request.result;
       if (!db.objectStoreNames.contains(BOOK_CACHE_STORE)) {
         db.createObjectStore(BOOK_CACHE_STORE, { keyPath: "bookId" });
+      }
+      if (!db.objectStoreNames.contains(EPUB_LOCATIONS_STORE)) {
+        db.createObjectStore(EPUB_LOCATIONS_STORE, { keyPath: "bookId" });
       }
     };
     request.onsuccess = () => resolve(request.result);
@@ -120,6 +131,40 @@ async function putCachedBookBlob(bookId: number, signature: string, blob: Blob):
   });
 }
 
+// epub.js's locations.generate() walks the entire spine to build pagination markers —
+// a CPU-bound cost paid on every open, independent of whether the blob itself was a
+// cache hit. Persisting the generated result lets repeat opens skip straight to
+// locations.load() instead of re-walking the whole book.
+export async function getCachedEpubLocations(bookId: number, signature: string): Promise<string | null> {
+  const db = await openBookCache();
+  if (!db) return null;
+  return new Promise((resolve) => {
+    const tx = db.transaction(EPUB_LOCATIONS_STORE, "readonly");
+    const store = tx.objectStore(EPUB_LOCATIONS_STORE);
+    const request = store.get(bookId);
+    request.onsuccess = () => {
+      const cached = request.result as CachedEpubLocations | undefined;
+      resolve(cached?.signature === signature ? cached.locations : null);
+    };
+    request.onerror = () => resolve(null);
+    tx.oncomplete = () => db.close();
+    tx.onerror = () => db.close();
+    tx.onabort = () => db.close();
+  });
+}
+
+export async function putCachedEpubLocations(bookId: number, signature: string, locations: string): Promise<void> {
+  const db = await openBookCache();
+  if (!db) return;
+  await new Promise<void>((resolve) => {
+    const tx = db.transaction(EPUB_LOCATIONS_STORE, "readwrite");
+    tx.objectStore(EPUB_LOCATIONS_STORE).put({ bookId, signature, locations, savedAt: Date.now() } satisfies CachedEpubLocations);
+    tx.oncomplete = () => { db.close(); resolve(); };
+    tx.onerror = () => { db.close(); resolve(); };
+    tx.onabort = () => { db.close(); resolve(); };
+  });
+}
+
 export async function listBooks(params?: { search?: string; category?: string; tag?: string }): Promise<Book[]> {
   return (await api.get("/books", { params })).data;
 }
@@ -152,13 +197,24 @@ export async function listBookmarks(bookId: number): Promise<Bookmark[]> {
   return (await api.get(`/books/${bookId}/bookmarks`)).data;
 }
 
-export async function fetchBookBlob(bookOrId: Book | number): Promise<Blob> {
+export async function fetchBookBlob(
+  bookOrId: Book | number,
+  onProgress?: (loaded: number, total: number | null) => void,
+): Promise<Blob> {
   const bookId = typeof bookOrId === "number" ? bookOrId : bookOrId.id;
   const signature = typeof bookOrId === "number" ? "" : bookCacheSignature(bookOrId);
   const cached = await getCachedBookBlob(bookId, signature);
   if (cached) return cached;
 
-  const r = await api.get(`/books/${bookId}/read`, { responseType: "blob" });
+  // Large audio/video files can take a while on slow connections — give downloads
+  // much more headroom than the client's default 15s JSON-request timeout.
+  const r = await api.get(`/books/${bookId}/read`, {
+    responseType: "blob",
+    timeout: 300000,
+    onDownloadProgress: onProgress
+      ? (evt) => onProgress(evt.loaded, evt.total ?? null)
+      : undefined,
+  });
   await putCachedBookBlob(bookId, signature, r.data);
   return r.data;
 }

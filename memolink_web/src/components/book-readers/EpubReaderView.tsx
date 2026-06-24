@@ -5,6 +5,7 @@ import type Rendition from "epubjs/types/rendition";
 import type Contents from "epubjs/types/contents";
 import {
   fetchBookBlob, updateBookProgress, addBookmark, listBookmarks, addBookHighlight, listBookHighlights,
+  bookCacheSignature, getCachedEpubLocations, putCachedEpubLocations,
   type Bookmark, type BookHighlight,
 } from "../../api/booksApi";
 import type { ReaderViewProps, HighlightAnchor } from "./format";
@@ -17,7 +18,6 @@ import { NoteSourceButton } from "./NoteSourceButton";
 import { HighlightColorPicker } from "./HighlightColorPicker";
 import { PageNavArrows } from "./PageNavArrows";
 import { ReaderLoadingState } from "./ReaderLoadingState";
-import { HighlightActionButton } from "./HighlightActionButton";
 import { HIGHLIGHT_COLORS, highlightColorMark } from "./highlightColors";
 
 const HIGHLIGHT_NAME = "ml-tts";
@@ -27,7 +27,7 @@ function persistHighlightName(colorId: string): string {
   return `ml-persist-${colorId}`;
 }
 
-interface PendingSelection { x: number; y: number; start: number; end: number; }
+interface PendingSelection { start: number; end: number; }
 
 interface TextNodeEntry {
   node: Text;
@@ -160,6 +160,7 @@ export function EpubReaderView({
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [progress, setProgress] = useState<{ loaded: number; total: number | null } | null>(null);
   const [numPages, setNumPages] = useState(0);
   const [currentPage, setCurrentPage] = useState(Math.max(1, initialPage || 1));
   const [canMovePrev, setCanMovePrev] = useState(false);
@@ -206,10 +207,11 @@ export function EpubReaderView({
     let cancelled = false;
     setLoading(true);
     setError(null);
+    setProgress(null);
 
     (async () => {
       try {
-        const blob = await fetchBookBlob(book);
+        const blob = await fetchBookBlob(book, (loaded, total) => { if (!cancelled) setProgress({ loaded, total }); });
         const buf = await blob.arrayBuffer();
         if (cancelled || !containerRef.current) return;
 
@@ -225,7 +227,14 @@ export function EpubReaderView({
         });
         renditionRef.current = rendition;
 
-        await epubBook.locations.generate(150);
+        const signature = bookCacheSignature(book);
+        const cachedLocations = await getCachedEpubLocations(book.id, signature);
+        if (cachedLocations) {
+          epubBook.locations.load(cachedLocations);
+        } else {
+          await epubBook.locations.generate(150);
+          putCachedEpubLocations(book.id, signature, epubBook.locations.save()).catch(() => {});
+        }
         if (cancelled) return;
         const total = epubBook.locations.length();
         setNumPagesValue(total);
@@ -260,7 +269,7 @@ export function EpubReaderView({
         setLoading(false);
       } catch {
         if (!cancelled) {
-          setError("Could not load this book. It may no longer be available in OneDrive.");
+          setError("Could not load this book. It may no longer be available in the library.");
           setLoading(false);
         }
       }
@@ -534,22 +543,14 @@ export function EpubReaderView({
           setPendingSelection(null);
           return;
         }
-        const rect = range.getBoundingClientRect();
-        const frameEl = win.frameElement as HTMLIFrameElement | null;
-        const frameRect = frameEl?.getBoundingClientRect();
-        setPendingSelection({
-          x: (frameRect?.left ?? 0) + rect.left + rect.width / 2,
-          y: (frameRect?.top ?? 0) + rect.top,
-          start,
-          end,
-        });
+        setPendingSelection({ start, end });
       };
       doc.addEventListener("selectionchange", fn);
       selectionListenersRef.current.push({ doc, fn });
     });
   }
 
-  async function handleAddHighlight() {
+  async function handleAddHighlight(colorId: string) {
     if (!pendingSelection) return;
     const snippet = pageTextRef.current.slice(pendingSelection.start, pendingSelection.end);
     const created = await addBookHighlight(book.id, {
@@ -561,14 +562,14 @@ export function EpubReaderView({
       start_offset: pendingSelection.start,
       end_offset: pendingSelection.end,
       snippet,
-      color: highlightColor,
+      color: colorId,
     });
     setHighlights((prev) => [...prev, created]);
     onHighlightAdded?.();
     const contents = renditionRef.current?.getContents();
     const list = (Array.isArray(contents) ? contents : contents ? [contents] : []) as Contents[];
     list.forEach((c: any) => c?.window?.getSelection?.()?.removeAllRanges());
-    setTimeout(() => setPendingSelection(null), 900);
+    setPendingSelection(null);
   }
 
   // The rendered page content lives inside epub.js's own iframe per chapter, which is a
@@ -687,7 +688,7 @@ export function EpubReaderView({
       <div className={`flex-1 overflow-hidden relative transition-colors ${readerSurfaceClass(colorMode)}`} {...swipeHandlers}>
         {loading && (
           <div className={`absolute inset-0 z-10 ${readerSurfaceClass(colorMode)}`}>
-            <ReaderLoadingState book={book} colorMode={colorMode} />
+            <ReaderLoadingState book={book} colorMode={colorMode} progress={progress} />
           </div>
         )}
         {error ? (
@@ -709,10 +710,6 @@ export function EpubReaderView({
           </>
         )}
       </div>
-
-      {pendingSelection && (
-        <HighlightActionButton x={pendingSelection.x} y={pendingSelection.y} onHighlight={handleAddHighlight} />
-      )}
 
       {tts.playing && (
         <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50">
@@ -777,7 +774,7 @@ export function EpubReaderView({
             >
               {tts.playing ? (tts.paused ? "Resume" : "Pause") : "Read Aloud"}
             </button>
-            <HighlightColorPicker value={highlightColor} onChange={setHighlightColor} />
+            <HighlightColorPicker value={highlightColor} onChange={setHighlightColor} disabled={!pendingSelection} onApply={handleAddHighlight} />
           </div>
 
           <div className="flex items-center gap-2">

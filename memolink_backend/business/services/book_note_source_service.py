@@ -16,6 +16,7 @@ from memolink_backend.contracts.book_dtos import BookNoteSourceResponseDTO
 logger = logging.getLogger(__name__)
 
 AUDIO_EXTENSIONS = {".mp3", ".m4a", ".m4b", ".aac", ".wav", ".ogg"}
+VIDEO_EXTENSIONS = {".mp4", ".webm", ".mov", ".m4v"}
 NO_TEXT_EXTENSIONS = {".cbz", ".cbr"}
 
 _TIMESTAMP_LINE = re.compile(r"-->")
@@ -138,6 +139,8 @@ class BookNoteSourceService:
             ext = (book.file_extension or "").lower()
             if ext in AUDIO_EXTENSIONS:
                 raise ValueError("Note extraction is not supported for audiobooks — there is no text to extract")
+            if ext in VIDEO_EXTENSIONS:
+                raise ValueError("Note extraction is not supported for videos — there is no text to extract")
             if ext in NO_TEXT_EXTENSIONS:
                 raise ValueError("Note extraction is not supported for comic books — there is no text to extract")
             if ext == ".mobi":

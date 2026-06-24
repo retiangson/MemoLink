@@ -16,10 +16,9 @@ import { NoteSourceButton } from "./NoteSourceButton";
 import { HighlightColorPicker } from "./HighlightColorPicker";
 import { PageNavArrows } from "./PageNavArrows";
 import { ReaderLoadingState } from "./ReaderLoadingState";
-import { HighlightActionButton } from "./HighlightActionButton";
 import { highlightColorMark } from "./highlightColors";
 
-interface PendingSelection { x: number; y: number; start: number; end: number; }
+interface PendingSelection { start: number; end: number; }
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
 
@@ -48,6 +47,7 @@ export function PdfReaderView({
   const [pageAnim, setPageAnim] = useState<"next" | "prev" | null>(null);
   const [pendingSelection, setPendingSelection] = useState<PendingSelection | null>(null);
   const [highlights, setHighlights] = useState<BookHighlight[]>([]);
+  const [progress, setProgress] = useState<{ loaded: number; total: number | null } | null>(null);
   const autoContinueRef = useRef(false);
 
   const tts = useTTS();
@@ -57,9 +57,10 @@ export function PdfReaderView({
     let cancelled = false;
     setLoading(true);
     setError(null);
+    setProgress(null);
     (async () => {
       try {
-        const blob = await fetchBookBlob(book);
+        const blob = await fetchBookBlob(book, (loaded, total) => { if (!cancelled) setProgress({ loaded, total }); });
         const buf = await blob.arrayBuffer();
         const doc = await pdfjsLib.getDocument({ data: buf }).promise;
         if (cancelled) return;
@@ -67,7 +68,7 @@ export function PdfReaderView({
         setNumPages(doc.numPages);
         setCurrentPage((p) => Math.min(Math.max(1, p), doc.numPages));
       } catch {
-        if (!cancelled) setError("Could not load this book. It may no longer be available in OneDrive.");
+        if (!cancelled) setError("Could not load this book. It may no longer be available in the library.");
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -265,11 +266,10 @@ export function PdfReaderView({
       setPendingSelection(null);
       return;
     }
-    const rect = sel.getRangeAt(0).getBoundingClientRect();
-    setPendingSelection({ x: rect.left + rect.width / 2, y: rect.top, start, end });
+    setPendingSelection({ start, end });
   }
 
-  async function handleAddHighlight() {
+  async function handleAddHighlight(colorId: string) {
     if (!pendingSelection) return;
     const snippet = pageTextRef.current.slice(pendingSelection.start, pendingSelection.end);
     const created = await addBookHighlight(book.id, {
@@ -278,12 +278,12 @@ export function PdfReaderView({
       start_offset: pendingSelection.start,
       end_offset: pendingSelection.end,
       snippet,
-      color: highlightColor,
+      color: colorId,
     });
     setHighlights((prev) => [...prev, created]);
     onHighlightAdded?.();
     window.getSelection()?.removeAllRanges();
-    setTimeout(() => setPendingSelection(null), 900);
+    setPendingSelection(null);
   }
 
   // Arrival from a Note double-click: pulse the divs if they already carry a persistent
@@ -359,7 +359,7 @@ export function PdfReaderView({
         {...swipeHandlers}
       >
         {loading ? (
-          <ReaderLoadingState book={book} colorMode={colorMode} />
+          <ReaderLoadingState book={book} colorMode={colorMode} progress={progress} />
         ) : error ? (
           <div className="flex items-center justify-center text-red-400 text-sm">{error}</div>
         ) : (
@@ -410,10 +410,6 @@ export function PdfReaderView({
           </>
         )}
       </div>
-
-      {pendingSelection && (
-        <HighlightActionButton x={pendingSelection.x} y={pendingSelection.y} onHighlight={handleAddHighlight} />
-      )}
 
       {tts.playing && (
         <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50">
@@ -478,7 +474,7 @@ export function PdfReaderView({
             >
               {tts.playing ? (tts.paused ? "Resume" : "Pause") : "Read Aloud"}
             </button>
-            <HighlightColorPicker value={highlightColor} onChange={setHighlightColor} />
+            <HighlightColorPicker value={highlightColor} onChange={setHighlightColor} disabled={!pendingSelection} onApply={handleAddHighlight} />
           </div>
 
           <div className="flex items-center gap-2">
