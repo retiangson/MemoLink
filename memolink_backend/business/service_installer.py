@@ -242,3 +242,7 @@ class ServiceInstaller:
             user_book_repo=self._domain.get_user_book_repository(),
             note_repo=self._domain.get_note_repository(),
         )
+
+    def get_book_cache_service(self):
+        from memolink_backend.business.services.book_cache_service import BookCacheService
+        return BookCacheService(onedrive_service=self.get_onedrive_service())

@@ -1,7 +1,6 @@
 from typing import Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
-from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from sqlalchemy import text
@@ -11,6 +10,7 @@ from memolink_backend.core.db import get_db
 from memolink_backend.di.request_container import RequestContainer, get_request_container
 from memolink_backend.business.services.book_service import BookAccessError
 from memolink_backend.business.services.onedrive_service import OneDriveServiceError
+from memolink_backend.business.services.book_cache_service import BookCacheServiceError
 from memolink_backend.business.services.book_note_source_service import run_book_note_source_job
 from memolink_backend.business.services.book_highlight_service import BookHighlightError
 from memolink_backend.utils.file_extractor import extract_pptx_slides
@@ -24,6 +24,7 @@ from memolink_backend.contracts.book_dtos import (
     BookSlidesResponseDTO,
     BookHighlightCreateDTO,
     BookHighlightResponseDTO,
+    BookReadUrlResponseDTO,
 )
 
 router = APIRouter(prefix="/books", tags=["books"])
@@ -273,15 +274,18 @@ def log_reader_error(
     return {"ok": True}
 
 
-@router.get("/{book_id}/read")
+@router.get("/{book_id}/read", response_model=BookReadUrlResponseDTO)
 async def read_book(
     book_id: int,
     info: UserInfo = Depends(get_current_user_info),
     _access: int = Depends(require_books_access),
     c: RequestContainer = Depends(get_request_container),
 ):
-    """Streams the PDF bytes through the backend so the OneDrive access token
-    is never exposed to the frontend."""
+    """Returns a short-lived presigned S3 URL for the book file instead of streaming
+    bytes through the backend. Streaming breaks on Lambda for any book over a few MB
+    (its synchronous response payload is hard-capped at 6 MB), so the file is cached
+    in S3 on first read and served directly to the client from there instead. The
+    book is re-fetched from OneDrive only when the S3 cache is missing or stale."""
     try:
         book = c.books().get_book_for_reading(info.id, book_id, is_admin=info.is_admin)
     except BookAccessError as exc:
@@ -300,10 +304,11 @@ async def read_book(
         raise HTTPException(status_code=exc.status_code, detail=exc.detail)
 
     audit_details = _book_audit_details(book, user=info)
+    fallback_mime = _EXTENSION_MIME_FALLBACK.get((book.file_extension or "").lower(), "application/octet-stream")
+    mime_type = book.mime_type or fallback_mime
+
     try:
-        content = await c.onedrive().download_file_bytes(
-            drive_id=book.onedrive_drive_id, item_id=book.onedrive_item_id
-        )
+        result = await c.book_cache().get_read_url(book, mime_type=mime_type)
     except OneDriveServiceError as exc:
         details = {
             **audit_details,
@@ -329,23 +334,33 @@ async def read_book(
                 "sync_error": book.sync_error,
             },
         )
+    except BookCacheServiceError as exc:
+        details = {
+            **audit_details,
+            "status_code": exc.status_code,
+            "error": exc.detail,
+        }
+        c.logs().error(
+            "books.read",
+            f"S3 book cache failed for book #{book.id}: {exc.detail}",
+            details,
+            info.id,
+        )
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail)
 
     c.logs().info(
         "books.read",
-        f"Book downloaded for reading: {book.title}",
-        {
-            **audit_details,
-            "downloaded_bytes": len(content),
-            "size_matches_database": book.file_size is None or len(content) == book.file_size,
-        },
+        f"Book read URL generated: {book.title}" + (" (cache hit)" if result["cache_hit"] else " (downloaded from OneDrive and cached)"),
+        {**audit_details, "cache_hit": result["cache_hit"]},
         info.id,
     )
 
-    fallback_mime = _EXTENSION_MIME_FALLBACK.get((book.file_extension or "").lower(), "application/octet-stream")
-    return StreamingResponse(
-        iter([content]),
-        media_type=book.mime_type or fallback_mime,
-        headers={"Content-Disposition": f'inline; filename="{book.file_name or "book"}"'},
+    return BookReadUrlResponseDTO(
+        url=result["url"],
+        expires_in=result["expires_in"],
+        file_name=book.file_name,
+        mime_type=mime_type,
+        file_size=book.file_size,
     )
 
 

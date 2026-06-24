@@ -131,6 +131,14 @@ class BookSlidesResponseDTO(BaseModel):
     slides: List[str]
 
 
+class BookReadUrlResponseDTO(BaseModel):
+    url: str
+    expires_in: int
+    file_name: str
+    mime_type: str
+    file_size: Optional[int] = None
+
+
 class BookIdsDTO(BaseModel):
     book_ids: List[int]
 
