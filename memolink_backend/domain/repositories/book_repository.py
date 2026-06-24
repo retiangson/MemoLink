@@ -15,6 +15,12 @@ class BookRepository:
     def get_by_onedrive_item_id(self, onedrive_item_id: str) -> Optional[Book]:
         return self.db.query(Book).filter(Book.onedrive_item_id == onedrive_item_id).first()
 
+    def get_by_onedrive_item_ids(self, onedrive_item_ids: list[str]) -> dict[str, Book]:
+        if not onedrive_item_ids:
+            return {}
+        rows = self.db.query(Book).filter(Book.onedrive_item_id.in_(onedrive_item_ids)).all()
+        return {b.onedrive_item_id: b for b in rows}
+
     def list_all(self, search: Optional[str] = None, page: int = 1, page_size: int = 20) -> List[Book]:
         q = self._filter_search(self.db.query(Book), search)
         offset = (page - 1) * page_size
@@ -58,8 +64,10 @@ class BookRepository:
         last_modified: Optional[datetime],
         created_by_admin_id: int,
         default_title: str,
+        existing: Optional[Book] = None,
+        commit: bool = True,
     ) -> Book:
-        book = self.get_by_onedrive_item_id(onedrive_item_id)
+        book = existing if existing is not None else self.get_by_onedrive_item_id(onedrive_item_id)
         if book:
             book.onedrive_drive_id = onedrive_drive_id
             book.file_name = file_name
@@ -86,8 +94,11 @@ class BookRepository:
                 is_published=True,
             )
             self.db.add(book)
-        self.db.commit()
-        self.db.refresh(book)
+        if commit:
+            self.db.commit()
+            self.db.refresh(book)
+        else:
+            self.db.flush()
         return book
 
     def update_metadata(

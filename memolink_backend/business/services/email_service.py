@@ -2,6 +2,7 @@ import asyncio
 import base64
 import html
 import json
+import logging
 import re
 from email.utils import parseaddr, parsedate_to_datetime
 from email.mime.base import MIMEBase
@@ -21,6 +22,8 @@ from memolink_backend.domain.repositories.note_repository import NoteRepository
 from memolink_backend.domain.repositories.reminder_repository import ReminderRepository
 from memolink_backend.business.services.embedding_service import EmbeddingService
 from memolink_backend.business.services.gmail_connector import GmailConnector
+
+logger = logging.getLogger(__name__)
 
 
 def _strip_html(html: str) -> str:
@@ -108,7 +111,8 @@ def _decode_body(part: dict) -> str:
         return ""
     try:
         return base64.urlsafe_b64decode(data + "==").decode("utf-8", errors="replace")
-    except Exception:
+    except Exception as exc:
+        logger.debug("Failed to decode email body part: %s", exc)
         return ""
 
 
@@ -143,7 +147,8 @@ def _extract_sanitized_body_html(payload: dict) -> str | None:
         return None
     try:
         return _sanitize_email_html(raw)
-    except Exception:
+    except Exception as exc:
+        logger.warning("Failed to sanitize email HTML body, falling back to plain text: %s", exc)
         return None
 
 
@@ -189,7 +194,8 @@ def _parse_gmail_message(msg: dict) -> dict:
     date_raw = _get_header(hdrs, "Date")
     try:
         email_date = parsedate_to_datetime(date_raw) if date_raw else None
-    except Exception:
+    except Exception as exc:
+        logger.debug("Could not parse email Date header %r: %s", date_raw, exc)
         email_date = None
     return {
         "subject": subject,
@@ -221,7 +227,8 @@ def _decode_composite_token(token: str | None, account_ids: list[int]) -> dict[i
     if token:
         try:
             decoded = json.loads(base64.urlsafe_b64decode(token.encode()).decode())
-        except Exception:
+        except Exception as exc:
+            logger.warning("Failed to decode email pagination token: %s", exc)
             decoded = {}
     decoded = {int(k): v for k, v in decoded.items()}
     return {aid: decoded.get(aid, _BROWSE_TOKEN_START) for aid in account_ids}
@@ -257,8 +264,8 @@ def _batch_extract_reminders(emails: list[dict]) -> list[dict | None]:
             results = json.loads(match.group(), strict=False)
             if isinstance(results, list) and len(results) == len(emails):
                 return [r if r.get("text") else None for r in results]
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning("Batch reminder extraction from emails failed: %s", exc)
     return [None] * len(emails)
 
 
@@ -287,8 +294,8 @@ def _score_emails_with_gpt(emails: list[dict]) -> list[float]:
         scores = json.loads(re.search(r"\[.*\]", content, re.DOTALL).group())
         if len(scores) == len(emails):
             return [float(max(1, min(5, s))) for s in scores]
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning("GPT email importance scoring failed: %s", exc)
     return [3.0] * len(emails)
 
 
@@ -337,7 +344,8 @@ class EmailService:
             date_raw = _get_header(hdrs, "Date")
             try:
                 email_date = parsedate_to_datetime(date_raw) if date_raw else None
-            except Exception:
+            except Exception as exc:
+                logger.debug("Could not parse email Date header %r: %s", date_raw, exc)
                 email_date = None
             snippet = _clean_snippet(msg.get("snippet", ""))
             body = _extract_body(msg.get("payload", {}))[:4000]
@@ -383,8 +391,8 @@ class EmailService:
                         embed_text = f"{email['subject']} {email['sender_email']} {email['snippet'] or ''} {email['body'][:1000]}"
                         vec = self.embedding_service.embed_text(embed_text)
                         self.record_repo.save_embedding(record.id, vec)
-                    except Exception:
-                        pass
+                    except Exception as exc:
+                        logger.warning("Failed to embed synced email record %s: %s", record.id, exc)
 
         return {"synced": saved, "skipped": len(message_ids) - len(new_ids), "filtered": len(new_ids) - saved}
 
@@ -540,8 +548,8 @@ class EmailService:
             msg = await self.gmail.get_message(user_id, r.gmail_message_id, format="full", email_account_id=r.email_account_id)
             if msg:
                 rfc_message_id = _get_header(msg.get("payload", {}).get("headers", []), "Message-ID") or None
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("Failed to fetch RFC Message-ID for reply threading (record %s): %s", record_id, exc)
 
         full_body = self._build_reply_chain_body(
             body,
@@ -562,7 +570,8 @@ class EmailService:
                 attachments=attachments,
             )
             return True
-        except Exception:
+        except Exception as exc:
+            logger.error("send_reply failed for record %s: %s", record_id, exc)
             return False
 
     async def gmail_reply_suggestions(self, user_id: int, *, gmail_message_id: str, email_account_id: int | None = None, draft_hint: str | None = None) -> list[str]:
@@ -604,7 +613,8 @@ class EmailService:
                 attachments=attachments,
             )
             return True
-        except Exception:
+        except Exception as exc:
+            logger.error("gmail_send_reply failed for message %s: %s", gmail_message_id, exc)
             return False
 
     async def email_to_note_by_gmail_id(self, user_id: int, *, gmail_message_id: str, email_account_id: int | None = None) -> dict | None:
@@ -626,8 +636,8 @@ class EmailService:
             try:
                 vec = self.embedding_service.embed_text(f"{note.title or ''} {note_data['content'][:1500]}")
                 self.note_repo.save_embedding(note.id, vec)
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning("Failed to embed email-derived note %s: %s", note.id, exc)
         self.note_repo.db.commit()
         self.note_repo.db.refresh(note)
         return {"note_id": note.id, "title": note.title}
@@ -666,8 +676,8 @@ class EmailService:
             try:
                 vec = self.embedding_service.embed_text(f"{note.title or ''} {note_data['content'][:1500]}")
                 self.note_repo.save_embedding(note.id, vec)
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning("Failed to embed email-derived note %s: %s", note.id, exc)
         self.note_repo.db.commit()
         self.note_repo.db.refresh(note)
         return {"note_id": note.id, "title": note.title}
@@ -704,8 +714,8 @@ class EmailService:
                     "due_date": data.get("due_date"),
                     "due_time": data.get("due_time"),
                 }
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("GPT reminder extraction failed for email record %s: %s", record_id, exc)
         return {"text": r.subject, "description": r.snippet, "due_date": None, "due_time": None}
 
     def create_reminder_from_email(self, user_id: int, record_id: int) -> dict | None:
@@ -793,8 +803,8 @@ class EmailService:
                     f"{subject} {sender_email} {snippet} {body_text[:1000]}"
                 )
                 self.record_repo.save_embedding(record.id, vec)
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning("Failed to embed email record %s: %s", record.id, exc)
 
     def _build_live_search_result(self, user_id: int, gmail_message_id: str, msg: dict) -> dict:
         hdrs = msg.get("payload", {}).get("headers", [])
@@ -804,7 +814,8 @@ class EmailService:
         date_raw = _get_header(hdrs, "Date")
         try:
             email_date = parsedate_to_datetime(date_raw) if date_raw else None
-        except Exception:
+        except Exception as exc:
+            logger.debug("Could not parse email Date header %r: %s", date_raw, exc)
             email_date = None
         snippet = _clean_snippet(msg.get("snippet", ""))
         body = _extract_body(msg.get("payload", {}))[:3000]
@@ -827,8 +838,8 @@ class EmailService:
                 is_read=is_read,
                 email_date=email_date,
             )
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("Failed to save email record for live search result %s: %s", gmail_message_id, exc)
 
         return {
             "id": gmail_message_id,
@@ -844,12 +855,10 @@ class EmailService:
 
     def live_search_sync(self, user_id: int, query: str, top_k: int = 3) -> list[dict]:
         """Synchronous Gmail search using httpx.Client — safe to call from any thread or sync context."""
-        import logging as _log
-        _logger = _log.getLogger(__name__)
         try:
             message_ids = self.gmail.list_messages_sync(user_id, query=query, max_results=top_k * 2)
         except Exception as exc:
-            _logger.warning(f"[live_search] user={user_id} q={query!r} list failed: {exc}")
+            logger.warning(f"[live_search] user={user_id} q={query!r} list failed: {exc}")
             return []
         if not message_ids:
             return []
@@ -859,7 +868,7 @@ class EmailService:
             try:
                 msg = self.gmail.get_message_sync(user_id, mid, format="full")
             except Exception as exc:
-                _logger.warning(f"[live_search] user={user_id} message={mid} fetch failed: {exc}")
+                logger.warning(f"[live_search] user={user_id} message={mid} fetch failed: {exc}")
                 continue
             if not msg:
                 continue
@@ -874,8 +883,6 @@ class EmailService:
         BrowseEmailResult on the frontend), so a chat-found email can be opened directly
         in a tab with no extra round-trip. Synchronous — safe to call from chat_service's
         sync route-planning path."""
-        import logging as _log
-        _logger = _log.getLogger(__name__)
         accounts = self.account_repo.list_by_user(user_id)
         if not accounts:
             return []
@@ -887,13 +894,13 @@ class EmailService:
                     user_id, query=query, max_results=top_k, email_account_id=account.id,
                 )
             except Exception as exc:
-                _logger.warning(f"[search_for_chat] user={user_id} account={account.id} q={query!r} list failed: {exc}")
+                logger.warning(f"[search_for_chat] user={user_id} account={account.id} q={query!r} list failed: {exc}")
                 continue
             for mid in message_ids:
                 try:
                     msg = self.gmail.get_message_sync(user_id, mid, format="full", email_account_id=account.id)
                 except Exception as exc:
-                    _logger.warning(f"[search_for_chat] user={user_id} message={mid} fetch failed: {exc}")
+                    logger.warning(f"[search_for_chat] user={user_id} message={mid} fetch failed: {exc}")
                     continue
                 if not msg:
                     continue
@@ -920,7 +927,8 @@ class EmailService:
         Also saves new results to email_records so they're available next time."""
         try:
             message_ids = await self.gmail.list_messages(user_id, query=query, max_results=top_k * 2)
-        except Exception:
+        except Exception as exc:
+            logger.warning(f"[live_search] user={user_id} q={query!r} list failed: {exc}")
             return []
         if not message_ids:
             return []
@@ -952,7 +960,8 @@ class EmailService:
         date_raw = _get_header(hdrs, "Date")
         try:
             email_date = parsedate_to_datetime(date_raw) if date_raw else None
-        except Exception:
+        except Exception as exc:
+            logger.debug("Could not parse email Date header %r: %s", date_raw, exc)
             email_date = None
         snippet = _clean_snippet(msg.get("snippet", ""))
         body = _extract_body(msg.get("payload", {}))[:3000]
@@ -1086,7 +1095,8 @@ class EmailService:
             date_raw = _get_header(hdrs, "Date")
             try:
                 email_date = parsedate_to_datetime(date_raw) if date_raw else None
-            except Exception:
+            except Exception as exc:
+                logger.debug("Could not parse email Date header %r: %s", date_raw, exc)
                 email_date = None
             snippet = _clean_snippet(msg.get("snippet", ""))
             body = _extract_body(msg.get("payload", {}))[:3000]
@@ -1143,8 +1153,8 @@ class EmailService:
                 vec = self.embedding_service.embed_text(text)
                 self.record_repo.save_embedding(r.id, vec)
                 count += 1
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning("Failed to backfill embedding for email record %s: %s", r.id, exc)
         return count
 
     async def auto_process(self, user_id: int, db, workspace_id: int | None = None) -> dict:
@@ -1190,8 +1200,8 @@ class EmailService:
                         )
                         self.note_repo.save_embedding(digest.id, vec)
                         db.commit()
-                    except Exception:
-                        pass
+                    except Exception as exc:
+                        logger.error("Failed to commit re-embedded Email Digest note %s — note may not be persisted: %s", digest.id, exc)
                 self.record_repo.mark_appended([r.id for r in important])
                 notes_added = len(important)
             else:
@@ -1207,8 +1217,8 @@ class EmailService:
                             " ".join(r.subject for r in important)
                         )
                         self.note_repo.save_embedding(note.id, vec)
-                    except Exception:
-                        pass
+                    except Exception as exc:
+                        logger.warning("Failed to embed new Email Digest note %s: %s", note.id, exc)
                 db.commit()
                 self.record_repo.mark_appended([r.id for r in important])
                 notes_added = len(important)
@@ -1267,7 +1277,8 @@ class EmailService:
                     continue
                 try:
                     found = self.note_repo.find_by_title_for_user(user_id, name)
-                except Exception:
+                except Exception as exc:
+                    logger.debug("Note title lookup failed for %r: %s", name, exc)
                     found = None
                 if found:
                     referenced_note = found
@@ -1293,8 +1304,8 @@ class EmailService:
                         for n in top_notes
                     ]
                     note_context = "\n\n".join(blocks)
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning("Vector/hybrid note search failed while building email reply context: %s", exc)
 
         sender = sender_name or sender_email
         body = body[:2000]
@@ -1350,8 +1361,8 @@ class EmailService:
                 replies = json.loads(match.group(), strict=False)
                 if isinstance(replies, list) and len(replies) >= 1:
                     return [str(r) for r in replies[:3]]
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("GPT reply suggestion generation failed: %s", exc)
         return []
 
     def generate_compose_draft(self, user_id: int, *, to: str, subject: str, topic: str) -> str:
@@ -1368,7 +1379,8 @@ class EmailService:
                     continue
                 try:
                     found = self.note_repo.find_by_title_for_user(user_id, name)
-                except Exception:
+                except Exception as exc:
+                    logger.debug("Note title lookup failed for %r: %s", name, exc)
                     found = None
                 if found:
                     referenced_note = found
@@ -1389,8 +1401,8 @@ class EmailService:
                         for n in top_notes
                     ]
                     note_context = "\n\n".join(blocks)
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning("Vector/hybrid note search failed while building email reply context: %s", exc)
 
         if note_context:
             context_label = "REFERENCED NOTE" if referenced_note else "RELEVANT NOTES FROM MY KNOWLEDGE BASE"
@@ -1427,5 +1439,6 @@ class EmailService:
                 max_tokens=600,
             )
             return resp.choices[0].message.content.strip()
-        except Exception:
+        except Exception as exc:
+            logger.warning("GPT compose-draft generation failed: %s", exc)
             return ""

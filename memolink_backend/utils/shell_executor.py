@@ -126,11 +126,12 @@ class ProcessRegistry:
                 else:
                     import signal
                     os.killpg(os.getpgid(popen.pid), signal.SIGTERM)
-            except Exception:
+            except Exception as exc:
+                logger.debug("Graceful kill failed for pid=%s, falling back to popen.kill(): %s", popen.pid, exc)
                 try:
                     popen.kill()
-                except Exception:
-                    pass
+                except Exception as kill_exc:
+                    logger.warning("Failed to kill process pid=%s: %s", popen.pid, kill_exc)
             self._processes.pop(proc_id, None)
             return True
 

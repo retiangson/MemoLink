@@ -1,6 +1,7 @@
 import hashlib
 import hmac
 import json
+import logging
 import time
 from datetime import datetime, timezone
 from urllib.parse import quote
@@ -19,6 +20,7 @@ from memolink_backend.core.security import get_current_user, verify_token
 from memolink_backend.di.request_container import RequestContainer, get_request_container
 
 router = APIRouter(prefix="/email", tags=["email"])
+logger = logging.getLogger(__name__)
 
 # Gmail hard-caps a sent message at ~25 MB once MIME-encoded; base64 inflates
 # raw bytes by ~37%, so keep the raw attachment total comfortably under that.
@@ -55,6 +57,7 @@ def _download_attachments(attachments_meta: list[dict]) -> list[dict]:
             obj = s3.get_object(Bucket=settings.s3_upload_bucket, Key=key)
             data = obj["Body"].read()
         except ClientError as exc:
+            logger.warning("Could not read attachment '%s' from S3 key %s: %s", meta.get("filename", key), key, exc)
             raise HTTPException(status_code=502, detail=f"Could not read attachment '{meta.get('filename', key)}': {exc}")
         total += len(data)
         if total > _MAX_ATTACHMENT_TOTAL_BYTES:
@@ -81,8 +84,8 @@ def _cleanup_attachments(attachments_meta: list[dict]) -> None:
             continue
         try:
             s3.delete_object(Bucket=settings.s3_upload_bucket, Key=key)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("Failed to clean up temporary S3 attachment %s: %s", key, exc)
 
 GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"

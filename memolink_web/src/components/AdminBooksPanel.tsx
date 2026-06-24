@@ -138,7 +138,11 @@ export function AdminBooksPanel() {
         setDesktopSync({ status: "running", message: parsed?.output ?? "Syncing…" });
       }
     } catch (err: any) {
-      setDesktopSync({ status: "failed", message: err?.response?.data?.detail ?? "Could not start desktop sync." });
+      console.error("Desktop sync failed:", err);
+      setDesktopSync({
+        status: "failed",
+        message: err?.response?.data?.detail ?? err?.message ?? "Could not start desktop sync.",
+      });
     }
   }
 

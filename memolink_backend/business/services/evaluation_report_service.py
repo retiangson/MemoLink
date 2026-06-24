@@ -3,6 +3,7 @@ EvaluationReportService - admin-only aggregation, export, and report generation.
 """
 import io
 import csv
+import logging
 import zipfile
 from typing import Optional, List, Dict
 
@@ -18,6 +19,8 @@ from memolink_backend.contracts.evaluation_dtos import (
     ParticipantBudgetRow, ParticipantBudgetList,
 )
 from memolink_backend.business.services.evaluation_service import DEFAULT_BUDGET_SECONDS
+
+logger = logging.getLogger(__name__)
 
 _EXPORT_TABLES = [
     ("sessions", EvaluationSession),
@@ -143,8 +146,8 @@ class EvaluationReportService:
         try:
             for uid, email in self._repo.db.execute(text("SELECT id, email FROM users")).fetchall():
                 emails[uid] = email
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("Failed to load user emails for participant list: %s", exc)
         rows = []
         for s in self._repo.list_sessions():
             if s.user_id is None:

@@ -42,6 +42,7 @@ Users trigger scans manually - no cost on regular page load.
 """
 
 import json
+import logging
 import re
 from datetime import datetime, timezone, timedelta
 from typing import Optional
@@ -50,6 +51,8 @@ from openai import OpenAI
 from memolink_backend.core.config import settings
 from memolink_backend.domain.repositories.proactive_insight_repository import ProactiveInsightRepository
 from memolink_backend.domain.repositories.note_repository import NoteRepository
+
+logger = logging.getLogger(__name__)
 
 _HTML_TAG = re.compile(r"<[^>]+>")
 _UPLOAD_RE = re.compile(
@@ -111,8 +114,8 @@ def _analyse_batch(batch: list[dict]) -> list[dict]:
             parsed = json.loads(match.group())
             if isinstance(parsed, list):
                 return parsed
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning("Proactive insight generation failed: %s", exc)
     return []
 
 

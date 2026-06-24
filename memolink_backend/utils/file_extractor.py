@@ -1,9 +1,12 @@
 import io
+import logging
 import re
 import html as _html
 import base64
 import zipfile
 from html.parser import HTMLParser
+
+logger = logging.getLogger(__name__)
 
 AUDIO_VIDEO_EXTS = {"mp3", "mp4", "mpeg", "mpga", "m4a", "mp4a", "wav", "webm", "ogg", "flac", "avi"}
 
@@ -157,6 +160,7 @@ def extract_text_local(file_bytes: bytes, filename: str) -> str:
             parser.feed(file_bytes.decode("utf-8", errors="ignore"))
             return "\n".join(parser._parts)
         except Exception as e:
+            logger.warning("HTML text extraction failed for %r: %s", filename, e)
             return f"[HTML extraction error] {e}"
 
     if ext == "pdf":
@@ -168,6 +172,7 @@ def extract_text_local(file_bytes: bytes, filename: str) -> str:
                     parts.append(page.extract_text() or "")
             return "\n".join(parts)
         except Exception as e:
+            logger.warning("PDF text extraction failed for %r: %s", filename, e)
             return f"[PDF extraction error] {e}"
 
     if ext == "docx":
@@ -176,6 +181,7 @@ def extract_text_local(file_bytes: bytes, filename: str) -> str:
             doc = docx.Document(io.BytesIO(file_bytes))
             return "\n".join(p.text for p in doc.paragraphs)
         except Exception as e:
+            logger.warning("DOCX text extraction failed for %r: %s", filename, e)
             return f"[DOCX extraction error] {e}"
 
     if ext == "pptx":
@@ -189,6 +195,7 @@ def extract_text_local(file_bytes: bytes, filename: str) -> str:
                         parts.append(shape.text)
             return "\n".join(parts)
         except Exception as e:
+            logger.warning("PPTX text extraction failed for %r: %s", filename, e)
             return f"[PPTX extraction error] {e}"
 
     if ext == "ppt":
@@ -206,6 +213,7 @@ def extract_text_local(file_bytes: bytes, filename: str) -> str:
                     if name.lower().endswith(".txt")
                 )
         except Exception as e:
+            logger.warning("ZIP text extraction failed for %r: %s", filename, e)
             return f"[ZIP extraction error] {e}"
 
     if ext in AUDIO_VIDEO_EXTS:
@@ -293,8 +301,8 @@ def _para_images_html(para, doc) -> list[str]:
             b64 = base64.b64encode(img_part.blob).decode()
             ct = img_part.content_type
             imgs.append(f'<img src="data:{ct};base64,{b64}" style="max-width:100%">')
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("Failed to extract embedded DOCX image %r: %s", embed, exc)
     return imgs
 
 
@@ -388,8 +396,8 @@ def extract_pptx_slides(file_bytes: bytes) -> list[str]:
                     mime = "image/jpeg" if ext in ("jpg", "jpeg") else f"image/{ext}"
                     b64 = base64.b64encode(img_data).decode()
                     slide_images.append(f'<img src="data:{mime};base64,{b64}" style="max-width:100%">')
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.debug("Failed to extract embedded PPTX slide %s image: %s", slide_num, exc)
                 continue
             if not hasattr(shape, "text_frame"):
                 continue
@@ -428,20 +436,20 @@ def extract_formatted_html(file_bytes: bytes, filename: str) -> str:
     if ext == "docx":
         try:
             return _docx_to_html(file_bytes)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("Rich DOCX-to-HTML extraction failed for %r, falling back to plain text: %s", filename, exc)
 
     if ext == "pdf":
         try:
             return _pdf_to_html(file_bytes)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("Rich PDF-to-HTML extraction failed for %r, falling back to plain text: %s", filename, exc)
 
     if ext == "pptx":
         try:
             return _pptx_to_html(file_bytes)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("Rich PPTX-to-HTML extraction failed for %r, falling back to plain text: %s", filename, exc)
 
     if ext in ("html", "htm"):
         try:
@@ -452,8 +460,8 @@ def extract_formatted_html(file_bytes: bytes, filename: str) -> str:
             converter.ignore_images = False
             converter.body_width = 0
             return converter.handle(raw).strip()
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("HTML-to-text conversion failed for %r, falling back to plain text: %s", filename, exc)
 
     # For all other types (txt, md, zip, audio) use plain extraction + wrap
     text = extract_text_local(file_bytes, filename)
@@ -573,6 +581,7 @@ def transcribe_audio_detailed(
             )
         except Exception as e:
             detail = getattr(e, "body", None) or ""
+            logger.warning("Whisper transcription failed for %r: %s", filename, e)
             return _ok(f"[Transcription error] {e}{f' - detail: {detail}' if detail else ''}", "whisper")
 
     if backend == "deepgram":
@@ -582,6 +591,7 @@ def transcribe_audio_detailed(
             return _ok(_transcribe_deepgram(file_bytes, filename, ext, language, mode=mode), "deepgram")
         except Exception as e:
             detail = getattr(e, "body", None) or ""
+            logger.warning("Deepgram transcription failed for %r: %s", filename, e)
             return _ok(f"[Transcription error] {e}{f' - detail: {detail}' if detail else ''}", "deepgram")
 
     if size < _DEEPGRAM_THRESHOLD:
@@ -592,13 +602,15 @@ def transcribe_audio_detailed(
             )
         except Exception as e:
             detail = getattr(e, "body", None) or ""
+            logger.warning("Whisper transcription failed for %r: %s", filename, e)
             return _ok(f"[Transcription error] {e}{f' - detail: {detail}' if detail else ''}", "whisper")
 
     # ≥ 5 MB: try Deepgram first
     if settings.deepgram_api_key:
         try:
             return _ok(_transcribe_deepgram(file_bytes, filename, ext, language, mode=mode), "deepgram")
-        except Exception:
+        except Exception as exc:
+            logger.warning("Deepgram transcription failed for %r, falling back to Whisper: %s", filename, exc)
             fallback_used = True  # fall through to Whisper fallback
 
     # Whisper fallback (only if within its 25 MB cap)
@@ -610,6 +622,7 @@ def transcribe_audio_detailed(
             )
         except Exception as e:
             detail = getattr(e, "body", None) or ""
+            logger.warning("Whisper transcription failed for %r: %s", filename, e)
             return _ok(f"[Transcription error] {e}{f' - detail: {detail}' if detail else ''}", "whisper")
 
     return _ok("[Transcription skipped] File exceeds the 25 MB limit and Deepgram is not configured or failed.", "none")

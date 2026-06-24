@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from datetime import date, datetime, timezone
 from typing import Optional
 
@@ -13,6 +14,8 @@ from memolink_backend.business.services.recurrence_service import expand_occurre
 from memolink_backend.domain.models.reminder import Reminder
 from memolink_backend.domain.repositories.email_account_repository import EmailAccountRepository
 from memolink_backend.domain.repositories.reminder_repository import ReminderRepository
+
+logger = logging.getLogger(__name__)
 
 
 class CalendarService:
@@ -55,7 +58,8 @@ class CalendarService:
                 events = await self.calendar_connector.list_events(
                     user_id, time_min=time_min, time_max=time_max, email_account_id=account.id,
                 )
-            except ValueError:
+            except ValueError as exc:
+                logger.warning("Google Calendar sync failed for account %s: %s", account.id, exc)
                 continue  # token/network failure for this account — skip, don't break the whole view
 
             for event in events:
@@ -82,8 +86,8 @@ class CalendarService:
                             updated_at = datetime.fromisoformat(updated_str.replace("Z", "+00:00"))
                             if updated_at <= existing.last_synced_at:
                                 continue  # local copy is already current
-                        except ValueError:
-                            pass
+                        except ValueError as exc:
+                            logger.debug("Could not parse Google event 'updated' timestamp %r: %s", updated_str, exc)
                     self.reminder_repo.update_fields(
                         existing, **fields, calendar_account_id=account.id, last_synced_at=now,
                     )
@@ -110,7 +114,8 @@ class CalendarService:
                 continue
             try:
                 start_date = date.fromisoformat(r.due_date)
-            except ValueError:
+            except ValueError as exc:
+                logger.warning("Reminder %s has unparseable due_date %r, skipping from calendar view: %s", r.id, r.due_date, exc)
                 continue
             for occ_date in expand_occurrences(r.recurrence_rule, start_date, range_start, range_end):
                 occurrences.append({

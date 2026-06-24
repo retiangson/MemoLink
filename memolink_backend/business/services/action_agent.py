@@ -488,7 +488,8 @@ class ActionAgentRunner:
                 )
             except TypeError:
                 notes = self.note_repo.search_by_vector(vec, top_k=5, workspace_id=workspace_id, user_id=user_id)
-        except Exception:
+        except Exception as exc:
+            logger.warning("Note search failed for action agent query %r, using recent notes: %s", query, exc)
             notes = self.note_repo.get_for_user(user_id, workspace_id)[:5]
         if not notes:
             return "No relevant notes found."
@@ -503,14 +504,14 @@ class ActionAgentRunner:
             vec = self.embedding.embed_text(f"{title} {content}"[:2000])
             if hasattr(self.note_repo, "save_embedding"):
                 self.note_repo.save_embedding(note.id, vec)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("Failed to embed agent-created note %s: %s", note.id, exc)
         repo_db = getattr(self.note_repo, "db", None)
         if repo_db is not None:
             try:
                 repo_db.commit()
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.error("Failed to commit agent-created note %s — note may not be persisted: %s", note.id, exc)
         return f"Created note '{title}' (ID: {note.id})"
 
     def _edit_note(self, note_id: int, content: str, title: Optional[str]) -> str:
@@ -575,7 +576,8 @@ class ActionAgentRunner:
                     if error:
                         parts.append(f"\n--- error ---\n{error}")
                     return "\n".join(parts)
-                except Exception:
+                except Exception as exc:
+                    logger.debug("Failed to parse desktop shell result, returning raw: %s", exc)
                     return str(result.result)
 
         return f"Command: {command}\n⏱️ Timed out after {timeout_sec}s waiting for the desktop app to respond."

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 from typing import Any
 
@@ -8,6 +9,8 @@ from openai import OpenAI
 
 from memolink_backend.core.config import settings
 from memolink_backend.utils.file_extractor import transcribe_audio_detailed
+
+logger = logging.getLogger(__name__)
 
 
 class TranscriptionService:
@@ -78,7 +81,8 @@ class TranscriptionService:
             )
             raw = (resp.choices[0].message.content or "").strip()
             data = json.loads(raw)
-        except Exception:
+        except Exception as exc:
+            logger.warning("Lecture transcript cleanup/summary generation failed, using raw transcript: %s", exc)
             data = {}
 
         cleaned_transcript = self._cleanup_lecture_transcript(str(data.get("cleaned_transcript") or clean))

@@ -54,7 +54,8 @@ class EvaluationService:
                 text("SELECT value FROM feature_flags WHERE key = 'evaluation_analytics_enabled'")
             ).fetchone()
             return (row is None) or (row[0] != "false")
-        except Exception:
+        except Exception as exc:
+            logger.warning("[Eval] analytics_enabled flag lookup failed, defaulting to disabled: %s", exc)
             return False
 
     # ── Sessions ─────────────────────────────────────────────────────────────
@@ -92,8 +93,8 @@ class EvaluationService:
                 if started.tzinfo is None:
                     started = started.replace(tzinfo=timezone.utc)
                 s.total_time_seconds = int((now - started).total_seconds())
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("[Eval] failed to compute total_time_seconds for session %s: %s", s.id, exc)
         self._repo.commit()
         return OkResponse(ok=True, id=s.id)
 

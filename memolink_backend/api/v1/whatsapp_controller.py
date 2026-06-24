@@ -1,3 +1,4 @@
+import logging
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -5,6 +6,7 @@ from memolink_backend.core.security import get_current_user
 from memolink_backend.business.services import whatsapp_service
 
 router = APIRouter(prefix="/whatsapp", tags=["whatsapp"])
+logger = logging.getLogger(__name__)
 
 
 def _bridge_error_detail(resp: httpx.Response) -> str:
@@ -42,6 +44,7 @@ def start_whatsapp(user_id: int = Depends(get_current_user)):
     try:
         return whatsapp_service.start_bridge(user_id)
     except RuntimeError as e:
+        logger.warning("WhatsApp bridge failed to start for user_id=%s: %s", user_id, e)
         raise HTTPException(status_code=503, detail=str(e))
 
 
@@ -95,6 +98,7 @@ async def send_message(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
+        logger.warning("WhatsApp send_message failed for chat_id=%s: %s", req.chat_id, e)
         raise HTTPException(status_code=503, detail=str(e))
 
 
@@ -114,6 +118,7 @@ async def delete_message(
         detail = _bridge_error_detail(e.response)
         raise HTTPException(status_code=status, detail=detail)
     except Exception as e:
+        logger.warning("WhatsApp delete_message failed for chat_id=%s msg_id=%s: %s", req.chat_id, req.msg_id, e)
         raise HTTPException(status_code=503, detail=str(e))
 
 
@@ -131,6 +136,7 @@ async def delete_chat(
         detail = _bridge_error_detail(e.response)
         raise HTTPException(status_code=status, detail=detail)
     except Exception as e:
+        logger.warning("WhatsApp delete_chat failed for chat_id=%s: %s", req.chat_id, e)
         raise HTTPException(status_code=503, detail=str(e))
 
 
@@ -154,6 +160,7 @@ async def get_media(
     except HTTPException:
         raise
     except Exception as e:
+        logger.warning("WhatsApp get_media failed for chat_id=%s msg_id=%s: %s", chat_id, msg_id, e)
         raise HTTPException(status_code=503, detail=str(e))
 
 

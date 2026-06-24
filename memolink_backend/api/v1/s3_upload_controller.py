@@ -1,3 +1,4 @@
+import logging
 import uuid
 import boto3
 from botocore.config import Config
@@ -14,6 +15,7 @@ from memolink_backend.contracts.note_dtos import NoteCreateDTO
 from memolink_backend.utils.file_extractor import extract_formatted_html
 
 router = APIRouter(prefix="/upload", tags=["upload"])
+logger = logging.getLogger(__name__)
 
 _200_MB = 200 * 1024 * 1024
 
@@ -103,8 +105,8 @@ def presign_upload(
                 {"filename": body.filename, "error": str(exc)},
                 current_user_id,
             )
-        except Exception:
-            pass
+        except Exception as log_exc:
+            logger.debug("Non-critical cleanup/logging step failed: %s", log_exc)
         raise HTTPException(status_code=500, detail=f"Could not generate upload URL: {exc}")
 
     size_mb = round(body.size_bytes / 1024 / 1024, 2)
@@ -117,8 +119,8 @@ def presign_upload(
             {"filename": body.filename, "size_mb": size_mb, "key": key, "s3_host": url_host},
             current_user_id,
         )
-    except Exception:
-        pass
+    except Exception as log_exc:
+        logger.debug("Non-critical cleanup/logging step failed: %s", log_exc)
 
     return PresignResponse(url=url, key=key, expires_in=3600)
 
@@ -169,8 +171,8 @@ def process_from_s3(
                             {"filename": filename, "size_mb": size_mb, "fallback": "deepgram"},
                             current_user_id,
                         )
-                    except Exception:
-                        pass
+                    except Exception as log_exc:
+                        logger.debug("Non-critical cleanup/logging step failed: %s", log_exc)
                 else:
                     try:
                         c.logs().warning(
@@ -179,8 +181,8 @@ def process_from_s3(
                             {"filename": filename, "size_mb": size_mb},
                             current_user_id,
                         )
-                    except Exception:
-                        pass
+                    except Exception as log_exc:
+                        logger.debug("Non-critical cleanup/logging step failed: %s", log_exc)
 
             # 3. Extract text
             html_content = extract_formatted_html(content_bytes, filename).replace("\x00", "")
@@ -194,8 +196,8 @@ def process_from_s3(
                         {"filename": filename, "size_mb": size_mb},
                         current_user_id,
                     )
-                except Exception:
-                    pass
+                except Exception as log_exc:
+                    logger.debug("Non-critical cleanup/logging step failed: %s", log_exc)
 
             # 5. Nothing extracted
             if not html_content.strip() or html_content.strip() == "<p></p>":
@@ -208,8 +210,8 @@ def process_from_s3(
                         {"filename": filename, "size_mb": size_mb},
                         current_user_id,
                     )
-                except Exception:
-                    pass
+                except Exception as log_exc:
+                    logger.debug("Non-critical cleanup/logging step failed: %s", log_exc)
                 continue
 
             # 6. Create note
@@ -230,8 +232,8 @@ def process_from_s3(
                     {"filename": filename, "size_mb": size_mb},
                     current_user_id,
                 )
-            except Exception:
-                pass
+            except Exception as log_exc:
+                logger.debug("Non-critical cleanup/logging step failed: %s", log_exc)
 
         except Exception as exc:
             failed.append({"filename": filename, "reason": str(exc)})
@@ -242,12 +244,12 @@ def process_from_s3(
                     {"filename": filename, "error": str(exc)},
                     current_user_id,
                 )
-            except Exception:
-                pass
+            except Exception as log_exc:
+                logger.debug("Non-critical cleanup/logging step failed: %s", log_exc)
             try:
                 db.rollback()
-            except Exception:
-                pass
+            except Exception as log_exc:
+                logger.debug("Non-critical cleanup/logging step failed: %s", log_exc)
 
         finally:
             # Always delete the S3 object - whether processing succeeded or failed
@@ -261,7 +263,7 @@ def process_from_s3(
                         {"key": key, "error": str(del_exc)},
                         current_user_id,
                     )
-                except Exception:
-                    pass
+                except Exception as log_exc:
+                    logger.debug("Non-critical cleanup/logging step failed: %s", log_exc)
 
     return {"notes": created, "failed": failed}

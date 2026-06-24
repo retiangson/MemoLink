@@ -12,12 +12,14 @@ export async function createDesktopCommand(
   commandType: string,
   payload: Record<string, unknown>
 ): Promise<DesktopCommand> {
-  const res = await api.post("/desktop/commands", { command_type: commandType, payload });
+  // No timeout: the desktop app may take a long time to execute the command
+  // (e.g. a large OneDrive sync) before this resolves.
+  const res = await api.post("/desktop/commands", { command_type: commandType, payload }, { timeout: 0 });
   return res.data;
 }
 
 export async function getDesktopCommand(id: number): Promise<DesktopCommand> {
-  const res = await api.get(`/desktop/commands/${id}`);
+  const res = await api.get(`/desktop/commands/${id}`, { timeout: 0 });
   return res.data;
 }
 

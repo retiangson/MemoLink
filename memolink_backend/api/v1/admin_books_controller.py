@@ -8,6 +8,8 @@ from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import RedirectResponse
 
+import logging
+
 from memolink_backend.core.config import settings
 from memolink_backend.core.security import get_current_admin
 from memolink_backend.di.request_container import RequestContainer, get_request_container
@@ -23,6 +25,7 @@ from memolink_backend.contracts.book_dtos import (
 )
 
 router = APIRouter(prefix="/admin/books", tags=["admin-books"])
+logger = logging.getLogger(__name__)
 
 
 def _frontend_redirect_url(params: dict[str, str]) -> str:
@@ -158,6 +161,7 @@ def update_book(
     try:
         return c.books().update_metadata(book_id, body)
     except Exception as exc:
+        logger.warning("Failed to update metadata for book %s: %s", book_id, exc)
         raise HTTPException(status_code=404, detail=str(exc))
 
 
@@ -170,6 +174,7 @@ def publish_book(
     try:
         return c.books().set_published(book_id, True)
     except Exception as exc:
+        logger.warning("Failed to publish book %s: %s", book_id, exc)
         raise HTTPException(status_code=404, detail=str(exc))
 
 
@@ -182,6 +187,7 @@ def unpublish_book(
     try:
         return c.books().set_published(book_id, False)
     except Exception as exc:
+        logger.warning("Failed to unpublish book %s: %s", book_id, exc)
         raise HTTPException(status_code=404, detail=str(exc))
 
 

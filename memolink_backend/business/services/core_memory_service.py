@@ -425,8 +425,8 @@ class CoreMemoryService:
         try:
             vec = self._embedding.embed_text(f"{note.title}\n{note.searchable_content or ''}")
             self._notes.save_embedding(note.id, vec)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("Failed to embed prompted core memory %s: %s", note.id, exc)
 
         return {
             "note": note,
@@ -707,8 +707,8 @@ class CoreMemoryService:
         try:
             vec = self._embedding.embed_text(f"{dto.title}\n{searchable}")
             self._notes.save_embedding(note.id, vec)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("Failed to embed core memory %s: %s", note.id, exc)
         return CoreMemoryResponseDTO.model_validate(note)
 
     # ── Update ────────────────────────────────────────────────────────────────
@@ -737,8 +737,8 @@ class CoreMemoryService:
             try:
                 vec = self._embedding.embed_text(f"{updated.title}\n{searchable}")
                 self._notes.save_embedding(updated.id, vec)
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning("Failed to re-embed updated core memory %s: %s", updated.id, exc)
         return CoreMemoryResponseDTO.model_validate(updated or note)
 
     # ── Delete ────────────────────────────────────────────────────────────────
@@ -760,8 +760,9 @@ class CoreMemoryService:
             return note.masked_content or note.title or ""
         try:
             plaintext = decrypt_memory(note.encrypted_content)
-        except Exception:
-            raise HTTPException(status_code=500, detail="Decryption failed — encryption key may have changed")
+        except Exception as exc:
+            logger.exception("Failed to decrypt core memory %s", memory_id)
+            raise HTTPException(status_code=500, detail="Decryption failed — encryption key may have changed") from exc
         self._notes.touch_memory_last_used(memory_id)
         return plaintext
 
@@ -836,8 +837,8 @@ class CoreMemoryService:
                             try:
                                 vec = self._embedding.embed_text(f"{updated.title}\n{searchable}")
                                 self._notes.save_embedding(updated.id, vec)
-                            except Exception:
-                                pass
+                            except Exception as exc:
+                                logger.warning("Failed to re-embed upgraded auto-detected memory %s: %s", updated.id, exc)
                             saved += 1
                     continue
                 encrypted = encrypt_memory(plaintext) if plaintext else None
@@ -858,8 +859,8 @@ class CoreMemoryService:
                 try:
                     vec = self._embedding.embed_text(f"{title}\n{searchable}")
                     self._notes.save_embedding(note.id, vec)
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.warning("Failed to embed auto-detected memory %s: %s", note.id, exc)
                 saved += 1
             except Exception:
                 logger.debug("CoreMemoryService.detect_and_store item failed", exc_info=True)

@@ -43,8 +43,9 @@ class BookSyncService:
     def _apply_files(self, files: list[dict], admin_user_id: int) -> tuple[int, int]:
         created = 0
         updated = 0
+        existing_by_item_id = self._books.get_by_onedrive_item_ids([f["item_id"] for f in files])
         for f in files:
-            existing = self._books.get_by_onedrive_item_id(f["item_id"])
+            existing = existing_by_item_id.get(f["item_id"])
             self._books.upsert_from_sync(
                 onedrive_drive_id=f["drive_id"],
                 onedrive_item_id=f["item_id"],
@@ -56,9 +57,13 @@ class BookSyncService:
                 last_modified=_parse_iso(f["last_modified"]),
                 created_by_admin_id=admin_user_id,
                 default_title=_filename_to_title(f["name"]),
+                existing=existing,
+                commit=False,
             )
             if existing:
                 updated += 1
             else:
                 created += 1
+        if files:
+            self._books.db.commit()
         return created, updated

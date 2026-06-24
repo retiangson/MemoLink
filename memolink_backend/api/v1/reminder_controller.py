@@ -1,5 +1,6 @@
 import json
 import datetime
+import logging
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -12,6 +13,7 @@ from memolink_backend.di.request_container import get_request_container, Request
 from memolink_backend.core.config import settings
 
 router = APIRouter(prefix="/reminders", tags=["reminders"])
+logger = logging.getLogger(__name__)
 
 
 def _serialize(r: Reminder) -> dict:
@@ -166,7 +168,8 @@ def detect_reminder_from_message(
             "due_date": result.get("due_date") or None,
             "due_time": result.get("due_time") or None,
         }
-    except Exception:
+    except Exception as exc:
+        logger.warning("GPT reminder detection failed: %s", exc)
         return {"detected": False, "text": None, "due_date": None, "due_time": None}
 
 

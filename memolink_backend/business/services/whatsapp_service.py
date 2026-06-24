@@ -54,7 +54,8 @@ def _session_dir(user_id: int) -> Path:
             p = base / str(user_id)
             p.mkdir(parents=True, exist_ok=True)
             return p
-        except OSError:
+        except OSError as exc:
+            logger.debug("Cannot use WhatsApp session dir %s, trying next fallback: %s", base, exc)
             continue
     raise RuntimeError("Cannot create WhatsApp session directory in home or /tmp")
 
@@ -157,8 +158,8 @@ def _kill_orphan_bridge() -> None:
                 capture_output=True, timeout=3,
             )
             time.sleep(0.3)
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.debug("Failed to kill orphan WhatsApp bridge process: %s", exc)
 
 
 def _clear_session(user_id: int) -> None:
@@ -250,8 +251,8 @@ def stop_bridge(user_id: int) -> dict:
             except subprocess.TimeoutExpired:
                 proc.kill()
                 proc.wait(timeout=3)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("Failed to terminate WhatsApp bridge process cleanly: %s", exc)
         # Clear saved session so the next connect always shows a fresh QR
         _clear_session(user_id)
         return {"stopped": True}
@@ -280,7 +281,8 @@ def get_status() -> dict:
             "chatCount":           data.get("chatCount", 0),
             "messageCount":        data.get("messageCount", 0),
         }
-    except Exception:
+    except Exception as exc:
+        logger.warning("WhatsApp bridge health check failed: %s", exc)
         return {"connected": False, "status": "disconnected", "qr_image": None,
                 "historySynced": False, "historySyncComplete": False, "historySyncProgress": None,
                 "chatCount": 0, "messageCount": 0}
@@ -306,13 +308,15 @@ async def list_chats() -> list:
                         )
                         payload = msg_resp.json()
                         return bool(payload.get("total", 0) or payload.get("messages"))
-                    except Exception:
+                    except Exception as exc:
+                        logger.debug("Failed to check message count for chat %r: %s", chat.get("id"), exc)
                         return False
 
             semaphore = asyncio.Semaphore(8)
             checks = await asyncio.gather(*(has_messages(chat, semaphore) for chat in chats))
             return [chat for chat, keep in zip(chats, checks) if keep]
-    except Exception:
+    except Exception as exc:
+        logger.warning("Failed to list WhatsApp chats: %s", exc)
         return []
 
 
@@ -324,7 +328,8 @@ async def get_messages(chat_id: str, limit: int = 20, offset: int = 0) -> dict:
                 params={"chatId": chat_id, "limit": limit, "offset": offset},
             )
             return resp.json()   # {messages: [...], total: N}
-    except Exception:
+    except Exception as exc:
+        logger.warning("Failed to fetch WhatsApp messages for chat %r: %s", chat_id, exc)
         return {"messages": [], "total": 0}
 
 
@@ -339,7 +344,8 @@ async def get_profile_picture(chat_id: str) -> dict | None:
                 return None
             resp.raise_for_status()
             return resp.json()
-    except Exception:
+    except Exception as exc:
+        logger.debug("Failed to fetch WhatsApp profile picture for %r: %s", chat_id, exc)
         return None
 
 
@@ -446,5 +452,6 @@ async def suggest_reply(chat_id: str, note_context: str = "", draft_reply: str =
         )
         result = json.loads(resp.choices[0].message.content)
         return result.get("replies", [])
-    except Exception:
+    except Exception as exc:
+        logger.warning("Failed to generate WhatsApp reply suggestions: %s", exc)
         return []

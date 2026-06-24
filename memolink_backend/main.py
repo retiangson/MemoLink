@@ -16,12 +16,15 @@ _logger = logging.getLogger(__name__)
 def _try_write_system_log(level: str, source: str, message: str, details: dict) -> None:
     """Write to system_logs without ever raising - used inside exception handlers."""
     try:
-        from memolink_backend.core.db import get_db
+        from memolink_backend.core.db import SessionLocal
         from memolink_backend.domain.repositories.system_log_repository import SystemLogRepository
-        db = next(get_db())
-        SystemLogRepository(db).create(level, source, message, details)
-    except Exception:
-        pass
+        db = SessionLocal()
+        try:
+            SystemLogRepository(db).create(level, source, message, details)
+        finally:
+            db.close()
+    except Exception as exc:
+        _logger.error("Failed to write system log (source=%s, message=%s): %s", source, message, exc)
 
 BACKEND_ROOT = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(BACKEND_ROOT)

@@ -1,3 +1,4 @@
+import logging
 from fastapi import APIRouter, UploadFile, File, Form, Depends
 from typing import List, Optional
 from memolink_backend.di.request_container import RequestContainer, get_request_container
@@ -10,6 +11,7 @@ _WHISPER_LIMIT_BYTES = 25 * 1024 * 1024
 _AUDIO_VIDEO_EXTS = {".mp3", ".mp4", ".m4a", ".wav", ".webm", ".ogg", ".flac", ".mpeg", ".mpga", ".mov", ".avi"}
 
 router = APIRouter(prefix="/notes", tags=["notes"])
+logger = logging.getLogger(__name__)
 
 
 @router.post("/bulk")
@@ -53,13 +55,14 @@ async def bulk_upload(
             c.logs().info("bulk.upload", f"Note created from '{filename}'", {"filename": filename, "size_mb": size_mb}, current_user_id)
         except Exception as exc:
             failed.append({"filename": filename, "reason": str(exc)})
+            logger.error("Failed to process bulk upload '%s' for user_id=%s: %s", filename, current_user_id, exc)
             try:
                 c.logs().error("bulk.upload", f"Failed to process '{filename}': {exc}", {"filename": filename, "error": str(exc)}, current_user_id)
-            except Exception:
-                pass
+            except Exception as log_exc:
+                logger.warning("Failed to write system log for bulk upload failure of '%s': %s", filename, log_exc)
             try:
                 db.rollback()
-            except Exception:
-                pass
+            except Exception as rollback_exc:
+                logger.warning("Failed to rollback db session after bulk upload failure of '%s': %s", filename, rollback_exc)
 
     return {"notes": created, "failed": failed}

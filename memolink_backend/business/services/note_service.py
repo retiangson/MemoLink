@@ -1,3 +1,4 @@
+import logging
 from typing import Optional, List, Any
 from sqlalchemy.orm import Session
 
@@ -6,6 +7,8 @@ from memolink_backend.domain.interfaces.i_note_repository import INoteRepository
 from memolink_backend.business.services.embedding_service import EmbeddingService
 from memolink_backend.business.interfaces.i_note_service import INoteService
 from memolink_backend.contracts.note_dtos import NoteCreateDTO, NoteUpdateDTO, NoteResponseDTO
+
+logger = logging.getLogger(__name__)
 
 
 class NoteService(INoteService):
@@ -26,8 +29,8 @@ class NoteService(INoteService):
                 with self.db.begin_nested():  # savepoint - rolls back only embedding on failure
                     vector = self.embedding_service.embed_text(dto.content)
                     self.repo.save_embedding(note.id, vector)
-            except Exception:
-                pass  # note is still committed without an embedding
+            except Exception as exc:
+                logger.warning("Failed to embed note %s on create: %s", note.id, exc)
         if self.db:
             self.db.commit()
             self.db.refresh(note)
@@ -56,8 +59,8 @@ class NoteService(INoteService):
                 with self.db.begin_nested():
                     vector = self.embedding_service.embed_text(dto.content)
                     self.repo.save_embedding(note.id, vector)
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning("Failed to re-embed note %s on update: %s", note.id, exc)
         if self.db:
             self.db.commit()
             self.db.refresh(note)

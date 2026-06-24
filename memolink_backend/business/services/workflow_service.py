@@ -40,6 +40,7 @@ ACTION TYPES
 from __future__ import annotations
 
 import json
+import logging
 import re
 import uuid
 from typing import Iterator, Optional
@@ -55,6 +56,8 @@ from memolink_backend.domain.repositories.conversation_repository import Convers
 from memolink_backend.domain.repositories.reminder_repository import ReminderRepository
 from memolink_backend.business.services.embedding_service import EmbeddingService
 from memolink_backend.utils.web_search import brave_image_search, brave_search
+
+logger = logging.getLogger(__name__)
 
 _HTML = re.compile(r"<[^>]+>")
 
@@ -205,7 +208,8 @@ class WorkflowService:
         raw = resp.choices[0].message.content or ""
         try:
             data = _extract_first_json_value(raw)
-        except ValueError:
+        except ValueError as exc:
+            logger.debug("Workflow suggest() got non-JSON response, skipping suggestions: %s", exc)
             return []
         if not isinstance(data, dict):
             return []
@@ -392,8 +396,8 @@ class WorkflowService:
             try:
                 vec = self._embed.embed_text(f"{p['title']} {p.get('content','')}"[:2000])
                 self._notes.save_embedding(note.id, vec)
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning("Failed to embed workflow-created note %s: %s", note.id, exc)
             self._notes.db.commit()
             return f"Note '{p['title']}' created (ID {note.id})"
 
@@ -558,7 +562,8 @@ class WorkflowService:
                 workspace_id=workspace_id,
                 user_id=user_id,
             )
-        except Exception:
+        except Exception as exc:
+            logger.warning("Vector/hybrid note search failed for workflow query %r: %s", query, exc)
             notes = self._notes.get_for_user(user_id, workspace_id)[:6]
         if not notes:
             return "(no notes found in this workspace)"

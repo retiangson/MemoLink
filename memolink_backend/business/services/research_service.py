@@ -167,7 +167,8 @@ class ResearchService:
                     workspace_id=workspace_id,
                     user_id=user_id,
                 )
-            except Exception:
+            except Exception as exc:
+                logger.warning("Vector/hybrid note search failed during research, using recent notes: %s", exc)
                 top_notes = all_notes[:10]
 
             for n in top_notes:

@@ -1,4 +1,5 @@
 import json
+import logging
 import re
 from datetime import date, timedelta
 from typing import Optional
@@ -11,6 +12,7 @@ from memolink_backend.core.config import settings
 from memolink_backend.core.db import get_db
 from memolink_backend.domain.models.reminder import Reminder
 
+logger = logging.getLogger(__name__)
 _HTML_TAG = re.compile(r"<[^>]+>")
 
 
@@ -134,7 +136,8 @@ async def suggest(
         raw = data.get("suggestions", [])
         if not isinstance(raw, list):
             raw = []
-    except Exception:
+    except Exception as exc:
+        logger.debug("Failed to parse GPT suggestion response: %s", exc)
         raw = []
 
     saved = []

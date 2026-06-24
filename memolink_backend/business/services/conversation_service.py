@@ -1,3 +1,4 @@
+import logging
 from typing import Any, Optional, List
 from sqlalchemy.orm import Session
 
@@ -7,6 +8,8 @@ from memolink_backend.domain.interfaces.i_conversation_repository import IConver
 from memolink_backend.domain.interfaces.i_note_repository import INoteRepository
 from memolink_backend.business.services.embedding_service import EmbeddingService
 from memolink_backend.business.interfaces.i_conversation_service import IConversationService
+
+logger = logging.getLogger(__name__)
 
 
 class ConversationService(IConversationService):
@@ -67,7 +70,7 @@ class ConversationService(IConversationService):
             with self.db.begin_nested():
                 vector = self.embedding.embed_text(content)
                 self.note_repo.save_embedding(note.id, vector)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("Failed to embed chat-snippet note %s: %s", note.id, exc)
         self.db.commit()
         return {"id": note.id, "title": note_title}

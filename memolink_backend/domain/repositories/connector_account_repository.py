@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from typing import Any, Optional
 from datetime import datetime
 
@@ -8,6 +9,8 @@ from sqlalchemy.orm import Session
 
 from memolink_backend.core.encryption import decrypt_text, encrypt_text
 from memolink_backend.domain.models.connector_account import ConnectorAccount
+
+logger = logging.getLogger(__name__)
 
 
 class ConnectorAccountRepository:
@@ -70,7 +73,8 @@ class ConnectorAccountRepository:
             return None
         try:
             config = json.loads(row.config_json) if row.config_json else {}
-        except Exception:
+        except Exception as exc:
+            logger.warning("Failed to parse config_json for connector_type=%s user_id=%s: %s", connector_type, user_id, exc)
             config = {}
         return {
             "connector_type": row.connector_type,
@@ -89,7 +93,8 @@ class ConnectorAccountRepository:
             return None
         try:
             config = json.loads(row.config_json) if row.config_json else {}
-        except Exception:
+        except Exception as exc:
+            logger.warning("Failed to parse config_json for connector_type=%s user_id=%s: %s", connector_type, user_id, exc)
             config = {}
         return {
             "display_name": row.display_name,

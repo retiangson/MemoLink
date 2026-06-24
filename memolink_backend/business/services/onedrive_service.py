@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import time
 from datetime import datetime, timezone
 from typing import Optional
@@ -10,6 +11,8 @@ import httpx
 
 from memolink_backend.core.config import settings
 from memolink_backend.domain.repositories.onedrive_account_repository import OneDriveAccountRepository
+
+logger = logging.getLogger(__name__)
 
 GRAPH_BASE = "https://graph.microsoft.com/v1.0"
 MS_AUTH_URL = "https://login.microsoftonline.com/{tenant}/oauth2/v2.0/authorize"
@@ -154,6 +157,15 @@ class OneDriveService:
                 },
             )
         if resp.status_code != 200:
+            try:
+                err_body = resp.json()
+                err_reason = err_body.get("error_description") or err_body.get("error") or resp.text[:300]
+            except Exception:
+                err_reason = resp.text[:300]
+            logger.error(
+                "OneDrive token refresh failed for user_id=%s (HTTP %s): %s",
+                tokens.get("user_id"), resp.status_code, err_reason,
+            )
             raise OneDriveServiceError(401, "Failed to refresh OneDrive access token — reconnect OneDrive in admin settings")
 
         token_data = resp.json()
@@ -162,6 +174,7 @@ class OneDriveService:
         expires_in = token_data.get("expires_in", 3600)
         expiry_dt = datetime.fromtimestamp(time.time() + expires_in, tz=timezone.utc)
         if not access_token:
+            logger.error("OneDrive token refresh for user_id=%s returned HTTP 200 with no access_token", tokens.get("user_id"))
             raise OneDriveServiceError(401, "OneDrive token refresh returned no access token")
 
         self._repo.upsert(

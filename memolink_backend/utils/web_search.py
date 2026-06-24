@@ -1,5 +1,9 @@
+import logging
+
 import httpx
 from memolink_backend.core.config import settings
+
+logger = logging.getLogger(__name__)
 
 _BRAVE_URL = "https://api.search.brave.com/res/v1/web/search"
 _BRAVE_IMAGE_URL = "https://api.search.brave.com/res/v1/images/search"
@@ -39,7 +43,8 @@ def brave_search(query: str, count: int = 5) -> str:
             desc = r.get("description", "").strip()
             lines.append(f"### {i}. {title}\n{url}\n\n{desc}")
         return "\n\n".join(lines)
-    except Exception:
+    except Exception as exc:
+        logger.warning("Brave web search failed for query %r: %s", query, exc)
         return ""
 
 
@@ -79,5 +84,6 @@ def brave_image_search(query: str, count: int = 3) -> str:
             if page_url:
                 lines.append(f"[Source: {safe_title}]({page_url})")
         return "\n\n".join(lines) if len(lines) > 1 else ""
-    except Exception:
+    except Exception as exc:
+        logger.warning("Brave image search failed for query %r: %s", query, exc)
         return ""

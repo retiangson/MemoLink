@@ -100,7 +100,8 @@ class SlashCommandService:
             return {}
         try:
             return self._user_api_key_repo.get_all_decrypted(user_id)
-        except Exception:
+        except Exception as exc:
+            logger.warning("Failed to resolve user API keys for user_id=%s: %s", user_id, exc)
             return {}
 
     def _ai(self, model: str, messages: list, user_id: int | None) -> str:
@@ -123,8 +124,8 @@ class SlashCommandService:
             vector = self.embedding.embed_text(new_content)
             self.note_repo.save_embedding(note.id, vector)
             self.db.commit()
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.error("Failed to commit slash-command update for note %s — note may not be persisted: %s", note.id, exc)
 
     def _not_found(self, name: str) -> str:
         return f'Could not find a note matching **"{name}"**. Check the title and try again.'
@@ -285,7 +286,8 @@ class SlashCommandService:
                     workspace_id=workspace_id,
                     user_id=user_id,
                 )
-            except Exception:
+            except Exception as exc:
+                logger.warning("Vector/hybrid note search failed for slash command question %r: %s", question, exc)
                 notes = []
 
         if notes and query_terms:
@@ -342,10 +344,11 @@ class SlashCommandService:
                             full_text = payload["replace"]
                         elif "quiz" in payload:
                             full_text = f"__QUIZ__:{json.dumps(payload['quiz'])}"
-                    except Exception:
-                        pass
+                    except Exception as exc:
+                        logger.debug("Failed to parse slash-command SSE payload %r: %s", chunk, exc)
                 yield chunk
         except Exception as exc:
+            logger.warning("Slash command %r failed: %s", dto.command, exc)
             msg = f"Command failed: {exc}"
             yield _sse({"t": msg})
             full_text = msg
@@ -497,8 +500,8 @@ class SlashCommandService:
             vector = self.embedding.embed_text(summary)
             self.note_repo.save_embedding(new_note.id, vector)
             self.db.commit()
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("Failed to embed slash-command summary note %s: %s", new_note.id, exc)
         yield _sse({"t": f"✅ Summary note created: **{title}**\n\n[[NOTE_LINK:{new_note.id}:{title}]]"})
 
     # ── /Natural & /Humanize ──────────────────────────────────────────────────
@@ -615,8 +618,8 @@ class SlashCommandService:
             vector = self.embedding.embed_text(restored_content)
             self.note_repo.save_embedding(note.id, vector)
             self.db.commit()
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("Failed to re-embed undo-restored note %s: %s", note.id, exc)
         yield _sse({"note_updated": note.id})
         yield _sse({"t": f"✅ **{restored_title or note.title}** has been restored to its previous version."})
 
@@ -717,7 +720,8 @@ Base questions ONLY on the provided notes. Do not invent facts not in the notes.
             raw = re.sub(r"\s*```$", "", raw)
             quiz_data = json.loads(raw)
             yield _sse({"quiz": quiz_data})
-        except Exception:
+        except Exception as exc:
+            logger.warning("Failed to parse quiz JSON response: %s", exc)
             yield _sse({"t": "⚠ Failed to parse quiz response. Please try again."})
 
     # ── /Discussion ───────────────────────────────────────────────────────────
@@ -777,8 +781,8 @@ Base questions ONLY on the provided notes. Do not invent facts not in the notes.
         if dto.user_id and self._user_api_key_repo:
             try:
                 user_keys_named = self._user_api_key_repo.get_all_decrypted_with_names(dto.user_id)
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning("Failed to resolve named user API keys for user_id=%s: %s", dto.user_id, exc)
 
         existing_model_ids = {m for _, m in discussion_models}
         for model_id, info in user_keys_named.items():
@@ -883,8 +887,8 @@ Base questions ONLY on the provided notes. Do not invent facts not in the notes.
                 messages=[{"role": "user", "content": synth_prompt}],
             ).choices[0].message.content or ""
             yield _sse({"t": synth})
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("Discussion synthesis (model=%s) failed: %s", synth_model, exc)
 
     # ── /Write ───────────────────────────────────────────────────────────────
 
@@ -907,8 +911,8 @@ Base questions ONLY on the provided notes. Do not invent facts not in the notes.
         if dto.user_id and self._user_api_key_repo:
             try:
                 user_keys_named = self._user_api_key_repo.get_all_decrypted_with_names(dto.user_id)
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning("Failed to resolve named user API keys for user_id=%s: %s", dto.user_id, exc)
         user_keys = {m: {"key": v["key"], "base_url": v.get("base_url")} for m, v in user_keys_named.items()}
 
         # ── Step 1: gather notes (silent inspiration) ────────────────────────
@@ -926,7 +930,8 @@ Base questions ONLY on the provided notes. Do not invent facts not in the notes.
                         workspace_id=dto.workspace_id,
                         user_id=dto.user_id,
                     )
-                except Exception:
+                except Exception as exc:
+                    logger.warning("Vector/hybrid note search failed for /Write prompt %r: %s", writing_prompt, exc)
                     top_notes = all_notes[:8]
                 blocks = []
                 for n in top_notes:

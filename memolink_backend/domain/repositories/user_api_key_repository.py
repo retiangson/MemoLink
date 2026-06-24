@@ -1,7 +1,10 @@
+import logging
 from typing import Optional
 from sqlalchemy.orm import Session
 from memolink_backend.domain.models.user_api_key import UserApiKey
 from memolink_backend.core.encryption import encrypt_text, decrypt_text
+
+logger = logging.getLogger(__name__)
 
 
 class UserApiKeyRepository:
@@ -33,8 +36,8 @@ class UserApiKeyRepository:
                     "key": decrypt_text(row.encrypted_key),
                     "base_url": row.base_url,
                 }
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning("Failed to decrypt API key id=%s user_id=%s model=%s: %s", row.id, user_id, row.model, exc)
         return result
 
     def get_all_decrypted_with_names(self, user_id: int) -> dict[str, dict]:
@@ -50,8 +53,8 @@ class UserApiKeyRepository:
                     "base_url": row.base_url,
                     "name": row.provider,
                 }
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning("Failed to decrypt API key id=%s user_id=%s model=%s: %s", row.id, user_id, row.model, exc)
         return result
 
     def name_exists(self, user_id: int, name: str, exclude_id: Optional[int] = None) -> bool:

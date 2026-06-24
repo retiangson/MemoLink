@@ -66,7 +66,8 @@ def _yt_title(url: str, fallback: str) -> str:
         with urllib.request.urlopen(oembed, timeout=5) as r:
             data = json.loads(r.read())
             return data.get("title") or fallback
-    except Exception:
+    except Exception as exc:
+        logger.debug("YouTube oEmbed title fetch failed for %s: %s", url, exc)
         return fallback
 
 

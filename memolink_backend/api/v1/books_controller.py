@@ -1,3 +1,4 @@
+import logging
 from typing import Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
@@ -28,6 +29,7 @@ from memolink_backend.contracts.book_dtos import (
 )
 
 router = APIRouter(prefix="/books", tags=["books"])
+logger = logging.getLogger(__name__)
 
 
 class BookReaderErrorDTO(BaseModel):
@@ -386,11 +388,13 @@ async def read_book_slides(
             drive_id=book.onedrive_drive_id, item_id=book.onedrive_item_id
         )
     except OneDriveServiceError as exc:
+        logger.warning("OneDrive download failed for slide extraction on book %s: %s", book.id, exc.detail)
         raise HTTPException(status_code=exc.status_code, detail=exc.detail)
 
     try:
         slides = extract_pptx_slides(content)
     except Exception as exc:
+        logger.warning("Failed to parse PPTX slides for book %s: %s", book.id, exc)
         raise HTTPException(status_code=500, detail=f"Failed to parse PPTX: {exc}")
 
     return BookSlidesResponseDTO(slides=slides)

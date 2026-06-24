@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from datetime import date
 from typing import Any
@@ -11,6 +12,8 @@ from memolink_backend.utils.academic_search import format_papers_context, search
 
 from .academic import build_dynamic_academic_queries
 from .messages import build_primary_system_prompt, get_mode_prompt, get_mode_settings
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -115,7 +118,8 @@ class AcademicWriterContextEngine(ContextEngine):
                     core_api_key=settings.core_api_key,
                     include_arxiv=True,
                 )
-            except Exception:
+            except Exception as exc:
+                logger.warning("Academic paper search failed for query %r: %s", query, exc)
                 continue
             for paper in batch:
                 key = (paper.get("title") or "").lower()[:60]

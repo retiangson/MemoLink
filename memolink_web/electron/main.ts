@@ -17,6 +17,17 @@ const execAsync = promisify(exec);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// ── Persistent error log ──────────────────────────────────────────────────────
+// Packaged builds have no visible console, so every error that would otherwise
+// be swallowed by a fire-and-forget .catch(() => {}) is appended here instead.
+function logToFile(message: string) {
+  console.error(message);
+  try {
+    const logPath = path.join(app.getPath("userData"), "memolink.log");
+    fs.appendFile(logPath, `[${new Date().toISOString()}] ${message}\n`).catch(() => {});
+  } catch { /* app.getPath unavailable before "ready" — console.error above still ran */ }
+}
+
 function resolveUserPath(input: string): string {
   if (!input) return input;
   const home = os.homedir();
@@ -320,7 +331,16 @@ function bridgeRequest(baseUrl: string, token: string, method: string, path: str
     }, (res) => {
       let data = "";
       res.on("data", (c: Buffer) => { data += c.toString(); });
-      res.on("end", () => resolve(data));
+      res.on("end", () => {
+        const status = res.statusCode ?? 0;
+        if (status >= 200 && status < 300) {
+          resolve(data);
+          return;
+        }
+        let detail = data;
+        try { detail = JSON.parse(data).detail ?? data; } catch { /* not JSON */ }
+        reject(new Error(`HTTP ${status}: ${String(detail).slice(0, 300)}`));
+      });
     });
     req.on("error", reject);
     if (bodyBuf.length) req.write(bodyBuf);
@@ -330,11 +350,13 @@ function bridgeRequest(baseUrl: string, token: string, method: string, path: str
 
 function postResult(baseUrl: string, token: string, commandId: number, result: { ok: boolean; output?: string; error?: string }) {
   const body = JSON.stringify({ ok: result.ok, output: result.output ?? null, error: result.error ?? null });
-  bridgeRequest(baseUrl, token, "POST", `/api/desktop/commands/${commandId}/result`, body).catch(() => {});
+  bridgeRequest(baseUrl, token, "POST", `/api/desktop/commands/${commandId}/result`, body)
+    .catch((err) => logToFile(`Failed to post result for command ${commandId}: ${err?.message ?? err}`));
 }
 
 function postProgress(baseUrl: string, token: string, commandId: number, message: string) {
-  bridgeRequest(baseUrl, token, "POST", `/api/desktop/commands/${commandId}/progress`, JSON.stringify({ message })).catch(() => {});
+  bridgeRequest(baseUrl, token, "POST", `/api/desktop/commands/${commandId}/progress`, JSON.stringify({ message }))
+    .catch((err) => logToFile(`Failed to post progress for command ${commandId}: ${err?.message ?? err}`));
 }
 
 // ── OneDrive book sync: runs an unbounded local loop, one small backend call at a
@@ -346,6 +368,8 @@ async function runOneDriveSync(baseUrl: string, token: string, commandId: number
   let backoffMs = 1000;
   const MAX_BACKOFF_MS = 30_000;
   let lastProgressAt = 0;
+  let consecutiveFailures = 0;
+  const MAX_CONSECUTIVE_FAILURES = 5;
 
   while (true) {
     try {
@@ -356,6 +380,7 @@ async function runOneDriveSync(baseUrl: string, token: string, commandId: number
       updated += page.updated ?? 0;
       cursor = page.cursor ?? null;
       backoffMs = 1000;
+      consecutiveFailures = 0;
 
       const now = Date.now();
       if (now - lastProgressAt > 2000) {
@@ -367,7 +392,14 @@ async function runOneDriveSync(baseUrl: string, token: string, commandId: number
         postResult(baseUrl, token, commandId, { ok: true, output: `Sync complete — scanned ${scanned}, ${created} new, ${updated} updated.` });
         return;
       }
-    } catch {
+    } catch (err: any) {
+      consecutiveFailures++;
+      const message = err?.message ?? "Unknown error";
+      if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+        postResult(baseUrl, token, commandId, { ok: false, error: `OneDrive sync failed after ${MAX_CONSECUTIVE_FAILURES} attempts: ${message}` });
+        return;
+      }
+      postProgress(baseUrl, token, commandId, `Error, retrying (${consecutiveFailures}/${MAX_CONSECUTIVE_FAILURES}): ${message}`);
       await new Promise((r) => setTimeout(r, backoffMs));
       backoffMs = Math.min(backoffMs * 2, MAX_BACKOFF_MS);
     }
@@ -383,14 +415,21 @@ function startDesktopBridge(baseUrl: string, token: string) {
   }
 
   function sendHeartbeat() {
-    request("POST", "/api/desktop/heartbeat").catch(() => {});
+    request("POST", "/api/desktop/heartbeat").catch((err) => logToFile(`Heartbeat failed: ${err?.message ?? err}`));
   }
 
   const syncRunning = new Set<number>();
 
   function pollCommands() {
     request("GET", "/api/desktop/pending").then((body) => {
-      const commands: Array<{ id: number; command_type: string; payload: Record<string, unknown> }> = JSON.parse(body);
+      let commands: Array<{ id: number; command_type: string; payload: Record<string, unknown> }>;
+      try {
+        commands = JSON.parse(body);
+        if (!Array.isArray(commands)) throw new Error(`expected an array, got: ${body.slice(0, 300)}`);
+      } catch (err: any) {
+        logToFile(`Failed to parse /api/desktop/pending response: ${err?.message ?? err}`);
+        return;
+      }
       for (const cmd of commands) {
         if (cmd.command_type === "onedrive-sync") {
           if (syncRunning.has(cmd.id)) continue;
@@ -402,7 +441,7 @@ function startDesktopBridge(baseUrl: string, token: string) {
           postResult(baseUrl, token, cmd.id, result);
         });
       }
-    }).catch(() => {});
+    }).catch((err) => logToFile(`Failed to poll /api/desktop/pending: ${err?.message ?? err}`));
   }
 
   sendHeartbeat();
@@ -443,11 +482,11 @@ function setupAutoUpdater() {
   });
 
   autoUpdater.on("error", (err) => {
-    console.error("Auto-updater error:", err.message);
+    logToFile(`Auto-updater error: ${err.message}`);
   });
 
   autoUpdater.checkForUpdates().catch((err) => {
-    console.error("Update check failed:", err.message);
+    logToFile(`Update check failed: ${err.message}`);
   });
 }
 

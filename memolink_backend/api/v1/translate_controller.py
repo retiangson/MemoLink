@@ -135,7 +135,8 @@ async def _score_gpt_translation(gpt: AsyncOpenAI, original: str, translation: s
     try:
         back = await _back_translate(gpt, translation, target_language, model=settings.openai_chat_model)
         return await _score_similarity(gpt, original, back)
-    except Exception:
+    except Exception as exc:
+        logger.warning("GPT back-translation scoring failed for language=%s: %s", target_language, exc)
         return None
 
 

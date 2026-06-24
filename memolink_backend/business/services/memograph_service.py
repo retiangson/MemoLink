@@ -44,12 +44,15 @@ NODE TYPES  →  10 types, each with a distinct colour in the frontend canvas
 """
 
 import json
+import logging
 import re
 from typing import Optional
 from openai import OpenAI
 from memolink_backend.core.config import settings
 from memolink_backend.domain.repositories.graph_repository import GraphRepository
 from memolink_backend.domain.repositories.note_repository import NoteRepository
+
+logger = logging.getLogger(__name__)
 
 
 def _strip_html(html: str) -> str:
@@ -112,8 +115,8 @@ def _extract_entities_batch(notes_batch: list[dict]) -> list[dict]:
             parsed = json.loads(match.group())
             if isinstance(parsed, list):
                 return parsed
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning("MemoGraph entity extraction failed for note batch: %s", exc)
     # Fallback: empty results for each note
     return [{"note_index": i + 1} for i in range(len(notes_batch))]
 

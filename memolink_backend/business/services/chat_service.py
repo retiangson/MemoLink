@@ -817,15 +817,16 @@ class ChatService(IChatService):
             return
         try:
             getattr(self._log, level.lower())("chat", message, details, user_id)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("Failed to write system log entry: %s", exc)
 
     def _resolve_user_keys(self, user_id: int | None) -> dict:
         if not user_id or not self._user_api_key_repo:
             return {}
         try:
             return self._user_api_key_repo.get_all_decrypted(user_id)
-        except Exception:
+        except Exception as exc:
+            logger.warning("Failed to resolve user API keys for user_id=%s: %s", user_id, exc)
             return {}
 
     def _persist_direct_response(
@@ -1211,7 +1212,8 @@ class ChatService(IChatService):
             return None
         try:
             return json.loads(match.group(1))
-        except Exception:
+        except Exception as exc:
+            logger.debug("Failed to parse pending memory spec comment: %s", exc)
             return None
 
     def _maybe_capture_prompted_memory_answer(
@@ -1434,7 +1436,8 @@ class ChatService(IChatService):
                     if note.id not in seen:
                         seen.add(note.id)
                         selected.append(note)
-            except Exception:
+            except Exception as exc:
+                logger.warning("Query expansion search failed for %r: %s", q, exc)
                 continue
 
         if not selected:
@@ -1493,8 +1496,8 @@ class ChatService(IChatService):
             sections = data.get("sections") or []
             if sections:
                 return sections
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("Long academic section planning failed, using fallback outline: %s", exc)
         return fallback
 
     def _render_long_academic_status(
@@ -1554,7 +1557,8 @@ class ChatService(IChatService):
                     if key and key not in seen_titles:
                         seen_titles.add(key)
                         papers.append(paper)
-            except Exception:
+            except Exception as exc:
+                logger.warning("Academic paper search failed for query %r: %s", query, exc)
                 continue
         paper_context = format_papers_context(papers[:10]) if papers else ""
 
@@ -1664,8 +1668,8 @@ class ChatService(IChatService):
         if result_papers and user_id:
             try:
                 self._save_cited_papers_as_notes(final_content, result_papers, user_id, workspace_id)
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning("Failed to save cited papers as notes: %s", exc)
         return (final_content, used_model)
 
     def _save_cited_papers_as_notes(
@@ -1702,8 +1706,8 @@ class ChatService(IChatService):
                 try:
                     vec = self.embedding.embed_text(f"{title}\n{paper.get('abstract', '')}")
                     self.repo_notes.save_embedding(note.id, vec)
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.warning("Failed to embed cited-paper note %r: %s", title, exc)
                 existing_titles.add(title_key)
                 saved += 1
             except Exception as exc:
@@ -1757,7 +1761,8 @@ class ChatService(IChatService):
                     workspace_id=ws_filter,
                     user_id=dto.user_id,
                 )
-            except Exception:
+            except Exception as exc:
+                logger.warning("Vector/hybrid note search failed, falling back to recent notes: %s", exc)
                 top_notes = all_notes[:dto.top_k]
 
             if not top_notes:
@@ -1791,8 +1796,8 @@ class ChatService(IChatService):
                         sources.append(ChatAnswerSource(note_id=note.id, title=note.title, snippet=note.content[:200] + "..."))
                         plain = _strip_base64_images(_HTML_TAG.sub(" ", note.content)).strip()
                         rag_blocks.append(f"[NOTE {note.id}: {note.title or 'Untitled'} - related via MemoGraph]\n{plain}")
-                except Exception:
-                    pass  # graph enhancement is best-effort; never break chat
+                except Exception as exc:
+                    logger.debug("MemoGraph enhancement failed (best-effort, chat continues): %s", exc)
 
         system_msgs = [{"role": "system", "content": _SYSTEM_PROMPT}]
         if rag_blocks:
@@ -1919,13 +1924,15 @@ class ChatService(IChatService):
                             try:
                                 tokens = account_repo.get_decrypted_tokens(dto.user_id)
                                 email_address = str((tokens or {}).get("email") or "").strip()
-                            except Exception:
+                            except Exception as exc:
+                                logger.debug("Failed to read decrypted email tokens for WhatsApp draft: %s", exc)
                                 email_address = ""
                             if not email_address:
                                 try:
                                     account = account_repo.get_by_user_id(dto.user_id)
                                     email_address = str(getattr(account, "email_address", "") or "").strip()
-                                except Exception:
+                                except Exception as exc:
+                                    logger.debug("Failed to read email account for WhatsApp draft: %s", exc)
                                     email_address = ""
                     if not email_address:
                         _whatsapp_draft_prefill = (
@@ -1945,8 +1952,10 @@ class ChatService(IChatService):
                         "or edit it first.\n\n"
                         f'<whatsapp_draft to="{to_safe}" body_b64="{body_b64}"></whatsapp_draft>'
                     )
-            except Exception:
-                pass
+            except ValueError:
+                pass  # insufficient intent info — not an error, just skip the draft
+            except Exception as exc:
+                logger.warning("WhatsApp draft prefill build failed: %s", exc)
 
         _email_draft_prefill: str | None = None
         if not _whatsapp_intent and (_asks_compose or _asks_reply) and self._email_service and dto.user_id:
@@ -1968,8 +1977,8 @@ class ChatService(IChatService):
                 _note_titles: list[str] = []
                 try:
                     _note_titles = [n.title for n in self.repo_notes.get_for_user(dto.user_id) if n.title]
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.warning("Failed to fetch note titles for email intent extraction: %s", exc)
 
                 _intent: dict = {}
                 try:
@@ -2008,8 +2017,8 @@ class ChatService(IChatService):
                     if _raw:
                         _raw = _re.sub(r"^```(?:json)?\s*|\s*```$", "", _raw, flags=_re.S).strip()
                         _intent = _json.loads(_raw)
-                except Exception:
-                    pass  # Falls through to regex fallback below
+                except Exception as exc:
+                    logger.debug("AI email intent extraction failed, falling back to regex: %s", exc)
 
                 # --- Populate fields from AI intent or regex fallback ---
                 recipient_hint: str = ""
@@ -2150,15 +2159,16 @@ class ChatService(IChatService):
                                                     break
                                                 except Exception:
                                                     continue
-                                        except Exception:
+                                        except Exception as exc:
+                                            logger.debug("AI email body rewrite failed, using raw note body: %s", exc)
                                             body_text = raw_body
                                     else:
                                         # No style instruction — send the note content directly, no AI rewriting
                                         body_text = raw_body
                                     matched_note = True
                                     break
-                    except Exception:
-                        pass
+                    except Exception as exc:
+                        logger.warning("Note-matching for email draft body failed: %s", exc)
 
                 if not matched_note and _conversation_body_source:
                     body_text = _conversation_body_source
@@ -2177,8 +2187,8 @@ class ChatService(IChatService):
                     f"Here's your draft {action} — review it and click **Send** to deliver, "
                     f"or click **Edit** to adjust the message first.\n\n{draft_tag}"
                 )
-            except Exception:
-                pass  # Fall through to normal email RAG
+            except Exception as exc:
+                logger.warning("Email draft prefill build failed, falling through to normal email RAG: %s", exc)
 
         # Email RAG — live Gmail search when user asks about email
         _email_keywords = {"email", "gmail", "inbox", "message", "attachment", "mail", "sent", "received"}
@@ -2187,7 +2197,7 @@ class ChatService(IChatService):
         # down in _build_route_plan — skip the narrative RAG pass so GPT doesn't also
         # write prose about the same emails (and we don't hit Gmail twice).
         _email_search_list_intent = _has_email_search_list_intent(user_text)
-        print(f"[EMAIL_RAG] asks={_asks_about_email} list_intent={_email_search_list_intent} uid={dto.user_id} has_svc={self._email_service is not None}", flush=True)
+        logger.debug("[EMAIL_RAG] asks=%s list_intent=%s uid=%s has_svc=%s", _asks_about_email, _email_search_list_intent, dto.user_id, self._email_service is not None)
         if _asks_about_email and not _email_search_list_intent and dto.user_id and user_text:
             email_blocks: list[str] = []
             no_account = False
@@ -2199,9 +2209,8 @@ class ChatService(IChatService):
                         from memolink_backend.core.encryption import decrypt_text as _dt
                         tokens = self._email_service.account_repo.get_decrypted_tokens(dto.user_id)
                         has_account = tokens is not None
-                        print(f"[EMAIL_RAG] tokens={'yes' if tokens else 'None'} has_account={has_account}", flush=True)
                     except Exception as _e:
-                        print(f"[EMAIL_RAG] get_tokens raised: {_e}", flush=True)
+                        logger.warning("[EMAIL_RAG] get_decrypted_tokens failed for user_id=%s: %s", dto.user_id, _e)
 
                     if not has_account:
                         no_account = True
@@ -2234,8 +2243,8 @@ class ChatService(IChatService):
                         try:
                             q_vec = self.embedding.embed_text(user_text)
                             hits = self._email_record_repo.search_by_vector(q_vec, user_id=dto.user_id, top_k=3)
-                        except Exception:
-                            pass
+                        except Exception as exc:
+                            logger.warning("Email vector search failed, falling back to keyword search: %s", exc)
                         if not hits:
                             hits = self._email_record_repo.keyword_search(dto.user_id, user_text, top_k=3)
                         for em in hits:
@@ -2245,8 +2254,8 @@ class ChatService(IChatService):
                                 f"[EMAIL]\nSubject: {em.subject}\nFrom: {sender}\n"
                                 f"Date: {date_str}\nBody:\n{(em.body_text or em.snippet or '')[:1500]}"
                             )
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning("Email RAG lookup failed: %s", exc)
 
             if email_blocks:
                 system_msgs.append({"role": "system", "content": (
@@ -2477,6 +2486,7 @@ class ChatService(IChatService):
                 data_url, revised, img_model = _generate_image(plan.image_prompt)
                 answer = f"![Generated image]({data_url})\n\n*{revised}*"
             except Exception as exc:
+                logger.warning("Image generation failed for prompt %r: %s", plan.image_prompt, exc)
                 img_model = "stable-diffusion"
                 answer = f"⚠ Image generation failed: {exc}"
             assistant_msg = self.repo_conv.add_message(plan.conversation_id, "assistant", answer, model=img_model)
@@ -2635,6 +2645,7 @@ class ChatService(IChatService):
                 data_url, revised, img_model = _generate_image(plan.image_prompt)
                 answer = f"![Generated image]({data_url})\n\n*{revised}*"
             except Exception as exc:
+                logger.warning("Image generation failed for prompt %r: %s", plan.image_prompt, exc)
                 answer = f"⚠ Image generation failed: {exc}"
             yield sse_event(MessageReplaceEvent(content=answer))
             assistant_msg = self.repo_conv.add_message(plan.conversation_id, "assistant", answer, model=img_model)
@@ -2676,8 +2687,8 @@ class ChatService(IChatService):
                 if _long_papers and dto.user_id:
                     try:
                         self._save_cited_papers_as_notes(long_answer, _long_papers, dto.user_id, ws_filter)
-                    except Exception:
-                        pass
+                    except Exception as exc:
+                        logger.warning("Failed to save cited papers as notes (long academic path): %s", exc)
                 clean_answer, conf_level, conf_reason = _parse_confidence(long_answer)
                 final_conf = conf_level or plan.pre_conf_level
                 final_reason = conf_reason or plan.pre_conf_reason
@@ -2797,8 +2808,8 @@ class ChatService(IChatService):
         if plan.smart_mode_name == "academic_writer" and plan.fetched_papers and dto.user_id:
             try:
                 self._save_cited_papers_as_notes(full_answer, plan.fetched_papers, dto.user_id, plan.workspace_filter)
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning("Failed to save cited papers as notes (smart mode path): %s", exc)
 
         clean_answer, conf_level, conf_reason = _parse_confidence(full_answer)
         final_conf = conf_level or plan.pre_conf_level
@@ -2863,8 +2874,8 @@ class ChatService(IChatService):
                 self._eval.mark_task(dto.user_id, "ask_rag_question", "Ask a question based on the note", "rag_chat")
                 if len(src_ids) > 0:
                     self._eval.mark_task(dto.user_id, "check_citation", "Review the source citation", "rag_chat")
-            except Exception:
-                pass  # analytics must never break chat
+            except Exception as exc:
+                logger.debug("Analytics tracking failed (non-fatal, chat continues): %s", exc)
 
         # Phase 2: AI-powered Core Memory detection (fire-and-forget, post-stream)
         if dto.user_id and user_text:
@@ -2876,8 +2887,8 @@ class ChatService(IChatService):
                     embedding_service=self.embedding,
                 )
                 _cm_svc.detect_and_store(dto.user_id, plan.workspace_filter, user_text)
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning("Core memory detection failed: %s", exc)
 
     async def handle_file_upload(
         self,
@@ -2927,8 +2938,8 @@ class ChatService(IChatService):
             _smart_mode = _smart_analysis.get("mode", "general_chat")
             _mode_settings = smart_engine.get_mode_settings(_smart_mode)
             _extra_kwargs = {"temperature": _mode_settings["temperature"], "max_tokens": _mode_settings["max_tokens"]}
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("Smart engine analysis failed for file upload, using defaults: %s", exc)
 
         # ── 4. RAG — multi-query retrieval using smart engine's retrieval_queries ─
         rag_blocks: list[str] = []
@@ -2968,7 +2979,8 @@ class ChatService(IChatService):
                                 if n.id not in seen_ids:
                                     seen_ids.add(n.id)
                                     top_notes.append(n)
-                        except Exception:
+                        except Exception as exc:
+                            logger.warning("Query expansion search failed for %r (file upload): %s", q, exc)
                             continue
                     if not top_notes:
                         top_notes = all_notes[:12]
@@ -2976,8 +2988,8 @@ class ChatService(IChatService):
                     for n in top_notes:
                         plain = _strip_base64_images(_HTML_TAG.sub(" ", n.content)).strip()
                         rag_blocks.append(f"[NOTE {n.id}: {n.title or 'Untitled'}]\n{plain[:char_limit]}")
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning("RAG note retrieval failed for file upload: %s", exc)
 
         # ── 4b. Academic paper search (academic_writer only) ──────────────────
         # Derives queries from note titles (topic-aware) and hardcoded RAG/AI defaults.
@@ -3137,15 +3149,15 @@ class ChatService(IChatService):
                 )
                 if _improved and _improved.strip() != answer.strip():
                     answer = _improved
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning("Quality check failed for file-upload answer: %s", exc)
 
         # ── 9. Auto-save cited papers as notes (academic mode) ───────────────
         if _smart_mode == "academic_writer" and _all_papers and user_id:
             try:
                 self._save_cited_papers_as_notes(answer, _all_papers, user_id, None)
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning("Failed to save cited papers as notes (file upload path): %s", exc)
 
         # ── 10. Save and return ────────────────────────────────────────────────
         clean_answer, _, _ = _parse_confidence(answer)
