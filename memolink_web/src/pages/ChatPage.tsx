@@ -68,6 +68,7 @@ import { BooksLibraryModal } from "../components/BooksLibraryModal";
 import { BookReader } from "../components/BookReader";
 import { useBookTabs } from "../hooks/useBookTabs";
 import { listMyBooks, getBook, getBookHighlight, type Book } from "../api/booksApi";
+import { useIsDesktop } from "../hooks/useIsDesktop";
 
 type WorkspaceHook = ReturnType<typeof useWorkspace>;
 type LayoutMode = "stacked" | "columns" | "rows";
@@ -83,7 +84,8 @@ function getSavedRatio(key: string): number {
 }
 
 export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: WorkspaceHook }) {
-  const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth >= 640);
+  const isDesktop = useIsDesktop();
+  const [sidebarOpen, setSidebarOpen] = useState(isDesktop);
   const [layoutMode, setLayoutMode] = useState<LayoutMode>(getSavedLayout);
   const [colRatio, setColRatio] = useState(() => getSavedRatio("memolink_split_col"));
   const [rowRatio, setRowRatio] = useState(() => getSavedRatio("memolink_split_row"));
@@ -96,7 +98,14 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
   const emailTabs = useEmailTabs();
   const whatsappTabs = useWhatsappTabs();
   const [emailActionLoadingId, setEmailActionLoadingId] = useState<string | null>(null);
-  const [rightPanelOpen, setRightPanelOpen] = useState(() => window.innerWidth >= 640);
+  const [rightPanelOpen, setRightPanelOpen] = useState(isDesktop);
+
+  // Re-sync both panels whenever the viewport crosses the sm breakpoint (resize,
+  // orientation change, devtools device toolbar) instead of only checking at mount.
+  useEffect(() => {
+    setSidebarOpen(isDesktop);
+    setRightPanelOpen(isDesktop);
+  }, [isDesktop]);
   const [recycleBinOpen, setRecycleBinOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const { theme, setTheme } = useTheme();
@@ -1641,6 +1650,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                 onProgress={handleBookProgress}
                 jumpToHighlight={bookTabs.active.pendingHighlight}
                 onJumpToHighlightHandled={() => bookTabs.clearPendingHighlight(bookTabs.active!.book.id)}
+                onHighlightAdded={reloadNotes}
               />
             )
           ) : isEmailActive ? (

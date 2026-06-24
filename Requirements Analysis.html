@@ -656,6 +656,42 @@
           <td><span class="req-priority p-high">High</span></td>
           <td><span class="req-cat c-func">Evaluation</span></td>
         </tr>
+        <tr>
+          <td class="req-id">FR-84</td>
+          <td class="req-text">Admins can connect a OneDrive account via Microsoft OAuth from the Admin Panel's Books tab, select a folder, and trigger a full or paginated sync that imports files as books with metadata (title, author, file type, size, OneDrive item ID). Admins can disconnect the account at any time.</td>
+          <td><span class="req-priority p-high">High</span></td>
+          <td><span class="req-cat c-func">Books Library</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">FR-85</td>
+          <td class="req-text">Admins can publish or unpublish individual books, or bulk publish/unpublish all books or a selected subset, controlling which books are visible to regular users.</td>
+          <td><span class="req-priority p-high">High</span></td>
+          <td><span class="req-cat c-func">Books Library</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">FR-86</td>
+          <td class="req-text">Users can browse all published books, borrow a book into "My Books", and remove a borrowed book from their library. Supported formats are PDF, EPUB, PPTX, audio, TXT, SRT/VTT captions, CBZ/CBR comics, and MOBI.</td>
+          <td><span class="req-priority p-high">High</span></td>
+          <td><span class="req-cat c-func">Books Library</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">FR-87</td>
+          <td class="req-text">The in-app book reader supports pagination, reading-progress tracking that resumes from the last-read page, user bookmarks with optional notes, and light/dark/sepia colour modes. A Read Aloud control provides text-to-speech playback of the book content.</td>
+          <td><span class="req-priority p-high">High</span></td>
+          <td><span class="req-cat c-func">Books Library</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">FR-88</td>
+          <td class="req-text">Users can select text in a book (PDF, EPUB, PPTX, TXT, captions, or MOBI - not audio or comics, which have no extractable text) and choose a highlight colour. The highlight is appended to an auto-generated per-book note titled "{Book Title} - Highlights"; double-clicking the highlight inside that note jumps the reader back to the exact passage. The Notes list refreshes immediately when a highlight is added.</td>
+          <td><span class="req-priority p-high">High</span></td>
+          <td><span class="req-cat c-func">Books Library</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">FR-89</td>
+          <td class="req-text">Users can trigger "Save as Note Source" on a book (PDF, EPUB, PPTX, TXT, or SRT/VTT only) to extract its full text into chunked, embedded notes that become part of the RAG knowledge base and are citable in AI Chat answers. The extraction runs as an async job with states pending, processing, ready, or failed, pollable via a status endpoint.</td>
+          <td><span class="req-priority p-high">High</span></td>
+          <td><span class="req-cat c-func">Books Library</span></td>
+        </tr>
       </tbody>
     </table>
   </section>
@@ -854,6 +890,24 @@
           <td><span class="req-priority p-med">Medium</span></td>
           <td><span class="req-cat c-non">Maintainability</span></td>
         </tr>
+        <tr>
+          <td class="req-id">NFR-18</td>
+          <td class="req-text">OneDrive OAuth access and refresh tokens must be encrypted at rest (Fernet) in the <code>onedrive_accounts</code> table; plain-text tokens must never be persisted or logged.</td>
+          <td><span class="req-priority p-high">High</span></td>
+          <td><span class="req-cat c-non">Security</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">NFR-19</td>
+          <td class="req-text">All <code>/api/admin/books/...</code> endpoints must return HTTP 403 for any request whose JWT does not carry <code>is_admin: true</code>, consistent with other admin-only endpoints.</td>
+          <td><span class="req-priority p-high">High</span></td>
+          <td><span class="req-cat c-non">Security</span></td>
+        </tr>
+        <tr>
+          <td class="req-id">NFR-20</td>
+          <td class="req-text">Streaming a book file via <code>GET /api/books/{id}/read</code> must not load the entire file into memory; large audio/video/PDF books must stream incrementally to the client.</td>
+          <td><span class="req-priority p-med">Medium</span></td>
+          <td><span class="req-cat c-non">Performance</span></td>
+        </tr>
       </tbody>
     </table>
   </section>
@@ -1035,6 +1089,31 @@
         <div class="uc-title">UC-34 &middot; Manage User Access Levels</div>
         <div class="uc-desc">Admin opens the Admin Panel and navigates to the Users tab. Each user row displays a colour-coded access level badge (Regular / Plus / Pro) and a dropdown to change it. Admin upgrades a user to Pro; the backend calls PATCH /admin/users/{id}/level and persists the new value. The user must re-login so their JWT reflects the updated level. In the Feature Flags tab the admin uses the tabbed Access Level Requirements UI to set research_mode_min_level to "plus", ensuring Regular users cannot access Research Mode until upgraded.</div>
       </div>
+      <div class="uc-card">
+        <div class="uc-actor">Actor: Admin User</div>
+        <div class="uc-title">UC-35 &middot; Connect OneDrive and Sync Books</div>
+        <div class="uc-desc">Admin opens the Admin Panel's Books tab and clicks "Connect OneDrive". The system redirects to Microsoft's OAuth consent screen; on approval the encrypted tokens are stored and the admin selects a books folder. Clicking "Sync" pulls files from OneDrive via Microsoft Graph and creates or updates <code>books</code> rows with metadata, sync status, and errors shown per book.</div>
+      </div>
+      <div class="uc-card">
+        <div class="uc-actor">Actor: Admin User</div>
+        <div class="uc-title">UC-36 &middot; Publish Books to the Library</div>
+        <div class="uc-desc">Admin reviews newly synced, unpublished books in the Books tab and clicks "Publish" on individual titles, or uses "Publish All" / "Publish Selected" to make a batch of books visible to all users at once.</div>
+      </div>
+      <div class="uc-card">
+        <div class="uc-actor">Actor: Logged-in User</div>
+        <div class="uc-title">UC-37 &middot; Borrow and Read a Book</div>
+        <div class="uc-desc">User opens the Books Library, browses published titles, and clicks "Borrow" to add a book to "My Books". Opening the book launches the in-app reader (format-specific - PDF, EPUB, PPTX, audio, TXT, captions, comics, or MOBI), which resumes from the last-read page and supports bookmarks and light/dark/sepia colour modes.</div>
+      </div>
+      <div class="uc-card">
+        <div class="uc-actor">Actor: Logged-in User</div>
+        <div class="uc-title">UC-38 &middot; Highlight Text in a Book</div>
+        <div class="uc-desc">While reading a PDF, EPUB, PPTX, TXT, captioned, or MOBI book, the user selects a passage of text and picks a highlight colour from the popup. The system appends the snippet to an auto-generated "{Book Title} - Highlights" note and refreshes the Notes list immediately. Double-clicking the highlight later in that note jumps the reader back to the original page and offset.</div>
+      </div>
+      <div class="uc-card">
+        <div class="uc-actor">Actor: Logged-in User</div>
+        <div class="uc-title">UC-39 &middot; Save a Book as a Note Source</div>
+        <div class="uc-desc">User clicks "Save as Note Source" on a borrowed PDF, EPUB, PPTX, TXT, or SRT/VTT book. The system kicks off an async extraction job (pending &rarr; processing &rarr; ready/failed) that chunks and embeds the book's full text into notes. The user polls the status endpoint until the job is ready, after which the book's content is citable in AI Chat answers.</div>
+      </div>
     </div>
   </section>
 
@@ -1185,6 +1264,22 @@
       <span class="req-id">US-35</span> &nbsp;
       <span class="story-as">As a Pro user,</span> I want Research Mode to be available to me without any extra configuration so that <span class="story-so">I can run deep multi-source research queries as part of my premium subscription tier.</span>
     </div>
+    <div class="story">
+      <span class="req-id">US-36</span> &nbsp;
+      <span class="story-as">As an administrator,</span> I want to sync a OneDrive folder into the app so that <span class="story-so">I can manage the institution's book collection from one shared cloud folder instead of uploading files manually.</span>
+    </div>
+    <div class="story">
+      <span class="req-id">US-37</span> &nbsp;
+      <span class="story-as">As a student,</span> I want to borrow a book and have my reading position remembered so that <span class="story-so">I can pick up exactly where I left off on any device.</span>
+    </div>
+    <div class="story">
+      <span class="req-id">US-38</span> &nbsp;
+      <span class="story-as">As a student,</span> I want to highlight passages while reading and have them saved as a note so that <span class="story-so">my book annotations live alongside my other study notes and are easy to revisit.</span>
+    </div>
+    <div class="story">
+      <span class="req-id">US-39</span> &nbsp;
+      <span class="story-as">As a researcher,</span> I want to turn a book's content into searchable notes so that <span class="story-so">I can ask the AI chat questions grounded in that book's text, with citations back to the source pages.</span>
+    </div>
   </section>
 
   <hr class="divider" />
@@ -1258,6 +1353,16 @@
         <div class="constraint-icon">&#x1F4AC;</div>
         <h4>Feedback Storage Only</h4>
         <p>Bug reports and suggestions are stored in the database and optionally emailed to the admin via SMTP. No external ticketing system integration (e.g. GitHub Issues, Jira) is provided in this version.</p>
+      </div>
+      <div class="constraint">
+        <div class="constraint-icon">&#x1F4D6;</div>
+        <h4>OneDrive Dependency for Books</h4>
+        <p>The Books Library is sourced exclusively from a single admin-connected OneDrive account via Microsoft OAuth. There is no direct book upload path - books must exist in the synced OneDrive folder.</p>
+      </div>
+      <div class="constraint">
+        <div class="constraint-icon">&#x1F4C4;</div>
+        <h4>Highlight &amp; Note-Source Format Scope</h4>
+        <p>Highlighting works only on formats with extractable text - PDF, EPUB, PPTX, TXT, captions (SRT/VTT), and MOBI - not audio or comics (CBZ/CBR). "Save as Note Source" further narrows to PDF, EPUB, PPTX, TXT, and SRT/VTT.</p>
       </div>
     </div>
   </section>

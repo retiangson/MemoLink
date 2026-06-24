@@ -126,6 +126,12 @@ Add every variable from your `.env` file:
 | `SMTP_PASSWORD` | Your Gmail app password |
 | `SMTP_FROM` | Your Gmail address |
 | `FRONTEND_URL` | Your Azure Static Web App URL (fill in after Part 2) |
+| `MICROSOFT_CLIENT_ID` | Optional - enables Books Library OneDrive sync |
+| `MICROSOFT_CLIENT_SECRET` | Optional - enables Books Library OneDrive sync |
+| `MICROSOFT_TENANT_ID` | Optional - leave blank for `common` |
+| `MICROSOFT_REDIRECT_URI` | `https://<your-api-domain>/api/admin/books/onedrive/callback` |
+| `ONEDRIVE_BOOKS_FOLDER_ID` / `ONEDRIVE_BOOKS_FOLDER_PATH` | Optional - which OneDrive folder to sync books from |
+| `ONEDRIVE_SYNC_ENABLED` | `true` |
 
 ---
 
@@ -293,5 +299,7 @@ OPENAI_EMBEDDING_MODEL     GEMINI_API_KEY             DEEPSEEK_API_KEY
 BRAVE_SEARCH_API_KEY       SEMANTIC_SCHOLAR_API_KEY   JWT_SECRET_KEY
 JWT_ALGORITHM              SMTP_HOST                  SMTP_PORT
 SMTP_USER                  SMTP_PASSWORD              SMTP_FROM
-FRONTEND_URL
+FRONTEND_URL                MICROSOFT_CLIENT_ID        MICROSOFT_CLIENT_SECRET
+MICROSOFT_TENANT_ID        MICROSOFT_REDIRECT_URI      ONEDRIVE_BOOKS_FOLDER_ID
+ONEDRIVE_BOOKS_FOLDER_PATH ONEDRIVE_SYNC_ENABLED
 ```

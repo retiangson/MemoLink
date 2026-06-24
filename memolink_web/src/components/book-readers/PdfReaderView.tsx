@@ -26,7 +26,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
 export function PdfReaderView({
   book, initialPage, colorMode, onProgress,
   noteStatus, noteStatusLoaded, savingNoteSource, onSaveAsNoteSource,
-  jumpToHighlight, onJumpToHighlightHandled,
+  jumpToHighlight, onJumpToHighlightHandled, onHighlightAdded,
 }: ReaderViewProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const textLayerRef = useRef<HTMLDivElement | null>(null);
@@ -281,6 +281,7 @@ export function PdfReaderView({
       color: highlightColor,
     });
     setHighlights((prev) => [...prev, created]);
+    onHighlightAdded?.();
     window.getSelection()?.removeAllRanges();
     setTimeout(() => setPendingSelection(null), 900);
   }

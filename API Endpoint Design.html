@@ -259,6 +259,35 @@
         <tr><td><span class="method m-get">GET</span></td><td><code>/survey/admin/report</code></td><td>Get per-question distribution and averages (admin only)</td><td>Survey Admin</td></tr>
         <tr><td><span class="method m-get">GET</span></td><td><code>/survey/admin/responses</code></td><td>List all survey responses with metadata (admin only)</td><td>Survey Admin</td></tr>
         <tr><td><span class="method m-get">GET</span></td><td><code>/survey/admin/export</code></td><td>Download wide-format survey CSV (admin only)</td><td>Survey Admin</td></tr>
+        <tr><td><span class="method m-get">GET</span></td><td><code>/books</code></td><td>List published books</td><td>Books</td></tr>
+        <tr><td><span class="method m-get">GET</span></td><td><code>/books/my</code></td><td>List current user's borrowed books</td><td>Books</td></tr>
+        <tr><td><span class="method m-get">GET</span></td><td><code>/books/{id}</code></td><td>Get a single book</td><td>Books</td></tr>
+        <tr><td><span class="method m-post">POST</span></td><td><code>/books/{id}/borrow</code></td><td>Borrow a book into "My Books"</td><td>Books</td></tr>
+        <tr><td><span class="method m-delete">DELETE</span></td><td><code>/books/{id}/my</code></td><td>Remove a book from "My Books"</td><td>Books</td></tr>
+        <tr><td><span class="method m-post">POST</span></td><td><code>/books/{id}/progress</code></td><td>Update reading progress (page/percent)</td><td>Books</td></tr>
+        <tr><td><span class="method m-post">POST</span></td><td><code>/books/{id}/bookmark</code></td><td>Add a bookmark</td><td>Books</td></tr>
+        <tr><td><span class="method m-get">GET</span></td><td><code>/books/{id}/bookmarks</code></td><td>List bookmarks for a book</td><td>Books</td></tr>
+        <tr><td><span class="method m-post">POST</span></td><td><code>/books/{id}/highlights</code></td><td>Add a highlight (creates/appends to the book's Highlights note)</td><td>Books</td></tr>
+        <tr><td><span class="method m-get">GET</span></td><td><code>/books/highlights/{highlight_id}</code></td><td>Get a single highlight</td><td>Books</td></tr>
+        <tr><td><span class="method m-get">GET</span></td><td><code>/books/{id}/highlights</code></td><td>List highlights for a book</td><td>Books</td></tr>
+        <tr><td><span class="method m-get">GET</span></td><td><code>/books/{id}/read</code></td><td>Stream the book file (binary)</td><td>Books</td></tr>
+        <tr><td><span class="method m-get">GET</span></td><td><code>/books/{id}/slides</code></td><td>Get extracted PPTX slide content (HTML per slide)</td><td>Books</td></tr>
+        <tr><td><span class="method m-post">POST</span></td><td><code>/books/{id}/save-as-note-source</code></td><td>Kick off async note extraction</td><td>Books</td></tr>
+        <tr><td><span class="method m-get">GET</span></td><td><code>/books/{id}/note-source-status</code></td><td>Poll the extraction job status</td><td>Books</td></tr>
+        <tr><td><span class="method m-get">GET</span></td><td><code>/admin/books</code></td><td>List all books, including unpublished (admin only)</td><td>Books Admin</td></tr>
+        <tr><td><span class="method m-get">GET</span></td><td><code>/admin/books/onedrive/status</code></td><td>Check OneDrive connection status (admin only)</td><td>Books Admin</td></tr>
+        <tr><td><span class="method m-get">GET</span></td><td><code>/admin/books/onedrive/auth-url</code></td><td>Get OneDrive OAuth consent URL (admin only)</td><td>Books Admin</td></tr>
+        <tr><td><span class="method m-get">GET</span></td><td><code>/admin/books/onedrive/callback</code></td><td>OneDrive OAuth callback - redirect target (admin only)</td><td>Books Admin</td></tr>
+        <tr><td><span class="method m-delete">DELETE</span></td><td><code>/admin/books/onedrive/disconnect</code></td><td>Disconnect the OneDrive account (admin only)</td><td>Books Admin</td></tr>
+        <tr><td><span class="method m-post">POST</span></td><td><code>/admin/books/sync</code></td><td>Sync all books from OneDrive - full sync (admin only)</td><td>Books Admin</td></tr>
+        <tr><td><span class="method m-post">POST</span></td><td><code>/admin/books/sync/page</code></td><td>Sync one page of books from OneDrive - resumable (admin only)</td><td>Books Admin</td></tr>
+        <tr><td><span class="method m-patch">PATCH</span></td><td><code>/admin/books/{id}</code></td><td>Update book metadata (admin only)</td><td>Books Admin</td></tr>
+        <tr><td><span class="method m-post">POST</span></td><td><code>/admin/books/{id}/publish</code></td><td>Publish a single book (admin only)</td><td>Books Admin</td></tr>
+        <tr><td><span class="method m-post">POST</span></td><td><code>/admin/books/{id}/unpublish</code></td><td>Unpublish a single book (admin only)</td><td>Books Admin</td></tr>
+        <tr><td><span class="method m-post">POST</span></td><td><code>/admin/books/publish-all</code></td><td>Bulk-publish all books (admin only)</td><td>Books Admin</td></tr>
+        <tr><td><span class="method m-post">POST</span></td><td><code>/admin/books/unpublish-all</code></td><td>Bulk-unpublish all books (admin only)</td><td>Books Admin</td></tr>
+        <tr><td><span class="method m-post">POST</span></td><td><code>/admin/books/publish-selected</code></td><td>Bulk-publish a selected subset of book IDs (admin only)</td><td>Books Admin</td></tr>
+        <tr><td><span class="method m-post">POST</span></td><td><code>/admin/books/unpublish-selected</code></td><td>Bulk-unpublish a selected subset of book IDs (admin only)</td><td>Books Admin</td></tr>
       </tbody>
     </table>
   </section>
@@ -3003,6 +3032,794 @@ data: <span class="json-str">[DONE]</span></pre>
               <div class="schema-box-title">Response</div>
               <pre><span class="json-type">Content-Type: text/csv</span>
 <span class="json-type">Content-Disposition: attachment; filename=survey_export.csv</span></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <hr class="divider" />
+
+  <!-- BOOKS -->
+  <section>
+    <div class="section-label">Books</div>
+    <h2>Books Endpoints</h2>
+    <p>All Books endpoints require a valid JWT and are gated by the <code>books_library_enabled</code> feature flag and <code>books_library_min_level</code> access tier via the <code>require_books_access</code> dependency (admins always pass). Non-qualifying requests receive HTTP 403.</p>
+    <div class="ep-group">
+
+      <!-- LIST BOOKS -->
+      <div class="ep-card open" id="ep-books-list">
+        <div class="ep-header" onclick="toggle('ep-books-list')">
+          <span class="method m-get">GET</span>
+          <span class="ep-path">/api/v1/books</span>
+          <span class="ep-summary">List published books</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">Returns all books with <code>is_published = true</code>, optionally filtered by <code>search</code> (title/author), <code>category</code>, and <code>tag</code> query params.</p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Query Params</div>
+              <pre><span class="json-key">search</span>   <span class="json-type">string (optional)</span>
+<span class="json-key">category</span> <span class="json-type">string (optional)</span>
+<span class="json-key">tag</span>      <span class="json-type">string (optional)</span></pre>
+            </div>
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200 - BookResponseDTO[]</div>
+              <pre>[
+  {
+    <span class="json-key">"id"</span>: <span class="json-num">12</span>,
+    <span class="json-key">"title"</span>: <span class="json-str">"Introduction to RAG"</span>,
+    <span class="json-key">"author"</span>: <span class="json-str">"J. Smith"</span>,
+    <span class="json-key">"file_extension"</span>: <span class="json-str">".pdf"</span>,
+    <span class="json-key">"is_published"</span>: <span class="json-bool">true</span>,
+    <span class="json-key">"sync_status"</span>: <span class="json-str">"synced"</span>
+  }
+]</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- MY BOOKS -->
+      <div class="ep-card open" id="ep-books-my">
+        <div class="ep-header" onclick="toggle('ep-books-my')">
+          <span class="method m-get">GET</span>
+          <span class="ep-path">/api/v1/books/my</span>
+          <span class="ep-summary">List current user's borrowed books</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">Returns the caller's <code>user_books</code> rows (borrowed/reading/completed), each including the nested <code>book</code> object plus reading progress fields.</p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">No Request Body</div>
+              <pre><span class="json-type">Bearer token required</span></pre>
+            </div>
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200 - UserBookResponseDTO[]</div>
+              <pre>[
+  {
+    <span class="json-key">"id"</span>: <span class="json-num">3</span>,
+    <span class="json-key">"book_id"</span>: <span class="json-num">12</span>,
+    <span class="json-key">"status"</span>: <span class="json-str">"reading"</span>,
+    <span class="json-key">"current_page"</span>: <span class="json-num">42</span>,
+    <span class="json-key">"total_pages"</span>: <span class="json-num">210</span>,
+    <span class="json-key">"progress_percent"</span>: <span class="json-num">20.0</span>,
+    <span class="json-key">"book"</span>: { <span class="json-type">"...BookResponseDTO"</span> }
+  }
+]</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- GET BOOK -->
+      <div class="ep-card" id="ep-books-get">
+        <div class="ep-header" onclick="toggle('ep-books-get')">
+          <span class="method m-get">GET</span>
+          <span class="ep-path">/api/v1/books/{book_id}</span>
+          <span class="ep-summary">Get a single published book</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">Returns a single book's metadata. Raises 404 if the book does not exist or is not published.</p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Path Param</div>
+              <pre><span class="json-key">book_id</span> <span class="json-type">integer</span></pre>
+            </div>
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200 - BookResponseDTO</div>
+              <pre><span class="json-type">Full book object</span></pre>
+            </div>
+          </div>
+          <div class="schema-row" style="margin-top:.8rem;">
+            <div class="schema-box">
+              <div class="schema-box-title">Error Responses</div>
+              <pre><span class="json-num">404</span> <span class="json-type">Book not found or not published</span></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- BORROW BOOK -->
+      <div class="ep-card" id="ep-books-borrow">
+        <div class="ep-header" onclick="toggle('ep-books-borrow')">
+          <span class="method m-post">POST</span>
+          <span class="ep-path">/api/v1/books/{book_id}/borrow</span>
+          <span class="ep-summary">Borrow a book into "My Books"</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">Creates (or returns the existing) <code>user_books</code> row for the caller and book, enforced unique on <code>(user_id, book_id)</code>.</p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Path Param</div>
+              <pre><span class="json-key">book_id</span> <span class="json-type">integer</span></pre>
+            </div>
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200 - UserBookResponseDTO</div>
+              <pre><span class="json-type">Newly created or existing borrow record</span></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- REMOVE FROM MY BOOKS -->
+      <div class="ep-card" id="ep-books-remove">
+        <div class="ep-header" onclick="toggle('ep-books-remove')">
+          <span class="method m-delete">DELETE</span>
+          <span class="ep-path">/api/v1/books/{book_id}/my</span>
+          <span class="ep-summary">Remove a book from "My Books"</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">Deletes the caller's <code>user_books</code> row for the given book. Does not delete bookmarks, highlights, or note sources already created.</p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Path Param</div>
+              <pre><span class="json-key">book_id</span> <span class="json-type">integer</span></pre>
+            </div>
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200</div>
+              <pre>{ <span class="json-key">"removed"</span>: <span class="json-bool">true</span> }</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- UPDATE PROGRESS -->
+      <div class="ep-card" id="ep-books-progress">
+        <div class="ep-header" onclick="toggle('ep-books-progress')">
+          <span class="method m-post">POST</span>
+          <span class="ep-path">/api/v1/books/{book_id}/progress</span>
+          <span class="ep-summary">Update reading progress</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">Updates <code>current_page</code>/<code>total_pages</code> and recomputes <code>progress_percent</code> and <code>last_read_at</code> on the caller's <code>user_books</code> row. Used by the in-app reader to resume where the user left off.</p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Request Body - BookProgressUpdateDTO</div>
+              <pre>{
+  <span class="json-key">"current_page"</span>: <span class="json-num">42</span>,
+  <span class="json-key">"total_pages"</span>:   <span class="json-num">210</span>
+}</pre>
+            </div>
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200 - UserBookResponseDTO</div>
+              <pre><span class="json-type">Updated borrow record</span></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ADD BOOKMARK -->
+      <div class="ep-card" id="ep-books-bookmark-add">
+        <div class="ep-header" onclick="toggle('ep-books-bookmark-add')">
+          <span class="method m-post">POST</span>
+          <span class="ep-path">/api/v1/books/{book_id}/bookmark</span>
+          <span class="ep-summary">Add a bookmark</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">Creates a <code>book_bookmarks</code> row at the given page with an optional note.</p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Request Body - BookmarkCreateDTO</div>
+              <pre>{
+  <span class="json-key">"page_number"</span>: <span class="json-num">42</span>,
+  <span class="json-key">"note"</span>:        <span class="json-str">"Key definition here"</span>
+}</pre>
+            </div>
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200 - BookmarkResponseDTO</div>
+              <pre><span class="json-type">Newly created bookmark</span></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- LIST BOOKMARKS -->
+      <div class="ep-card" id="ep-books-bookmark-list">
+        <div class="ep-header" onclick="toggle('ep-books-bookmark-list')">
+          <span class="method m-get">GET</span>
+          <span class="ep-path">/api/v1/books/{book_id}/bookmarks</span>
+          <span class="ep-summary">List bookmarks for a book</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">Returns the caller's bookmarks for the given book, ordered by page number.</p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200 - BookmarkResponseDTO[]</div>
+              <pre><span class="json-type">Array of bookmark records</span></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ADD HIGHLIGHT -->
+      <div class="ep-card open" id="ep-books-highlight-add">
+        <div class="ep-header" onclick="toggle('ep-books-highlight-add')">
+          <span class="method m-post">POST</span>
+          <span class="ep-path">/api/v1/books/{book_id}/highlights</span>
+          <span class="ep-summary">Add a highlight (mirrors into Notes)</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">Available for PDF, EPUB, PPTX, TXT, SRT/VTT captions, and MOBI formats only (not audio or comic archives). Creates a <code>book_highlights</code> row and appends the snippet to an auto-generated <code>"{Book Title} - Highlights"</code> note (created on first highlight), so the highlight is immediately visible in the Notes list and citable in AI Chat. Double-clicking the highlight in Notes jumps back to the source passage in the reader.</p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Request Body - BookHighlightCreateDTO</div>
+              <pre>{
+  <span class="json-key">"format"</span>:       <span class="json-str">"pdf"</span>,
+  <span class="json-key">"page_number"</span>:  <span class="json-num">42</span>,
+  <span class="json-key">"start_offset"</span>: <span class="json-num">120</span>,
+  <span class="json-key">"end_offset"</span>:   <span class="json-num">186</span>,
+  <span class="json-key">"snippet"</span>:      <span class="json-str">"RAG combines retrieval with generation..."</span>,
+  <span class="json-key">"color"</span>:        <span class="json-str">"yellow"</span>
+}</pre>
+            </div>
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200 - BookHighlightResponseDTO</div>
+              <pre>{
+  <span class="json-key">"id"</span>:      <span class="json-num">7</span>,
+  <span class="json-key">"book_id"</span>: <span class="json-num">12</span>,
+  <span class="json-key">"note_id"</span>: <span class="json-num">88</span>,
+  <span class="json-key">"format"</span>:  <span class="json-str">"pdf"</span>,
+  <span class="json-key">"snippet"</span>: <span class="json-str">"RAG combines retrieval with generation..."</span>,
+  <span class="json-key">"color"</span>:   <span class="json-str">"yellow"</span>
+}</pre>
+            </div>
+          </div>
+          <div class="schema-row" style="margin-top:.8rem;">
+            <div class="schema-box">
+              <div class="schema-box-title">Error Responses</div>
+              <pre><span class="json-num">400</span> <span class="json-type">Highlighting is not supported for this book's format (e.g. audio, CBZ/CBR)</span></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- GET HIGHLIGHT -->
+      <div class="ep-card" id="ep-books-highlight-get">
+        <div class="ep-header" onclick="toggle('ep-books-highlight-get')">
+          <span class="method m-get">GET</span>
+          <span class="ep-path">/api/v1/books/highlights/{highlight_id}</span>
+          <span class="ep-summary">Get a single highlight</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">Returns one highlight owned by the caller, including the page/offset data used to scroll the reader back to the exact passage.</p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Path Param</div>
+              <pre><span class="json-key">highlight_id</span> <span class="json-type">integer</span></pre>
+            </div>
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200 - BookHighlightResponseDTO</div>
+              <pre><span class="json-type">Full highlight object</span></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- LIST HIGHLIGHTS -->
+      <div class="ep-card" id="ep-books-highlight-list">
+        <div class="ep-header" onclick="toggle('ep-books-highlight-list')">
+          <span class="method m-get">GET</span>
+          <span class="ep-path">/api/v1/books/{book_id}/highlights</span>
+          <span class="ep-summary">List highlights for a book</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">Returns the caller's highlights for the given book, ordered by page number.</p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200 - BookHighlightResponseDTO[]</div>
+              <pre><span class="json-type">Array of highlight records</span></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- READ BOOK -->
+      <div class="ep-card open" id="ep-books-read">
+        <div class="ep-header" onclick="toggle('ep-books-read')">
+          <span class="method m-get">GET</span>
+          <span class="ep-path">/api/v1/books/{book_id}/read</span>
+          <span class="ep-summary">Stream the book file</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">Streams the raw file bytes from OneDrive through the backend so the OneDrive access token is never exposed to the frontend. The reader component picks a renderer based on <code>file_extension</code> (PDF, EPUB, PPTX-via-slides, audio player, plain text, SRT/VTT captions, CBZ/CBR, MOBI).</p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Path Param</div>
+              <pre><span class="json-key">book_id</span> <span class="json-type">integer</span></pre>
+            </div>
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200</div>
+              <pre><span class="json-type">Content-Type: book.mime_type (binary stream)</span>
+<span class="json-type">Content-Disposition: inline; filename="{file_name}"</span></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- READ SLIDES -->
+      <div class="ep-card" id="ep-books-slides">
+        <div class="ep-header" onclick="toggle('ep-books-slides')">
+          <span class="method m-get">GET</span>
+          <span class="ep-path">/api/v1/books/{book_id}/slides</span>
+          <span class="ep-summary">Get extracted PPTX slide content</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">Extracts slide title, bullet text, and embedded images server-side via python-pptx (there's no LibreOffice-free way to render OOXML slides visually). Returns 400 for any book whose extension is not <code>.pptx</code>.</p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200 - BookSlidesResponseDTO</div>
+              <pre>{
+  <span class="json-key">"slides"</span>: [
+    <span class="json-str">"&lt;h2&gt;Slide 1&lt;/h2&gt;&lt;ul&gt;&lt;li&gt;Point one&lt;/li&gt;&lt;/ul&gt;"</span>
+  ]
+}</pre>
+            </div>
+          </div>
+          <div class="schema-row" style="margin-top:.8rem;">
+            <div class="schema-box">
+              <div class="schema-box-title">Error Responses</div>
+              <pre><span class="json-num">400</span> <span class="json-type">Slide extraction is only available for .pptx books</span>
+<span class="json-num">500</span> <span class="json-type">Failed to parse PPTX</span></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SAVE AS NOTE SOURCE -->
+      <div class="ep-card open" id="ep-books-save-note-source">
+        <div class="ep-header" onclick="toggle('ep-books-save-note-source')">
+          <span class="method m-post">POST</span>
+          <span class="ep-path">/api/v1/books/{book_id}/save-as-note-source</span>
+          <span class="ep-summary">Extract book text into a chunked, embedded note source</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">Available for PDF, EPUB, PPTX, TXT, and SRT/VTT formats only (not MOBI, comic archives, or audio). Creates/reuses a <code>book_note_sources</code> row (unique on <code>user_id</code> + <code>book_id</code>) and schedules a background task that extracts the full book text, splits it into <code>book_note_chunks</code>, embeds each chunk, and marks the job <code>ready</code> so the content becomes citable in AI Chat retrieval. The job transitions through <code>pending</code> &rarr; <code>processing</code> &rarr; <code>ready</code>/<code>failed</code>; calling this endpoint again while a job is already <code>processing</code> does not start a duplicate background task.</p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Path Param</div>
+              <pre><span class="json-key">book_id</span> <span class="json-type">integer</span></pre>
+            </div>
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200 - BookNoteSourceResponseDTO</div>
+              <pre>{
+  <span class="json-key">"id"</span>:      <span class="json-num">5</span>,
+  <span class="json-key">"book_id"</span>: <span class="json-num">12</span>,
+  <span class="json-key">"status"</span>:  <span class="json-str">"pending"</span>
+}</pre>
+            </div>
+          </div>
+          <div class="schema-row" style="margin-top:.8rem;">
+            <div class="schema-box">
+              <div class="schema-box-title">Error Responses</div>
+              <pre><span class="json-num">400</span> <span class="json-type">Save as Note Source is not supported for this book's format (e.g. MOBI, CBZ/CBR, audio)</span></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- NOTE SOURCE STATUS -->
+      <div class="ep-card" id="ep-books-note-source-status">
+        <div class="ep-header" onclick="toggle('ep-books-note-source-status')">
+          <span class="method m-get">GET</span>
+          <span class="ep-path">/api/v1/books/{book_id}/note-source-status</span>
+          <span class="ep-summary">Poll the extraction job status</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">Used by the frontend to poll job progress after calling <code>save-as-note-source</code>. Returns <code>null</code> if no job has ever been started for this user/book pair.</p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200 - BookNoteSourceResponseDTO | null</div>
+              <pre>{
+  <span class="json-key">"status"</span>: <span class="json-str">"ready"</span>,
+  <span class="json-key">"error_message"</span>: <span class="json-null">null</span>
+}</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <hr class="divider" />
+
+  <!-- ADMIN BOOKS -->
+  <section>
+    <div class="section-label">Admin / Books</div>
+    <h2>Admin Books Endpoints</h2>
+    <p>All Admin Books endpoints require a valid JWT with <code>is_admin: true</code>, enforced by the <code>get_current_admin</code> FastAPI dependency. Non-admin requests receive HTTP 403. These power the Admin Panel's Books tab: OneDrive connection, folder sync, and publish/unpublish management.</p>
+    <div class="ep-group">
+
+      <!-- ADMIN LIST BOOKS -->
+      <div class="ep-card open" id="ep-admin-books-list">
+        <div class="ep-header" onclick="toggle('ep-admin-books-list')">
+          <span class="method m-get">GET</span>
+          <span class="ep-path">/api/v1/admin/books</span>
+          <span class="ep-summary">List all books, including unpublished (admin only)</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">Returns a paginated list of every synced book regardless of <code>is_published</code> status, optionally filtered by <code>search</code> (title/author).</p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Query Params</div>
+              <pre><span class="json-key">search</span>    <span class="json-type">string (optional)</span>
+<span class="json-key">page</span>      <span class="json-type">integer (default 1)</span>
+<span class="json-key">page_size</span> <span class="json-type">integer (default 20, max 100)</span></pre>
+            </div>
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200 - BookResponseDTO[]</div>
+              <pre><span class="json-type">Paginated array of book objects, including sync_status and sync_error</span></pre>
+            </div>
+          </div>
+          <div class="schema-row" style="margin-top:.8rem;">
+            <div class="schema-box">
+              <div class="schema-box-title">Error Responses</div>
+              <pre><span class="json-num">403</span> <span class="json-type">Not an admin</span></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ONEDRIVE STATUS -->
+      <div class="ep-card open" id="ep-admin-onedrive-status">
+        <div class="ep-header" onclick="toggle('ep-admin-onedrive-status')">
+          <span class="method m-get">GET</span>
+          <span class="ep-path">/api/v1/admin/books/onedrive/status</span>
+          <span class="ep-summary">Check OneDrive connection status (admin only)</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">Looks up the caller's row in <code>onedrive_accounts</code> (unique on <code>user_id</code>). Tokens are stored Fernet-encrypted and never returned to the client.</p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200 (connected)</div>
+              <pre>{
+  <span class="json-key">"connected"</span>:    <span class="json-bool">true</span>,
+  <span class="json-key">"display_name"</span>: <span class="json-str">"Jane Admin"</span>,
+  <span class="json-key">"email"</span>:        <span class="json-str">"jane@school.edu"</span>
+}</pre>
+            </div>
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200 (not connected)</div>
+              <pre>{ <span class="json-key">"connected"</span>: <span class="json-bool">false</span> }</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ONEDRIVE AUTH URL -->
+      <div class="ep-card" id="ep-admin-onedrive-auth-url">
+        <div class="ep-header" onclick="toggle('ep-admin-onedrive-auth-url')">
+          <span class="method m-get">GET</span>
+          <span class="ep-path">/api/v1/admin/books/onedrive/auth-url</span>
+          <span class="ep-summary">Get OneDrive OAuth consent URL (admin only)</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">Builds the Microsoft identity platform authorize URL (using <code>MICROSOFT_CLIENT_ID</code>/<code>MICROSOFT_TENANT_ID</code>/<code>MICROSOFT_REDIRECT_URI</code>) with an HMAC-signed, timestamped <code>state</code> parameter binding the request to the calling admin's user ID. The frontend redirects the browser to this URL to start the consent flow.</p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200</div>
+              <pre>{ <span class="json-key">"url"</span>: <span class="json-str">"https://login.microsoftonline.com/common/oauth2/v2.0/authorize?..."</span> }</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ONEDRIVE CALLBACK -->
+      <div class="ep-card" id="ep-admin-onedrive-callback">
+        <div class="ep-header" onclick="toggle('ep-admin-onedrive-callback')">
+          <span class="method m-get">GET</span>
+          <span class="ep-path">/api/v1/admin/books/onedrive/callback</span>
+          <span class="ep-summary">OneDrive OAuth callback - redirect target (admin only)</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">Microsoft redirects here with <code>code</code> and <code>state</code> after consent. The state signature/timestamp is verified (10-minute expiry) to recover the admin's user ID, the authorization code is exchanged for access/refresh tokens via Microsoft Graph, tokens are Fernet-encrypted and upserted into <code>onedrive_accounts</code>, and the browser is redirected back to the frontend Admin Panel Books tab with <code>?admin=books&amp;onedrive_connected=1</code>.</p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Query Params</div>
+              <pre><span class="json-key">code</span>  <span class="json-type">string (required) - OAuth authorization code</span>
+<span class="json-key">state</span> <span class="json-type">string (required) - signed state from auth-url</span></pre>
+            </div>
+            <div class="schema-box">
+              <div class="schema-box-title">Response 302</div>
+              <pre><span class="json-type">Redirect to frontend Admin Panel, Books tab</span></pre>
+            </div>
+          </div>
+          <div class="schema-row" style="margin-top:.8rem;">
+            <div class="schema-box">
+              <div class="schema-box-title">Error Responses</div>
+              <pre><span class="json-num">400</span> <span class="json-type">Invalid or expired OAuth state</span></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ONEDRIVE DISCONNECT -->
+      <div class="ep-card" id="ep-admin-onedrive-disconnect">
+        <div class="ep-header" onclick="toggle('ep-admin-onedrive-disconnect')">
+          <span class="method m-delete">DELETE</span>
+          <span class="ep-path">/api/v1/admin/books/onedrive/disconnect</span>
+          <span class="ep-summary">Disconnect the OneDrive account (admin only)</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">Deletes the caller's <code>onedrive_accounts</code> row. Already-synced books remain in the library, but further syncs require reconnecting.</p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200</div>
+              <pre>{ <span class="json-key">"ok"</span>: <span class="json-bool">true</span> }</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SYNC -->
+      <div class="ep-card open" id="ep-admin-books-sync">
+        <div class="ep-header" onclick="toggle('ep-admin-books-sync')">
+          <span class="method m-post">POST</span>
+          <span class="ep-path">/api/v1/admin/books/sync</span>
+          <span class="ep-summary">Sync all books from OneDrive - full sync (admin only)</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">Walks the configured OneDrive folder (<code>ONEDRIVE_BOOKS_FOLDER_ID</code>/<code>ONEDRIVE_BOOKS_FOLDER_PATH</code>) end-to-end via Microsoft Graph, upserting a <code>books</code> row per supported file (matched on <code>onedrive_item_id</code>, unique). Disabled with 503 when <code>ONEDRIVE_SYNC_ENABLED=false</code>.</p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200 - OneDriveSyncResultDTO</div>
+              <pre>{
+  <span class="json-key">"scanned"</span>: <span class="json-num">48</span>,
+  <span class="json-key">"created"</span>: <span class="json-num">3</span>,
+  <span class="json-key">"updated"</span>: <span class="json-num">1</span>
+}</pre>
+            </div>
+          </div>
+          <div class="schema-row" style="margin-top:.8rem;">
+            <div class="schema-box">
+              <div class="schema-box-title">Error Responses</div>
+              <pre><span class="json-num">503</span> <span class="json-type">OneDrive sync is disabled (ONEDRIVE_SYNC_ENABLED=false)</span></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SYNC PAGE -->
+      <div class="ep-card" id="ep-admin-books-sync-page">
+        <div class="ep-header" onclick="toggle('ep-admin-books-sync-page')">
+          <span class="method m-post">POST</span>
+          <span class="ep-path">/api/v1/admin/books/sync/page</span>
+          <span class="ep-summary">Sync one page of books from OneDrive - resumable (admin only)</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">One resumable step of a sync — lists and upserts a single OneDrive folder page using a cursor, rather than walking the whole tree in one request. Intended to be driven in a loop by a long-running client so a sync of any size can complete without a single request timing out.</p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Request Body - OneDriveSyncPageRequestDTO</div>
+              <pre>{ <span class="json-key">"cursor"</span>: <span class="json-null">null</span> }</pre>
+            </div>
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200 - OneDriveSyncPageResultDTO</div>
+              <pre>{
+  <span class="json-key">"cursor"</span>: <span class="json-str">"eyJza2lwVG9rZW4iOiAuLi4ifQ"</span>,
+  <span class="json-key">"done"</span>:   <span class="json-bool">false</span>,
+  <span class="json-key">"scanned"</span>: <span class="json-num">20</span>,
+  <span class="json-key">"created"</span>: <span class="json-num">2</span>,
+  <span class="json-key">"updated"</span>: <span class="json-num">0</span>
+}</pre>
+            </div>
+          </div>
+          <div class="schema-row" style="margin-top:.8rem;">
+            <div class="schema-box">
+              <div class="schema-box-title">Error Responses</div>
+              <pre><span class="json-num">503</span> <span class="json-type">OneDrive sync is disabled (ONEDRIVE_SYNC_ENABLED=false)</span></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- UPDATE BOOK METADATA -->
+      <div class="ep-card" id="ep-admin-books-update">
+        <div class="ep-header" onclick="toggle('ep-admin-books-update')">
+          <span class="method m-patch">PATCH</span>
+          <span class="ep-path">/api/v1/admin/books/{book_id}</span>
+          <span class="ep-summary">Update book metadata (admin only)</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">Partial update of admin-editable fields (title, author, description, category, tags, cover image), independent of OneDrive sync. Returns 404 if the book does not exist.</p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Request Body - BookUpdateDTO</div>
+              <pre>{
+  <span class="json-key">"title"</span>:    <span class="json-str">"Introduction to RAG (2nd ed.)"</span>,
+  <span class="json-key">"category"</span>: <span class="json-str">"Computer Science"</span>,
+  <span class="json-key">"tags"</span>:     <span class="json-str">"rag,nlp,embeddings"</span>
+}</pre>
+            </div>
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200 - BookResponseDTO</div>
+              <pre><span class="json-type">Updated book object</span></pre>
+            </div>
+          </div>
+          <div class="schema-row" style="margin-top:.8rem;">
+            <div class="schema-box">
+              <div class="schema-box-title">Error Responses</div>
+              <pre><span class="json-num">404</span> <span class="json-type">Book not found</span></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PUBLISH ONE -->
+      <div class="ep-card" id="ep-admin-books-publish">
+        <div class="ep-header" onclick="toggle('ep-admin-books-publish')">
+          <span class="method m-post">POST</span>
+          <span class="ep-path">/api/v1/admin/books/{book_id}/publish</span>
+          <span class="ep-summary">Publish a single book (admin only)</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">Sets <code>is_published = true</code>, making the book visible to users in the library and borrowable. Returns 404 if the book does not exist.</p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200 - BookResponseDTO</div>
+              <pre><span class="json-type">Updated book with is_published: true</span></pre>
+            </div>
+          </div>
+          <div class="schema-row" style="margin-top:.8rem;">
+            <div class="schema-box">
+              <div class="schema-box-title">Error Responses</div>
+              <pre><span class="json-num">404</span> <span class="json-type">Book not found</span></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- UNPUBLISH ONE -->
+      <div class="ep-card" id="ep-admin-books-unpublish">
+        <div class="ep-header" onclick="toggle('ep-admin-books-unpublish')">
+          <span class="method m-post">POST</span>
+          <span class="ep-path">/api/v1/admin/books/{book_id}/unpublish</span>
+          <span class="ep-summary">Unpublish a single book (admin only)</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">Sets <code>is_published = false</code>, hiding the book from the library without deleting its synced metadata or any user data already created against it.</p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200 - BookResponseDTO</div>
+              <pre><span class="json-type">Updated book with is_published: false</span></pre>
+            </div>
+          </div>
+          <div class="schema-row" style="margin-top:.8rem;">
+            <div class="schema-box">
+              <div class="schema-box-title">Error Responses</div>
+              <pre><span class="json-num">404</span> <span class="json-type">Book not found</span></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PUBLISH ALL -->
+      <div class="ep-card" id="ep-admin-books-publish-all">
+        <div class="ep-header" onclick="toggle('ep-admin-books-publish-all')">
+          <span class="method m-post">POST</span>
+          <span class="ep-path">/api/v1/admin/books/publish-all</span>
+          <span class="ep-summary">Bulk-publish all books (admin only)</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">Sets <code>is_published = true</code> on every book in one statement. Used by the "Publish All" bulk action in the Admin Panel Books tab.</p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200 - BulkPublishResultDTO</div>
+              <pre>{ <span class="json-key">"updated"</span>: <span class="json-num">48</span> }</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- UNPUBLISH ALL -->
+      <div class="ep-card" id="ep-admin-books-unpublish-all">
+        <div class="ep-header" onclick="toggle('ep-admin-books-unpublish-all')">
+          <span class="method m-post">POST</span>
+          <span class="ep-path">/api/v1/admin/books/unpublish-all</span>
+          <span class="ep-summary">Bulk-unpublish all books (admin only)</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">Sets <code>is_published = false</code> on every book in one statement.</p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200 - BulkPublishResultDTO</div>
+              <pre>{ <span class="json-key">"updated"</span>: <span class="json-num">48</span> }</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PUBLISH SELECTED -->
+      <div class="ep-card" id="ep-admin-books-publish-selected">
+        <div class="ep-header" onclick="toggle('ep-admin-books-publish-selected')">
+          <span class="method m-post">POST</span>
+          <span class="ep-path">/api/v1/admin/books/publish-selected</span>
+          <span class="ep-summary">Bulk-publish a selected subset of book IDs (admin only)</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">Sets <code>is_published = true</code> for the given list of book IDs only. Backs the checkbox-driven "Publish Selected" bulk action.</p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Request Body - BookIdsDTO</div>
+              <pre>{ <span class="json-key">"book_ids"</span>: [<span class="json-num">3</span>, <span class="json-num">7</span>, <span class="json-num">12</span>] }</pre>
+            </div>
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200 - BulkPublishResultDTO</div>
+              <pre>{ <span class="json-key">"updated"</span>: <span class="json-num">3</span> }</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- UNPUBLISH SELECTED -->
+      <div class="ep-card" id="ep-admin-books-unpublish-selected">
+        <div class="ep-header" onclick="toggle('ep-admin-books-unpublish-selected')">
+          <span class="method m-post">POST</span>
+          <span class="ep-path">/api/v1/admin/books/unpublish-selected</span>
+          <span class="ep-summary">Bulk-unpublish a selected subset of book IDs (admin only)</span>
+          <span class="ep-toggle">&#x25BC;</span>
+        </div>
+        <div class="ep-body">
+          <p class="ep-desc">Sets <code>is_published = false</code> for the given list of book IDs only.</p>
+          <div class="schema-row">
+            <div class="schema-box">
+              <div class="schema-box-title">Request Body - BookIdsDTO</div>
+              <pre>{ <span class="json-key">"book_ids"</span>: [<span class="json-num">3</span>, <span class="json-num">7</span>] }</pre>
+            </div>
+            <div class="schema-box">
+              <div class="schema-box-title">Response 200 - BulkPublishResultDTO</div>
+              <pre>{ <span class="json-key">"updated"</span>: <span class="json-num">2</span> }</pre>
             </div>
           </div>
         </div>

@@ -43,7 +43,7 @@ function paginateText(text: string, pageSize: number): string[] {
 export function TxtReaderView({
   book, initialPage, colorMode, onProgress,
   noteStatus, noteStatusLoaded, savingNoteSource, onSaveAsNoteSource,
-  jumpToHighlight, onJumpToHighlightHandled,
+  jumpToHighlight, onJumpToHighlightHandled, onHighlightAdded,
 }: ReaderViewProps) {
   const [pages, setPages] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -138,6 +138,7 @@ export function TxtReaderView({
       color: highlightColor,
     });
     setHighlights((prev) => [...prev, created]);
+    onHighlightAdded?.();
     window.getSelection()?.removeAllRanges();
     setTimeout(() => setPendingSelection(null), 900);
   }

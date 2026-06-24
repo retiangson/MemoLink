@@ -1,7 +1,7 @@
 ﻿import React, { useEffect, useRef } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
-import { Blockquote } from "@tiptap/extension-blockquote";
+import { Node, mergeAttributes } from "@tiptap/core";
 import Underline from "@tiptap/extension-underline";
 import Highlight from "@tiptap/extension-highlight";
 import TextAlign from "@tiptap/extension-text-align";
@@ -29,19 +29,55 @@ interface RichNoteEditorProps {
 }
 
 // Book highlights are appended to their "{Title} - Highlights" note as
-// <blockquote data-hl-id="..."> fragments (see book_highlight_service.py). The default
-// Blockquote node doesn't persist custom attributes, so this extends it to keep
-// data-hl-id intact across getHTML()/setContent() round-trips.
-const BookHighlightBlockquote = Blockquote.extend({
+// <blockquote data-hl-id="...">{snippet}<br><em>— {title}, page {n}</em></blockquote>
+// fragments (see book_highlight_service.py). Modelled as an atom node (like the Image
+// extension below) so the cursor can never enter it — the snippet/citation render entirely
+// from node attributes, making the block uneditable while the rest of the note stays
+// fully editable. Plain user-typed blockquotes still use StarterKit's default node; the
+// higher parse priority here only claims blockquotes carrying data-hl-id.
+const BookHighlightBlock = Node.create({
+  name: "bookHighlightBlock",
+  group: "block",
+  atom: true,
+  selectable: true,
+  draggable: false,
+  isolating: true,
+
   addAttributes() {
     return {
-      ...this.parent?.(),
-      "data-hl-id": {
+      hlId: {
         default: null,
-        parseHTML: (el: HTMLElement) => el.getAttribute("data-hl-id"),
-        renderHTML: (attrs: any) => (attrs["data-hl-id"] ? { "data-hl-id": attrs["data-hl-id"] } : {}),
+        renderHTML: (attrs: any) => (attrs.hlId ? { "data-hl-id": attrs.hlId } : {}),
       },
+      snippet: { default: "", rendered: false },
+      citation: { default: "", rendered: false },
     };
+  },
+
+  parseHTML() {
+    return [
+      {
+        tag: "blockquote[data-hl-id]",
+        priority: 100,
+        getAttrs: (el: HTMLElement) => {
+          const citation = el.querySelector("em")?.textContent || "";
+          const clone = el.cloneNode(true) as HTMLElement;
+          clone.querySelectorAll("em, br").forEach((n) => n.remove());
+          const snippet = clone.textContent?.trim() || "";
+          return { hlId: el.getAttribute("data-hl-id"), snippet, citation };
+        },
+      },
+    ];
+  },
+
+  renderHTML({ node, HTMLAttributes }) {
+    return [
+      "blockquote",
+      mergeAttributes(HTMLAttributes, { class: "book-highlight-block", contenteditable: "false" }),
+      node.attrs.snippet,
+      ["br"],
+      ["em", {}, node.attrs.citation],
+    ];
   },
 });
 
@@ -138,8 +174,8 @@ export function RichNoteEditor({ value, onChange, noteKey, disabled, editorRef, 
 
   const editor = useEditor({
     extensions: [
-      StarterKit.configure({ heading: { levels: [1, 2, 3, 4] }, blockquote: false }),
-      BookHighlightBlockquote,
+      StarterKit.configure({ heading: { levels: [1, 2, 3, 4] } }),
+      BookHighlightBlock,
       Underline,
       Highlight.configure({ multicolor: false }),
       TextAlign.configure({ types: ["heading", "paragraph"] }),
@@ -207,7 +243,7 @@ export function RichNoteEditor({ value, onChange, noteKey, disabled, editorRef, 
   // Expose editor instance to parent via ref
   useEffect(() => { if (editorRef) editorRef.current = editor; }, [editor]);
 
-  // Double-clicking a highlight blockquote jumps back into the source book.
+  // Clicking a highlight block jumps back into the source book.
   useEffect(() => {
     if (!editor || !onOpenHighlight) return;
     const dom = editor.view.dom;
@@ -217,8 +253,8 @@ export function RichNoteEditor({ value, onChange, noteKey, disabled, editorRef, 
       const id = parseInt(el.getAttribute("data-hl-id") || "", 10);
       if (!Number.isNaN(id)) onOpenHighlight(id);
     };
-    dom.addEventListener("dblclick", handler);
-    return () => dom.removeEventListener("dblclick", handler);
+    dom.addEventListener("click", handler);
+    return () => dom.removeEventListener("click", handler);
   }, [editor, onOpenHighlight]);
 
   // Reinitialise when noteKey changes (switching notes)

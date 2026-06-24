@@ -108,6 +108,24 @@ Create the app in the Spotify Developer Dashboard and add the redirect URI above
 
 ---
 
+## Books Library (OneDrive Sync)
+
+Set these backend variables to enable the **Books Library**'s admin-only OneDrive sync (Admin Panel -> Books).
+
+| Variable | Default | Description |
+|---|---|---|
+| `MICROSOFT_CLIENT_ID` | blank | App registration's Application (client) ID, from portal.azure.com -> Microsoft Entra ID -> App registrations |
+| `MICROSOFT_CLIENT_SECRET` | blank | App registration's client secret |
+| `MICROSOFT_TENANT_ID` | blank | Leave blank to use `common` (personal + work/school accounts) |
+| `MICROSOFT_REDIRECT_URI` | `http://localhost:8000/api/admin/books/onedrive/callback` | Must match the redirect URI registered in your Azure app |
+| `ONEDRIVE_BOOKS_FOLDER_ID` | blank | OneDrive item ID of the books folder (takes priority over path) |
+| `ONEDRIVE_BOOKS_FOLDER_PATH` | blank | Folder path relative to OneDrive root, e.g. `Books` |
+| `ONEDRIVE_SYNC_ENABLED` | `true` | Toggles the Books Library sync feature on/off |
+
+Once connected (Admin Panel -> Books -> Connect OneDrive), the admin triggers a sync to pull supported files (PDF, EPUB, PPTX, audio, TXT, SRT/VTT, CBZ/CBR, MOBI) from the configured folder into the shared library.
+
+---
+
 ## Email / Password Reset
 
 All SMTP variables are optional. If left blank, password reset links are printed to the backend console instead of emailed.

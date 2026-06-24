@@ -148,7 +148,7 @@ function flashOrPulseCueRange(container: HTMLElement, anchor: Pick<HighlightAnch
 export function CaptionReaderView({
   book, initialPage, colorMode, onProgress,
   noteStatus, noteStatusLoaded, savingNoteSource, onSaveAsNoteSource,
-  jumpToHighlight, onJumpToHighlightHandled,
+  jumpToHighlight, onJumpToHighlightHandled, onHighlightAdded,
 }: ReaderViewProps) {
   const ext = (book.file_extension || "").toLowerCase() === ".vtt" ? "vtt" : "srt";
 
@@ -250,6 +250,7 @@ export function CaptionReaderView({
       color: highlightColor,
     });
     setHighlights((prev) => [...prev, created]);
+    onHighlightAdded?.();
     window.getSelection()?.removeAllRanges();
     setTimeout(() => setPendingSelection(null), 900);
   }

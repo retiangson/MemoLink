@@ -239,6 +239,11 @@
     <span class="pill">Cited Paper Auto-Save</span>
     <span class="pill">Conversation-Aware Web Search</span>
     <span class="pill">Email Draft from Context</span>
+    <span class="pill">Books Library</span>
+    <span class="pill">OneDrive Sync</span>
+    <span class="pill">EPUB / PDF / PPTX Reader</span>
+    <span class="pill">Reading Progress</span>
+    <span class="pill">Highlights to Notes</span>
   </div>
 </div>
 
@@ -508,6 +513,16 @@
         <h3>Text-to-Speech Reading</h3>
         <p>Any note can be read aloud via the <code>/Read</code> command or the play button in the note editor, using the browser's free Web Speech API (no API cost). Playback <strong>starts from the cursor position and skips the note title</strong>, so you can begin reading from any paragraph. The player bar offers play/pause, stop, ◀◀ / ▶▶ sentence navigation, and speed control (0.75×–2×), with the voice selectable in Settings. The sentence currently being spoken is highlighted live in the editor using non-destructive ProseMirror decorations - visual overlays that never modify the document. Gated by the <code>tts_enabled</code> feature flag.</p>
       </div>
+      <div class="card">
+        <div class="card-icon">&#x1F4D6;</div>
+        <h3>Books Library</h3>
+        <p>An admin-managed library of books synced from a OneDrive folder via Microsoft OAuth. Admins connect OneDrive in the Admin Panel's Books tab, pick a folder, and sync; users then browse, borrow into <strong>My Books</strong>, and read in-app. Supported formats: PDF, EPUB, PPTX, audio, TXT, SRT/VTT captions, CBZ/CBR comics, and MOBI. The in-app reader supports pagination, reading-progress tracking that resumes where you left off, bookmarks, light/dark/sepia colour modes, and Read Aloud text-to-speech.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">&#x1F58D;&#xFE0F;</div>
+        <h3>Highlights &amp; Save as Note Source</h3>
+        <p>Selecting text in a book (PDF, EPUB, PPTX, TXT, captions, or MOBI) and choosing a highlight colour appends the passage to an auto-generated note titled "{Book Title} - Highlights" - double-clicking a highlight there jumps the reader back to the exact spot, and the Notes list refreshes instantly. <strong>Save as Note Source</strong> extracts a book's full text (PDF, EPUB, PPTX, TXT, SRT/VTT) into chunked, embedded notes so its content becomes citable in AI Chat answers, processed as an async pending &rarr; processing &rarr; ready/failed job.</p>
+      </div>
     </div>
   </section>
 
@@ -657,6 +672,12 @@
           <td><code>business/services/workflow_service</code></td>
           <td>Analyses each chat reply and suggests 0–3 conversational actions (create reminder/note, summarise workspace, search web, organise notes, suggest title, extract tasks, report outline); approval saves the user turn + streamed assistant result to the conversation; non-OpenAI models fall back to GPT-4o-mini for tool-calling</td>
           <td><span class="tag tag-ai">OpenAI</span><span class="tag tag-py">Python</span></td>
+        </tr>
+        <tr>
+          <td><strong>Books Library</strong></td>
+          <td><code>business/services/book_service</code>, <code>book_sync_service</code>, <code>onedrive_service</code>, <code>book_note_source_service</code></td>
+          <td>OneDrive OAuth connect/sync via Microsoft Graph; book borrowing, reading progress, bookmarks, and highlight-to-note mirroring; async "Save as Note Source" job extracts book text into chunked, embedded notes for RAG</td>
+          <td><span class="tag tag-ai">Microsoft Graph</span><span class="tag tag-py">Python</span><span class="tag tag-db">pgvector</span></td>
         </tr>
         <tr>
           <td><strong>Deployment</strong></td>
@@ -998,7 +1019,9 @@
            <strong>evaluation_user_ratings</strong> - per-response user ratings (context relevance, answer usefulness, faithfulness, citation usefulness, trust, supported-by-notes)<br/>
            <strong>consent fields</strong> - evaluation and survey consent confirmation, versioning, timestamps, and withdrawal metadata<br/>
            <strong>evaluation_feature_usage</strong> - feature action counters per session<br/>
-           <strong>survey_questions / survey_responses / survey_answers</strong> - configurable 37-question survey with Likert, choice, and free-text answers</p>
+           <strong>survey_questions / survey_responses / survey_answers</strong> - configurable 37-question survey with Likert, choice, and free-text answers<br/>
+           <strong>books / user_books / book_bookmarks / book_highlights</strong> - OneDrive-synced book catalogue, per-user borrow + reading-progress state, bookmarks, and highlights mirrored into notes<br/>
+           <strong>book_note_sources / book_note_chunks / onedrive_accounts</strong> - async "Save as Note Source" job tracking, generated-chunk-to-page linking for citations, and encrypted per-admin OneDrive OAuth tokens</p>
       </div>
       <div class="card">
         <h3>AI &amp; Media</h3>

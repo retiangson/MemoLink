@@ -195,7 +195,8 @@
   <section>
     <div class="section-label">ERD</div>
     <h2>Entity-Relationship Overview</h2>
-    <p>MemoLink uses nine original core tables - <code>users</code>, <code>workspaces</code>, <code>notes</code>, <code>embeddings</code>, <code>conversations</code>, <code>messages</code>, <code>reminders</code>, <code>feature_flags</code>, and <code>feedback</code> - plus additional extension tables for system logs, translation cache, API keys, Gmail integration, graph memory, proactive insights, evaluation analytics, and survey responses. All user-scoped tables cascade-delete when the user is removed. Notes, conversations, and workspaces carry a <code>deleted_at</code> column for soft-delete support. Notes, conversations, and reminders each carry a <code>workspace_id</code> foreign key so every piece of content is scoped to a workspace. Embeddings remain linked to notes; retrieval is workspace-scoped by joining through the note's <code>workspace_id</code>.</p>
+    <p>MemoLink uses nine original core tables - <code>users</code>, <code>workspaces</code>, <code>notes</code>, <code>embeddings</code>, <code>conversations</code>, <code>messages</code>, <code>reminders</code>, <code>feature_flags</code>, and <code>feedback</code> - plus additional extension tables for system logs, translation cache, API keys, Gmail integration, graph memory, proactive insights, evaluation analytics, survey responses, and the Books Library. All user-scoped tables cascade-delete when the user is removed. Notes, conversations, and workspaces carry a <code>deleted_at</code> column for soft-delete support. Notes, conversations, and reminders each carry a <code>workspace_id</code> foreign key so every piece of content is scoped to a workspace. Embeddings remain linked to notes; retrieval is workspace-scoped by joining through the note's <code>workspace_id</code>.</p>
+  <p style="margin-top:.7rem;"><strong style="color:var(--text)">New tables for the Books Library:</strong> <code>books</code> stores the OneDrive-synced catalogue; <code>user_books</code> tracks per-user borrowing and reading progress; <code>book_bookmarks</code> and <code>book_highlights</code> store per-user annotations, with each highlight mirrored into a Note; <code>book_note_sources</code> and <code>book_note_chunks</code> back the async "Save as Note Source" extraction job; <code>onedrive_accounts</code> stores one encrypted Microsoft OAuth token pair per connected admin.</p>
   <p style="margin-top:.7rem;"><strong style="color:var(--text)">Schema stability for most new features:</strong> AI image generation (with fallback chain), multi-model chat, translation, web search, agent mode, and password reset are all stateless at the database layer - they require no additional tables or columns. Generated images are embedded as base64 data URLs inside the existing <code>messages.content</code> TEXT column (base64 is stripped from context before OpenAI calls to prevent token overflow). Model attribution is carried in the SSE stream and rendered client-side. Rich HTML from bulk file upload is stored in <code>notes.content</code>, which already accepts arbitrary HTML including embedded <code>&lt;img&gt;</code> tags.</p>
   <p style="margin-top:.7rem;"><strong style="color:var(--text)">New tables for admin features:</strong> The <code>feature_flags</code> table stores system-wide feature toggles, defaults, and per-feature minimum access levels. The <code>feedback</code> table stores user-submitted bug reports and suggestions. The <code>users</code> table gains an <code>is_admin BOOLEAN</code> column and an <code>access_level VARCHAR</code> column (<code>'regular'</code> | <code>'plus'</code> | <code>'pro'</code>). JWT tokens embed both <code>is_admin</code> and <code>access_level</code> claims; the <code>get_current_user_info</code> dependency decodes them for stateless access-level enforcement without a DB lookup on every request.</p>
 
@@ -302,6 +303,76 @@
           <div class="erd-col"><span class="erd-col-name">message</span><span class="erd-col-type">TEXT</span></div>
           <div class="erd-col"><span class="erd-col-name">status</span><span class="erd-col-type">VARCHAR(20)</span></div>
           <div class="erd-col"><span class="erd-col-name">created_at</span><span class="erd-col-type">TIMESTAMPTZ</span></div>
+        </div>
+
+        <!-- books -->
+        <div class="erd-table">
+          <div class="erd-th">books</div>
+          <div class="erd-col"><span class="erd-pk erd-col-name">&#x1F511; id</span><span class="erd-col-type">INTEGER</span></div>
+          <div class="erd-col"><span class="erd-fk erd-col-name">&rarr; created_by_admin_id</span><span class="erd-col-type">INTEGER</span></div>
+          <div class="erd-col"><span class="erd-col-name">title</span><span class="erd-col-type">VARCHAR</span></div>
+          <div class="erd-col"><span class="erd-col-name">onedrive_item_id</span><span class="erd-col-type">VARCHAR</span></div>
+          <div class="erd-col"><span class="erd-col-name">is_published</span><span class="erd-col-type">BOOLEAN</span></div>
+          <div class="erd-col"><span class="erd-col-name">sync_status</span><span class="erd-col-type">VARCHAR</span></div>
+        </div>
+
+        <!-- user_books -->
+        <div class="erd-table">
+          <div class="erd-th">user_books</div>
+          <div class="erd-col"><span class="erd-pk erd-col-name">&#x1F511; id</span><span class="erd-col-type">INTEGER</span></div>
+          <div class="erd-col"><span class="erd-fk erd-col-name">&rarr; user_id</span><span class="erd-col-type">INTEGER</span></div>
+          <div class="erd-col"><span class="erd-fk erd-col-name">&rarr; book_id</span><span class="erd-col-type">INTEGER</span></div>
+          <div class="erd-col"><span class="erd-col-name">status</span><span class="erd-col-type">VARCHAR</span></div>
+          <div class="erd-col"><span class="erd-col-name">progress_percent</span><span class="erd-col-type">FLOAT</span></div>
+        </div>
+
+        <!-- book_bookmarks -->
+        <div class="erd-table">
+          <div class="erd-th">book_bookmarks</div>
+          <div class="erd-col"><span class="erd-pk erd-col-name">&#x1F511; id</span><span class="erd-col-type">INTEGER</span></div>
+          <div class="erd-col"><span class="erd-fk erd-col-name">&rarr; user_id</span><span class="erd-col-type">INTEGER</span></div>
+          <div class="erd-col"><span class="erd-fk erd-col-name">&rarr; book_id</span><span class="erd-col-type">INTEGER</span></div>
+          <div class="erd-col"><span class="erd-col-name">page_number</span><span class="erd-col-type">INTEGER</span></div>
+        </div>
+
+        <!-- book_highlights -->
+        <div class="erd-table">
+          <div class="erd-th">book_highlights</div>
+          <div class="erd-col"><span class="erd-pk erd-col-name">&#x1F511; id</span><span class="erd-col-type">INTEGER</span></div>
+          <div class="erd-col"><span class="erd-fk erd-col-name">&rarr; user_id</span><span class="erd-col-type">INTEGER</span></div>
+          <div class="erd-col"><span class="erd-fk erd-col-name">&rarr; book_id</span><span class="erd-col-type">INTEGER</span></div>
+          <div class="erd-col"><span class="erd-fk erd-col-name">&rarr; note_id</span><span class="erd-col-type">INTEGER</span></div>
+          <div class="erd-col"><span class="erd-col-name">snippet</span><span class="erd-col-type">TEXT</span></div>
+          <div class="erd-col"><span class="erd-col-name">color</span><span class="erd-col-type">VARCHAR</span></div>
+        </div>
+
+        <!-- book_note_sources -->
+        <div class="erd-table">
+          <div class="erd-th">book_note_sources</div>
+          <div class="erd-col"><span class="erd-pk erd-col-name">&#x1F511; id</span><span class="erd-col-type">INTEGER</span></div>
+          <div class="erd-col"><span class="erd-fk erd-col-name">&rarr; user_id</span><span class="erd-col-type">INTEGER</span></div>
+          <div class="erd-col"><span class="erd-fk erd-col-name">&rarr; book_id</span><span class="erd-col-type">INTEGER</span></div>
+          <div class="erd-col"><span class="erd-col-name">status</span><span class="erd-col-type">VARCHAR</span></div>
+        </div>
+
+        <!-- book_note_chunks -->
+        <div class="erd-table">
+          <div class="erd-th">book_note_chunks</div>
+          <div class="erd-col"><span class="erd-pk erd-col-name">&#x1F511; id</span><span class="erd-col-type">INTEGER</span></div>
+          <div class="erd-col"><span class="erd-fk erd-col-name">&rarr; book_note_source_id</span><span class="erd-col-type">INTEGER</span></div>
+          <div class="erd-col"><span class="erd-fk erd-col-name">&rarr; note_id</span><span class="erd-col-type">INTEGER</span></div>
+          <div class="erd-col"><span class="erd-fk erd-col-name">&rarr; book_id</span><span class="erd-col-type">INTEGER</span></div>
+          <div class="erd-col"><span class="erd-col-name">page_number</span><span class="erd-col-type">INTEGER</span></div>
+        </div>
+
+        <!-- onedrive_accounts -->
+        <div class="erd-table">
+          <div class="erd-th">onedrive_accounts</div>
+          <div class="erd-col"><span class="erd-pk erd-col-name">&#x1F511; id</span><span class="erd-col-type">INTEGER</span></div>
+          <div class="erd-col"><span class="erd-fk erd-col-name">&rarr; user_id</span><span class="erd-col-type">INTEGER</span></div>
+          <div class="erd-col"><span class="erd-col-name">ms_user_id</span><span class="erd-col-type">VARCHAR</span></div>
+          <div class="erd-col"><span class="erd-col-name">encrypted_access_token</span><span class="erd-col-type">TEXT</span></div>
+          <div class="erd-col"><span class="erd-col-name">encrypted_refresh_token</span><span class="erd-col-type">TEXT</span></div>
         </div>
 
       </div>
@@ -1008,6 +1079,188 @@
 
   <hr class="divider" />
 
+  <!-- BOOKS LIBRARY TABLES -->
+  <section>
+    <div class="section-label">Books Library</div>
+    <h2>Books Library Tables</h2>
+    <p>These tables back the OneDrive-synced Books Library - admin-managed book catalogue, per-user borrowing and reading progress, bookmarks, highlights mirrored into notes, the async "Save as Note Source" extraction job, and encrypted OneDrive OAuth accounts.</p>
+
+    <!-- books -->
+    <div class="schema-card" style="margin-top:1.4rem;">
+      <div class="schema-header">
+        <span class="schema-icon">&#x1F4D6;</span>
+        <span class="schema-name">books</span>
+        <span class="schema-desc">One row per synced OneDrive file</span>
+      </div>
+      <table class="col-table">
+        <thead><tr><th>Column</th><th>Type</th><th>Constraints</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td class="col-name">id</td><td class="col-type">INTEGER</td><td><span class="badge-pk">PK</span></td><td class="col-notes">Auto-incrementing primary key</td></tr>
+          <tr><td class="col-name">title</td><td class="col-type">VARCHAR</td><td><span class="badge-nn">NOT NULL</span></td><td class="col-notes">Book title, derived from the OneDrive file name or admin-edited metadata</td></tr>
+          <tr><td class="col-name">author</td><td class="col-type">VARCHAR</td><td>nullable</td><td class="col-notes">Author name, editable by admins</td></tr>
+          <tr><td class="col-name">description</td><td class="col-type">TEXT</td><td>nullable</td><td class="col-notes">Optional book description shown in the library</td></tr>
+          <tr><td class="col-name">category</td><td class="col-type">VARCHAR</td><td>nullable</td><td class="col-notes">Optional category label for browsing/filtering</td></tr>
+          <tr><td class="col-name">tags</td><td class="col-type">VARCHAR</td><td>nullable</td><td class="col-notes">Comma-separated tags</td></tr>
+          <tr><td class="col-name">file_name</td><td class="col-type">VARCHAR</td><td><span class="badge-nn">NOT NULL</span></td><td class="col-notes">Original file name as stored in OneDrive</td></tr>
+          <tr><td class="col-name">file_extension</td><td class="col-type">VARCHAR</td><td>nullable</td><td class="col-notes">File extension - drives which in-app reader component is used (PDF, EPUB, PPTX, audio, TXT, SRT/VTT, CBZ/CBR, MOBI)</td></tr>
+          <tr><td class="col-name">mime_type</td><td class="col-type">VARCHAR</td><td>nullable</td><td class="col-notes">MIME type reported by OneDrive</td></tr>
+          <tr><td class="col-name">file_size</td><td class="col-type">BIGINT</td><td>nullable</td><td class="col-notes">File size in bytes</td></tr>
+          <tr><td class="col-name">cover_image_url</td><td class="col-type">VARCHAR</td><td>nullable</td><td class="col-notes">Optional cover image URL shown in the library grid</td></tr>
+          <tr><td class="col-name">onedrive_drive_id</td><td class="col-type">VARCHAR</td><td><span class="badge-nn">NOT NULL</span></td><td class="col-notes">OneDrive drive identifier the file belongs to</td></tr>
+          <tr><td class="col-name">onedrive_item_id</td><td class="col-type">VARCHAR</td><td><span class="badge-uq">UNIQUE</span><span class="badge-nn">NOT NULL</span></td><td class="col-notes">OneDrive item identifier - unique per file; used to detect existing books on re-sync</td></tr>
+          <tr><td class="col-name">onedrive_web_url</td><td class="col-type">VARCHAR</td><td>nullable</td><td class="col-notes">Direct OneDrive web URL for the file</td></tr>
+          <tr><td class="col-name">onedrive_share_link</td><td class="col-type">VARCHAR</td><td>nullable</td><td class="col-notes">Sharing link used for streaming/downloading the file content</td></tr>
+          <tr><td class="col-name">last_modified</td><td class="col-type">TIMESTAMPTZ</td><td>nullable</td><td class="col-notes">Last-modified timestamp reported by OneDrive - used to detect changed files on sync</td></tr>
+          <tr><td class="col-name">is_published</td><td class="col-type">BOOLEAN</td><td>default: false</td><td class="col-notes">Whether the book is visible to regular users; toggled via admin publish/unpublish endpoints</td></tr>
+          <tr><td class="col-name">sync_status</td><td class="col-type">VARCHAR</td><td>default: <code>"synced"</code></td><td class="col-notes">Sync state of this book's metadata/content relative to OneDrive</td></tr>
+          <tr><td class="col-name">sync_error</td><td class="col-type">TEXT</td><td>nullable</td><td class="col-notes">Last sync error message, shown to admins per book</td></tr>
+          <tr><td class="col-name">created_by_admin_id</td><td class="col-type">INTEGER</td><td><span class="badge-fk">FK &rarr; users.id</span> nullable</td><td class="col-notes">Admin who triggered the sync that created this book; ON DELETE SET NULL so the book survives admin account removal</td></tr>
+          <tr><td class="col-name">created_at</td><td class="col-type">TIMESTAMPTZ</td><td>server default: now()</td><td class="col-notes">When the book row was first created</td></tr>
+          <tr><td class="col-name">updated_at</td><td class="col-type">TIMESTAMPTZ</td><td>server default: now()</td><td class="col-notes">When the book row was last updated (metadata edit or re-sync)</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- user_books -->
+    <div class="schema-card" style="margin-top:1.4rem;">
+      <div class="schema-header">
+        <span class="schema-icon">&#x1F4DA;</span>
+        <span class="schema-name">user_books</span>
+        <span class="schema-desc">Tracks each user's borrowed books and reading progress - unique per (user_id, book_id)</span>
+      </div>
+      <table class="col-table">
+        <thead><tr><th>Column</th><th>Type</th><th>Constraints</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td class="col-name">id</td><td class="col-type">INTEGER</td><td><span class="badge-pk">PK</span></td><td class="col-notes">Auto-incrementing primary key</td></tr>
+          <tr><td class="col-name">user_id</td><td class="col-type">INTEGER</td><td><span class="badge-fk">FK &rarr; users.id</span><span class="badge-nn">NOT NULL</span></td><td class="col-notes">CASCADE DELETE - removing a user removes their borrowed-book records</td></tr>
+          <tr><td class="col-name">book_id</td><td class="col-type">INTEGER</td><td><span class="badge-fk">FK &rarr; books.id</span><span class="badge-nn">NOT NULL</span></td><td class="col-notes">CASCADE DELETE - removing a book removes related user_books rows</td></tr>
+          <tr><td class="col-name">status</td><td class="col-type">VARCHAR</td><td>default: <code>"borrowed"</code></td><td class="col-notes">One of <code>borrowed</code>, <code>reading</code>, <code>completed</code>, <code>removed</code></td></tr>
+          <tr><td class="col-name">current_page</td><td class="col-type">INTEGER</td><td>default: 0</td><td class="col-notes">Last-read page number, used to resume reading</td></tr>
+          <tr><td class="col-name">total_pages</td><td class="col-type">INTEGER</td><td>nullable</td><td class="col-notes">Total page count, set once known by the reader</td></tr>
+          <tr><td class="col-name">progress_percent</td><td class="col-type">FLOAT</td><td>default: 0.0</td><td class="col-notes">Reading progress as a percentage, shown in My Books</td></tr>
+          <tr><td class="col-name">borrowed_at</td><td class="col-type">TIMESTAMPTZ</td><td>server default: now()</td><td class="col-notes">When the user borrowed the book</td></tr>
+          <tr><td class="col-name">last_read_at</td><td class="col-type">TIMESTAMPTZ</td><td>nullable</td><td class="col-notes">Timestamp of the most recent progress update</td></tr>
+          <tr><td class="col-name">completed_at</td><td class="col-type">TIMESTAMPTZ</td><td>nullable</td><td class="col-notes">When the book was marked completed</td></tr>
+        </tbody>
+      </table>
+      <p style="margin-top:.8rem;font-size:.85rem;color:var(--muted);"><span class="badge-uq">UNIQUE</span> constraint on <code>(user_id, book_id)</code> - a user can only have one borrow record per book.</p>
+    </div>
+
+    <!-- book_bookmarks -->
+    <div class="schema-card" style="margin-top:1.4rem;">
+      <div class="schema-header">
+        <span class="schema-icon">&#x1F516;</span>
+        <span class="schema-name">book_bookmarks</span>
+        <span class="schema-desc">User-created bookmarks within a book</span>
+      </div>
+      <table class="col-table">
+        <thead><tr><th>Column</th><th>Type</th><th>Constraints</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td class="col-name">id</td><td class="col-type">INTEGER</td><td><span class="badge-pk">PK</span></td><td class="col-notes">Auto-incrementing primary key</td></tr>
+          <tr><td class="col-name">user_id</td><td class="col-type">INTEGER</td><td><span class="badge-fk">FK &rarr; users.id</span><span class="badge-nn">NOT NULL</span></td><td class="col-notes">CASCADE DELETE</td></tr>
+          <tr><td class="col-name">book_id</td><td class="col-type">INTEGER</td><td><span class="badge-fk">FK &rarr; books.id</span><span class="badge-nn">NOT NULL</span></td><td class="col-notes">CASCADE DELETE</td></tr>
+          <tr><td class="col-name">page_number</td><td class="col-type">INTEGER</td><td><span class="badge-nn">NOT NULL</span></td><td class="col-notes">Page the bookmark points to</td></tr>
+          <tr><td class="col-name">note</td><td class="col-type">TEXT</td><td>nullable</td><td class="col-notes">Optional free-text note attached to the bookmark</td></tr>
+          <tr><td class="col-name">created_at</td><td class="col-type">TIMESTAMPTZ</td><td>server default: now()</td><td class="col-notes">When the bookmark was created</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- book_highlights -->
+    <div class="schema-card" style="margin-top:1.4rem;">
+      <div class="schema-header">
+        <span class="schema-icon">&#x1F58D;&#xFE0F;</span>
+        <span class="schema-name">book_highlights</span>
+        <span class="schema-desc">Saved text highlights, each mirrored into a Note</span>
+      </div>
+      <table class="col-table">
+        <thead><tr><th>Column</th><th>Type</th><th>Constraints</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td class="col-name">id</td><td class="col-type">INTEGER</td><td><span class="badge-pk">PK</span></td><td class="col-notes">Auto-incrementing primary key</td></tr>
+          <tr><td class="col-name">user_id</td><td class="col-type">INTEGER</td><td><span class="badge-fk">FK &rarr; users.id</span><span class="badge-nn">NOT NULL</span></td><td class="col-notes">CASCADE DELETE</td></tr>
+          <tr><td class="col-name">book_id</td><td class="col-type">INTEGER</td><td><span class="badge-fk">FK &rarr; books.id</span><span class="badge-nn">NOT NULL</span></td><td class="col-notes">CASCADE DELETE</td></tr>
+          <tr><td class="col-name">note_id</td><td class="col-type">INTEGER</td><td><span class="badge-fk">FK &rarr; notes.id</span><span class="badge-nn">NOT NULL</span></td><td class="col-notes">The mirror "{Book Title} - Highlights" note. ON DELETE CASCADE - deleting that note permanently deletes all of its highlights.</td></tr>
+          <tr><td class="col-name">format</td><td class="col-type">VARCHAR</td><td><span class="badge-nn">NOT NULL</span></td><td class="col-notes">Source format the highlight was taken from (pdf, epub, pptx, txt, captions, mobi)</td></tr>
+          <tr><td class="col-name">page_number</td><td class="col-type">INTEGER</td><td><span class="badge-nn">NOT NULL</span></td><td class="col-notes">Page the highlight is on</td></tr>
+          <tr><td class="col-name">start_offset</td><td class="col-type">INTEGER</td><td><span class="badge-nn">NOT NULL</span></td><td class="col-notes">Character start offset within the page text</td></tr>
+          <tr><td class="col-name">end_offset</td><td class="col-type">INTEGER</td><td><span class="badge-nn">NOT NULL</span></td><td class="col-notes">Character end offset within the page text - used to jump the reader back to the exact passage</td></tr>
+          <tr><td class="col-name">snippet</td><td class="col-type">TEXT</td><td><span class="badge-nn">NOT NULL</span></td><td class="col-notes">The highlighted text, also appended into the mirror note's content</td></tr>
+          <tr><td class="col-name">color</td><td class="col-type">VARCHAR</td><td>default: <code>"yellow"</code></td><td class="col-notes">User-chosen highlight colour</td></tr>
+          <tr><td class="col-name">created_at</td><td class="col-type">TIMESTAMPTZ</td><td>server default: now()</td><td class="col-notes">When the highlight was created</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- book_note_sources -->
+    <div class="schema-card" style="margin-top:1.4rem;">
+      <div class="schema-header">
+        <span class="schema-icon">&#x23F3;</span>
+        <span class="schema-name">book_note_sources</span>
+        <span class="schema-desc">Tracks the async "Save as Note Source" job per (user, book)</span>
+      </div>
+      <table class="col-table">
+        <thead><tr><th>Column</th><th>Type</th><th>Constraints</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td class="col-name">id</td><td class="col-type">INTEGER</td><td><span class="badge-pk">PK</span></td><td class="col-notes">Auto-incrementing primary key</td></tr>
+          <tr><td class="col-name">user_id</td><td class="col-type">INTEGER</td><td><span class="badge-fk">FK &rarr; users.id</span><span class="badge-nn">NOT NULL</span></td><td class="col-notes">CASCADE DELETE</td></tr>
+          <tr><td class="col-name">book_id</td><td class="col-type">INTEGER</td><td><span class="badge-fk">FK &rarr; books.id</span><span class="badge-nn">NOT NULL</span></td><td class="col-notes">CASCADE DELETE</td></tr>
+          <tr><td class="col-name">status</td><td class="col-type">VARCHAR</td><td>default: <code>"pending"</code></td><td class="col-notes">One of <code>pending</code>, <code>processing</code>, <code>ready</code>, <code>failed</code> - polled via <code>GET /api/books/{id}/note-source-status</code></td></tr>
+          <tr><td class="col-name">error_message</td><td class="col-type">TEXT</td><td>nullable</td><td class="col-notes">Error detail if extraction failed</td></tr>
+          <tr><td class="col-name">created_at</td><td class="col-type">TIMESTAMPTZ</td><td>server default: now()</td><td class="col-notes">When the extraction job was requested</td></tr>
+          <tr><td class="col-name">updated_at</td><td class="col-type">TIMESTAMPTZ</td><td>server default: now()</td><td class="col-notes">When the job status was last updated</td></tr>
+        </tbody>
+      </table>
+      <p style="margin-top:.8rem;font-size:.85rem;color:var(--muted);"><span class="badge-uq">UNIQUE</span> constraint on <code>(user_id, book_id)</code> - one active extraction record per user per book.</p>
+    </div>
+
+    <!-- book_note_chunks -->
+    <div class="schema-card" style="margin-top:1.4rem;">
+      <div class="schema-header">
+        <span class="schema-icon">&#x1F9E9;</span>
+        <span class="schema-name">book_note_chunks</span>
+        <span class="schema-desc">Links each generated Note chunk back to its book/page for citation display</span>
+      </div>
+      <table class="col-table">
+        <thead><tr><th>Column</th><th>Type</th><th>Constraints</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td class="col-name">id</td><td class="col-type">INTEGER</td><td><span class="badge-pk">PK</span></td><td class="col-notes">Auto-incrementing primary key</td></tr>
+          <tr><td class="col-name">book_note_source_id</td><td class="col-type">INTEGER</td><td><span class="badge-fk">FK &rarr; book_note_sources.id</span><span class="badge-nn">NOT NULL</span></td><td class="col-notes">CASCADE DELETE - removing the source job removes its chunk links</td></tr>
+          <tr><td class="col-name">note_id</td><td class="col-type">INTEGER</td><td><span class="badge-fk">FK &rarr; notes.id</span><span class="badge-nn">NOT NULL</span></td><td class="col-notes">CASCADE DELETE - the generated, embedded note chunk</td></tr>
+          <tr><td class="col-name">book_id</td><td class="col-type">INTEGER</td><td><span class="badge-fk">FK &rarr; books.id</span><span class="badge-nn">NOT NULL</span></td><td class="col-notes">CASCADE DELETE</td></tr>
+          <tr><td class="col-name">page_number</td><td class="col-type">INTEGER</td><td>nullable</td><td class="col-notes">Page this chunk was extracted from, shown alongside AI Chat citations</td></tr>
+          <tr><td class="col-name">created_at</td><td class="col-type">TIMESTAMPTZ</td><td>server default: now()</td><td class="col-notes">When this chunk link was created</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- onedrive_accounts -->
+    <div class="schema-card" style="margin-top:1.4rem;">
+      <div class="schema-header">
+        <span class="schema-icon">&#x2601;&#xFE0F;</span>
+        <span class="schema-name">onedrive_accounts</span>
+        <span class="schema-desc">One row per admin's connected OneDrive account (encrypted tokens)</span>
+      </div>
+      <table class="col-table">
+        <thead><tr><th>Column</th><th>Type</th><th>Constraints</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td class="col-name">id</td><td class="col-type">INTEGER</td><td><span class="badge-pk">PK</span></td><td class="col-notes">Auto-incrementing primary key</td></tr>
+          <tr><td class="col-name">user_id</td><td class="col-type">INTEGER</td><td><span class="badge-fk">FK &rarr; users.id</span><span class="badge-uq">UNIQUE</span><span class="badge-nn">NOT NULL</span></td><td class="col-notes">CASCADE DELETE - one OneDrive account per user</td></tr>
+          <tr><td class="col-name">ms_user_id</td><td class="col-type">VARCHAR</td><td><span class="badge-nn">NOT NULL</span></td><td class="col-notes">Microsoft account identifier returned by the Graph API</td></tr>
+          <tr><td class="col-name">display_name</td><td class="col-type">VARCHAR</td><td>nullable</td><td class="col-notes">Display name of the connected Microsoft account</td></tr>
+          <tr><td class="col-name">email</td><td class="col-type">VARCHAR</td><td>nullable</td><td class="col-notes">Email address of the connected Microsoft account</td></tr>
+          <tr><td class="col-name">encrypted_access_token</td><td class="col-type">TEXT</td><td><span class="badge-nn">NOT NULL</span></td><td class="col-notes">Fernet-encrypted OAuth access token - never stored or logged in plain text</td></tr>
+          <tr><td class="col-name">encrypted_refresh_token</td><td class="col-type">TEXT</td><td><span class="badge-nn">NOT NULL</span></td><td class="col-notes">Fernet-encrypted OAuth refresh token, used to silently renew the access token</td></tr>
+          <tr><td class="col-name">token_expiry</td><td class="col-type">TIMESTAMPTZ</td><td>nullable</td><td class="col-notes">Expiry timestamp of the current access token</td></tr>
+          <tr><td class="col-name">connected_at</td><td class="col-type">TIMESTAMPTZ</td><td>server default: now()</td><td class="col-notes">When the admin first connected this OneDrive account</td></tr>
+          <tr><td class="col-name">updated_at</td><td class="col-type">TIMESTAMPTZ</td><td>server default: now()</td><td class="col-notes">When the token pair was last refreshed</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+  </section>
+
+  <hr class="divider" />
+
   <!-- RELATIONSHIPS -->
   <section>
     <div class="section-label">Relationships</div>
@@ -1090,6 +1343,42 @@
         <span class="rel-type">standalone</span>
         <span class="rel-to">-</span>
         <span class="rel-note">translation_cache has no foreign keys. It is a shared global cache keyed by SHA-256 hash of source_text::target_language. Not scoped to any user - all users benefit from and contribute to the same cache pool.</span>
+      </li>
+      <li class="rel-item">
+        <span class="rel-from">users</span>
+        <span class="rel-type">1 &rarr; 0..1</span>
+        <span class="rel-to">onedrive_accounts</span>
+        <span class="rel-note">An admin connects at most one OneDrive account. onedrive_accounts.user_id UNIQUE FK &rarr; users.id (CASCADE DELETE). Tokens are Fernet-encrypted.</span>
+      </li>
+      <li class="rel-item">
+        <span class="rel-from">books</span>
+        <span class="rel-type">1 &rarr; many</span>
+        <span class="rel-to">user_books</span>
+        <span class="rel-note">A book can be borrowed by many users. user_books.book_id &rarr; books.id (CASCADE DELETE). UNIQUE on (user_id, book_id).</span>
+      </li>
+      <li class="rel-item">
+        <span class="rel-from">books</span>
+        <span class="rel-type">1 &rarr; many</span>
+        <span class="rel-to">book_bookmarks, book_highlights</span>
+        <span class="rel-note">A book can have many bookmarks and highlights across users. Both FKs CASCADE DELETE from books and from users.</span>
+      </li>
+      <li class="rel-item">
+        <span class="rel-from">notes</span>
+        <span class="rel-type">1 &rarr; many</span>
+        <span class="rel-to">book_highlights</span>
+        <span class="rel-note">Each highlight mirrors into one "{Book Title} - Highlights" note. book_highlights.note_id &rarr; notes.id (ON DELETE CASCADE) - deleting that note deletes all of its highlights.</span>
+      </li>
+      <li class="rel-item">
+        <span class="rel-from">books</span>
+        <span class="rel-type">1 &rarr; many</span>
+        <span class="rel-to">book_note_sources</span>
+        <span class="rel-note">A book can have one "Save as Note Source" job per user. book_note_sources.book_id &rarr; books.id (CASCADE DELETE). UNIQUE on (user_id, book_id).</span>
+      </li>
+      <li class="rel-item">
+        <span class="rel-from">book_note_sources</span>
+        <span class="rel-type">1 &rarr; many</span>
+        <span class="rel-to">book_note_chunks</span>
+        <span class="rel-note">A completed extraction job produces many chunked notes. book_note_chunks.book_note_source_id &rarr; book_note_sources.id (CASCADE DELETE); each chunk also links to notes.id and books.id (both CASCADE DELETE).</span>
       </li>
     </ul>
   </section>
@@ -1232,6 +1521,48 @@
         <div class="index-name">ix_translation_cache_text_hash</div>
         <div class="index-cols">translation_cache(text_hash) UNIQUE</div>
         <div class="index-purpose">O(1) cache lookup by SHA-256 hash key; UNIQUE enforces one entry per text+language pair</div>
+      </div>
+      <div class="index-card">
+        <div class="index-table-label">books</div>
+        <div class="index-name">idx_books_onedrive_item_id_uq</div>
+        <div class="index-cols">books(onedrive_item_id) UNIQUE</div>
+        <div class="index-purpose">Detects existing books on re-sync; prevents duplicate imports of the same OneDrive file</div>
+      </div>
+      <div class="index-card">
+        <div class="index-table-label">books</div>
+        <div class="index-name">idx_books_is_published</div>
+        <div class="index-cols">books(is_published)</div>
+        <div class="index-purpose">Fast filter for the user-facing published-books library list</div>
+      </div>
+      <div class="index-card">
+        <div class="index-table-label">user_books</div>
+        <div class="index-name">idx_user_books_user_book_uq</div>
+        <div class="index-cols">user_books(user_id, book_id) UNIQUE</div>
+        <div class="index-purpose">Enforces one borrow record per user per book; fast "My Books" lookup</div>
+      </div>
+      <div class="index-card">
+        <div class="index-table-label">book_bookmarks</div>
+        <div class="index-name">idx_book_bookmarks_user_book</div>
+        <div class="index-cols">book_bookmarks(user_id, book_id)</div>
+        <div class="index-purpose">List a user's bookmarks for a specific book</div>
+      </div>
+      <div class="index-card">
+        <div class="index-table-label">book_highlights</div>
+        <div class="index-name">idx_book_highlights_user_book</div>
+        <div class="index-cols">book_highlights(user_id, book_id)</div>
+        <div class="index-purpose">List a user's highlights for a specific book</div>
+      </div>
+      <div class="index-card">
+        <div class="index-table-label">book_note_sources</div>
+        <div class="index-name">idx_book_note_sources_user_book_uq</div>
+        <div class="index-cols">book_note_sources(user_id, book_id) UNIQUE</div>
+        <div class="index-purpose">One extraction job per user per book; fast status-poll lookup</div>
+      </div>
+      <div class="index-card">
+        <div class="index-table-label">onedrive_accounts</div>
+        <div class="index-name">idx_onedrive_accounts_user_id_uq</div>
+        <div class="index-cols">onedrive_accounts(user_id) UNIQUE</div>
+        <div class="index-purpose">Enforces one connected OneDrive account per admin; fast connection-status lookup</div>
       </div>
     </div>
   </section>

@@ -24,7 +24,7 @@ interface PendingSelection { x: number; y: number; start: number; end: number; }
 // still works fully since it only needs this browser-side parse.
 export function MobiReaderView({
   book, initialPage, colorMode, onProgress,
-  jumpToHighlight, onJumpToHighlightHandled,
+  jumpToHighlight, onJumpToHighlightHandled, onHighlightAdded,
 }: ReaderViewProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -137,6 +137,7 @@ export function MobiReaderView({
       color: highlightColor,
     });
     setHighlights((prev) => [...prev, created]);
+    onHighlightAdded?.();
     window.getSelection()?.removeAllRanges();
     setTimeout(() => setPendingSelection(null), 900);
   }

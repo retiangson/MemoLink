@@ -751,6 +751,41 @@ az acr build --registry memlinkacr \
           <td><span class="tag-opt">Optional</span></td>
         </tr>
         <tr>
+          <td>MICROSOFT_CLIENT_ID</td>
+          <td>Azure AD app registration client ID. Used for the OneDrive OAuth connect flow that powers the Books Library admin sync.</td>
+          <td><span class="tag-opt">Optional</span></td>
+        </tr>
+        <tr>
+          <td>MICROSOFT_CLIENT_SECRET</td>
+          <td>Azure AD app registration client secret, paired with <code>MICROSOFT_CLIENT_ID</code> for the OneDrive OAuth token exchange.</td>
+          <td><span class="tag-opt">Optional</span></td>
+        </tr>
+        <tr>
+          <td>MICROSOFT_TENANT_ID</td>
+          <td>Azure AD tenant ID for the OneDrive OAuth authorize/token endpoints. Leave blank to use <code>common</code> (multi-tenant + personal accounts).</td>
+          <td><span class="tag-opt">Optional</span></td>
+        </tr>
+        <tr>
+          <td>MICROSOFT_REDIRECT_URI</td>
+          <td>OAuth redirect URI registered in the Azure AD app. Defaults to <code>http://localhost:8000/api/admin/books/onedrive/callback</code>.</td>
+          <td><span class="tag-opt">Optional</span></td>
+        </tr>
+        <tr>
+          <td>ONEDRIVE_BOOKS_FOLDER_ID</td>
+          <td>OneDrive folder item ID to sync books from. Takes precedence over <code>ONEDRIVE_BOOKS_FOLDER_PATH</code> if both are set.</td>
+          <td><span class="tag-opt">Optional</span></td>
+        </tr>
+        <tr>
+          <td>ONEDRIVE_BOOKS_FOLDER_PATH</td>
+          <td>OneDrive folder path to sync books from (e.g. <code>/Books</code>), used when <code>ONEDRIVE_BOOKS_FOLDER_ID</code> is not set.</td>
+          <td><span class="tag-opt">Optional</span></td>
+        </tr>
+        <tr>
+          <td>ONEDRIVE_SYNC_ENABLED</td>
+          <td>Feature switch for the admin OneDrive sync endpoints. Defaults to <code>true</code>; set to <code>false</code> to disable syncing (returns HTTP 503).</td>
+          <td><span class="tag-opt">Optional</span></td>
+        </tr>
+        <tr>
           <td>VITE_API_BASE_URL</td>
           <td><em>Frontend build-time variable.</em> Full URL of the backend API including <code>/api</code> suffix, e.g. <code>https://memolink.up.railway.app/api</code>. Set in platform settings or <code>memolink_web/.env</code> for local dev.</td>
           <td><span class="tag-req">Required (frontend)</span></td>

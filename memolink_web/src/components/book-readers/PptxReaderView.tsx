@@ -21,7 +21,7 @@ interface PendingSelection { x: number; y: number; start: number; end: number; }
 export function PptxReaderView({
   book, initialPage, colorMode, onProgress,
   noteStatus, noteStatusLoaded, savingNoteSource, onSaveAsNoteSource,
-  jumpToHighlight, onJumpToHighlightHandled,
+  jumpToHighlight, onJumpToHighlightHandled, onHighlightAdded,
 }: ReaderViewProps) {
   const [slides, setSlides] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -110,6 +110,7 @@ export function PptxReaderView({
       color: highlightColor,
     });
     setHighlights((prev) => [...prev, created]);
+    onHighlightAdded?.();
     window.getSelection()?.removeAllRanges();
     setTimeout(() => setPendingSelection(null), 900);
   }

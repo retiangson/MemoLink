@@ -32,6 +32,7 @@ export interface ReaderViewProps {
   onSaveAsNoteSource?: () => void;
   jumpToHighlight?: HighlightAnchor | null;
   onJumpToHighlightHandled?: () => void;
+  onHighlightAdded?: () => void;
 }
 
 export const READER_COLOR_MODE_LABELS: Record<ReaderColorMode, string> = {
