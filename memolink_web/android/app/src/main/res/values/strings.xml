@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">MemoLink</string>
+    <string name="title_activity_main">MemoLink</string>
+    <string name="package_name">com.memolink.app</string>
+    <string name="custom_url_scheme">com.memolink.app</string>
+</resources>
