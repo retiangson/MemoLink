@@ -159,7 +159,7 @@ const CONTENT: Record<string, React.ReactNode> = {
 
   books: (
     <div className="space-y-4 text-sm text-gray-400 leading-relaxed">
-      <p>The Books Library is a shared collection synced by an admin from OneDrive. Open it from the top bar to browse, borrow, and read books in-app.</p>
+      <p>The Books Library is a shared collection of books curated by an admin. Open it from the top bar to browse, borrow, and read books in-app.</p>
       <div>
         <p className="text-xs font-semibold text-indigo-300 mb-2 uppercase tracking-wider">Supported Formats</p>
         <p>PDF, EPUB, PPTX, audio, TXT, SRT/VTT (captions), CBZ/CBR (comics), and MOBI.</p>
@@ -183,7 +183,7 @@ const CONTENT: Record<string, React.ReactNode> = {
           {[
             "Select text in PDF, EPUB, PPTX, TXT, captions, or MOBI books, then click Highlight - pick a color to tag it.",
             "Every highlight is appended to an auto-generated \"{Book Title} - Highlights\" note, and the Notes list updates instantly.",
-            "Double-click a highlight inside that note to jump the reader straight back to the exact passage.",
+            "Click a highlight inside that note to jump the reader straight back to the exact passage - the highlighted text itself can't be edited.",
             "\"Save as Note Source\" extracts a book's full text (PDF, EPUB, PPTX, TXT, SRT/VTT) into searchable notes so it becomes part of AI Chat's grounded answers.",
             "Deleting the highlights note permanently (from the Recycle Bin) also permanently deletes all highlights saved for that book.",
           ].map((item, i) => (

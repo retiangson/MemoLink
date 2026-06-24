@@ -10,7 +10,6 @@ import { NoteSourceButton } from "./NoteSourceButton";
 import { HighlightColorPicker } from "./HighlightColorPicker";
 import { PageNavArrows } from "./PageNavArrows";
 import { ReaderLoadingState } from "./ReaderLoadingState";
-import { HighlightActionButton } from "./HighlightActionButton";
 import { captureSelectionInContainer, applyPersistentMarks, flashOrPulseRange } from "./domTextHighlight";
 
 interface PendingSelection { x: number; y: number; start: number; end: number; }
@@ -46,7 +45,7 @@ export function PptxReaderView({
         setCurrentSlide((p) => Math.min(Math.max(1, p), Math.max(1, s.length)));
       })
       .catch(() => {
-        if (!cancelled) setError("Could not load this presentation. It may no longer be available in OneDrive.");
+        if (!cancelled) setError("Could not load this presentation. It may no longer be available in the library.");
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -98,7 +97,7 @@ export function PptxReaderView({
     setPendingSelection(captureSelectionInContainer(container));
   }
 
-  async function handleAddHighlight() {
+  async function handleAddHighlight(colorId: string) {
     if (!pendingSelection || !slideRef.current) return;
     const snippet = (slideRef.current.textContent || "").slice(pendingSelection.start, pendingSelection.end);
     const created = await addBookHighlight(book.id, {
@@ -107,12 +106,12 @@ export function PptxReaderView({
       start_offset: pendingSelection.start,
       end_offset: pendingSelection.end,
       snippet,
-      color: highlightColor,
+      color: colorId,
     });
     setHighlights((prev) => [...prev, created]);
     onHighlightAdded?.();
     window.getSelection()?.removeAllRanges();
-    setTimeout(() => setPendingSelection(null), 900);
+    setPendingSelection(null);
   }
 
   // Arrival from a Note double-click: switch to the highlight's slide if needed, then pulse
@@ -172,10 +171,6 @@ export function PptxReaderView({
         )}
       </div>
 
-      {pendingSelection && (
-        <HighlightActionButton x={pendingSelection.x} y={pendingSelection.y} onHighlight={handleAddHighlight} />
-      )}
-
       {tts.playing && (
         <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50">
           <TTSPlayerBar
@@ -208,7 +203,7 @@ export function PptxReaderView({
             >
               {tts.playing ? (tts.paused ? "Resume" : "Pause") : "Read Aloud"}
             </button>
-            <HighlightColorPicker value={highlightColor} onChange={setHighlightColor} />
+            <HighlightColorPicker value={highlightColor} onChange={setHighlightColor} disabled={!pendingSelection} onApply={handleAddHighlight} />
           </div>
 
           <div className="flex items-center gap-2">

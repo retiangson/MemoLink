@@ -3,8 +3,10 @@ import {
   listBooks, listMyBooks, borrowBook, removeFromMyBooks,
   type Book, type UserBook,
 } from "../api/booksApi";
-import { getBookFormat } from "./book-readers/format";
+import { getBookFormat, getBookCategory, BOOK_CATEGORY_LABELS, type BookCategory } from "./book-readers/format";
 import { BookFormatIcon, getFormatStyle } from "./BookFormatIcon";
+
+const CATEGORY_OPTIONS: BookCategory[] = ["ebook", "pdf", "audiobook", "video", "comic", "presentation", "text"];
 
 const COVER_PALETTES = [
   "from-indigo-400 to-indigo-950",
@@ -60,6 +62,7 @@ export function BooksLibraryModal({ show, onClose, initialView = "browse", onMyB
   const [books, setBooks] = useState<Book[]>([]);
   const [myBooks, setMyBooks] = useState<UserBook[]>([]);
   const [search, setSearch] = useState("");
+  const [category, setCategory] = useState<BookCategory | "all">("all");
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
   const [borrowingId, setBorrowingId] = useState<number | null>(null);
@@ -105,7 +108,7 @@ export function BooksLibraryModal({ show, onClose, initialView = "browse", onMyB
 
   useEffect(() => {
     setPage(1);
-  }, [view, search]);
+  }, [view, search, category]);
 
   async function handleBorrow(book: Book) {
     setBorrowingId(book.id);
@@ -137,11 +140,20 @@ export function BooksLibraryModal({ show, onClose, initialView = "browse", onMyB
     return myBooks.some((m) => m.book_id === bookId);
   }
 
+  function matchesCategory(book: Book | null | undefined): boolean {
+    if (category === "all") return true;
+    if (!book) return false;
+    return getBookCategory(getBookFormat(book)) === category;
+  }
+
+  const filteredBooks = useMemo(() => books.filter(matchesCategory), [books, category]);
+
   const filteredMyBooks = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return myBooks;
     return myBooks.filter((ub) => {
       const book = ub.book;
+      if (!matchesCategory(book)) return false;
+      if (!q) return true;
       return [
         book?.title,
         book?.author,
@@ -151,12 +163,12 @@ export function BooksLibraryModal({ show, onClose, initialView = "browse", onMyB
         book?.file_name,
       ].some((value) => (value ?? "").toLowerCase().includes(q));
     });
-  }, [myBooks, search]);
+  }, [myBooks, search, category]);
 
-  const activeItems = view === "browse" ? books : filteredMyBooks;
+  const activeItems = view === "browse" ? filteredBooks : filteredMyBooks;
   const totalPages = Math.max(1, Math.ceil(activeItems.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
-  const pagedBooks = books.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+  const pagedBooks = filteredBooks.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
   const pagedMyBooks = filteredMyBooks.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   function renderPager() {
@@ -235,6 +247,23 @@ export function BooksLibraryModal({ show, onClose, initialView = "browse", onMyB
             className="min-w-0 flex-1 bg-[var(--ml-bg-surface)] border border-[var(--ml-bg-hover)] rounded-lg px-3 py-2 text-sm text-gray-200"
           />
         </div>
+        <div className="max-w-4xl mx-auto flex items-center gap-1.5 flex-wrap mt-2.5">
+          <button
+            onClick={() => setCategory("all")}
+            className={`px-2.5 py-1 text-[11px] rounded-full border transition ${category === "all" ? "bg-indigo-600 border-indigo-600 text-white" : "border-[var(--ml-bg-hover)] text-gray-400 hover:bg-[var(--ml-bg-hover)]"}`}
+          >
+            All
+          </button>
+          {CATEGORY_OPTIONS.map((c) => (
+            <button
+              key={c}
+              onClick={() => setCategory((prev) => (prev === c ? "all" : c))}
+              className={`px-2.5 py-1 text-[11px] rounded-full border transition ${category === c ? "bg-indigo-600 border-indigo-600 text-white" : "border-[var(--ml-bg-hover)] text-gray-400 hover:bg-[var(--ml-bg-hover)]"}`}
+            >
+              {BOOK_CATEGORY_LABELS[c]}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="flex-1 overflow-auto p-5">
@@ -242,8 +271,10 @@ export function BooksLibraryModal({ show, onClose, initialView = "browse", onMyB
           <div className="max-w-4xl mx-auto">
             {loading ? (
               <p className="text-sm text-gray-500">Loading…</p>
-            ) : books.length === 0 ? (
-              <p className="text-sm text-gray-500">No published books found.</p>
+            ) : filteredBooks.length === 0 ? (
+              <p className="text-sm text-gray-500">
+                {category !== "all" ? "No books match this category." : "No published books found."}
+              </p>
             ) : (
               <>
                 <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-x-4 gap-y-6">
@@ -283,7 +314,9 @@ export function BooksLibraryModal({ show, onClose, initialView = "browse", onMyB
               <p className="text-sm text-gray-500">Loading…</p>
             ) : filteredMyBooks.length === 0 ? (
               <p className="text-sm text-gray-500">
-                {search.trim() ? "No books in My Books match your search." : "You haven't added any books yet. Browse the library to get started."}
+                {search.trim() || category !== "all"
+                  ? "No books in My Books match your search or filter."
+                  : "You haven't added any books yet. Browse the library to get started."}
               </p>
             ) : (
               <>

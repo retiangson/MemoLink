@@ -5,6 +5,7 @@ import { PdfReaderView } from "./book-readers/PdfReaderView";
 import { EpubReaderView } from "./book-readers/EpubReaderView";
 import { PptxReaderView } from "./book-readers/PptxReaderView";
 import { AudioReaderView } from "./book-readers/AudioReaderView";
+import { VideoReaderView } from "./book-readers/VideoReaderView";
 import { TxtReaderView } from "./book-readers/TxtReaderView";
 import { CaptionReaderView } from "./book-readers/CaptionReaderView";
 import { ComicReaderView } from "./book-readers/ComicReaderView";
@@ -104,6 +105,7 @@ export function BookReader({ book, initialPage, onClose, onProgress, onAskAI, ju
       {format === "epub" && <EpubReaderView book={book} initialPage={initialPage} colorMode={colorMode} onProgress={onProgress} jumpToHighlight={jumpToHighlight} onJumpToHighlightHandled={onJumpToHighlightHandled} onHighlightAdded={onHighlightAdded} {...noteSourceProps} />}
       {format === "pptx" && <PptxReaderView book={book} initialPage={initialPage} colorMode={colorMode} onProgress={onProgress} jumpToHighlight={jumpToHighlight} onJumpToHighlightHandled={onJumpToHighlightHandled} onHighlightAdded={onHighlightAdded} {...noteSourceProps} />}
       {format === "audio" && <AudioReaderView book={book} initialPage={initialPage} colorMode={colorMode} onProgress={onProgress} />}
+      {format === "video" && <VideoReaderView book={book} initialPage={initialPage} colorMode={colorMode} onProgress={onProgress} />}
       {format === "txt" && <TxtReaderView book={book} initialPage={initialPage} colorMode={colorMode} onProgress={onProgress} jumpToHighlight={jumpToHighlight} onJumpToHighlightHandled={onJumpToHighlightHandled} onHighlightAdded={onHighlightAdded} {...noteSourceProps} />}
       {(format === "srt" || format === "vtt") && <CaptionReaderView book={book} initialPage={initialPage} colorMode={colorMode} onProgress={onProgress} jumpToHighlight={jumpToHighlight} onJumpToHighlightHandled={onJumpToHighlightHandled} onHighlightAdded={onHighlightAdded} {...noteSourceProps} />}
       {(format === "cbz" || format === "cbr") && <ComicReaderView book={book} initialPage={initialPage} colorMode={colorMode} onProgress={onProgress} />}

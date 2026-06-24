@@ -1,11 +1,14 @@
 import React from "react";
 import type { Book } from "../../api/booksApi";
 import type { ReaderColorMode } from "./format";
+import { formatBytes } from "./format";
 
 interface Props {
   book: Book;
   label?: string;
   colorMode?: ReaderColorMode;
+  /** Bytes downloaded so far; total falls back to book.file_size when the response has no Content-Length. */
+  progress?: { loaded: number; total: number | null } | null;
 }
 
 function cardClass(mode: ReaderColorMode): string {
@@ -20,7 +23,10 @@ function mutedClass(mode: ReaderColorMode): string {
   return "text-gray-500";
 }
 
-export function ReaderLoadingState({ book, label = "Loading book, please wait", colorMode = "dark" }: Props) {
+export function ReaderLoadingState({ book, label = "Loading book, please wait", colorMode = "dark", progress }: Props) {
+  const total = progress?.total ?? book.file_size ?? null;
+  const percent = progress && total ? Math.min(100, Math.round((progress.loaded / total) * 100)) : null;
+
   return (
     <div className="w-full h-full min-h-[280px] flex items-center justify-center px-6 py-10">
       <div className={`w-full max-w-sm rounded-lg border px-6 py-7 shadow-xl ${cardClass(colorMode)}`}>
@@ -43,10 +49,18 @@ export function ReaderLoadingState({ book, label = "Loading book, please wait", 
 
           <div className="w-full">
             <div className={`h-1.5 overflow-hidden rounded-full ${colorMode === "dark" ? "bg-[var(--ml-bg-hover)]" : "bg-black/10"}`}>
-              <div className="h-full w-1/2 rounded-full bg-indigo-400/80 animate-[ml-reader-loading_1.2s_ease-in-out_infinite]" />
+              {percent !== null ? (
+                <div className="h-full rounded-full bg-indigo-400/80 transition-[width] duration-200" style={{ width: `${percent}%` }} />
+              ) : (
+                <div className="h-full w-1/2 rounded-full bg-indigo-400/80 animate-[ml-reader-loading_1.2s_ease-in-out_infinite]" />
+              )}
             </div>
             <p className={`mt-3 text-[11px] ${mutedClass(colorMode)}`}>
-              Preparing a local copy for faster reading next time.
+              {progress
+                ? percent !== null
+                  ? `Downloading… ${formatBytes(progress.loaded)} of ${formatBytes(total!)} (${percent}%)`
+                  : `Downloading… ${formatBytes(progress.loaded)}`
+                : "Preparing a local copy for faster reading next time."}
             </p>
           </div>
         </div>

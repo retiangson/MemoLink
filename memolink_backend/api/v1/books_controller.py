@@ -43,6 +43,10 @@ _EXTENSION_MIME_FALLBACK = {
     ".cbz": "application/vnd.comicbook+zip",
     ".cbr": "application/vnd.comicbook-rar",
     ".mobi": "application/x-mobipocket-ebook",
+    ".mp4": "video/mp4",
+    ".webm": "video/webm",
+    ".mov": "video/quicktime",
+    ".m4v": "video/x-m4v",
 }
 
 

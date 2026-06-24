@@ -10,7 +10,6 @@ import { NoteSourceButton } from "./NoteSourceButton";
 import { HighlightColorPicker } from "./HighlightColorPicker";
 import { PageNavArrows } from "./PageNavArrows";
 import { ReaderLoadingState } from "./ReaderLoadingState";
-import { HighlightActionButton } from "./HighlightActionButton";
 import { parseCaptions, type Cue } from "./captions";
 import { highlightColorMark } from "./highlightColors";
 
@@ -159,6 +158,7 @@ export function CaptionReaderView({
   const [pageAnim, setPageAnim] = useState<"next" | "prev" | null>(null);
   const [pendingSelection, setPendingSelection] = useState<PendingSelection | null>(null);
   const [highlights, setHighlights] = useState<BookHighlight[]>([]);
+  const [progress, setProgress] = useState<{ loaded: number; total: number | null } | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
   const tts = useTTS();
@@ -168,7 +168,8 @@ export function CaptionReaderView({
     let cancelled = false;
     setLoading(true);
     setError(null);
-    fetchBookBlob(book)
+    setProgress(null);
+    fetchBookBlob(book, (loaded, total) => { if (!cancelled) setProgress({ loaded, total }); })
       .then((blob) => blob.text())
       .then((text) => {
         if (cancelled) return;
@@ -178,7 +179,7 @@ export function CaptionReaderView({
         setCurrentPage((cp) => Math.min(Math.max(1, cp), p.length));
       })
       .catch(() => {
-        if (!cancelled) setError("Could not load this file. It may no longer be available in OneDrive.");
+        if (!cancelled) setError("Could not load this file. It may no longer be available in the library.");
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -237,7 +238,7 @@ export function CaptionReaderView({
     setPendingSelection({ x: rect.left + rect.width / 2, y: rect.top, start, end });
   }
 
-  async function handleAddHighlight() {
+  async function handleAddHighlight(colorId: string) {
     if (!pendingSelection) return;
     const fullText = pageJoinedText(pages[currentPage - 1] || []);
     const snippet = fullText.slice(pendingSelection.start, pendingSelection.end);
@@ -247,12 +248,12 @@ export function CaptionReaderView({
       start_offset: pendingSelection.start,
       end_offset: pendingSelection.end,
       snippet,
-      color: highlightColor,
+      color: colorId,
     });
     setHighlights((prev) => [...prev, created]);
     onHighlightAdded?.();
     window.getSelection()?.removeAllRanges();
-    setTimeout(() => setPendingSelection(null), 900);
+    setPendingSelection(null);
   }
 
   // Arrival from a Note double-click: switch to the highlight's page if needed, then pulse
@@ -290,7 +291,7 @@ export function CaptionReaderView({
         {...swipeHandlers}
       >
         {loading ? (
-          <ReaderLoadingState book={book} colorMode={colorMode} />
+          <ReaderLoadingState book={book} colorMode={colorMode} progress={progress} />
         ) : error ? (
           <div className="flex items-center justify-center text-red-400 text-sm">{error}</div>
         ) : (
@@ -320,10 +321,6 @@ export function CaptionReaderView({
           </>
         )}
       </div>
-
-      {pendingSelection && (
-        <HighlightActionButton x={pendingSelection.x} y={pendingSelection.y} onHighlight={handleAddHighlight} />
-      )}
 
       {tts.playing && (
         <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50">
@@ -357,7 +354,7 @@ export function CaptionReaderView({
             >
               {tts.playing ? (tts.paused ? "Resume" : "Pause") : "Read Aloud"}
             </button>
-            <HighlightColorPicker value={highlightColor} onChange={setHighlightColor} />
+            <HighlightColorPicker value={highlightColor} onChange={setHighlightColor} disabled={!pendingSelection} onApply={handleAddHighlight} />
           </div>
 
           <div className="flex items-center gap-2">

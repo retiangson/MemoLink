@@ -5,6 +5,7 @@ const FORMAT_STYLES: Record<BookFormat, { bg: string; fg: string; ring: string; 
   epub: { bg: "bg-sky-500/15", fg: "text-sky-400", ring: "ring-sky-500/30", label: "EPUB" },
   pptx: { bg: "bg-orange-500/15", fg: "text-orange-400", ring: "ring-orange-500/30", label: "PPTX" },
   audio: { bg: "bg-emerald-500/15", fg: "text-emerald-400", ring: "ring-emerald-500/30", label: "Audio" },
+  video: { bg: "bg-fuchsia-500/15", fg: "text-fuchsia-400", ring: "ring-fuchsia-500/30", label: "Video" },
   txt: { bg: "bg-slate-500/15", fg: "text-slate-400", ring: "ring-slate-500/30", label: "TXT" },
   srt: { bg: "bg-violet-500/15", fg: "text-violet-400", ring: "ring-violet-500/30", label: "SRT" },
   vtt: { bg: "bg-cyan-500/15", fg: "text-cyan-400", ring: "ring-cyan-500/30", label: "VTT" },
@@ -50,6 +51,13 @@ export function BookFormatIcon({ format, className = "w-4 h-4" }: { format: Book
           <path d="M4 14.5v-3a8 8 0 0 1 16 0v3" strokeLinecap="round" />
           <path d="M4 14a2 2 0 0 1 2-2h0.8a.9.9 0 0 1 .9.9v3.6a.9.9 0 0 1-.9.9H6a2 2 0 0 1-2-2z" strokeLinejoin="round" />
           <path d="M20 14a2 2 0 0 0-2-2h-0.8a.9.9 0 0 0-.9.9v3.6a.9.9 0 0 0 .9.9H18a2 2 0 0 0 2-2z" strokeLinejoin="round" />
+        </svg>
+      );
+    case "video":
+      return (
+        <svg viewBox="0 0 24 24" fill="none" className={className} stroke="currentColor" strokeWidth={1.7}>
+          <rect x="3" y="5" width="18" height="14" rx="1.5" strokeLinejoin="round" />
+          <path d="M10 9.5v5l4.5-2.5Z" strokeLinejoin="round" strokeLinecap="round" />
         </svg>
       );
     case "txt":

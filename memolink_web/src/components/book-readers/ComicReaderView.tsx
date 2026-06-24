@@ -82,6 +82,7 @@ export function ComicReaderView({ book, initialPage, colorMode, onProgress }: Re
   const [pageLoading, setPageLoading] = useState(false);
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
   const [showBookmarks, setShowBookmarks] = useState(false);
+  const [progress, setProgress] = useState<{ loaded: number; total: number | null } | null>(null);
 
   const sourceRef = useRef<ComicSource | null>(null);
   const urlCacheRef = useRef<Map<number, string>>(new Map());
@@ -90,9 +91,10 @@ export function ComicReaderView({ book, initialPage, colorMode, onProgress }: Re
     let cancelled = false;
     setLoading(true);
     setError(null);
+    setProgress(null);
     (async () => {
       try {
-        const blob = await fetchBookBlob(book);
+        const blob = await fetchBookBlob(book, (loaded, total) => { if (!cancelled) setProgress({ loaded, total }); });
         const buf = await blob.arrayBuffer();
         const ext = (book.file_extension || "").toLowerCase();
         const source = ext === ".cbr" ? await buildCbrSource(buf) : await buildCbzSource(buf);
@@ -101,7 +103,7 @@ export function ComicReaderView({ book, initialPage, colorMode, onProgress }: Re
         setPageCount(source.names.length);
         setCurrentPage((p) => Math.min(Math.max(1, p), Math.max(1, source.names.length)));
       } catch {
-        if (!cancelled) setError("Could not load this comic. It may no longer be available in OneDrive.");
+        if (!cancelled) setError("Could not load this comic. It may no longer be available in the library.");
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -184,7 +186,7 @@ export function ComicReaderView({ book, initialPage, colorMode, onProgress }: Re
         {...swipeHandlers}
       >
         {loading ? (
-          <ReaderLoadingState book={book} colorMode={colorMode} label="Loading comic, please wait" />
+          <ReaderLoadingState book={book} colorMode={colorMode} label="Loading comic, please wait" progress={progress} />
         ) : error ? (
           <div className="flex items-center justify-center text-red-400 text-sm">{error}</div>
         ) : (

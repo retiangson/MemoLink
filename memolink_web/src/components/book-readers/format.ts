@@ -6,6 +6,7 @@ export type BookFormat =
   | "epub"
   | "pptx"
   | "audio"
+  | "video"
   | "txt"
   | "srt"
   | "vtt"
@@ -85,6 +86,7 @@ export function richContentFilter(mode: ReaderColorMode): string {
 }
 
 const AUDIO_EXTENSIONS = new Set([".mp3", ".m4a", ".m4b", ".aac", ".wav", ".ogg"]);
+const VIDEO_EXTENSIONS = new Set([".mp4", ".webm", ".mov", ".m4v"]);
 
 export function getBookFormat(book: Pick<Book, "file_extension" | "mime_type">): BookFormat {
   const ext = (book.file_extension || "").toLowerCase();
@@ -98,6 +100,7 @@ export function getBookFormat(book: Pick<Book, "file_extension" | "mime_type">):
   if (ext === ".cbr") return "cbr";
   if (ext === ".mobi") return "mobi";
   if (AUDIO_EXTENSIONS.has(ext)) return "audio";
+  if (VIDEO_EXTENSIONS.has(ext)) return "video";
 
   const mime = (book.mime_type || "").toLowerCase();
   if (mime === "application/pdf") return "pdf";
@@ -110,8 +113,59 @@ export function getBookFormat(book: Pick<Book, "file_extension" | "mime_type">):
   if (mime === "application/vnd.comicbook-rar") return "cbr";
   if (mime === "application/x-mobipocket-ebook") return "mobi";
   if (mime.startsWith("audio/")) return "audio";
+  if (mime.startsWith("video/")) return "video";
 
   return "unsupported";
+}
+
+/** Coarse, user-facing groupings of BookFormat for library filtering (see BooksLibraryModal). */
+export type BookCategory = "ebook" | "pdf" | "audiobook" | "video" | "comic" | "presentation" | "text";
+
+export const BOOK_CATEGORY_LABELS: Record<BookCategory, string> = {
+  ebook: "eBooks",
+  pdf: "PDF",
+  audiobook: "Audiobooks",
+  video: "Videos",
+  comic: "Comics",
+  presentation: "Presentations",
+  text: "Text & Captions",
+};
+
+export function getBookCategory(format: BookFormat): BookCategory | null {
+  switch (format) {
+    case "epub":
+    case "mobi":
+      return "ebook";
+    case "pdf":
+      return "pdf";
+    case "audio":
+      return "audiobook";
+    case "video":
+      return "video";
+    case "cbz":
+    case "cbr":
+      return "comic";
+    case "pptx":
+      return "presentation";
+    case "txt":
+    case "srt":
+    case "vtt":
+      return "text";
+    default:
+      return null;
+  }
+}
+
+export function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  const units = ["KB", "MB", "GB"];
+  let value = bytes / 1024;
+  let i = 0;
+  while (value >= 1024 && i < units.length - 1) {
+    value /= 1024;
+    i++;
+  }
+  return `${value.toFixed(value >= 10 ? 0 : 1)} ${units[i]}`;
 }
 
 export function formatTimestamp(seconds: number): string {

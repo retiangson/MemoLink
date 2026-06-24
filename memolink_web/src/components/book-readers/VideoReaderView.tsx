@@ -9,8 +9,10 @@ import { ReaderLoadingState } from "./ReaderLoadingState";
 
 const SPEEDS = [1, 1.25, 1.5, 1.75, 2];
 
-export function AudioReaderView({ book, initialPage, colorMode, onProgress }: ReaderViewProps) {
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+// Videos have no extractable text, so this reader has no TTS, highlight, or
+// note-source UI — same reduced toolbar as AudioReaderView/ComicReaderView.
+export function VideoReaderView({ book, initialPage, colorMode, onProgress }: ReaderViewProps) {
+  const videoRef = useRef<HTMLVideoElement | null>(null);
   const objectUrlRef = useRef<string | null>(null);
   const seekedToInitialRef = useRef(false);
 
@@ -42,7 +44,7 @@ export function AudioReaderView({ book, initialPage, colorMode, onProgress }: Re
         setLoading(false);
       } catch {
         if (!cancelled) {
-          setError("Could not load this book. It may no longer be available in the library.");
+          setError("Could not load this video. It may no longer be available in the library.");
           setLoading(false);
         }
       }
@@ -69,7 +71,7 @@ export function AudioReaderView({ book, initialPage, colorMode, onProgress }: Re
   }, [currentTime, duration, loading, book.id, onProgress]);
 
   function handleLoadedMetadata() {
-    const el = audioRef.current;
+    const el = videoRef.current;
     if (!el) return;
     setDuration(el.duration || 0);
     if (!seekedToInitialRef.current && initialPage > 0) {
@@ -79,7 +81,7 @@ export function AudioReaderView({ book, initialPage, colorMode, onProgress }: Re
   }
 
   function togglePlay() {
-    const el = audioRef.current;
+    const el = videoRef.current;
     if (!el) return;
     if (el.paused) {
       el.play();
@@ -91,20 +93,20 @@ export function AudioReaderView({ book, initialPage, colorMode, onProgress }: Re
   }
 
   function seekBy(deltaSeconds: number) {
-    const el = audioRef.current;
+    const el = videoRef.current;
     if (!el) return;
     el.currentTime = Math.min(Math.max(0, el.currentTime + deltaSeconds), duration || el.currentTime + deltaSeconds);
   }
 
   function seekTo(seconds: number) {
-    const el = audioRef.current;
+    const el = videoRef.current;
     if (!el) return;
     el.currentTime = Math.min(Math.max(0, seconds), duration || seconds);
   }
 
   function changeSpeed(next: number) {
     setSpeed(next);
-    if (audioRef.current) audioRef.current.playbackRate = next;
+    if (videoRef.current) videoRef.current.playbackRate = next;
   }
 
   async function handleBookmark() {
@@ -121,28 +123,24 @@ export function AudioReaderView({ book, initialPage, colorMode, onProgress }: Re
 
   return (
     <>
-      <audio
-        ref={audioRef}
-        src={src ?? undefined}
-        onLoadedMetadata={handleLoadedMetadata}
-        onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
-        onPlay={() => setPlaying(true)}
-        onPause={() => setPlaying(false)}
-        onEnded={() => setPlaying(false)}
-        className="hidden"
-      />
-      <div className={`flex-1 overflow-auto flex items-center justify-center px-4 transition-colors ${readerSurfaceClass(colorMode)}`}>
+      <div className={`flex-1 overflow-auto flex items-center justify-center px-4 py-6 transition-colors ${readerSurfaceClass(colorMode)}`}>
         {loading ? (
-          <ReaderLoadingState book={book} label="Loading audiobook, please wait" colorMode={colorMode} progress={progress} />
+          <ReaderLoadingState book={book} label="Loading video, please wait" colorMode={colorMode} progress={progress} />
         ) : error ? (
           <div className="text-red-400 text-sm">{error}</div>
         ) : (
-          <div className="w-full max-w-md flex flex-col items-center gap-6 py-10">
-            <div className="w-40 h-40 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center">
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-16 h-16 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 19V6l12-2v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-2c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2z" />
-              </svg>
-            </div>
+          <div className="w-full max-w-3xl flex flex-col items-center gap-5">
+            <video
+              ref={videoRef}
+              src={src ?? undefined}
+              onLoadedMetadata={handleLoadedMetadata}
+              onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
+              onPlay={() => setPlaying(true)}
+              onPause={() => setPlaying(false)}
+              onEnded={() => setPlaying(false)}
+              onClick={togglePlay}
+              className="w-full max-h-[70vh] rounded-lg bg-black shadow-lg"
+            />
 
             <div className="w-full flex flex-col gap-1.5">
               <input
@@ -200,7 +198,7 @@ export function AudioReaderView({ book, initialPage, colorMode, onProgress }: Re
 
       {!loading && !error && (
         <div className="flex items-center justify-between px-5 py-3 border-t border-[var(--ml-bg-hover)] shrink-0 gap-3">
-          <span className="text-xs text-gray-600">Audiobook</span>
+          <span className="text-xs text-gray-600">Video</span>
           <div className="flex items-center gap-2">
             <button
               onClick={handleBookmark}

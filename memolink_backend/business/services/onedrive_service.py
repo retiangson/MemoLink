@@ -25,6 +25,7 @@ SUPPORTED_EXTENSIONS = {
     ".pdf", ".epub", ".pptx",
     ".mp3", ".m4a", ".m4b", ".aac", ".wav", ".ogg",
     ".txt", ".srt", ".vtt", ".cbz", ".cbr", ".mobi",
+    ".mp4", ".webm", ".mov", ".m4v",
 }
 # Legacy binary .ppt is intentionally excluded — python-pptx (used by the reader and
 # note extraction) cannot parse it, matching the existing rejection in file_extractor.py.
