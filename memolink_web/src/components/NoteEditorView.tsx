@@ -94,6 +94,15 @@ export function NoteEditorView({
     });
   });
 
+  function readableTextBetween(doc: any, from: number, to: number): string {
+    return doc.textBetween(from, to, " ", (node: any) => {
+      if (node.type?.name !== "bookHighlightBlock") return "";
+      const snippet = String(node.attrs?.snippet ?? "").trim();
+      const citation = String(node.attrs?.citation ?? "").trim();
+      return [snippet, citation].filter(Boolean).join(" ");
+    });
+  }
+
   function stopRecording() {
     recording.stopRecording();
   }
@@ -126,16 +135,17 @@ export function NoteEditorView({
         const paraStart = $from.depth > 0 ? $from.start($from.depth) : 0;
         // Text from the paragraph start up to the cursor; the last sentence
         // terminator (. ! ? or newline) before the cursor marks the sentence start.
-        const before = doc.textBetween(paraStart, from, " ");
+        const before = readableTextBetween(doc, paraStart, from);
         const m = before.match(/[\s\S]*[.!?\n]\s*/);
         fromPos = paraStart + (m ? m[0].length : 0);
       }
-      rawDocText = doc.textBetween(fromPos, doc.content.size, " ");
-      if (!rawDocText.trim()) { fromPos = 0; rawDocText = doc.textBetween(0, doc.content.size, " "); }
+      rawDocText = readableTextBetween(doc, fromPos, doc.content.size);
+      if (!rawDocText.trim()) { fromPos = 0; rawDocText = readableTextBetween(doc, 0, doc.content.size); }
     } else {
       rawDocText = noteContentDraft.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
     }
     const trimmedDocText = rawDocText.trim();
+    if (!trimmedDocText) return;
     speakStartDocPos.current = fromPos;
     speakDocTrimOffset.current = rawDocText.length - rawDocText.trimStart().length;
     speakDocText.current = trimmedDocText;

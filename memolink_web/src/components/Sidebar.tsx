@@ -12,6 +12,7 @@ function fmtClock(s: number): string {
 
 interface SidebarProps {
   open: boolean;
+  overlay?: boolean;
   onClose: () => void;
   notes: Note[];
   setNotes: React.Dispatch<React.SetStateAction<any[]>>;
@@ -37,7 +38,7 @@ interface SidebarProps {
 }
 
 export function Sidebar({
-  open, onClose, notes, setNotes,
+  open, overlay = false, onClose, notes, setNotes,
   showNotes, setShowNotes, showConversations, setShowConversations,
   conversations, activeConversation,
   onNoteClick, onNewNote, onNoteMenu,
@@ -52,9 +53,11 @@ export function Sidebar({
 
   return (
     <>
-      {/* Mobile backdrop */}
-      <div className="fixed inset-0 bg-black/60 z-40 sm:hidden" onClick={onClose} />
-      <aside id="tour-sidebar" className="fixed inset-y-0 left-0 z-50 sm:relative sm:inset-auto w-[300px] h-full bg-[var(--ml-bg-base)] border-r border-[var(--ml-bg-panel)] flex flex-col flex-shrink-0">
+      {overlay && <div className="fixed inset-0 bg-black/60 z-40" onClick={onClose} />}
+      <aside
+        id="tour-sidebar"
+        className={`${overlay ? "fixed inset-y-0 left-0 z-50" : "relative"} w-[300px] h-full bg-[var(--ml-bg-base)] border-r border-[var(--ml-bg-panel)] flex flex-col flex-shrink-0`}
+      >
       <div className="px-4 py-3 border-b border-[var(--ml-bg-panel)] flex justify-between items-center">
         <div className="flex items-center gap-2 min-w-0">
           <img

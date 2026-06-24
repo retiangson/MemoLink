@@ -20,6 +20,7 @@ import { BookFormatIcon, getFormatStyle } from "./BookFormatIcon";
 
 interface RightPanelProps {
   open: boolean;
+  overlay?: boolean;
   onClose: () => void;
   items: SuggestionItem[];
   isGenerating: boolean;
@@ -57,11 +58,8 @@ interface RightPanelProps {
   spotifyRepeatMode: SpotifyRepeatMode;
   onSpotifyPrevious: () => void;
   onSpotifyTogglePlay: () => void;
-  onSpotifyStop: () => void;
   onSpotifyNext: () => void;
   onSpotifySelectTrack: (track: SpotifyApiTrack) => void;
-  onSpotifyShuffle: (shuffle: boolean) => void;
-  onSpotifyCycleRepeat: () => void;
   onSpotifySeek: (positionMs: number) => void;
   onOpenSpotifyTab: () => void;
   calendarEvents?: CalendarOccurrence[];
@@ -101,7 +99,7 @@ function SectionDragHandle() {
 }
 
 export function RightPanel({
-  open, onClose, items, isGenerating,
+  open, overlay = false, onClose, items, isGenerating,
   onAddManual, onToggleDone, onUpdate, onRemove, onClearDone,
   onGenerate, notificationPermission, onRequestNotificationPermission,
   emailConnected, emailAccounts = [],
@@ -113,7 +111,7 @@ export function RightPanel({
   insightsEnabled, workspaceId, onOpenNote,
   spotifyTrack, spotifyQueueTracks, spotifyPlaying, spotifyConnected, spotifyProgressMs, spotifyDurationMs,
   spotifyShuffle, spotifyRepeatMode,
-  onSpotifyPrevious, onSpotifyTogglePlay, onSpotifyStop, onSpotifyNext, onSpotifySelectTrack, onSpotifyShuffle, onSpotifyCycleRepeat, onSpotifySeek, onOpenSpotifyTab,
+  onSpotifyPrevious, onSpotifyTogglePlay, onSpotifyNext, onSpotifySelectTrack, onSpotifySeek, onOpenSpotifyTab,
   calendarEvents = [], calendarLoading, onOpenCalendarTab,
   booksEnabled, myBooks = [], onOpenBrowseBooks, onOpenMyBooks, onOpenBookReader,
 }: RightPanelProps) {
@@ -447,9 +445,11 @@ export function RightPanel({
 
   return (
     <>
-      {/* Mobile backdrop */}
-      <div className="fixed inset-0 bg-black/60 z-40 sm:hidden" onClick={onClose} />
-      <div id="tour-right-panel" className="fixed inset-y-0 right-0 z-50 sm:relative sm:inset-auto w-72 h-full flex flex-col bg-[var(--ml-bg-base)] border-l border-[var(--ml-bg-panel)] shrink-0">
+      {overlay && <div className="fixed inset-0 bg-black/60 z-40" onClick={onClose} />}
+      <div
+        id="tour-right-panel"
+        className={`${overlay ? "fixed inset-y-0 right-0 z-50" : "relative"} w-72 h-full flex flex-col bg-[var(--ml-bg-base)] border-l border-[var(--ml-bg-panel)] shrink-0`}
+      >
 
       {/* Header */}
       <div className="h-10 flex items-center justify-between px-4 border-b border-[var(--ml-bg-panel)] shrink-0 bg-[var(--ml-bg-bar)]">
@@ -1104,15 +1104,10 @@ export function RightPanel({
           progressMs={spotifyProgressMs}
           durationMs={spotifyDurationMs}
           showList={showSpotifyList}
-          shuffle={spotifyShuffle}
-          repeatMode={spotifyRepeatMode}
           onPrevious={onSpotifyPrevious}
           onTogglePlay={onSpotifyTogglePlay}
-          onStop={onSpotifyStop}
           onNext={onSpotifyNext}
           onSelectTrack={onSpotifySelectTrack}
-          onToggleShuffle={() => onSpotifyShuffle(!spotifyShuffle)}
-          onCycleRepeat={onSpotifyCycleRepeat}
           onSeek={onSpotifySeek}
           onToggleList={() => setShowSpotifyList((v) => !v)}
           onOpenFull={onOpenSpotifyTab}

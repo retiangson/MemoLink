@@ -68,7 +68,7 @@ import { BooksLibraryModal } from "../components/BooksLibraryModal";
 import { BookReader } from "../components/BookReader";
 import { useBookTabs } from "../hooks/useBookTabs";
 import { listMyBooks, getBook, getBookHighlight, type Book } from "../api/booksApi";
-import { useIsDesktop } from "../hooks/useIsDesktop";
+import { DESKTOP_LAYOUT_MIN_WIDTH, useIsDesktop } from "../hooks/useIsDesktop";
 
 type WorkspaceHook = ReturnType<typeof useWorkspace>;
 type LayoutMode = "stacked" | "columns" | "rows";
@@ -99,9 +99,10 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
   const whatsappTabs = useWhatsappTabs();
   const [emailActionLoadingId, setEmailActionLoadingId] = useState<string | null>(null);
   const [rightPanelOpen, setRightPanelOpen] = useState(isDesktop);
+  const activeLayoutMode: LayoutMode = isDesktop ? layoutMode : "stacked";
 
-  // Re-sync both panels whenever the viewport crosses the sm breakpoint (resize,
-  // orientation change, devtools device toolbar) instead of only checking at mount.
+  // Re-sync both panels whenever the viewport crosses the desktop breakpoint
+  // (resize, orientation change, devtools device toolbar) instead of only checking at mount.
   useEffect(() => {
     setSidebarOpen(isDesktop);
     setRightPanelOpen(isDesktop);
@@ -151,7 +152,9 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
   const [spotifyLibrary, setSpotifyLibrary] = useState<{ playlists: SpotifyApiPlaylist[]; tracks: SpotifyApiTrack[] }>({ playlists: [], tracks: [] });
   const [spotifyQueueContext, setSpotifyQueueContext] = useState<SpotifyApiTrack[] | null>(null);
   const spotifyPlayer = useSpotifyPlayer(spotifyConnected);
-  const spotifyPlaying = !spotifyPlayer.isPaused;
+  const [spotifyOptimisticPaused, setSpotifyOptimisticPaused] = useState<boolean | null>(null);
+  const spotifyPaused = spotifyOptimisticPaused ?? spotifyPlayer.isPaused;
+  const spotifyPlaying = !spotifyPaused;
   const [showTour, setShowTour] = useState(() => !localStorage.getItem("memolink_walkthrough_done"));
   const [bellTooltipVisible, setBellTooltipVisible] = useState(false);
 
@@ -175,6 +178,9 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
   function handleLayoutChange(mode: LayoutMode) {
     setLayoutMode(mode);
     localStorage.setItem("memolink_layout", mode);
+  }
+  function closeSidebarOnCompactLayout() {
+    if (window.innerWidth < DESKTOP_LAYOUT_MIN_WIDTH) setSidebarOpen(false);
   }
   function handleColRatio(r: number) { setColRatio(r); localStorage.setItem("memolink_split_col", String(r)); }
   function handleRowRatio(r: number) { setRowRatio(r); localStorage.setItem("memolink_split_row", String(r)); }
@@ -265,6 +271,8 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
   useEffect(() => {
     if (!spotifyConnected) {
       setSpotifyLibrary({ playlists: [], tracks: [] });
+      setSpotifyQueueContext(null);
+      setSpotifyOptimisticPaused(null);
       return;
     }
     let cancelled = false;
@@ -273,6 +281,12 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
       .catch(() => {});
     return () => { cancelled = true; };
   }, [spotifyConnected]);
+
+  useEffect(() => {
+    if (spotifyOptimisticPaused !== null && spotifyPlayer.isPaused === spotifyOptimisticPaused) {
+      setSpotifyOptimisticPaused(null);
+    }
+  }, [spotifyPlayer.isPaused, spotifyOptimisticPaused]);
 
   // Open the relevant modal after OAuth redirects
   useEffect(() => {
@@ -920,12 +934,12 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
     await sendSpotifyPlayback("next");
   }
 
-  async function handleSpotifyStop() {
-    await sendSpotifyPlayback("stop");
-  }
-
-  function handleSpotifyTogglePlay() {
-    void sendSpotifyPlayback(spotifyPlayer.isPaused ? "play" : "pause");
+  async function handleSpotifyTogglePlay() {
+    const nextPaused = !spotifyPaused;
+    const previous = spotifyPaused;
+    setSpotifyOptimisticPaused(nextPaused);
+    const ok = await sendSpotifyPlayback(nextPaused ? "pause" : "play");
+    if (!ok) setSpotifyOptimisticPaused(previous);
   }
 
   async function handleEmailArchive() {
@@ -1041,18 +1055,19 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
         setShowConversations={setShowConversations}
         conversations={convs.conversations}
         activeConversation={convs.activeConversation}
-        onNoteClick={(note: Note) => { handleOpenNote(note); if (window.innerWidth < 640) setSidebarOpen(false); }}
-        onNewNote={() => { handleOpenNote({ id: null, title: "", content: "" }); if (window.innerWidth < 640) setSidebarOpen(false); }}
+        overlay={!isDesktop}
+        onNoteClick={(note: Note) => { handleOpenNote(note); closeSidebarOnCompactLayout(); }}
+        onNewNote={() => { handleOpenNote({ id: null, title: "", content: "" }); closeSidebarOnCompactLayout(); }}
         onNoteMenu={(note: Note, rect: DOMRect) => setMenuData({ type: "note", item: note, top: rect.bottom + 4, left: rect.right - 160 })}
-        onConversationClick={(conv: Conversation) => { convs.handleSelectConversation(conv); setActiveTabType("chat"); if (window.innerWidth < 640) setSidebarOpen(false); }}
+        onConversationClick={(conv: Conversation) => { convs.handleSelectConversation(conv); setActiveTabType("chat"); closeSidebarOnCompactLayout(); }}
         onNewChat={() => {
           if (convs.activeConversation?.id === TEMP_ID && !convs.activeConversation.messages.length) {
-            setActiveTabType("chat"); chat.textareaRef.current?.focus(); if (window.innerWidth < 640) setSidebarOpen(false); return;
+            setActiveTabType("chat"); chat.textareaRef.current?.focus(); closeSidebarOnCompactLayout(); return;
           }
           convs.startNewChat();
           setActiveTabType("chat");
           setTimeout(() => chat.textareaRef.current?.focus(), 0);
-          if (window.innerWidth < 640) setSidebarOpen(false);
+          closeSidebarOnCompactLayout();
         }}
         onConversationMenu={(conv: Conversation, rect: DOMRect) => setMenuData({ type: "conversation", item: conv, top: rect.bottom + 4, left: rect.right - 160 })}
         onOpenRecycleBin={() => setRecycleBinOpen(true)}
@@ -1111,7 +1126,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
           <div className="flex items-center overflow-x-auto flex-1">
 
             {/* Chat tabs */}
-            {layoutMode === "stacked" && convs.openChats.map((chat, i) => {
+            {activeLayoutMode === "stacked" && convs.openChats.map((chat, i) => {
               const isActive = activeTabType === "chat" && convs.activeConversation?.id === chat.id;
               const isDragOver = dragOverTab?.type === "chat" && dragOverTab.index === i && dragSrcRef.current?.index !== i;
               return (
@@ -1148,7 +1163,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
             })}
 
             {/* Note tabs */}
-            {layoutMode === "stacked" && editor.openNotes.map((note, i) => {
+            {activeLayoutMode === "stacked" && editor.openNotes.map((note, i) => {
               const isActive = activeTabType === "note" && editor.activeIndex === i;
               const isDragOver = dragOverTab?.type === "note" && dragOverTab.index === i && dragSrcRef.current?.index !== i;
               return (
@@ -1185,7 +1200,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
             })}
 
             {/* Email tabs */}
-            {layoutMode === "stacked" && emailTabs.openTabs.map((tab, i) => {
+            {activeLayoutMode === "stacked" && emailTabs.openTabs.map((tab, i) => {
               const isActive = activeTabType === "email" && emailTabs.activeIndex === i;
               const isDragOver = dragOverTab?.type === "email" && dragOverTab.index === i && dragSrcRef.current?.index !== i;
               return (
@@ -1217,7 +1232,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
             })}
 
             {/* WhatsApp tabs */}
-            {layoutMode === "stacked" && whatsappTabs.openTabs.map((tab, i) => {
+            {activeLayoutMode === "stacked" && whatsappTabs.openTabs.map((tab, i) => {
               const isActive = activeTabType === "whatsapp" && whatsappTabs.activeIndex === i;
               const isDragOver = dragOverTab?.type === "whatsapp" && dragOverTab.index === i && dragSrcRef.current?.index !== i;
               return (
@@ -1243,7 +1258,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
             })}
 
             {/* Spotify app tab */}
-            {layoutMode === "stacked" && spotifyTabOpen && (
+            {activeLayoutMode === "stacked" && spotifyTabOpen && (
               <div
                 onClick={() => setActiveTabType("spotify")}
                 className={`flex items-center gap-1.5 px-3 h-10 text-xs cursor-pointer border-b-2 transition shrink-0 select-none ${
@@ -1264,7 +1279,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
             )}
 
             {/* Calendar app tab */}
-            {layoutMode === "stacked" && calendarTabOpen && (
+            {activeLayoutMode === "stacked" && calendarTabOpen && (
               <div
                 onClick={() => setActiveTabType("calendar")}
                 className={`flex items-center gap-1.5 px-3 h-10 text-xs cursor-pointer border-b-2 transition shrink-0 select-none ${
@@ -1285,7 +1300,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
             )}
 
             {/* Books app tab */}
-            {layoutMode === "stacked" && booksTabOpen && (
+            {activeLayoutMode === "stacked" && booksTabOpen && (
               <div
                 onClick={() => setActiveTabType("books")}
                 className={`flex items-center gap-1.5 px-3 h-10 text-xs cursor-pointer border-b-2 transition shrink-0 select-none ${
@@ -1306,7 +1321,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
             )}
 
             {/* Book reader tabs — each opened book gets its own tab */}
-            {layoutMode === "stacked" && bookTabs.openTabs.map((tab, i) => {
+            {activeLayoutMode === "stacked" && bookTabs.openTabs.map((tab, i) => {
               const isActive = activeTabType === "book" && bookTabs.activeIndex === i;
               return (
                 <div
@@ -1390,51 +1405,52 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
 
               {userMenuOpen && (
                 <>
-                  <div className="fixed inset-0 z-[9998] bg-black/50 sm:hidden" onClick={() => setUserMenuOpen(false)} />
-                  <div className="fixed inset-x-0 bottom-0 z-[9999] rounded-t-2xl max-h-[70vh] overflow-y-auto sm:absolute sm:inset-auto sm:right-0 sm:top-full sm:mt-2 sm:rounded-xl sm:w-52 sm:max-h-none bg-[var(--ml-bg-panel)] border border-[var(--ml-bg-hover)] shadow-2xl py-1">
+                  {!isDesktop && <div className="fixed inset-0 z-[9998] bg-black/50" onClick={() => setUserMenuOpen(false)} />}
+                  <div className={`${isDesktop ? "absolute right-0 top-full mt-2 rounded-xl w-52 max-h-none" : "fixed inset-x-0 bottom-0 rounded-t-2xl max-h-[70vh]"} z-[9999] overflow-y-auto bg-[var(--ml-bg-panel)] border border-[var(--ml-bg-hover)] shadow-2xl py-1`}>
                   {/* Email header */}
                   <div className="px-3 py-2.5 border-b border-[var(--ml-bg-hover)]">
                     <p className="text-[11px] text-gray-500 truncate">{user.email}</p>
                   </div>
 
-                  {/* Layout orientation */}
-                  <div className="px-3 py-2 border-b border-[var(--ml-bg-hover)]">
-                    <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1.5">Layout</p>
-                    <div className="flex gap-1">
-                      {([
-                        ["stacked", "Stacked"] as const,
-                        ["columns", "Side by side"] as const,
-                        ["rows", "Top / bottom"] as const,
-                      ]).map(([mode, label], idx) => (
-                        <button
-                          key={mode}
-                          title={label}
-                          onClick={() => { handleLayoutChange(mode); setUserMenuOpen(false); }}
-                          className={`flex-1 flex flex-col items-center gap-1 py-1.5 rounded-lg transition text-[10px] ${layoutMode === mode ? "bg-indigo-600 text-white" : "text-gray-400 hover:bg-[var(--ml-bg-hover)] hover:text-gray-200"}`}
-                        >
-                          {idx === 0 && (
-                            <svg viewBox="0 0 16 16" className="w-4 h-4" fill="currentColor">
-                              <rect x="2" y="3" width="12" height="4" rx="1"/>
-                              <rect x="2" y="9" width="12" height="4" rx="1"/>
-                            </svg>
-                          )}
-                          {idx === 1 && (
-                            <svg viewBox="0 0 16 16" className="w-4 h-4" fill="currentColor">
-                              <rect x="2" y="3" width="5" height="10" rx="1"/>
-                              <rect x="9" y="3" width="5" height="10" rx="1"/>
-                            </svg>
-                          )}
-                          {idx === 2 && (
-                            <svg viewBox="0 0 16 16" className="w-4 h-4" fill="currentColor">
-                              <rect x="2" y="2" width="12" height="5" rx="1"/>
-                              <rect x="2" y="9" width="12" height="5" rx="1"/>
-                            </svg>
-                          )}
-                          <span>{label}</span>
-                        </button>
-                      ))}
+                  {isDesktop && (
+                    <div className="px-3 py-2 border-b border-[var(--ml-bg-hover)]">
+                      <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1.5">Layout</p>
+                      <div className="flex gap-1">
+                        {([
+                          ["stacked", "Stacked"] as const,
+                          ["columns", "Side by side"] as const,
+                          ["rows", "Top / bottom"] as const,
+                        ]).map(([mode, label], idx) => (
+                          <button
+                            key={mode}
+                            title={label}
+                            onClick={() => { handleLayoutChange(mode); setUserMenuOpen(false); }}
+                            className={`flex-1 flex flex-col items-center gap-1 py-1.5 rounded-lg transition text-[10px] ${layoutMode === mode ? "bg-indigo-600 text-white" : "text-gray-400 hover:bg-[var(--ml-bg-hover)] hover:text-gray-200"}`}
+                          >
+                            {idx === 0 && (
+                              <svg viewBox="0 0 16 16" className="w-4 h-4" fill="currentColor">
+                                <rect x="2" y="3" width="12" height="4" rx="1"/>
+                                <rect x="2" y="9" width="12" height="4" rx="1"/>
+                              </svg>
+                            )}
+                            {idx === 1 && (
+                              <svg viewBox="0 0 16 16" className="w-4 h-4" fill="currentColor">
+                                <rect x="2" y="3" width="5" height="10" rx="1"/>
+                                <rect x="9" y="3" width="5" height="10" rx="1"/>
+                              </svg>
+                            )}
+                            {idx === 2 && (
+                              <svg viewBox="0 0 16 16" className="w-4 h-4" fill="currentColor">
+                                <rect x="2" y="2" width="12" height="5" rx="1"/>
+                                <rect x="2" y="9" width="12" height="5" rx="1"/>
+                              </svg>
+                            )}
+                            <span>{label}</span>
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                  </div>
+                  )}
 
                   {/* Theme */}
                   <div className="px-3 py-2 border-b border-[var(--ml-bg-hover)]">
@@ -1613,14 +1629,13 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
 
 
         {/* ── Content area ─────────────────────────────────────────────── */}
-        {layoutMode === "stacked" ? (
+        {activeLayoutMode === "stacked" ? (
           isSpotifyActive ? (
             <SpotifyFullPlayer
               track={spotifyPlayer.liveTrack}
               isPlaying={spotifyPlaying}
               onPrevious={handleSpotifyPrevious}
               onTogglePlay={handleSpotifyTogglePlay}
-              onStop={handleSpotifyStop}
               onNext={handleSpotifyNext}
               onPlayUri={handleSpotifyPlayUri}
               shuffle={spotifyShuffle}
@@ -1828,9 +1843,9 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
           )
         ) : (
           <SplitPane
-            direction={layoutMode === "columns" ? "horizontal" : "vertical"}
-            ratio={layoutMode === "columns" ? colRatio : rowRatio}
-            onRatioChange={layoutMode === "columns" ? handleColRatio : handleRowRatio}
+            direction={activeLayoutMode === "columns" ? "horizontal" : "vertical"}
+            ratio={activeLayoutMode === "columns" ? colRatio : rowRatio}
+            onRatioChange={activeLayoutMode === "columns" ? handleColRatio : handleRowRatio}
             first={
               <div className="flex flex-col h-full min-h-0 bg-[var(--ml-bg-base)]">
                 {/* Chat panel mini tab bar */}
@@ -2073,6 +2088,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
 
       <RightPanel
         open={rightPanelOpen}
+        overlay={!isDesktop}
         onClose={() => setRightPanelOpen(false)}
         items={suggestions.items}
         isGenerating={suggestions.isGenerating}
@@ -2113,11 +2129,8 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
         spotifyRepeatMode={spotifyRepeatMode}
         onSpotifyPrevious={handleSpotifyPrevious}
         onSpotifyTogglePlay={handleSpotifyTogglePlay}
-        onSpotifyStop={handleSpotifyStop}
         onSpotifyNext={handleSpotifyNext}
         onSpotifySelectTrack={handleSpotifySelectTrack}
-        onSpotifyShuffle={handleSpotifyShuffle}
-        onSpotifyCycleRepeat={handleSpotifyCycleRepeat}
         onSpotifySeek={handleSpotifySeek}
         onOpenSpotifyTab={openSpotifyInTab}
         calendarEvents={calendar.events}

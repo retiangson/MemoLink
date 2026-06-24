@@ -337,6 +337,16 @@ class ConnectorsService:
         fallback = active or (controllable[0] if controllable else None)
         return fallback.get("id") if fallback else None
 
+    async def _activate_spotify_device(self, user_id: int, device_id: str | None) -> None:
+        if not device_id:
+            return
+        await self._spotify_request(
+            user_id,
+            "PUT",
+            "https://api.spotify.com/v1/me/player",
+            json_body={"device_ids": [device_id], "play": False},
+        )
+
     async def search_spotify(self, user_id: int, query: str) -> dict[str, Any]:
         data = await self._spotify_request(
             user_id,
@@ -383,6 +393,8 @@ class ConnectorsService:
 
         method, url = action_map[action]
         target_device_id = await self._resolve_spotify_device_id(user_id, device_id)
+        if target_device_id:
+            await self._activate_spotify_device(user_id, target_device_id)
         body: dict[str, Any] | None = None
         if action == "play":
             if context_uri and uri:
@@ -418,14 +430,6 @@ class ConnectorsService:
             }
             await self._spotify_request(user_id, method, url, params=params)
             return {"ok": True}
-
-        if target_device_id and action == "play":
-            await self._spotify_request(
-                user_id,
-                "PUT",
-                "https://api.spotify.com/v1/me/player",
-                json_body={"device_ids": [target_device_id], "play": False},
-            )
 
         params = {"device_id": target_device_id} if target_device_id else None
         await self._spotify_request(user_id, method, url, params=params, json_body=body)

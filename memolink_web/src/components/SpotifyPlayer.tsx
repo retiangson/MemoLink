@@ -10,7 +10,6 @@ interface SpotifyControlState {
   isPlaying: boolean;
   onPrevious: () => void;
   onTogglePlay: () => void;
-  onStop: () => void;
   onNext: () => void;
 }
 
@@ -20,10 +19,6 @@ interface SpotifyMiniPlayerProps extends SpotifyControlState {
   progressMs: number;
   durationMs: number;
   showList: boolean;
-  shuffle: boolean;
-  repeatMode: SpotifyRepeatMode;
-  onToggleShuffle: () => void;
-  onCycleRepeat: () => void;
   onSeek: (positionMs: number) => void;
   onToggleList: () => void;
   onOpenFull: () => void;
@@ -61,29 +56,6 @@ function Equalizer({ active }: { active: boolean }) {
   );
 }
 
-function ShuffleIcon({ className = "h-3.5 w-3.5" }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 16 16" className={className} fill="currentColor">
-      <path d="M11 2.5h2.5a.5.5 0 0 1 .5.5v2.5a.5.5 0 0 1-1 0V4.2l-2.65 2.65a.5.5 0 0 1-.7-.7L12.3 3.5H11a.5.5 0 0 1 0-1M2 4a.5.5 0 0 1 .5-.5h2.1a1.5 1.5 0 0 1 1.16.55l5.49 6.77a.5.5 0 0 1 1.25.68h2.1a.5.5 0 0 1 0 1h-2.1a1.5 1.5 0 0 1-1.16-.55L5.85 5.18a.5.5 0 0 0-.39-.18H2.5A.5.5 0 0 1 2 4m9.04 7.85 2.66 2.65H11a.5.5 0 0 0 0 1h2.5a.5.5 0 0 0 .5-.5v-2.5a.5.5 0 0 0-1 0v1.3l-2.65-2.65a.5.5 0 0 0-.71.7M2.5 12.5a.5.5 0 0 0 0 1h2.1a1.5 1.5 0 0 0 1.16-.55l1.27-1.56a.5.5 0 0 0-.78-.63l-1.26 1.56a.5.5 0 0 1-.39.18z"/>
-    </svg>
-  );
-}
-
-function RepeatIcon({ mode, className = "h-3.5 w-3.5" }: { mode: SpotifyRepeatMode; className?: string }) {
-  return (
-    <span className="relative inline-flex">
-      <svg viewBox="0 0 16 16" className={className} fill="currentColor">
-        <path d="M4.5 3.5h6A2.5 2.5 0 0 1 13 6v1.5a.5.5 0 0 1-1 0V6a1.5 1.5 0 0 0-1.5-1.5h-6a.5.5 0 0 1 0-1m-1.3.65 1.3 1.3a.5.5 0 1 1-.7.7l-2-2a.5.5 0 0 1 0-.7l2-2a.5.5 0 1 1 .7.7zM11.5 12.5h-6A2.5 2.5 0 0 1 3 10V8.5a.5.5 0 0 1 1 0V10a1.5 1.5 0 0 0 1.5 1.5h6a.5.5 0 0 1 0 1m1.3-.65-1.3-1.3a.5.5 0 1 1 .7-.7l2 2a.5.5 0 0 1 0 .7l-2 2a.5.5 0 1 1-.7-.7z"/>
-      </svg>
-      {mode === "track" && (
-        <span className="absolute -bottom-1 -right-1.5 flex h-2.5 w-2.5 items-center justify-center rounded-full bg-current">
-          <span className="text-[7px] font-bold leading-none text-black">1</span>
-        </span>
-      )}
-    </span>
-  );
-}
-
 function ControlButton({
   title,
   onClick,
@@ -108,32 +80,27 @@ function ControlButton({
   );
 }
 
-function PlayerControls({ isPlaying, onPrevious, onTogglePlay, onStop, onNext }: Pick<SpotifyControlState, "isPlaying" | "onPrevious" | "onTogglePlay" | "onStop" | "onNext">) {
+function PlayerControls({ isPlaying, onPrevious, onTogglePlay, onNext }: Pick<SpotifyControlState, "isPlaying" | "onPrevious" | "onTogglePlay" | "onNext">) {
   return (
-    <div className="flex items-center justify-center gap-1.5">
+    <div className="flex items-center justify-center gap-2">
       <ControlButton title="Previous" onClick={onPrevious}>
-        <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="currentColor">
+        <svg viewBox="0 0 16 16" className="h-4 w-4" fill="currentColor">
           <path d="M4.5 4.5v7h-1v-7zm1.3 3.07 6.2-3.1a.5.5 0 0 1 .73.45v6.16a.5.5 0 0 1-.73.45l-6.2-3.1a.5.5 0 0 1 0-.86"/>
         </svg>
       </ControlButton>
-      <ControlButton title={isPlaying ? "Pause" : "Play"} onClick={onTogglePlay} className="bg-white text-black hover:bg-emerald-100 hover:text-black">
+      <ControlButton title={isPlaying ? "Pause" : "Play"} onClick={onTogglePlay} className="h-11 w-11 bg-white text-black hover:bg-emerald-100 hover:text-black">
         {isPlaying ? (
-          <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="currentColor">
+          <svg viewBox="0 0 16 16" className="h-5 w-5" fill="currentColor">
             <path d="M5.5 3.5A.5.5 0 0 1 6 4v8a.5.5 0 0 1-1 0V4a.5.5 0 0 1 .5-.5m5 0a.5.5 0 0 1 .5.5v8a.5.5 0 0 1-1 0V4a.5.5 0 0 1 .5-.5"/>
           </svg>
         ) : (
-          <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="currentColor">
+          <svg viewBox="0 0 16 16" className="h-5 w-5 translate-x-px" fill="currentColor">
             <path d="M5 3.6v8.8a.6.6 0 0 0 .92.5l6.8-4.4a.6.6 0 0 0 0-1L5.92 3.1A.6.6 0 0 0 5 3.6"/>
           </svg>
         )}
       </ControlButton>
-      <ControlButton title="Stop" onClick={onStop}>
-        <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="currentColor">
-          <path d="M4.5 4.5h7v7h-7z"/>
-        </svg>
-      </ControlButton>
       <ControlButton title="Next" onClick={onNext}>
-        <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="currentColor">
+        <svg viewBox="0 0 16 16" className="h-4 w-4" fill="currentColor">
           <path d="M11.5 4.5v7h1v-7zm-1.3 3.07L4 4.47a.5.5 0 0 0-.73.45v6.16a.5.5 0 0 0 .73.45l6.2-3.1a.5.5 0 0 0 0-.86"/>
         </svg>
       </ControlButton>
@@ -153,15 +120,10 @@ export function SpotifyMiniPlayer({
   queueTracks,
   isPlaying,
   showList,
-  shuffle,
-  repeatMode,
   onPrevious,
   onTogglePlay,
-  onStop,
   onNext,
   onSelectTrack,
-  onToggleShuffle,
-  onCycleRepeat,
   onSeek,
   onToggleList,
   onOpenFull,
@@ -217,7 +179,6 @@ export function SpotifyMiniPlayer({
   const progressPct = `${durationMs > 0 ? Math.min(100, Math.round((displayMs / durationMs) * 100)) : 0}%`;
   const title = track?.name ?? "Nothing playing";
   const artist = track ? track.artist : "Open Spotify to pick a track";
-  const repeatTitle = repeatMode === "off" ? "Enable repeat" : repeatMode === "context" ? "Repeat all - click for repeat one" : "Repeat one - click to turn off";
   return (
     <div className="group border-t border-[var(--ml-bg-panel)] bg-gradient-to-b from-[var(--ml-bg-surface)] to-[var(--ml-bg-bar)]" tabIndex={0}>
       <div className="flex justify-center pt-1" title="Hover to show player controls">
@@ -269,6 +230,11 @@ export function SpotifyMiniPlayer({
             <p className="truncate text-xs font-semibold text-gray-100">{title}</p>
             <p className="truncate text-[10px] text-gray-500">{artist}</p>
           </button>
+          <ControlButton title="Previous" onClick={onPrevious}>
+            <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="currentColor">
+              <path d="M4.5 4.5v7h-1v-7zm1.3 3.07 6.2-3.1a.5.5 0 0 1 .73.45v6.16a.5.5 0 0 1-.73.45l-6.2-3.1a.5.5 0 0 1 0-.86"/>
+            </svg>
+          </ControlButton>
           <ControlButton title={isPlaying ? "Pause" : "Play"} onClick={onTogglePlay} className="bg-white text-black hover:bg-emerald-100 hover:text-black">
             {isPlaying ? (
               <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="currentColor">
@@ -279,6 +245,11 @@ export function SpotifyMiniPlayer({
                 <path d="M5 3.6v8.8a.6.6 0 0 0 .92.5l6.8-4.4a.6.6 0 0 0 0-1L5.92 3.1A.6.6 0 0 0 5 3.6"/>
               </svg>
             )}
+          </ControlButton>
+          <ControlButton title="Next" onClick={onNext}>
+            <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="currentColor">
+              <path d="M11.5 4.5v7h1v-7zm-1.3 3.07L4 4.47a.5.5 0 0 0-.73.45v6.16a.5.5 0 0 0 .73.45l6.2-3.1a.5.5 0 0 0 0-.86"/>
+            </svg>
           </ControlButton>
           <button
             type="button"
@@ -293,37 +264,6 @@ export function SpotifyMiniPlayer({
           </button>
         </div>
 
-        <div className="flex items-center justify-center gap-1.5 px-3 pb-2.5">
-          <ControlButton
-            title={shuffle ? "Shuffle on" : "Shuffle off"}
-            onClick={onToggleShuffle}
-            className={shuffle ? "text-emerald-400!" : ""}
-          >
-            <ShuffleIcon />
-          </ControlButton>
-          <ControlButton title="Previous" onClick={onPrevious}>
-            <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="currentColor">
-              <path d="M4.5 4.5v7h-1v-7zm1.3 3.07 6.2-3.1a.5.5 0 0 1 .73.45v6.16a.5.5 0 0 1-.73.45l-6.2-3.1a.5.5 0 0 1 0-.86"/>
-            </svg>
-          </ControlButton>
-          <ControlButton title="Stop" onClick={onStop}>
-            <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="currentColor">
-              <path d="M4.5 4.5h7v7h-7z"/>
-            </svg>
-          </ControlButton>
-          <ControlButton title="Next" onClick={onNext}>
-            <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="currentColor">
-              <path d="M11.5 4.5v7h1v-7zm-1.3 3.07L4 4.47a.5.5 0 0 0-.73.45v6.16a.5.5 0 0 0 .73.45l6.2-3.1a.5.5 0 0 0 0-.86"/>
-            </svg>
-          </ControlButton>
-          <ControlButton
-            title={repeatTitle}
-            onClick={onCycleRepeat}
-            className={repeatMode !== "off" ? "text-emerald-400!" : ""}
-          >
-            <RepeatIcon mode={repeatMode} />
-          </ControlButton>
-        </div>
       </div>
 
       {showList && (
@@ -363,7 +303,6 @@ export function SpotifyFullPlayer({
   isPlaying,
   onPrevious,
   onTogglePlay,
-  onStop,
   onNext,
   onPlayUri,
   shuffle,
@@ -522,7 +461,6 @@ export function SpotifyFullPlayer({
                 isPlaying={isPlaying}
                 onPrevious={onPrevious}
                 onTogglePlay={onTogglePlay}
-                onStop={onStop}
                 onNext={onNext}
               />
             </div>
