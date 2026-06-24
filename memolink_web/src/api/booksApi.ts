@@ -1,3 +1,4 @@
+import axios from "axios";
 import { api } from "./client";
 
 export class BookDownloadError extends Error {
@@ -288,6 +289,14 @@ export async function listBookmarks(bookId: number): Promise<Bookmark[]> {
   return (await api.get(`/books/${bookId}/bookmarks`)).data;
 }
 
+interface BookReadUrl {
+  url: string;
+  expires_in: number;
+  file_name: string;
+  mime_type: string;
+  file_size: number | null;
+}
+
 export async function fetchBookBlob(
   bookOrId: Book | number,
   onProgress?: (loaded: number, total: number | null) => void,
@@ -300,11 +309,21 @@ export async function fetchBookBlob(
     if (cached) return cached;
   }
 
-  // Large audio/video files can take a while on slow connections — give downloads
-  // much more headroom than the client's default 15s JSON-request timeout.
+  let readUrl: BookReadUrl;
+  try {
+    readUrl = (await api.get(`/books/${bookId}/read`)).data;
+  } catch (error) {
+    throw await normalizeBookDownloadError(error);
+  }
+
+  // Fetched with the bare axios instance, not `api` — the URL is a presigned S3
+  // link that's already fully authorized via its query string, and S3 rejects
+  // requests carrying an unexpected Authorization header. Large audio/video files
+  // can take a while on slow connections, so this gets much more headroom than
+  // the client's default 15s JSON-request timeout.
   let r;
   try {
-    r = await api.get(`/books/${bookId}/read`, {
+    r = await axios.get(readUrl.url, {
       responseType: "blob",
       timeout: 300000,
       onDownloadProgress: onProgress
