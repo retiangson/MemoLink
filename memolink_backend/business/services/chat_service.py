@@ -106,6 +106,7 @@ def _strip_base64_images(text: str) -> str:
 from memolink_backend.domain.repositories.conversation_repository import ConversationRepository
 from memolink_backend.domain.repositories.note_repository import NoteRepository
 from memolink_backend.domain.repositories.reminder_repository import ReminderRepository
+from memolink_backend.domain.repositories.book_repository import BookRepository
 from memolink_backend.domain.interfaces.i_conversation_repository import IConversationRepository
 from memolink_backend.domain.interfaces.i_note_repository import INoteRepository
 from memolink_backend.business.services.embedding_service import EmbeddingService
@@ -775,6 +776,7 @@ class ChatService(IChatService):
         email_record_repo=None,
         email_service=None,
         core_memory_service=None,
+        book_repo=None,
     ):
         if conv_repo is not None and note_repo is not None:
             self.repo_conv: IConversationRepository = conv_repo
@@ -806,6 +808,7 @@ class ChatService(IChatService):
         self._email_record_repo = email_record_repo
         self._email_service = email_service
         self._eval = eval_service
+        self._book_repo = book_repo or (BookRepository(db) if db is not None else None)
         self._core_memory = core_memory_service or CoreMemoryService(
             note_repo=self.repo_notes,
             user_repo=None,
@@ -928,7 +931,11 @@ class ChatService(IChatService):
                 analyser_client = _get_client(model, user_keys)
                 plan.smart_analysis = smart_engine.analyse_request(user_text, analyser_client, model)
                 plan.smart_mode_name = plan.smart_analysis.get("mode", "general_chat")
-                if plan.smart_analysis.get("needs_clarification") and plan.smart_analysis.get("clarifying_question"):
+                # Skip clarification for short follow-up/affirmative messages — the analyser
+                # only sees the current text and would wrongly treat "yes that's what i mean"
+                # as ambiguous, losing conversation context.
+                _is_followup = len(user_text.split()) <= 8
+                if not _is_followup and plan.smart_analysis.get("needs_clarification") and plan.smart_analysis.get("clarifying_question"):
                     clarification_question = str(plan.smart_analysis["clarifying_question"])
                 else:
                     context_engine = smart_engine.build_context_engine(plan.smart_mode_name)
@@ -957,6 +964,15 @@ class ChatService(IChatService):
                 plan.smart_mode_name = "general_chat"
                 plan.extra_completion_kwargs = {}
                 plan.fetched_papers = []
+
+        # Inject books catalog AFTER context engine so it is never overwritten.
+        # Appended as the last system message so it is closest to the user turn.
+        _books_msg = self._get_books_catalog_msg(user_query=user_text)
+        if _books_msg:
+            plan.messages = list(plan.messages) + [{"role": "system", "content": _books_msg}]
+            self._syslog("info", "Books catalog injected into chat context", {}, dto.user_id)
+        else:
+            self._syslog("info", "Books catalog: skipped (no books or repo unavailable)", {}, dto.user_id)
 
         if whatsapp_draft_prefill:
             plan.decision = "direct_response"
@@ -1713,6 +1729,86 @@ class ChatService(IChatService):
             except Exception as exc:
                 logger.warning("Failed to save cited paper as note: %s", exc)
         return saved
+
+    def _get_books_catalog_msg(self, user_query: str = "") -> Optional[str]:
+        """Return a system message for available library books, or None.
+
+        Fuzzy-ranks books against the user query so direct/near matches surface first.
+        Splits output into a DIRECT MATCH section (score ≥ 0.3) and a general catalog.
+        """
+        if self._book_repo is None:
+            logger.warning("Books catalog: book_repo is None — catalog skipped")
+            return None
+        try:
+            books = self._book_repo.list_published(page_size=200)
+            if not books:
+                logger.info("Books catalog: no published books found")
+                return None
+
+            import difflib
+            query_lower = (user_query or "").lower()
+            query_words = [w for w in query_lower.split() if len(w) > 2]
+
+            scored: list[tuple[float, object]] = []
+            for b in books:
+                title_lower = (b.title or "").lower()
+                author_lower = (b.author or "").lower()
+                combined = f"{title_lower} {author_lower}"
+                seq = difflib.SequenceMatcher(None, query_lower, title_lower).ratio()
+                overlap = sum(0.2 for w in query_words if w in combined)
+                scored.append((seq + overlap, b))
+
+            scored.sort(key=lambda x: x[0], reverse=True)
+            logger.info("Books catalog: %d books scored; top score=%.2f", len(scored), scored[0][0] if scored else 0)
+
+            def _book_line(b) -> str:
+                # Pre-build the full token so the AI only needs to copy it, not construct it.
+                author_part = f" by {b.author}" if b.author else ""
+                ext = (b.file_extension or "").lstrip(".")
+                token = f"[[BOOK_BORROW:{b.id}:{b.title}]]"
+                return f"- {token}{author_part} ({ext})"
+
+            direct_matches = [(s, b) for s, b in scored if s >= 0.3]
+            rest = [(s, b) for s, b in scored if s < 0.3][:15]  # cap general list
+
+            sections: list[str] = []
+
+            if direct_matches:
+                match_lines = "\n".join(_book_line(b) for _, b in direct_matches[:5])
+                sections.append(
+                    "DIRECT BOOK MATCHES (highly relevant to this query):\n"
+                    + match_lines
+                    + "\n\nFor EVERY book listed above you MUST emit a [[BOOK_BORROW:ID:Title]] token "
+                    "on its own line immediately after you first mention it — "
+                    "whether you are recommending it, correcting a mistyped title, "
+                    "suggesting it as a possible match, or simply confirming it exists."
+                )
+
+            if rest:
+                rest_lines = "\n".join(_book_line(b) for _, b in rest)
+                sections.append("OTHER AVAILABLE BOOKS:\n" + rest_lines)
+
+            if not sections:
+                return None
+
+            catalog_body = "\n\n".join(sections)
+            return (
+                "--- MEMOLINK LIBRARY CATALOG ---\n"
+                "Books available in the user's MemoLink library. "
+                "Each entry already contains its ready-to-use token in [[BOOK_BORROW:ID:Title]] format.\n\n"
+                + catalog_body
+                + "\n\nTOKEN RULES (mandatory):\n"
+                "• When you mention, recommend, suggest, or confirm any book from this catalog, "
+                "copy its [[BOOK_BORROW:...]] token EXACTLY as shown and place it on its OWN LINE "
+                "immediately after the sentence where you name the book.\n"
+                "• Do NOT retype or reconstruct the token — copy it verbatim from the catalog line.\n"
+                "• If the user typed a wrong/approximate title and you identify the correct book, "
+                "still copy and emit that book's token.\n"
+                "• Never embed the token inside a sentence or bullet point."
+            )
+        except Exception as exc:
+            logger.warning("Could not load books catalog for chat context: %s", exc)
+            return None
 
     def _build_chat_context(self, dto: ChatRequestDTO):
         """Prepare conversation id, OpenAI messages list, and sources for a chat request."""

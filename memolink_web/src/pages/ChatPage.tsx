@@ -67,7 +67,7 @@ import { useCalendar } from "../hooks/useCalendar";
 import { BooksLibraryModal } from "../components/BooksLibraryModal";
 import { BookReader } from "../components/BookReader";
 import { useBookTabs } from "../hooks/useBookTabs";
-import { listMyBooks, getBook, getBookHighlight, type Book } from "../api/booksApi";
+import { listMyBooks, getBook, getBookHighlight, borrowBook, type Book } from "../api/booksApi";
 import { DESKTOP_LAYOUT_MIN_WIDTH, useIsDesktop } from "../hooks/useIsDesktop";
 import { useStudyTabs } from "../hooks/useStudyTabs";
 import { StudyToolView } from "../components/StudyToolView";
@@ -822,6 +822,22 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
     setBooksInitialView("my");
     setBooksTabOpen(true);
     setActiveTabType("books");
+  }
+
+  async function handleChatBorrowBook(bookId: number) {
+    try {
+      await borrowBook(bookId);
+      const updated = await listMyBooks();
+      setMyBooks(updated);
+      setBooksInitialView("my");
+      setBooksTabOpen(true);
+      setActiveTabType("books");
+    } catch {
+      // book may already be borrowed — open My Books anyway
+      setBooksInitialView("my");
+      setBooksTabOpen(true);
+      setActiveTabType("books");
+    }
   }
 
   function openBookTab(book: Book, page: number) {
@@ -1889,6 +1905,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                     onDropFiles={(files) => chat.setPendingFiles((p) => [...p, ...files])}
                     onApplyNoteEdit={handleApplyNoteEdit}
                     onOpenNote={handleOpenNoteById}
+                    onBorrowBook={flags.books_library_enabled ? handleChatBorrowBook : undefined}
                     onSaveNote={(title, content) => addNote(title, content)}
                     hasOpenNote={isNoteActive}
                     translationEnabled={flags.translation_enabled}
