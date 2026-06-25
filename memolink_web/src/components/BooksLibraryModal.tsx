@@ -74,7 +74,7 @@ export function BooksLibraryModal({ show, onClose, initialView = "browse", onMyB
     try {
       const result = await listBooks({
         search: search || undefined,
-        category: category !== "all" ? category : undefined,
+        format: category !== "all" ? category : undefined,
         page,
         page_size: PAGE_SIZE,
       });

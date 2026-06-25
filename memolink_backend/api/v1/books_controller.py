@@ -114,12 +114,13 @@ def list_books(
     search: Optional[str] = Query(None),
     category: Optional[str] = Query(None),
     tag: Optional[str] = Query(None),
+    format: Optional[str] = Query(None),
     page: int = Query(1, ge=1),
     page_size: int = Query(12, ge=1, le=100),
     user_id: int = Depends(require_books_access),
     c: RequestContainer = Depends(get_request_container),
 ):
-    return c.books().list_published(search, category, tag, page, page_size)
+    return c.books().list_published(search, category, tag, format, page, page_size)
 
 
 @router.get("/my", response_model=list[UserBookResponseDTO])

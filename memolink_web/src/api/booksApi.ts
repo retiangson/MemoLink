@@ -269,6 +269,7 @@ export async function listBooks(params?: {
   search?: string;
   category?: string;
   tag?: string;
+  format?: string;
   page?: number;
   page_size?: number;
 }): Promise<BookPageResponse> {

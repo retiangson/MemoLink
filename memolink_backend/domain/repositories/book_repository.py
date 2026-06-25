@@ -40,17 +40,37 @@ class BookRepository:
         search: Optional[str] = None,
         category: Optional[str] = None,
         tag: Optional[str] = None,
+        format: Optional[str] = None,
         page: int = 1,
         page_size: int = 12,
     ) -> List[Book]:
-        q = self._filter_published(search, category, tag)
+        q = self._filter_published(search, category, tag, format)
         offset = (page - 1) * page_size
         return q.order_by(Book.title.asc()).offset(offset).limit(page_size).all()
 
-    def count_published(self, search: Optional[str] = None, category: Optional[str] = None, tag: Optional[str] = None) -> int:
-        return self._filter_published(search, category, tag).count()
+    def count_published(
+        self,
+        search: Optional[str] = None,
+        category: Optional[str] = None,
+        tag: Optional[str] = None,
+        format: Optional[str] = None,
+    ) -> int:
+        return self._filter_published(search, category, tag, format).count()
 
-    def _filter_published(self, search: Optional[str], category: Optional[str], tag: Optional[str]):
+    # Mirrors the format groupings in memolink_web/src/components/book-readers/format.ts
+    # (getBookCategory) — the library's "eBooks / PDF / Audiobooks / ..." filter buttons
+    # are derived from file extension, not the free-text `Book.category` genre field.
+    FORMAT_EXTENSIONS = {
+        "ebook": (".epub", ".mobi"),
+        "pdf": (".pdf",),
+        "audiobook": (".mp3", ".m4a", ".m4b", ".aac", ".wav", ".ogg"),
+        "video": (".mp4", ".webm", ".mov", ".m4v"),
+        "comic": (".cbz", ".cbr"),
+        "presentation": (".pptx",),
+        "text": (".txt", ".srt", ".vtt"),
+    }
+
+    def _filter_published(self, search: Optional[str], category: Optional[str], tag: Optional[str], format: Optional[str] = None):
         q = self.db.query(Book).filter(Book.is_published == True)
         if search:
             like = f"%{search}%"
@@ -59,6 +79,10 @@ class BookRepository:
             q = q.filter(Book.category == category)
         if tag:
             q = q.filter(Book.tags.ilike(f"%{tag}%"))
+        if format:
+            extensions = self.FORMAT_EXTENSIONS.get(format)
+            if extensions:
+                q = q.filter(Book.file_extension.in_(extensions))
         return q
 
     def upsert_from_sync(
