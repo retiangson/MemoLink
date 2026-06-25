@@ -47,6 +47,18 @@ _EMAIL_SEARCH_STOP_WORDS = {
 
 _EMAIL_ADDR_RE = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")
 
+# Matches short affirmative/negative follow-up phrases that lack an independent intent
+# (e.g. "yes", "yes that's what I mean", "ok", "that's it").  These phrases make the
+# smart analyser return needs_clarification=True even though the user is just confirming
+# a prior answer — the clarification skip prevents losing conversation context.
+_FOLLOWUP_RE = re.compile(
+    r"^(yes|yeah|yep|yup|no|nope|nah|ok|okay|sure|right|correct|exactly|indeed|"
+    r"definitely|agreed|perfect|great|sounds\s+good|go\s+ahead|proceed|continue|"
+    r"that'?s?\s*(right|correct|it|what\s+i\s+(mean|meant)|the\s+one)|"
+    r"that\s+one|got\s+it|i\s+see|understood|makes?\s+sense|thanks?)\W*$",
+    re.IGNORECASE,
+)
+
 
 def _build_gmail_search_query(user_text: str) -> str:
     """Builds a Gmail-API-compatible `q` string from free text, mapping common phrasing
@@ -931,10 +943,10 @@ class ChatService(IChatService):
                 analyser_client = _get_client(model, user_keys)
                 plan.smart_analysis = smart_engine.analyse_request(user_text, analyser_client, model)
                 plan.smart_mode_name = plan.smart_analysis.get("mode", "general_chat")
-                # Skip clarification for short follow-up/affirmative messages — the analyser
+                # Skip clarification for affirmative/follow-up phrases — the analyser
                 # only sees the current text and would wrongly treat "yes that's what i mean"
                 # as ambiguous, losing conversation context.
-                _is_followup = len(user_text.split()) <= 8
+                _is_followup = bool(_FOLLOWUP_RE.match(user_text.strip()))
                 if not _is_followup and plan.smart_analysis.get("needs_clarification") and plan.smart_analysis.get("clarifying_question"):
                     clarification_question = str(plan.smart_analysis["clarifying_question"])
                 else:
