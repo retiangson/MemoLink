@@ -832,9 +832,11 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
       setActiveTabType("book");
       return;
     }
-    // Not yet in library → borrow then open
+    // Not yet in library → borrow first (failure is non-fatal; may already be owned)
+    try { await borrowBook(bookId); } catch { /* already owned or network hiccup — continue */ }
+
+    // Always refresh the list so we get the latest server state
     try {
-      await borrowBook(bookId);
       const updated = await listMyBooks();
       setMyBooks(updated);
       const newEntry = updated.find((m) => m.book_id === bookId);
@@ -843,7 +845,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
         setActiveTabType("book");
       }
     } catch {
-      // Already borrowed or API error → try opening with current state
+      // listMyBooks itself failed — fall back to whatever is in local state
       const fallback = myBooks.find((m) => m.book_id === bookId);
       if (fallback?.book) {
         openBookTab(fallback.book, fallback.current_page || 1);

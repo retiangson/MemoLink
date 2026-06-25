@@ -1761,11 +1761,15 @@ class ChatService(IChatService):
             scored.sort(key=lambda x: x[0], reverse=True)
             logger.info("Books catalog: %d books scored; top score=%.2f", len(scored), scored[0][0] if scored else 0)
 
+            def _safe_title(title: str) -> str:
+                # Strip ] so it can't prematurely close the [[...]] token delimiter.
+                return (title or "").replace("]", ")")
+
             def _book_line(b) -> str:
                 # Pre-build the full token so the AI only needs to copy it, not construct it.
                 author_part = f" by {b.author}" if b.author else ""
                 ext = (b.file_extension or "").lstrip(".")
-                token = f"[[BOOK_BORROW:{b.id}:{b.title}]]"
+                token = f"[[BOOK_BORROW:{b.id}:{_safe_title(b.title)}]]"
                 return f"- {token}{author_part} ({ext})"
 
             direct_matches = [(s, b) for s, b in scored if s >= 0.3]
