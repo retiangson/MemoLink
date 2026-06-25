@@ -17,6 +17,7 @@ from memolink_backend.business.services.book_highlight_service import BookHighli
 from memolink_backend.utils.file_extractor import extract_pptx_slides
 from memolink_backend.contracts.book_dtos import (
     BookResponseDTO,
+    BookPageResponseDTO,
     UserBookResponseDTO,
     BookProgressUpdateDTO,
     BookmarkCreateDTO,
@@ -108,15 +109,17 @@ def require_books_access(
     return user.id
 
 
-@router.get("", response_model=list[BookResponseDTO])
+@router.get("", response_model=BookPageResponseDTO)
 def list_books(
     search: Optional[str] = Query(None),
     category: Optional[str] = Query(None),
     tag: Optional[str] = Query(None),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(12, ge=1, le=100),
     user_id: int = Depends(require_books_access),
     c: RequestContainer = Depends(get_request_container),
 ):
-    return c.books().list_published(search, category, tag)
+    return c.books().list_published(search, category, tag, page, page_size)
 
 
 @router.get("/my", response_model=list[UserBookResponseDTO])

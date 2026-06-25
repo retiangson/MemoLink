@@ -26,6 +26,14 @@ class BookResponseDTO(BaseModel):
     updated_at: Optional[datetime] = None
 
 
+class BookPageResponseDTO(BaseModel):
+    items: List[BookResponseDTO]
+    total: int
+    page: int
+    page_size: int
+    pages: int
+
+
 class BookUpdateDTO(BaseModel):
     title: Optional[str] = None
     author: Optional[str] = None

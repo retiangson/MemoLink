@@ -40,7 +40,17 @@ class BookRepository:
         search: Optional[str] = None,
         category: Optional[str] = None,
         tag: Optional[str] = None,
+        page: int = 1,
+        page_size: int = 12,
     ) -> List[Book]:
+        q = self._filter_published(search, category, tag)
+        offset = (page - 1) * page_size
+        return q.order_by(Book.title.asc()).offset(offset).limit(page_size).all()
+
+    def count_published(self, search: Optional[str] = None, category: Optional[str] = None, tag: Optional[str] = None) -> int:
+        return self._filter_published(search, category, tag).count()
+
+    def _filter_published(self, search: Optional[str], category: Optional[str], tag: Optional[str]):
         q = self.db.query(Book).filter(Book.is_published == True)
         if search:
             like = f"%{search}%"
@@ -49,7 +59,7 @@ class BookRepository:
             q = q.filter(Book.category == category)
         if tag:
             q = q.filter(Book.tags.ilike(f"%{tag}%"))
-        return q.order_by(Book.title.asc()).all()
+        return q
 
     def upsert_from_sync(
         self,

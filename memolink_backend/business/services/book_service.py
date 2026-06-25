@@ -28,8 +28,18 @@ class BookService:
 
     # ── Browse ───────────────────────────────────────────────────────────────
 
-    def list_published(self, search: Optional[str] = None, category: Optional[str] = None, tag: Optional[str] = None) -> List[BookResponseDTO]:
-        return [BookResponseDTO.model_validate(b) for b in self._books.list_published(search, category, tag)]
+    def list_published(
+        self,
+        search: Optional[str] = None,
+        category: Optional[str] = None,
+        tag: Optional[str] = None,
+        page: int = 1,
+        page_size: int = 12,
+    ) -> dict:
+        total = self._books.count_published(search, category, tag)
+        items = [BookResponseDTO.model_validate(b) for b in self._books.list_published(search, category, tag, page, page_size)]
+        pages = max(1, (total + page_size - 1) // page_size)
+        return {"items": items, "total": total, "page": page, "page_size": page_size, "pages": pages}
 
     def get_published_book(self, book_id: int) -> BookResponseDTO:
         book = self._require_published(book_id)
