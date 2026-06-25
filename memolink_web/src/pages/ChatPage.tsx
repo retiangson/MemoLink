@@ -825,18 +825,30 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
   }
 
   async function handleChatBorrowBook(bookId: number) {
+    // Already in library → open the reader directly
+    const existing = myBooks.find((m) => m.book_id === bookId);
+    if (existing?.book) {
+      openBookTab(existing.book, existing.current_page || 1);
+      setActiveTabType("book");
+      return;
+    }
+    // Not yet in library → borrow then open
     try {
       await borrowBook(bookId);
       const updated = await listMyBooks();
       setMyBooks(updated);
-      setBooksInitialView("my");
-      setBooksTabOpen(true);
-      setActiveTabType("books");
+      const newEntry = updated.find((m) => m.book_id === bookId);
+      if (newEntry?.book) {
+        openBookTab(newEntry.book, 1);
+        setActiveTabType("book");
+      }
     } catch {
-      // book may already be borrowed — open My Books anyway
-      setBooksInitialView("my");
-      setBooksTabOpen(true);
-      setActiveTabType("books");
+      // Already borrowed or API error → try opening with current state
+      const fallback = myBooks.find((m) => m.book_id === bookId);
+      if (fallback?.book) {
+        openBookTab(fallback.book, fallback.current_page || 1);
+        setActiveTabType("book");
+      }
     }
   }
 

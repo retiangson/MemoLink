@@ -166,10 +166,10 @@ function ContentWithNoteLinks({ content, onOpenNote, onBorrowBook }: { content: 
               onClick={() => onBorrowBook(bookId)}
               className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium transition"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 16 16">
+                <path d="M1 2.828c.885-.37 2.154-.769 3.388-.893 1.33-.134 2.458.063 3.112.752v9.746c-.935-.53-2.12-.603-3.213-.493-1.18.12-2.37.461-3.287.811V2.828zm7.5-.141c.654-.689 1.782-.886 3.112-.752 1.234.124 2.503.523 3.388.893v9.923c-.918-.35-2.107-.692-3.287-.81-1.094-.111-2.278-.039-3.213.492V2.687zM8 1.783C7.015.936 5.649.505 4.18.42 2.546.328 1.107.605 0 1.125v14.018c0 .494.535.814 1.002.6 1.007-.44 2.155-.749 3.178-.849 1.18-.12 2.37.039 3.212.492.842-.453 2.033-.612 3.213-.492 1.022.1 2.17.408 3.178.849.467.213 1.002-.107 1.002-.6V1.125c-1.107-.52-2.547-.797-4.18-.705C10.35.505 8.985.936 8 1.783z"/>
               </svg>
-              Add to Library
+              Read Book
             </button>
           )}
         </div>
