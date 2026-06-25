@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import { marked } from "marked";
 import hljs from "highlight.js";
 import "highlight.js/styles/github-dark.css";
@@ -74,9 +74,13 @@ export default function MarkdownRenderer({ children, className }: Props) {
   marked.setOptions({ renderer, gfm: true, breaks: true });
   const html = marked.parse(withMath) as string;
 
+  const containerRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
-    const buttons = document.querySelectorAll(".code-copy-btn");
-    const handler = (e: any) => {
+    const container = containerRef.current;
+    if (!container) return;
+    const buttons = container.querySelectorAll(".code-copy-btn");
+    const copyHandler = (e: any) => {
       const encoded = e.target.getAttribute("data-code");
       if (!encoded) return;
       navigator.clipboard.writeText(decodeURIComponent(encoded));
@@ -84,10 +88,10 @@ export default function MarkdownRenderer({ children, className }: Props) {
       e.target.innerText = "Copied!";
       setTimeout(() => (e.target.innerText = orig), 1200);
     };
-    buttons.forEach((btn) => btn.addEventListener("click", handler));
-    return () => buttons.forEach((btn) => btn.removeEventListener("click", handler));
+    buttons.forEach((btn) => btn.addEventListener("click", copyHandler));
+    return () => buttons.forEach((btn) => btn.removeEventListener("click", copyHandler));
   }, [html]);
 
 
-  return <div className={`markdown-body ${className || ""}`} dangerouslySetInnerHTML={{ __html: html }} />;
+  return <div ref={containerRef} className={`markdown-body ${className || ""}`} dangerouslySetInnerHTML={{ __html: html }} />;
 }

@@ -66,7 +66,7 @@ function modelLabel(id?: string): string {
 }
 
 const NOTE_LINK_RE = /\[\[NOTE_LINK:(\d+):([^\]]+)\]\]/g;
-const TOKEN_RE = /(\[\[NOTE_LINK:\d+:[^\]]+\]\]|✅|⚠)/g;
+const TOKEN_RE = /(\[\[NOTE_LINK:\d+:[^\]]+\]\]|\[\[BOOK_BORROW:[^\]:]+:[^\]]+\]\]|✅|⚠)/g;
 
 function CmdCheck() {
   return (
@@ -91,7 +91,7 @@ function CmdWarn() {
 /** Render content splitting [[NOTE_LINK:id:title]], ✅ and ⚠ into styled components.
  *  Status icons (✅ ⚠) are paired with the immediately following text in a flex row
  *  so the icon stays inline with the first line of the MarkdownRenderer output. */
-function ContentWithNoteLinks({ content, onOpenNote }: { content: string; onOpenNote?: (id: number) => void }) {
+function ContentWithNoteLinks({ content, onOpenNote, onBorrowBook }: { content: string; onOpenNote?: (id: number) => void; onBorrowBook?: (bookId: number) => void }) {
   TOKEN_RE.lastIndex = 0;
   const parts = content.split(TOKEN_RE).filter(Boolean);
   if (parts.length === 1 && !TOKEN_RE.test(content)) {
@@ -145,6 +145,39 @@ function ContentWithNoteLinks({ content, onOpenNote }: { content: string; onOpen
       continue;
     }
 
+    const bookMatch = part.match(/^\[\[BOOK_BORROW:([^\]:]+):([^\]]+)\]\]$/);
+    if (bookMatch) {
+      const bookId = parseInt(bookMatch[1], 10);
+      const bookTitle = bookMatch[2];
+      const validId = !isNaN(bookId) && bookId > 0;
+      nodes.push(
+        <div key={i} className="my-3 flex items-center gap-3 px-4 py-3 rounded-xl bg-[#1a1a2e] border border-indigo-500/25 max-w-sm">
+          <span className="shrink-0 inline-flex items-center justify-center w-9 h-9 rounded-lg bg-indigo-500/15 text-indigo-400">
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="currentColor" viewBox="0 0 16 16">
+              <path d="M1 2.828c.885-.37 2.154-.769 3.388-.893 1.33-.134 2.458.063 3.112.752v9.746c-.935-.53-2.12-.603-3.213-.493-1.18.12-2.37.461-3.287.811V2.828zm7.5-.141c.654-.689 1.782-.886 3.112-.752 1.234.124 2.503.523 3.388.893v9.923c-.918-.35-2.107-.692-3.287-.81-1.094-.111-2.278-.039-3.213.492V2.687zM8 1.783C7.015.936 5.649.505 4.18.42 2.546.328 1.107.605 0 1.125v14.018c0 .494.535.814 1.002.6 1.007-.44 2.155-.749 3.178-.849 1.18-.12 2.37.039 3.212.492.842-.453 2.033-.612 3.213-.492 1.022.1 2.17.408 3.178.849.467.213 1.002-.107 1.002-.6V1.125c-1.107-.52-2.547-.797-4.18-.705C10.35.505 8.985.936 8 1.783z"/>
+            </svg>
+          </span>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-gray-200 truncate">{bookTitle}</p>
+            <p className="text-[11px] text-gray-500 mt-0.5">Available in library</p>
+          </div>
+          {onBorrowBook && validId && (
+            <button
+              onClick={() => onBorrowBook(bookId)}
+              className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium transition"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 16 16">
+                <path d="M1 2.828c.885-.37 2.154-.769 3.388-.893 1.33-.134 2.458.063 3.112.752v9.746c-.935-.53-2.12-.603-3.213-.493-1.18.12-2.37.461-3.287.811V2.828zm7.5-.141c.654-.689 1.782-.886 3.112-.752 1.234.124 2.503.523 3.388.893v9.923c-.918-.35-2.107-.692-3.287-.81-1.094-.111-2.278-.039-3.213.492V2.687zM8 1.783C7.015.936 5.649.505 4.18.42 2.546.328 1.107.605 0 1.125v14.018c0 .494.535.814 1.002.6 1.007-.44 2.155-.749 3.178-.849 1.18-.12 2.37.039 3.212.492.842-.453 2.033-.612 3.213-.492 1.022.1 2.17.408 3.178.849.467.213 1.002-.107 1.002-.6V1.125c-1.107-.52-2.547-.797-4.18-.705C10.35.505 8.985.936 8 1.783z"/>
+              </svg>
+              Read Book
+            </button>
+          )}
+        </div>
+      );
+      i++;
+      continue;
+    }
+
     nodes.push(<MarkdownRenderer key={i}>{part}</MarkdownRenderer>);
     i++;
   }
@@ -170,6 +203,7 @@ interface Props {
   onDelete?: () => void;
   onApplyEdit?: (content: string, noteId: number | null) => void;
   onOpenNote?: (noteId: number) => void;
+  onBorrowBook?: (bookId: number) => void;
   onSaveNote?: (title: string, content: string) => Promise<void> | void;
   hasOpenNote?: boolean;
   translationEnabled?: boolean;
@@ -216,7 +250,7 @@ function parseNoteEdit(content: string): {
   };
 }
 
-export default function ChatBubble({ role, content, model, streaming, onAdd, onDelete, onApplyEdit, onOpenNote, onSaveNote, hasOpenNote, translationEnabled = true, modelAttributionEnabled = true, confidence, confidenceReason, confidenceEnabled = true, routingReason, autopilotEnabled = true, workflowContext, workflowActions, onWorkflowActionDone, onWorkflowConversationMessages, messageId, evaluationActive, evalRating, onRetry, suggestWebSearch, onSearchOnline, emailResults, onOpenEmail }: Props) {
+export default function ChatBubble({ role, content, model, streaming, onAdd, onDelete, onApplyEdit, onOpenNote, onBorrowBook, onSaveNote, hasOpenNote, translationEnabled = true, modelAttributionEnabled = true, confidence, confidenceReason, confidenceEnabled = true, routingReason, autopilotEnabled = true, workflowContext, workflowActions, onWorkflowActionDone, onWorkflowConversationMessages, messageId, evaluationActive, evalRating, onRetry, suggestWebSearch, onSearchOnline, emailResults, onOpenEmail }: Props) {
   const isUser = role === "user";
   const [copied, setCopied] = useState(false);
   const [showLangPicker, setShowLangPicker] = useState(false);
@@ -387,22 +421,22 @@ export default function ChatBubble({ role, content, model, streaming, onAdd, onD
               <span>
                 {emailDrafts.length > 0 ? (
                   <>
-                    {draftBefore && <ContentWithNoteLinks content={draftBefore} onOpenNote={onOpenNote} />}
+                    {draftBefore && <ContentWithNoteLinks content={draftBefore} onOpenNote={onOpenNote} onBorrowBook={onBorrowBook} />}
                     {emailDrafts.map((d, idx) => (
                       <EmailDraftCard key={idx} to={d.to} subject={d.subject} body={d.body} messageId={d.messageId} threadId={d.threadId} />
                     ))}
-                    {draftAfter && <ContentWithNoteLinks content={draftAfter} onOpenNote={onOpenNote} />}
+                    {draftAfter && <ContentWithNoteLinks content={draftAfter} onOpenNote={onOpenNote} onBorrowBook={onBorrowBook} />}
                   </>
                 ) : whatsappDrafts.length > 0 ? (
                   <>
-                    {whatsappDraftBefore && <ContentWithNoteLinks content={whatsappDraftBefore} onOpenNote={onOpenNote} />}
+                    {whatsappDraftBefore && <ContentWithNoteLinks content={whatsappDraftBefore} onOpenNote={onOpenNote} onBorrowBook={onBorrowBook} />}
                     {whatsappDrafts.map((d, idx) => (
                       <WhatsappDraftCard key={idx} to={d.to} body={d.body} />
                     ))}
-                    {whatsappDraftAfter && <ContentWithNoteLinks content={whatsappDraftAfter} onOpenNote={onOpenNote} />}
+                    {whatsappDraftAfter && <ContentWithNoteLinks content={whatsappDraftAfter} onOpenNote={onOpenNote} onBorrowBook={onBorrowBook} />}
                   </>
                 ) : (
-                  <ContentWithNoteLinks content={pre} onOpenNote={onOpenNote} />
+                  <ContentWithNoteLinks content={pre} onOpenNote={onOpenNote} onBorrowBook={onBorrowBook} />
                 )}
                 {streaming && (
                   <span className="inline-block w-[2px] h-[1em] bg-indigo-400 ml-0.5 align-middle animate-[blink_0.8s_step-end_infinite]" />
@@ -479,7 +513,7 @@ export default function ChatBubble({ role, content, model, streaming, onAdd, onD
           </div>
         )}
 
-        {post && <div className="mt-3"><ContentWithNoteLinks content={post} onOpenNote={onOpenNote} /></div>}
+        {post && <div className="mt-3"><ContentWithNoteLinks content={post} onOpenNote={onOpenNote} onBorrowBook={onBorrowBook} /></div>}
 
         {!!emailResults?.length && onOpenEmail && (
           <EmailResultsList results={emailResults} onOpen={onOpenEmail} />

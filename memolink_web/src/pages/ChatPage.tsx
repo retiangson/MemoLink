@@ -67,7 +67,7 @@ import { useCalendar } from "../hooks/useCalendar";
 import { BooksLibraryModal } from "../components/BooksLibraryModal";
 import { BookReader } from "../components/BookReader";
 import { useBookTabs } from "../hooks/useBookTabs";
-import { listMyBooks, getBook, getBookHighlight, type Book } from "../api/booksApi";
+import { listMyBooks, getBook, getBookHighlight, borrowBook, type Book } from "../api/booksApi";
 import { DESKTOP_LAYOUT_MIN_WIDTH, useIsDesktop } from "../hooks/useIsDesktop";
 import { useStudyTabs } from "../hooks/useStudyTabs";
 import { StudyToolView } from "../components/StudyToolView";
@@ -822,6 +822,36 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
     setBooksInitialView("my");
     setBooksTabOpen(true);
     setActiveTabType("books");
+  }
+
+  async function handleChatBorrowBook(bookId: number) {
+    // Already in library → open the reader directly
+    const existing = myBooks.find((m) => m.book_id === bookId);
+    if (existing?.book) {
+      openBookTab(existing.book, existing.current_page || 1);
+      setActiveTabType("book");
+      return;
+    }
+    // Not yet in library → borrow first (failure is non-fatal; may already be owned)
+    try { await borrowBook(bookId); } catch { /* already owned or network hiccup — continue */ }
+
+    // Always refresh the list so we get the latest server state
+    try {
+      const updated = await listMyBooks();
+      setMyBooks(updated);
+      const newEntry = updated.find((m) => m.book_id === bookId);
+      if (newEntry?.book) {
+        openBookTab(newEntry.book, 1);
+        setActiveTabType("book");
+      }
+    } catch {
+      // listMyBooks itself failed — fall back to whatever is in local state
+      const fallback = myBooks.find((m) => m.book_id === bookId);
+      if (fallback?.book) {
+        openBookTab(fallback.book, fallback.current_page || 1);
+        setActiveTabType("book");
+      }
+    }
   }
 
   function openBookTab(book: Book, page: number) {
@@ -1889,6 +1919,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                     onDropFiles={(files) => chat.setPendingFiles((p) => [...p, ...files])}
                     onApplyNoteEdit={handleApplyNoteEdit}
                     onOpenNote={handleOpenNoteById}
+                    onBorrowBook={flags.books_library_enabled ? handleChatBorrowBook : undefined}
                     onSaveNote={(title, content) => addNote(title, content)}
                     hasOpenNote={isNoteActive}
                     translationEnabled={flags.translation_enabled}

@@ -34,6 +34,7 @@ class ServiceInstaller:
             email_service=self.get_email_service(),
             eval_service=self.get_evaluation_service(),
             core_memory_service=self.get_core_memory_service(),
+            book_repo=self._domain.get_book_repository(),
             action_agent=ActionAgentRunner(
                 conv_repo=self._domain.get_conversation_repository(),
                 note_repo=self._domain.get_note_repository(),

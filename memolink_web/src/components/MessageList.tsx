@@ -16,6 +16,7 @@ interface MessageListProps {
   onDropFiles: (files: File[]) => void;
   onApplyNoteEdit: (content: string, noteId: number | null) => void;
   onOpenNote?: (noteId: number) => void;
+  onBorrowBook?: (bookId: number) => void;
   onSaveNote?: (title: string, content: string) => Promise<void> | void;
   hasOpenNote: boolean;
   translationEnabled?: boolean;
@@ -37,7 +38,7 @@ export function MessageList({
   messages, loading, streaming, activeConversation,
   messagesContainerRef, bottomRef,
   onLoadOlder, onAddToNotes, onDeleteMessage, onDropFiles,
-  onApplyNoteEdit, onOpenNote, onSaveNote, hasOpenNote, translationEnabled = true, modelAttributionEnabled = true, confidenceEnabled = true, autopilotEnabled = true, workflowContext, workflowSuggestions, onWorkflowActionDone, onWorkflowConversationMessages, evaluationActive = false, evalRatings, onRetry, onSearchOnline, onOpenEmail,
+  onApplyNoteEdit, onOpenNote, onBorrowBook, onSaveNote, hasOpenNote, translationEnabled = true, modelAttributionEnabled = true, confidenceEnabled = true, autopilotEnabled = true, workflowContext, workflowSuggestions, onWorkflowActionDone, onWorkflowConversationMessages, evaluationActive = false, evalRatings, onRetry, onSearchOnline, onOpenEmail,
 }: MessageListProps) {
   return (
     <div
@@ -69,6 +70,7 @@ export function MessageList({
               onDelete={!isPendingAssistantMsg ? () => onDeleteMessage(msg.id, msg.content, idx) : undefined}
               onApplyEdit={!isPendingAssistantMsg && msg.role === "assistant" ? onApplyNoteEdit : undefined}
               onOpenNote={!isPendingAssistantMsg && msg.role === "assistant" ? onOpenNote : undefined}
+              onBorrowBook={!isPendingAssistantMsg && msg.role === "assistant" ? onBorrowBook : undefined}
               onSaveNote={!isPendingAssistantMsg && msg.role === "assistant" ? onSaveNote : undefined}
               hasOpenNote={hasOpenNote}
               translationEnabled={translationEnabled}
