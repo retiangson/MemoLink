@@ -197,23 +197,26 @@ class OneDriveService:
         return await self._list_supported_files_recursive(token=token, children_path=path)
 
     # ── Paginated listing (one Graph call per invocation) ───────────────────
+    # Uses Microsoft Graph's delta query, which enumerates the entire folder
+    # subtree (recursively, files and folders) in large server-paginated batches
+    # instead of one /children call per folder. This replaces the old per-folder
+    # breadth-first walk, which needed one Graph round trip per folder (10k+ for
+    # a large library) and was the main source of slow/timing-out syncs.
     # Lets a caller (e.g. the desktop app's sync loop) drive an arbitrarily long
-    # folder walk by repeatedly resuming from an opaque cursor, instead of one
-    # request having to walk the entire tree before returning.
+    # walk by repeatedly resuming from an opaque cursor wrapping Graph's own
+    # @odata.nextLink, instead of one request having to walk the entire tree
+    # before returning.
 
     async def list_folder_files_page(self, *, admin_user_id: int, cursor: Optional[str]) -> tuple[list[dict], Optional[str]]:
         token = await self._get_valid_access_token(for_admin_user_id=admin_user_id)
-        state = self._decode_cursor(cursor) if cursor else {"url": None, "pending_paths": [self._children_path()], "visited": []}
 
-        if state["url"]:
+        if cursor:
+            state = self._decode_cursor(cursor)
             url = state["url"]
             params = None
         else:
-            if not state["pending_paths"]:
-                return [], None
-            path = state["pending_paths"].pop()
-            url = f"{GRAPH_BASE}{path}"
-            params = {"$select": "id,name,file,folder,size,webUrl,lastModifiedDateTime,parentReference"}
+            url = f"{GRAPH_BASE}{self._delta_root_path()}"
+            params = {"$select": "id,name,file,folder,size,webUrl,lastModifiedDateTime,parentReference,deleted"}
 
         async with httpx.AsyncClient(timeout=30.0) as client:
             try:
@@ -224,25 +227,28 @@ class OneDriveService:
             raise OneDriveServiceError(resp.status_code, f"Microsoft Graph error listing OneDrive folder: {resp.text[:300]}")
 
         data = resp.json()
-        visited: set[str] = set(state["visited"])
         files: list[dict] = []
         for item in data.get("value", []):
-            if "folder" in item:
-                item_id = item.get("id")
-                if item_id and item_id not in visited:
-                    visited.add(item_id)
-                    state["pending_paths"].append(f"/me/drive/items/{item_id}/children")
-                continue
-            if "file" not in item:
+            if "deleted" in item or "folder" in item or "file" not in item:
                 continue
             file = self._supported_file_from_item(item)
             if file:
                 files.append(file)
 
-        state["visited"] = list(visited)
-        state["url"] = data.get("@odata.nextLink")
-        done = not state["url"] and not state["pending_paths"]
-        return files, (None if done else self._encode_cursor(state))
+        # A page ending in @odata.nextLink means more pages remain in this delta
+        # walk; a page ending in @odata.deltaLink means the walk is complete (that
+        # link is also a resumable token for a future incremental sync, not used yet).
+        next_link = data.get("@odata.nextLink")
+        done = next_link is None
+        return files, (None if done else self._encode_cursor({"url": next_link}))
+
+    def _delta_root_path(self) -> str:
+        if settings.onedrive_books_folder_id:
+            return f"/me/drive/items/{settings.onedrive_books_folder_id}/delta"
+        if settings.onedrive_books_folder_path:
+            path = settings.onedrive_books_folder_path.strip("/")
+            return f"/me/drive/root:/{quote(path)}:/delta"
+        return "/me/drive/root/delta"
 
     def _encode_cursor(self, state: dict) -> str:
         import base64

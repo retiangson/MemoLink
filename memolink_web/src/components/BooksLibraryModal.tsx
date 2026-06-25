@@ -64,20 +64,32 @@ export function BooksLibraryModal({ show, onClose, initialView = "browse", onMyB
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState<BookCategory | "all">("all");
   const [page, setPage] = useState(1);
+  const [browseTotal, setBrowseTotal] = useState(0);
+  const [browsePages, setBrowsePages] = useState(1);
   const [loading, setLoading] = useState(false);
   const [borrowingId, setBorrowingId] = useState<number | null>(null);
 
   const loadBrowse = useCallback(async () => {
     setLoading(true);
     try {
-      const b = await listBooks(search ? { search } : undefined);
-      setBooks(b);
+      const result = await listBooks({
+        search: search || undefined,
+        category: category !== "all" ? category : undefined,
+        page,
+        page_size: PAGE_SIZE,
+      });
+      setBooks(result.items);
+      setBrowseTotal(result.total);
+      setBrowsePages(result.pages);
+      if (page > result.pages) setPage(result.pages);
     } catch {
       setBooks([]);
+      setBrowseTotal(0);
+      setBrowsePages(1);
     } finally {
       setLoading(false);
     }
-  }, [search]);
+  }, [search, category, page]);
 
   const loadMyBooks = useCallback(async () => {
     setLoading(true);
@@ -146,8 +158,6 @@ export function BooksLibraryModal({ show, onClose, initialView = "browse", onMyB
     return getBookCategory(getBookFormat(book)) === category;
   }
 
-  const filteredBooks = useMemo(() => books.filter(matchesCategory), [books, category]);
-
   const filteredMyBooks = useMemo(() => {
     const q = search.trim().toLowerCase();
     return myBooks.filter((ub) => {
@@ -165,18 +175,18 @@ export function BooksLibraryModal({ show, onClose, initialView = "browse", onMyB
     });
   }, [myBooks, search, category]);
 
-  const activeItems = view === "browse" ? filteredBooks : filteredMyBooks;
-  const totalPages = Math.max(1, Math.ceil(activeItems.length / PAGE_SIZE));
+  const activeItemsCount = view === "browse" ? browseTotal : filteredMyBooks.length;
+  const totalPages = view === "browse" ? browsePages : Math.max(1, Math.ceil(filteredMyBooks.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
-  const pagedBooks = filteredBooks.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+  const pagedBooks = books;
   const pagedMyBooks = filteredMyBooks.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   function renderPager() {
-    if (loading || activeItems.length <= PAGE_SIZE) return null;
+    if (loading || activeItemsCount <= PAGE_SIZE) return null;
     return (
       <div className="flex items-center justify-between gap-3 pt-4">
         <p className="text-xs text-gray-500">
-          Showing {(safePage - 1) * PAGE_SIZE + 1}-{Math.min(safePage * PAGE_SIZE, activeItems.length)} of {activeItems.length}
+          Showing {(safePage - 1) * PAGE_SIZE + 1}-{Math.min(safePage * PAGE_SIZE, activeItemsCount)} of {activeItemsCount}
         </p>
         <div className="flex items-center gap-2">
           <button
@@ -271,7 +281,7 @@ export function BooksLibraryModal({ show, onClose, initialView = "browse", onMyB
           <div className="max-w-4xl mx-auto">
             {loading ? (
               <p className="text-sm text-gray-500">Loading…</p>
-            ) : filteredBooks.length === 0 ? (
+            ) : books.length === 0 ? (
               <p className="text-sm text-gray-500">
                 {category !== "all" ? "No books match this category." : "No published books found."}
               </p>

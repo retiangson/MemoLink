@@ -257,7 +257,21 @@ export async function putCachedEpubLocations(bookId: number, signature: string, 
   });
 }
 
-export async function listBooks(params?: { search?: string; category?: string; tag?: string }): Promise<Book[]> {
+export interface BookPageResponse {
+  items: Book[];
+  total: number;
+  page: number;
+  page_size: number;
+  pages: number;
+}
+
+export async function listBooks(params?: {
+  search?: string;
+  category?: string;
+  tag?: string;
+  page?: number;
+  page_size?: number;
+}): Promise<BookPageResponse> {
   return (await api.get("/books", { params })).data;
 }
 
