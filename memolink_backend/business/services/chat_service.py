@@ -47,16 +47,43 @@ _EMAIL_SEARCH_STOP_WORDS = {
 
 _EMAIL_ADDR_RE = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")
 
-# Matches short affirmative/negative follow-up phrases that lack an independent intent
-# (e.g. "yes", "yes that's what I mean", "ok", "that's it").  These phrases make the
-# smart analyser return needs_clarification=True even though the user is just confirming
-# a prior answer — the clarification skip prevents losing conversation context.
+# Single-word affirmative/negative openers used by the short-message fallback heuristic
+# (see _is_followup logic in _build_route_plan).
+_FOLLOWUP_OPENERS = frozenset({
+    "yes", "yeah", "yep", "yup", "no", "nope", "nah",
+    "ok", "okay", "sure", "right", "correct", "exactly",
+    "indeed", "definitely", "agreed", "perfect", "great",
+})
+# Spoken-filler words that may precede an opener ("uh, yes that's it").
+_FOLLOWUP_FILLER = frozenset({"uh", "um", "hmm", "er", "well", "oh"})
+
+# Matches complete affirmative/negative follow-up messages so the smart analyser does not
+# wrongly return needs_clarification=True when the user is merely confirming a prior answer.
+# Optional leading filler ("uh,", "um,") is accepted.  re.VERBOSE is used for readability.
 _FOLLOWUP_RE = re.compile(
-    r"^(yes|yeah|yep|yup|no|nope|nah|ok|okay|sure|right|correct|exactly|indeed|"
-    r"definitely|agreed|perfect|great|sounds\s+good|go\s+ahead|proceed|continue|"
-    r"that'?s?\s*(right|correct|it|what\s+i\s+(mean|meant)|the\s+one)|"
-    r"that\s+one|got\s+it|i\s+see|understood|makes?\s+sense|thanks?)\W*$",
-    re.IGNORECASE,
+    r"""
+    ^
+    (?:(?:uh+|um+|hmm+|er+|well|oh)[,.]?\s+)*   # optional filler opener
+    (?:
+        yes | yeah | yep | yup
+        | no  | nope | nah
+        | ok  | okay | sure
+        | right | correct | exactly
+        | indeed | definitely | agreed
+        | perfect | great
+        | sounds \s+ good
+        | go \s+ ahead | proceed | continue
+        | that '? s? \s* (?:right|correct|it|what \s+ i \s+ (?:mean|meant)|the \s+ one)
+        | that \s+ one
+        | got \s+ it
+        | i \s+ see
+        | understood
+        | makes? \s+ sense
+        | thanks?
+    )
+    \W* $
+    """,
+    re.IGNORECASE | re.VERBOSE,
 )
 
 
@@ -943,10 +970,23 @@ class ChatService(IChatService):
                 analyser_client = _get_client(model, user_keys)
                 plan.smart_analysis = smart_engine.analyse_request(user_text, analyser_client, model)
                 plan.smart_mode_name = plan.smart_analysis.get("mode", "general_chat")
-                # Skip clarification for affirmative/follow-up phrases — the analyser
-                # only sees the current text and would wrongly treat "yes that's what i mean"
-                # as ambiguous, losing conversation context.
-                _is_followup = bool(_FOLLOWUP_RE.match(user_text.strip()))
+                # Skip clarification for affirmative/follow-up messages.  Two-tier check:
+                # 1. Full regex match — pure affirmatives with optional filler ("uh, yes").
+                # 2. Opener + short message — catches "yes please do that" (≤ 6 tokens
+                #    starting with an affirmative word) and filler-prefixed variants like
+                #    "uh, yes that's it" (filler first word, affirmative second word).
+                _stripped_text = user_text.strip()
+                _text_words = _stripped_text.split()
+                _w0 = _text_words[0].lower().rstrip(",.!?") if _text_words else ""
+                _w1 = _text_words[1].lower().rstrip(",.!?") if len(_text_words) > 1 else ""
+                _is_followup = bool(_FOLLOWUP_RE.match(_stripped_text)) or (
+                    bool(_text_words)
+                    and len(_text_words) <= 6
+                    and (
+                        _w0 in _FOLLOWUP_OPENERS
+                        or (_w0 in _FOLLOWUP_FILLER and _w1 in _FOLLOWUP_OPENERS)
+                    )
+                )
                 if not _is_followup and plan.smart_analysis.get("needs_clarification") and plan.smart_analysis.get("clarifying_question"):
                     clarification_question = str(plan.smart_analysis["clarifying_question"])
                 else:
