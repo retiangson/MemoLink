@@ -6,15 +6,15 @@ import {
   BookDownloadError, type BookHighlight,
 } from "../../api/booksApi";
 import type { ReaderViewProps } from "./format";
-import { readerSurfaceClass, readerThemeColors, readerFontSizePx } from "./format";
-import { useTTS } from "../../hooks/useTTS";
+import { readerSurfaceClass, readerThemeColors, readerFontSizePx, findSentenceIndexForOffset } from "./format";
+import { useTTS, splitSentences } from "../../hooks/useTTS";
 import { usePageSwipe } from "../../hooks/usePageSwipe";
 import { useHighlightColor } from "../../hooks/useHighlightColor";
 import { TTSPlayerBar } from "../TTSPlayerBar";
 import { HighlightColorPicker } from "./HighlightColorPicker";
 import { PageNavArrows } from "./PageNavArrows";
 import { ReaderLoadingState } from "./ReaderLoadingState";
-import { captureSelectionInContainer, applyPersistentMarks, flashOrPulseRange } from "./domTextHighlight";
+import { captureSelectionInContainer, applyPersistentMarks, flashOrPulseRange, offsetOfNodeInContainer } from "./domTextHighlight";
 
 interface PendingSelection { x: number; y: number; start: number; end: number; }
 
@@ -205,13 +205,32 @@ export function MobiReaderView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [jumpToHighlight, currentPage, loading]);
 
+  function speakChapter(startIdx: number) {
+    const text = chapterRef.current?.textContent || "";
+    if (text.trim()) tts.speak(text, startIdx);
+  }
+
   function handleReadAloud() {
     if (tts.playing) {
       if (tts.paused) tts.resume(); else tts.pause();
       return;
     }
-    const text = chapterRef.current?.textContent || "";
-    if (text.trim()) tts.speak(text);
+    speakChapter(0);
+  }
+
+  function handleDoubleClick() {
+    const container = chapterRef.current;
+    const sel = window.getSelection();
+    if (!container || !sel || sel.rangeCount === 0) return;
+    const offset = offsetOfNodeInContainer(container, sel.anchorNode as Node, sel.anchorOffset);
+    window.getSelection()?.removeAllRanges();
+    setPendingSelection(null);
+    if (offset == null) return;
+    const text = container.textContent || "";
+    if (!text.trim()) return;
+    if (tts.playing) tts.stop();
+    const idx = findSentenceIndexForOffset(text, splitSentences(text), offset);
+    speakChapter(idx);
   }
 
   const colors = readerThemeColors(colorMode);
@@ -232,6 +251,7 @@ export function MobiReaderView({
               ref={chapterRef}
               onAnimationEnd={() => setPageAnim(null)}
               onMouseUp={handleMouseUp}
+              onDoubleClick={handleDoubleClick}
               className={`relative shadow-lg rounded-xl max-w-2xl w-full h-fit p-10 leading-relaxed ${pageAnim === "next" ? "ml-page-anim-next" : pageAnim === "prev" ? "ml-page-anim-prev" : ""}`}
               style={{ backgroundColor: colors.background, color: colors.foreground, fontSize: `${readerFontSizePx(fontSize, 15)}px` }}
               dangerouslySetInnerHTML={{ __html: chapterHtml }}
