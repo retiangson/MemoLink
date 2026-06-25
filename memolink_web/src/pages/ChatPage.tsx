@@ -18,13 +18,13 @@ import { DeleteModal } from "../components/DeleteModal";
 import { SettingsModal } from "../components/SettingsModal";
 import { EmailTabContent } from "../components/EmailTabContent";
 import { EmailComposeTabContent } from "../components/EmailComposeTabContent";
+import { EmailListTabContent } from "../components/EmailListTabContent";
 import { useEmailTabs } from "../hooks/useEmailTabs";
 import { WhatsappTabContent } from "../components/WhatsappTabContent";
 import { useWhatsappTabs } from "../hooks/useWhatsappTabs";
 import { archiveEmail, trashEmail, pinEmail, unpinEmail } from "../api/emailApi";
 import { HelpModal } from "../components/HelpModal";
 import { MemoGraphModal } from "../components/MemoGraphModal";
-import { StudyModeModal } from "../components/StudyModeModal";
 import { SurveyModal } from "../components/SurveyModal";
 import { useEvaluationHeartbeat } from "../hooks/useEvaluationHeartbeat";
 import { getMyRatings } from "../api/evaluationApi";
@@ -69,10 +69,13 @@ import { BookReader } from "../components/BookReader";
 import { useBookTabs } from "../hooks/useBookTabs";
 import { listMyBooks, getBook, getBookHighlight, type Book } from "../api/booksApi";
 import { DESKTOP_LAYOUT_MIN_WIDTH, useIsDesktop } from "../hooks/useIsDesktop";
+import { useStudyTabs } from "../hooks/useStudyTabs";
+import { StudyToolView } from "../components/StudyToolView";
+import { TABS as STUDY_TABS, type Tab as StudyTab } from "../components/study/StudyTabs";
 
 type WorkspaceHook = ReturnType<typeof useWorkspace>;
 type LayoutMode = "stacked" | "columns" | "rows";
-type TabType = "chat" | "note" | "email" | "spotify" | "whatsapp" | "calendar" | "books" | "book";
+type TabType = "chat" | "note" | "email" | "spotify" | "whatsapp" | "calendar" | "books" | "book" | "study";
 type DraggableTabType = "chat" | "note" | "email" | "whatsapp";
 type AdminTab = "feedback" | "features" | "users" | "logs" | "survey" | "evaluation" | "books";
 
@@ -113,7 +116,6 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
   const [showSettings, setShowSettings] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [showMemoGraph, setShowMemoGraph] = useState(false);
-  const [showStudyMode, setShowStudyMode] = useState(false);
   const [showCoreMemory, setShowCoreMemory] = useState(false);
   const [showSurvey, setShowSurvey] = useState(false);
   const [workflowSuggestions, setWorkflowSuggestions] = useState<Record<number, WorkflowAction[]>>({});
@@ -126,6 +128,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
   const [booksInitialView, setBooksInitialView] = useState<"browse" | "my">("browse");
   const bookTabs = useBookTabs();
   const [myBooks, setMyBooks] = useState<import("../api/booksApi").UserBook[]>([]);
+  const studyTabs = useStudyTabs();
   const [chatReminderSuggestion, setChatReminderSuggestion] = useState<{
     text: string; due_date: string | null; due_time: string | null; messageId: number;
   } | null>(null);
@@ -544,6 +547,13 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
     }
   }, [bookTabs.openTabs.length, activeTabType]);
 
+  // When all study tool tabs are closed, switch back to chat
+  useEffect(() => {
+    if (studyTabs.openTabs.length === 0 && activeTabType === "study") {
+      setActiveTabType("chat");
+    }
+  }, [studyTabs.openTabs.length, activeTabType]);
+
   useEffect(() => {
     const close = () => { setMenuData(null); setUserMenuOpen(false); };
     window.addEventListener("click", close);
@@ -762,6 +772,16 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
     setActiveTabType("email");
   }
 
+  function openAllMailInTab() {
+    emailTabs.openAllMailTab();
+    setActiveTabType("email");
+  }
+
+  function openEmailFolderInTab(account: import("../api/emailApi").EmailAccount, folder: "inbox" | "outbox" | "drafts" | "trash", folderLabel: string) {
+    emailTabs.openFolderTab(account.id, folder, folderLabel);
+    setActiveTabType("email");
+  }
+
   function openSpotifyInTab() {
     setSpotifyTabOpen(true);
     setActiveTabType("spotify");
@@ -793,6 +813,11 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
     const ub = myBooks.find((m) => m.book_id === bookId);
     if (!ub?.book) return;
     openBookTab(ub.book, ub.current_page || 1);
+  }
+
+  function openStudyTool(tool: StudyTab) {
+    studyTabs.openStudyTab(tool);
+    setActiveTabType("study");
   }
 
   // Double-clicking a highlight blockquote inside a Note jumps back into the book it
@@ -944,45 +969,83 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
 
   async function handleEmailArchive() {
     const active = emailTabs.active;
-    if (!active || active.kind !== "view" || !active.email.gmail_message_id) return;
-    const gmailMessageId = active.email.gmail_message_id;
-    setEmailActionLoadingId(gmailMessageId);
-    try {
-      await archiveEmail(gmailMessageId, active.email.email_account_id ?? undefined);
-      emailTabs.closeEmailTabById(gmailMessageId);
-    } finally {
-      setEmailActionLoadingId(null);
+    if (!active) return;
+    if (active.kind === "view" && active.email.gmail_message_id) {
+      const gmailMessageId = active.email.gmail_message_id;
+      setEmailActionLoadingId(gmailMessageId);
+      try {
+        await archiveEmail(gmailMessageId, active.email.email_account_id ?? undefined);
+        emailTabs.closeEmailTabById(gmailMessageId);
+      } finally {
+        setEmailActionLoadingId(null);
+      }
+    } else if (active.kind === "list" && active.viewingEmail?.gmail_message_id) {
+      const gmailMessageId = active.viewingEmail.gmail_message_id;
+      setEmailActionLoadingId(gmailMessageId);
+      try {
+        await archiveEmail(gmailMessageId, active.viewingEmail.email_account_id ?? undefined);
+        emailTabs.backToListInTab(emailTabs.activeIndex);
+      } finally {
+        setEmailActionLoadingId(null);
+      }
     }
   }
 
   async function handleEmailTrash() {
     const active = emailTabs.active;
-    if (!active || active.kind !== "view" || !active.email.gmail_message_id) return;
-    const gmailMessageId = active.email.gmail_message_id;
-    setEmailActionLoadingId(gmailMessageId);
-    try {
-      await trashEmail(gmailMessageId, active.email.email_account_id ?? undefined);
-      emailTabs.closeEmailTabById(gmailMessageId);
-    } finally {
-      setEmailActionLoadingId(null);
+    if (!active) return;
+    if (active.kind === "view" && active.email.gmail_message_id) {
+      const gmailMessageId = active.email.gmail_message_id;
+      setEmailActionLoadingId(gmailMessageId);
+      try {
+        await trashEmail(gmailMessageId, active.email.email_account_id ?? undefined);
+        emailTabs.closeEmailTabById(gmailMessageId);
+      } finally {
+        setEmailActionLoadingId(null);
+      }
+    } else if (active.kind === "list" && active.viewingEmail?.gmail_message_id) {
+      const gmailMessageId = active.viewingEmail.gmail_message_id;
+      setEmailActionLoadingId(gmailMessageId);
+      try {
+        await trashEmail(gmailMessageId, active.viewingEmail.email_account_id ?? undefined);
+        emailTabs.backToListInTab(emailTabs.activeIndex);
+      } finally {
+        setEmailActionLoadingId(null);
+      }
     }
   }
 
   async function handleEmailTogglePin() {
     const active = emailTabs.active;
-    if (!active || active.kind !== "view" || !active.email.gmail_message_id) return;
-    const gmailMessageId = active.email.gmail_message_id;
-    setEmailActionLoadingId(gmailMessageId);
-    try {
-      if (active.email.is_pinned) {
-        const res = await unpinEmail(gmailMessageId);
-        emailTabs.updateEmailTab(gmailMessageId, { is_pinned: res.is_pinned });
-      } else {
-        const res = await pinEmail(gmailMessageId, active.email.email_account_id ?? undefined);
-        emailTabs.updateEmailTab(gmailMessageId, { is_pinned: res.is_pinned, id: res.id });
+    if (!active) return;
+    if (active.kind === "view" && active.email.gmail_message_id) {
+      const gmailMessageId = active.email.gmail_message_id;
+      setEmailActionLoadingId(gmailMessageId);
+      try {
+        if (active.email.is_pinned) {
+          const res = await unpinEmail(gmailMessageId);
+          emailTabs.updateEmailTab(gmailMessageId, { is_pinned: res.is_pinned });
+        } else {
+          const res = await pinEmail(gmailMessageId, active.email.email_account_id ?? undefined);
+          emailTabs.updateEmailTab(gmailMessageId, { is_pinned: res.is_pinned, id: res.id });
+        }
+      } finally {
+        setEmailActionLoadingId(null);
       }
-    } finally {
-      setEmailActionLoadingId(null);
+    } else if (active.kind === "list" && active.viewingEmail?.gmail_message_id) {
+      const gmailMessageId = active.viewingEmail.gmail_message_id;
+      setEmailActionLoadingId(gmailMessageId);
+      try {
+        if (active.viewingEmail.is_pinned) {
+          const res = await unpinEmail(gmailMessageId);
+          emailTabs.updateListViewingEmail(emailTabs.activeIndex, { is_pinned: res.is_pinned });
+        } else {
+          const res = await pinEmail(gmailMessageId, active.viewingEmail.email_account_id ?? undefined);
+          emailTabs.updateListViewingEmail(emailTabs.activeIndex, { is_pinned: res.is_pinned, id: res.id });
+        }
+      } finally {
+        setEmailActionLoadingId(null);
+      }
     }
   }
 
@@ -999,6 +1062,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
   const isCalendarActive = activeTabType === "calendar" && calendarTabOpen;
   const isBooksActive = activeTabType === "books" && booksTabOpen;
   const isBookReaderActive = activeTabType === "book" && bookTabs.openTabs.length > 0;
+  const isStudyActive = activeTabType === "study" && studyTabs.openTabs.length > 0;
 
   const _LEVEL_ORDER: Record<string, number> = { regular: 0, plus: 1, pro: 2 };
   const _userLevel = user.access_level ?? "regular";
@@ -1205,7 +1269,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
               const isDragOver = dragOverTab?.type === "email" && dragOverTab.index === i && dragSrcRef.current?.index !== i;
               return (
                 <div
-                  key={tab.kind === "view" ? (tab.email.gmail_message_id ?? `email-${i}`) : tab.composeId}
+                  key={tab.kind === "view" ? (tab.email.gmail_message_id ?? `email-${i}`) : tab.kind === "compose" ? tab.composeId : (tab.scope.type === "all" ? "list-all" : `list-${tab.scope.accountId}-${tab.scope.folder}`)}
                   draggable
                   onDragStart={() => { dragSrcRef.current = { type: "email", index: i }; }}
                   onDragOver={(e) => { e.preventDefault(); setDragOverTab({ type: "email", index: i }); }}
@@ -1225,7 +1289,9 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                       <path d="M0 4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2zm2-1a1 1 0 0 0-1 1v.217l7 4.2 7-4.2V4a1 1 0 0 0-1-1zm13 2.383-4.708 2.825L15 11.105zm-.034 6.876-5.64-3.471L8 9.583l-1.326-.795-5.64 3.47A1 1 0 0 0 2 13h12a1 1 0 0 0 .966-.741M1 11.105l4.708-2.897L1 5.383z"/>
                     </svg>
                   )}
-                  <span className="max-w-[120px] truncate">{tab.kind === "compose" ? "New Mail" : (tab.email.subject || "(no subject)")}</span>
+                  <span className="max-w-[120px] truncate">
+                    {tab.kind === "compose" ? "New Mail" : tab.kind === "list" ? (tab.scope.type === "all" ? "All Mail" : tab.scope.folderLabel) : (tab.email.subject || "(no subject)")}
+                  </span>
                   <button onClick={(e) => { e.stopPropagation(); emailTabs.closeEmailTab(i); }} className="text-gray-600 hover:text-gray-300 w-3.5 h-3.5 flex items-center justify-center rounded-sm hover:bg-[var(--ml-bg-hover)] transition leading-none">×</button>
                 </div>
               );
@@ -1337,6 +1403,30 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                   <span className="max-w-[120px] truncate">{tab.book.title}</span>
                   <button
                     onClick={(e) => { e.stopPropagation(); bookTabs.closeBookTab(i); }}
+                    className="text-gray-600 hover:text-gray-300 w-3.5 h-3.5 flex items-center justify-center rounded-sm hover:bg-[var(--ml-bg-hover)] transition leading-none"
+                  >
+                    ×
+                  </button>
+                </div>
+              );
+            })}
+
+            {/* Study tool tabs — each opened study tool gets its own tab */}
+            {activeLayoutMode === "stacked" && studyTabs.openTabs.map((tab, i) => {
+              const isActive = activeTabType === "study" && studyTabs.activeIndex === i;
+              const meta = STUDY_TABS.find((t) => t.id === tab.tool);
+              return (
+                <div
+                  key={tab.tool}
+                  onClick={() => { studyTabs.setActiveIndex(i); setActiveTabType("study"); }}
+                  className={`flex items-center gap-1.5 px-3 h-10 text-xs cursor-pointer border-b-2 transition shrink-0 select-none ${
+                    isActive ? "border-emerald-500 text-white bg-[var(--ml-bg-base)]" : "border-transparent text-gray-500 hover:text-gray-300 hover:bg-[var(--ml-bg-base)]"
+                  }`}
+                >
+                  <span className="text-sm leading-none shrink-0">{meta?.icon}</span>
+                  <span className="max-w-[120px] truncate">{meta?.label}</span>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); studyTabs.closeStudyTab(i); }}
                     className="text-gray-600 hover:text-gray-300 w-3.5 h-3.5 flex items-center justify-center rounded-sm hover:bg-[var(--ml-bg-hover)] transition leading-none"
                   >
                     ×
@@ -1539,19 +1629,6 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                     </button>
                   )}
 
-                  {/* Study Mode */}
-                  {flags.study_mode_enabled && activeWorkspaceId && (
-                    <button
-                      onClick={() => { setUserMenuOpen(false); setShowStudyMode(true); }}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-emerald-300 hover:bg-emerald-500/10 hover:text-emerald-200 transition"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 shrink-0" fill="currentColor" viewBox="0 0 16 16">
-                        <path d="M8.5 2.687c.654-.689 1.782-.886 3.112-.752 1.234.124 2.503.523 3.388.893v9.923c-.918-.35-2.107-.692-3.287-.81-1.094-.111-2.278-.039-3.213.492zM8 1.783C7.015.936 5.587.81 4.287.94c-1.514.153-3.042.672-3.994 1.105A.5.5 0 0 0 0 2.5v11a.5.5 0 0 0 .707.455c.882-.4 2.303-.881 3.68-1.02 1.409-.142 2.59.087 3.223.877a.5.5 0 0 0 .78 0c.633-.79 1.814-1.019 3.222-.877 1.378.139 2.8.62 3.681 1.02A.5.5 0 0 0 16 13.5v-11a.5.5 0 0 0-.293-.455c-.952-.433-2.48-.952-3.994-1.105C10.413.809 8.985.936 8 1.783"/>
-                      </svg>
-                      Study Mode
-                    </button>
-                  )}
-
                   {/* Core Memory */}
                   {flags.core_memory_notes_enabled && (
                     <button
@@ -1683,18 +1760,47 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                 onHighlightAdded={reloadNotes}
               />
             )
+          ) : isStudyActive ? (
+            studyTabs.active && (
+              <StudyToolView
+                key={studyTabs.active.tool}
+                tool={studyTabs.active.tool}
+                workspaceId={activeWorkspaceId}
+                notes={notes.map((n) => ({ id: n.id, title: n.title }))}
+              />
+            )
           ) : isEmailActive ? (
             <main className="flex-1 overflow-hidden flex flex-col">
               {(() => {
                 const activeEmailTab = emailTabs.active;
                 if (!activeEmailTab) return null;
-                return activeEmailTab.kind === "compose" ? (
-                  <EmailComposeTabContent
-                    accounts={emailAccounts}
-                    draft={activeEmailTab.draft}
-                    onDraftChange={(patch) => emailTabs.setComposeDraft(activeEmailTab.composeId, patch)}
-                  />
-                ) : (
+                if (activeEmailTab.kind === "compose") {
+                  return (
+                    <EmailComposeTabContent
+                      accounts={emailAccounts}
+                      draft={activeEmailTab.draft}
+                      onDraftChange={(patch) => emailTabs.setComposeDraft(activeEmailTab.composeId, patch)}
+                    />
+                  );
+                }
+                if (activeEmailTab.kind === "list") {
+                  return (
+                    <EmailListTabContent
+                      scope={activeEmailTab.scope}
+                      viewingEmail={activeEmailTab.viewingEmail}
+                      emailAccounts={emailAccounts}
+                      onOpenEmail={(email) => emailTabs.viewEmailInListTab(emailTabs.activeIndex, email)}
+                      onBack={() => emailTabs.backToListInTab(emailTabs.activeIndex)}
+                      actionLoading={!!activeEmailTab.viewingEmail && emailActionLoadingId === activeEmailTab.viewingEmail.gmail_message_id}
+                      onArchive={handleEmailArchive}
+                      onTrash={handleEmailTrash}
+                      onTogglePin={handleEmailTogglePin}
+                      replyDraft={activeEmailTab.replyDraft}
+                      onReplyDraftChange={(_, draft) => emailTabs.setListReplyDraft(emailTabs.activeIndex, draft)}
+                    />
+                  );
+                }
+                return (
                   <EmailTabContent
                     email={activeEmailTab.email}
                     actionLoading={emailActionLoadingId === activeEmailTab.email.gmail_message_id}
@@ -2119,6 +2225,8 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
         emailAccounts={flags.email_enabled ? emailAccounts : []}
         onOpenEmailTab={openEmailInTab}
         onComposeNewMail={openComposeInTab}
+        onOpenAllMailTab={openAllMailInTab}
+        onOpenEmailFolderTab={openEmailFolderInTab}
         openEmailTabId={emailTabs.active?.kind === "view" ? (emailTabs.active.email.gmail_message_id ?? null) : null}
         onOpenWhatsappTab={openWhatsappInTab}
         openWhatsappChatId={whatsappTabs.active?.chat.id ?? null}
@@ -2156,6 +2264,8 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
         onOpenBrowseBooks={openBrowseBooks}
         onOpenMyBooks={openMyBooks}
         onOpenBookReader={openBookReader}
+        studyEnabled={flags.study_mode_enabled}
+        onOpenStudyTool={openStudyTool}
       />
 
       <DeleteModal
@@ -2194,13 +2304,6 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
           const note = notes.find((n) => n.id === noteId);
           if (note) handleOpenNote(note);
         }}
-      />
-
-      <StudyModeModal
-        show={showStudyMode}
-        onClose={() => setShowStudyMode(false)}
-        workspaceId={activeWorkspaceId}
-        notes={notes.map(n => ({ id: n.id, title: n.title }))}
       />
 
       <SurveyModal

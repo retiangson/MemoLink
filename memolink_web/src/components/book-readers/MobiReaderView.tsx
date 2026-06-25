@@ -1,7 +1,10 @@
 import React, { useEffect, useRef, useState } from "react";
 import { initMobiFile } from "@lingo-reader/mobi-parser";
 import type { Mobi } from "@lingo-reader/mobi-parser";
-import { fetchBookBlob, updateBookProgress, addBookHighlight, listBookHighlights, type BookHighlight } from "../../api/booksApi";
+import {
+  fetchBookBlob, updateBookProgress, addBookHighlight, listBookHighlights, reportBookReaderError,
+  BookDownloadError, type BookHighlight,
+} from "../../api/booksApi";
 import type { ReaderViewProps } from "./format";
 import { readerSurfaceClass, readerThemeColors, readerFontSizePx } from "./format";
 import { useTTS } from "../../hooks/useTTS";
@@ -14,6 +17,35 @@ import { ReaderLoadingState } from "./ReaderLoadingState";
 import { captureSelectionInContainer, applyPersistentMarks, flashOrPulseRange } from "./domTextHighlight";
 
 interface PendingSelection { x: number; y: number; start: number; end: number; }
+
+function describeMobiLoadError(error: unknown): string {
+  if (error instanceof BookDownloadError) {
+    if (error.status === 403) return "Add this book to My Books before opening it.";
+    if (error.status === 404 || error.status === 410) {
+      return "Could not download this book from OneDrive. It may no longer be available in the library.";
+    }
+    if (error.code === "ECONNABORTED") return "The book download timed out. Please try again on a stronger connection.";
+    if (!error.status) return "Network error while downloading this book. Please check your connection and try again.";
+    return error.message;
+  }
+  // initMobiFile throwing here (download succeeded) almost always means the file isn't a
+  // MOBI/PRC Palm database the parser recognizes — e.g. a pure KF8/AZW3 export, or a
+  // renamed/corrupted file (common when a .mobi was pulled out of a .zip incorrectly).
+  return "Could not open this MOBI file. It may be corrupted, or not a format this reader supports (e.g. a KF8/AZW3-only export).";
+}
+
+function technicalMobiLoadDetail(error: unknown): string | null {
+  if (error instanceof BookDownloadError) {
+    const parts = [
+      error.status ? `HTTP ${error.status}` : null,
+      error.code ? `code=${error.code}` : null,
+      error.detail ? (typeof error.detail === "string" ? error.detail : JSON.stringify(error.detail)) : null,
+    ].filter(Boolean);
+    return parts.length ? parts.join(" | ") : null;
+  }
+  if (error instanceof Error) return `${error.name}: ${error.message}`;
+  return error ? String(error) : null;
+}
 
 // MOBI chapters are parsed entirely client-side via @lingo-reader/mobi-parser; each
 // chapter's own CSS is intentionally ignored (it can't be trusted to play well with the
@@ -61,8 +93,22 @@ export function MobiReaderView({
         spineRef.current = spine;
         setChapterCount(spine.length);
         setCurrentPage((p) => Math.min(Math.max(1, p), Math.max(1, spine.length)));
-      } catch {
-        if (!cancelled) setError("Could not load this book. It may no longer be available in the library.");
+      } catch (loadError) {
+        if (!cancelled) {
+          console.error("MOBI reader failed", loadError);
+          const message = describeMobiLoadError(loadError);
+          setError(message);
+          reportBookReaderError({
+            book_id: book.id,
+            format: "mobi",
+            stage: "mobi-load",
+            message,
+            technical_detail: technicalMobiLoadDetail(loadError),
+            user_agent: navigator.userAgent,
+            url: window.location.pathname,
+            online: navigator.onLine,
+          }).catch(() => {});
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }

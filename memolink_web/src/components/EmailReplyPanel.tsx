@@ -11,7 +11,7 @@ interface EmailReplyPanelProps {
   emailAccountId?: number;
   senderName: string | null;
   senderEmail: string;
-  subject: string;
+  subject: string | null;
   defaultOpen?: boolean;
   // Optional controlled draft, lifted by callers that need the in-progress reply to
   // survive this component unmounting (e.g. switching tabs in ChatPage/EmailWorkspaceView).
@@ -77,7 +77,8 @@ export function EmailReplyPanel({ emailRecordId, gmailMessageId, emailAccountId,
   }
 
   const displayName = senderName || senderEmail;
-  const replySubject = subject.toLowerCase().startsWith("re:") ? subject : `Re: ${subject}`;
+  const safeSubject = subject || "(no subject)";
+  const replySubject = safeSubject.toLowerCase().startsWith("re:") ? safeSubject : `Re: ${safeSubject}`;
 
   return (
     <div className="border border-[var(--ml-bg-hover)] rounded-xl overflow-hidden">

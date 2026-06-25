@@ -17,6 +17,7 @@ import type { CalendarOccurrence } from "../api/calendarApi";
 import type { UserBook } from "../api/booksApi";
 import { getBookFormat } from "./book-readers/format";
 import { BookFormatIcon, getFormatStyle } from "./BookFormatIcon";
+import { TABS as STUDY_TABS, type Tab as StudyTab } from "./study/StudyTabs";
 
 interface RightPanelProps {
   open: boolean;
@@ -36,6 +37,8 @@ interface RightPanelProps {
   emailAccounts?: EmailAccount[];
   onOpenEmailTab?: (email: BrowseEmailResult) => void;
   onComposeNewMail?: () => void;
+  onOpenAllMailTab?: () => void;
+  onOpenEmailFolderTab?: (account: EmailAccount, folder: "inbox" | "outbox" | "drafts" | "trash", folderLabel: string) => void;
   openEmailTabId?: string | null;
   onEmailArchived?: (gmailMessageId: string) => void;
   onEmailTrashed?: (gmailMessageId: string) => void;
@@ -70,10 +73,12 @@ interface RightPanelProps {
   onOpenBrowseBooks?: () => void;
   onOpenMyBooks?: () => void;
   onOpenBookReader?: (bookId: number) => void;
+  studyEnabled?: boolean;
+  onOpenStudyTool?: (tool: StudyTab) => void;
 }
 
-type PanelSectionKey = "reminders" | "calendar" | "email" | "teams" | "whatsapp" | "books";
-const DEFAULT_SECTION_ORDER: PanelSectionKey[] = ["reminders", "calendar", "email", "teams", "whatsapp", "books"];
+type PanelSectionKey = "reminders" | "calendar" | "email" | "teams" | "whatsapp" | "books" | "study";
+const DEFAULT_SECTION_ORDER: PanelSectionKey[] = ["reminders", "calendar", "email", "teams", "whatsapp", "books", "study"];
 const SECTION_ORDER_STORAGE_KEY = "memolink_panel_section_order";
 
 function loadSectionOrder(): PanelSectionKey[] {
@@ -103,7 +108,7 @@ export function RightPanel({
   onAddManual, onToggleDone, onUpdate, onRemove, onClearDone,
   onGenerate, notificationPermission, onRequestNotificationPermission,
   emailConnected, emailAccounts = [],
-  onOpenEmailTab, onComposeNewMail, openEmailTabId, onEmailArchived, onEmailTrashed, onEmailPinChanged,
+  onOpenEmailTab, onComposeNewMail, onOpenAllMailTab, onOpenEmailFolderTab, openEmailTabId, onEmailArchived, onEmailTrashed, onEmailPinChanged,
   teamsConnected,
   whatsappConnected,
   whatsappAvailable,
@@ -114,6 +119,7 @@ export function RightPanel({
   onSpotifyPrevious, onSpotifyTogglePlay, onSpotifyNext, onSpotifySelectTrack, onSpotifySeek, onOpenSpotifyTab,
   calendarEvents = [], calendarLoading, onOpenCalendarTab,
   booksEnabled, myBooks = [], onOpenBrowseBooks, onOpenMyBooks, onOpenBookReader,
+  studyEnabled, onOpenStudyTool,
 }: RightPanelProps) {
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState<SuggestionItem | null>(null);
@@ -131,6 +137,7 @@ export function RightPanel({
   const [editingAccountLabel, setEditingAccountLabel] = useState("");
   const [showSpotifyList, setShowSpotifyList] = useState(false);
   const [showBooks, setShowBooks] = useState(false);
+  const [showStudy, setShowStudy] = useState(false);
 
   const [sectionOrder, setSectionOrder] = useState<PanelSectionKey[]>(loadSectionOrder);
   const sectionDragRef = useRef<PanelSectionKey | null>(null);
@@ -684,7 +691,7 @@ export function RightPanel({
                       </svg>
                       New Mail
                     </button>
-                    <button onClick={() => setSelectedMailTab("all")} className={`${mailNavButtonClass(selectedMailTab === "all")} flex items-center justify-center gap-1.5`}>
+                    <button onClick={() => { setSelectedMailTab("all"); onOpenAllMailTab?.(); }} className={`${mailNavButtonClass(selectedMailTab === "all")} flex items-center justify-center gap-1.5`}>
                       All Mail
                       {totalUnreadCount > 0 && (
                         <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-indigo-600/30 text-indigo-300">
@@ -736,10 +743,10 @@ export function RightPanel({
                     ))}
                   </div>
 
-                  {/* All sub-views stay mounted (hidden via CSS, not unmounted) so switching
-                      tabs never re-triggers a Gmail fetch — only the first load per view does. */}
+                  {/* All Mail stays mounted only to keep the unread badge count fed — it now
+                      always opens in a tab, so it's never shown inline in the sidebar. */}
                   <div className="flex flex-col gap-1.5 min-h-[2rem]">
-                    <div style={{ display: selectedMailTab === "all" ? "block" : "none" }}>
+                    <div style={{ display: "none" }}>
                       {onOpenEmailTab && (
                         <EmailAllMailList
                           onOpenEmail={onOpenEmailTab}
@@ -763,6 +770,7 @@ export function RightPanel({
                             onEmailTrashed={onEmailTrashed}
                             onPinChanged={onEmailPinChanged}
                             onUnreadCountChange={handleAccountUnreadCountChange}
+                            onOpenFolderTab={onOpenEmailFolderTab ? (folder, folderLabel) => onOpenEmailFolderTab(account, folder, folderLabel) : undefined}
                           />
                         )}
                       </div>
@@ -1067,6 +1075,48 @@ export function RightPanel({
                     })}
                 </div>
               )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Section 4.6: Study Mode ── */}
+      {studyEnabled && (
+        <div
+          draggable
+          onDragStart={() => handleSectionDragStart("study")}
+          onDragOver={(e) => { e.preventDefault(); if (sectionDragOver !== "study") setSectionDragOver("study"); }}
+          onDrop={(e) => { e.preventDefault(); handleSectionDrop("study"); }}
+          onDragEnd={handleSectionDragEnd}
+          style={{ order: sectionOrder.indexOf("study") }}
+          className={`border-b border-[var(--ml-bg-panel)] cursor-grab active:cursor-grabbing ${sectionDragOver === "study" ? "ring-1 ring-inset ring-indigo-500/50 bg-indigo-500/5" : ""}`}
+        >
+          <button
+            onClick={() => setShowStudy((v) => !v)}
+            className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-[#1a1a24] transition text-left"
+          >
+            <div className="flex items-center gap-2">
+              <SectionDragHandle />
+              <span className="text-sm leading-none">🎓</span>
+              <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Study</span>
+            </div>
+            <svg xmlns="http://www.w3.org/2000/svg" className={`w-3 h-3 text-gray-600 transition-transform ${showStudy ? "" : "-rotate-90"}`} fill="currentColor" viewBox="0 0 16 16">
+              <path d="M7.247 11.14 2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z"/>
+            </svg>
+          </button>
+
+          {showStudy && (
+            <div className="px-4 pb-3 flex flex-col gap-1">
+              {STUDY_TABS.map(({ id, label, icon }) => (
+                <button
+                  key={id}
+                  onClick={() => onOpenStudyTool?.(id)}
+                  className="w-full flex items-center gap-2 text-left px-2 py-1.5 rounded-lg hover:bg-[#1a1a24] transition"
+                >
+                  <span className="text-sm leading-none shrink-0">{icon}</span>
+                  <span className="text-[11px] text-gray-300">{label}</span>
+                </button>
+              ))}
             </div>
           )}
         </div>

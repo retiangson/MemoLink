@@ -68,6 +68,9 @@ interface EmailFolderBrowserProps {
   onEmailTrashed?: (gmailMessageId: string) => void;
   onPinChanged?: (gmailMessageId: string, isPinned: boolean) => void;
   onUnreadCountChange?: (accountId: number, count: number) => void;
+  // When provided, clicking a folder (Inbox/Sent/etc.) opens it as an in-app tab
+  // instead of expanding the folder inline in this sidebar list.
+  onOpenFolderTab?: (folder: FolderDef["key"], folderLabel: string) => void;
 }
 
 export function EmailFolderBrowser({
@@ -78,6 +81,7 @@ export function EmailFolderBrowser({
   onEmailTrashed,
   onPinChanged,
   onUnreadCountChange,
+  onOpenFolderTab,
 }: EmailFolderBrowserProps) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [folderState, setFolderState] = useState<Record<string, FolderState>>({});
@@ -262,7 +266,7 @@ export function EmailFolderBrowser({
         return (
           <div key={folder.key} className="rounded-lg overflow-hidden">
             <button
-              onClick={() => toggleFolder(folder.key)}
+              onClick={() => (onOpenFolderTab ? onOpenFolderTab(folder.key, folder.label) : toggleFolder(folder.key))}
               className="w-full flex items-center gap-2 px-2.5 py-1.5 hover:bg-[#1e1e2c] transition text-left"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3 text-blue-400 shrink-0" fill="currentColor" viewBox="0 0 16 16">

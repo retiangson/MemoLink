@@ -164,14 +164,18 @@ def _extract_attachments(payload: dict) -> list[dict]:
             part_headers = part.get("headers", [])
             raw_content_id = _get_header(part_headers, "Content-ID")
             content_id = raw_content_id.strip("<>") if raw_content_id else None
-            disposition = _get_header(part_headers, "Content-Disposition")
+            disposition = _get_header(part_headers, "Content-Disposition").lower()
+            # A Content-Disposition of "attachment" always means a real downloadable
+            # file, even if the part also carries a Content-ID (some senders set both) —
+            # otherwise such attachments were wrongly hidden from the Attachments list.
+            is_inline = "inline" in disposition or (bool(content_id) and "attachment" not in disposition)
             results.append({
                 "filename": filename,
                 "attachment_id": attachment_id,
                 "size": body.get("size", 0),
                 "mime_type": part.get("mimeType", ""),
                 "content_id": content_id,
-                "is_inline": bool(content_id) or "inline" in disposition.lower(),
+                "is_inline": is_inline,
             })
         # Recurse into nested parts
         results.extend(_extract_attachments(part))

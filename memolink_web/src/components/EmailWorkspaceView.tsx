@@ -103,13 +103,13 @@ export function EmailWorkspaceView({ emailAccounts }: EmailWorkspaceViewProps) {
           <div className="flex items-stretch border-b border-[var(--ml-bg-panel)] shrink-0 overflow-x-auto">
             {openTabs.map((tab, i) => (
               <div
-                key={tab.kind === "view" ? tab.email.gmail_message_id : tab.composeId}
+                key={tab.kind === "view" ? tab.email.gmail_message_id : tab.kind === "compose" ? tab.composeId : i}
                 onClick={() => setActiveIndex(i)}
                 className={`flex items-center gap-2 px-3 py-2 text-xs cursor-pointer border-r border-[var(--ml-bg-panel)] max-w-[180px] shrink-0 ${
                   i === activeIndex ? "bg-[var(--ml-bg-surface)] text-gray-100" : "text-gray-500 hover:text-gray-300"
                 }`}
               >
-                <span className="truncate">{tab.kind === "view" ? (tab.email.subject || "(no subject)") : "New Mail"}</span>
+                <span className="truncate">{tab.kind === "view" ? (tab.email.subject || "(no subject)") : tab.kind === "compose" ? "New Mail" : "Mail list"}</span>
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
@@ -131,7 +131,7 @@ export function EmailWorkspaceView({ emailAccounts }: EmailWorkspaceViewProps) {
             draft={active.draft}
             onDraftChange={(patch) => setComposeDraft(active.composeId, patch)}
           />
-        ) : active ? (
+        ) : active && active.kind === "view" ? (
           <EmailTabContent
             key={active.email.gmail_message_id}
             email={active.email}
