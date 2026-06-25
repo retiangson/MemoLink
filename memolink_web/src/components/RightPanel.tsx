@@ -18,6 +18,7 @@ import type { UserBook } from "../api/booksApi";
 import { getBookFormat } from "./book-readers/format";
 import { BookFormatIcon, getFormatStyle } from "./BookFormatIcon";
 import { TABS as STUDY_TABS, type Tab as StudyTab } from "./study/StudyTabs";
+import { StudyToolIcon, StudyCapIcon, getStudyToolStyle } from "./StudyToolIcon";
 
 interface RightPanelProps {
   open: boolean;
@@ -38,7 +39,7 @@ interface RightPanelProps {
   onOpenEmailTab?: (email: BrowseEmailResult) => void;
   onComposeNewMail?: () => void;
   onOpenAllMailTab?: () => void;
-  onOpenEmailFolderTab?: (account: EmailAccount, folder: "inbox" | "outbox" | "drafts" | "trash", folderLabel: string) => void;
+  onOpenEmailAccountTab?: (account: EmailAccount) => void;
   openEmailTabId?: string | null;
   onEmailArchived?: (gmailMessageId: string) => void;
   onEmailTrashed?: (gmailMessageId: string) => void;
@@ -75,10 +76,12 @@ interface RightPanelProps {
   onOpenBookReader?: (bookId: number) => void;
   studyEnabled?: boolean;
   onOpenStudyTool?: (tool: StudyTab) => void;
+  memographEnabled?: boolean;
+  onOpenMemoGraphTab?: () => void;
 }
 
-type PanelSectionKey = "reminders" | "calendar" | "email" | "teams" | "whatsapp" | "books" | "study";
-const DEFAULT_SECTION_ORDER: PanelSectionKey[] = ["reminders", "calendar", "email", "teams", "whatsapp", "books", "study"];
+type PanelSectionKey = "reminders" | "calendar" | "email" | "teams" | "whatsapp" | "books" | "study" | "memograph";
+const DEFAULT_SECTION_ORDER: PanelSectionKey[] = ["reminders", "calendar", "email", "teams", "whatsapp", "books", "study", "memograph"];
 const SECTION_ORDER_STORAGE_KEY = "memolink_panel_section_order";
 
 function loadSectionOrder(): PanelSectionKey[] {
@@ -103,12 +106,29 @@ function SectionDragHandle() {
   );
 }
 
+const EMAIL_ACCOUNT_COLORS = [
+  "bg-sky-500/15 text-sky-400",
+  "bg-amber-500/15 text-amber-400",
+  "bg-violet-500/15 text-violet-400",
+  "bg-emerald-500/15 text-emerald-400",
+  "bg-rose-500/15 text-rose-400",
+  "bg-cyan-500/15 text-cyan-400",
+];
+
+function EmailMailIcon({ className }: { className?: string }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="currentColor" viewBox="0 0 16 16">
+      <path d="M0 4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2zm2-1a1 1 0 0 0-1 1v.217l7 4.2 7-4.2V4a1 1 0 0 0-1-1zm13 2.383-4.708 2.825L15 11.105zm-.034 6.876-5.64-3.471L8 9.583l-1.326-.795-5.64 3.47A1 1 0 0 0 2 13h12a1 1 0 0 0 .966-.741M1 11.105l4.708-2.897L1 5.383z"/>
+    </svg>
+  );
+}
+
 export function RightPanel({
   open, overlay = false, onClose, items, isGenerating,
   onAddManual, onToggleDone, onUpdate, onRemove, onClearDone,
   onGenerate, notificationPermission, onRequestNotificationPermission,
   emailConnected, emailAccounts = [],
-  onOpenEmailTab, onComposeNewMail, onOpenAllMailTab, onOpenEmailFolderTab, openEmailTabId, onEmailArchived, onEmailTrashed, onEmailPinChanged,
+  onOpenEmailTab, onComposeNewMail, onOpenAllMailTab, onOpenEmailAccountTab, openEmailTabId, onEmailArchived, onEmailTrashed, onEmailPinChanged,
   teamsConnected,
   whatsappConnected,
   whatsappAvailable,
@@ -118,15 +138,15 @@ export function RightPanel({
   spotifyShuffle, spotifyRepeatMode,
   onSpotifyPrevious, onSpotifyTogglePlay, onSpotifyNext, onSpotifySelectTrack, onSpotifySeek, onOpenSpotifyTab,
   calendarEvents = [], calendarLoading, onOpenCalendarTab,
-  booksEnabled, myBooks = [], onOpenBrowseBooks, onOpenMyBooks, onOpenBookReader,
+  booksEnabled, myBooks = [], onOpenMyBooks, onOpenBookReader,
   studyEnabled, onOpenStudyTool,
+  memographEnabled, onOpenMemoGraphTab,
 }: RightPanelProps) {
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState<SuggestionItem | null>(null);
   const [showNoteReminders, setShowNoteReminders] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
   const [showEmailReminders, setShowEmailReminders] = useState(false);
-  const [selectedMailTab, setSelectedMailTab] = useState<"all" | number>("all");
   const [totalUnreadCount, setTotalUnreadCount] = useState(0);
   const [accountUnreadCounts, setAccountUnreadCounts] = useState<Record<number, number>>({});
   // Optimistic local overrides for account display names, keyed by account id.
@@ -138,6 +158,7 @@ export function RightPanel({
   const [showSpotifyList, setShowSpotifyList] = useState(false);
   const [showBooks, setShowBooks] = useState(false);
   const [showStudy, setShowStudy] = useState(false);
+  const [showMemoGraph, setShowMemoGraph] = useState(false);
 
   const [sectionOrder, setSectionOrder] = useState<PanelSectionKey[]>(loadSectionOrder);
   const sectionDragRef = useRef<PanelSectionKey | null>(null);
@@ -377,14 +398,6 @@ export function RightPanel({
     );
   }
 
-  function mailNavButtonClass(active: boolean) {
-    return `w-full text-center text-[11px] py-1.5 px-2.5 rounded-lg border transition ${
-      active
-        ? "border-indigo-500/40 text-indigo-300 bg-indigo-600/10"
-        : "border-[var(--ml-bg-hover)] text-gray-400 hover:text-indigo-300 hover:border-indigo-500/30"
-    }`;
-  }
-
   const renderCard = (item: SuggestionItem) => {
     const isToday   = !item.done && item.due_date === today;
     const isOverdue = !item.done && !!item.due_date && item.due_date < today;
@@ -582,9 +595,12 @@ export function RightPanel({
           style={{ order: sectionOrder.indexOf("calendar") }}
           className={`border-b border-[var(--ml-bg-panel)] cursor-grab active:cursor-grabbing ${sectionDragOver === "calendar" ? "ring-1 ring-inset ring-indigo-500/50 bg-indigo-500/5" : ""}`}
         >
-          <button
+          <div
+            role="button"
+            tabIndex={0}
             onClick={() => setShowCalendar((v) => !v)}
-            className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-[#1a1a24] transition text-left"
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setShowCalendar((v) => !v); } }}
+            className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-[#1a1a24] transition text-left cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-400"
           >
             <div className="flex items-center gap-2">
               <SectionDragHandle />
@@ -615,7 +631,7 @@ export function RightPanel({
                 <path d="M7.247 11.14 2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z"/>
               </svg>
             </div>
-          </button>
+          </div>
 
           {showCalendar && (
             <div className="px-4 pb-3">
@@ -680,100 +696,110 @@ export function RightPanel({
                 <p className="text-[11px] text-gray-600 text-center pt-1">No email accounts connected.</p>
               ) : (
                 <>
-                  {/* Mail/Calendar nav — vertical list of "Load more"-style buttons */}
+                  {/* Flat icon+label list — matches the Study tools list styling */}
                   <div className="flex flex-col gap-1">
                     <button
                       onClick={() => onComposeNewMail?.()}
-                      className="w-full flex items-center justify-center gap-1.5 text-[11px] font-medium py-1.5 rounded-lg border border-indigo-500/25 text-indigo-300 bg-indigo-600/10 hover:bg-indigo-600/20 transition"
+                      className="w-full flex items-center gap-2 text-left px-2 py-1.5 rounded-lg hover:bg-[#1a1a24] transition"
                     >
-                      <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" fill="currentColor" viewBox="0 0 16 16">
-                        <path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168zM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207zM9.5 2.207 12.793 5.5 11.5 6.793 8.207 3.5z"/>
-                      </svg>
-                      New Mail
+                      <span className="shrink-0 inline-flex items-center justify-center w-5 h-5 rounded-md bg-indigo-500/15 text-indigo-400">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" fill="currentColor" viewBox="0 0 16 16">
+                          <path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168zM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207zM9.5 2.207 12.793 5.5 11.5 6.793 8.207 3.5z"/>
+                        </svg>
+                      </span>
+                      <span className="text-[11px] text-gray-300">New Mail</span>
                     </button>
-                    <button onClick={() => { setSelectedMailTab("all"); onOpenAllMailTab?.(); }} className={`${mailNavButtonClass(selectedMailTab === "all")} flex items-center justify-center gap-1.5`}>
-                      All Mail
+
+                    <button
+                      onClick={() => onOpenAllMailTab?.()}
+                      className="w-full flex items-center gap-2 text-left px-2 py-1.5 rounded-lg hover:bg-[#1a1a24] transition"
+                    >
+                      <span className="shrink-0 inline-flex items-center justify-center w-5 h-5 rounded-md bg-blue-500/15 text-blue-400">
+                        <EmailMailIcon className="w-3 h-3" />
+                      </span>
+                      <span className="text-[11px] text-gray-300 flex-1">All Mail</span>
                       {totalUnreadCount > 0 && (
-                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-indigo-600/30 text-indigo-300">
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-indigo-600/30 text-indigo-300 shrink-0">
                           {totalUnreadCount}
                         </span>
                       )}
                     </button>
-                    {emailAccounts.map((account) => (
-                      <button
-                        key={account.id}
-                        onClick={() => setSelectedMailTab(account.id)}
-                        onDoubleClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedMailTab(account.id);
-                          setEditingAccountTabId(account.id);
-                          setEditingAccountLabel(getAccountLabel(account));
-                        }}
-                        title={account.email}
-                        className={`${mailNavButtonClass(selectedMailTab === account.id)} flex items-center justify-center gap-1.5`}
-                      >
-                        {editingAccountTabId === account.id ? (
-                          <input
-                            autoFocus
-                            value={editingAccountLabel}
-                            onChange={(e) => setEditingAccountLabel(e.target.value)}
-                            onBlur={() => commitAccountLabel(account.id, editingAccountLabel)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") {
-                                e.preventDefault();
-                                commitAccountLabel(account.id, editingAccountLabel);
-                              }
-                              if (e.key === "Escape") {
-                                e.preventDefault();
-                                setEditingAccountTabId(null);
-                              }
-                            }}
-                            onClick={(e) => e.stopPropagation()}
-                            className="max-w-[140px] bg-transparent border-b border-indigo-400 outline-none text-white text-[11px] text-center"
-                          />
-                        ) : (
-                          <span className="truncate max-w-[140px]">{getAccountLabel(account)}</span>
-                        )}
-                        {!!accountUnreadCounts[account.id] && (
-                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-indigo-600/30 text-indigo-300 shrink-0">
-                            {accountUnreadCounts[account.id]}
+
+                    {emailAccounts.map((account, idx) => {
+                      const color = EMAIL_ACCOUNT_COLORS[idx % EMAIL_ACCOUNT_COLORS.length];
+                      return (
+                        <button
+                          key={account.id}
+                          onClick={() => onOpenEmailAccountTab?.(account)}
+                          onDoubleClick={(e) => {
+                            e.stopPropagation();
+                            setEditingAccountTabId(account.id);
+                            setEditingAccountLabel(getAccountLabel(account));
+                          }}
+                          title={account.email}
+                          className="w-full flex items-center gap-2 text-left px-2 py-1.5 rounded-lg hover:bg-[#1a1a24] transition"
+                        >
+                          <span className={`shrink-0 inline-flex items-center justify-center w-5 h-5 rounded-md ${color}`}>
+                            <EmailMailIcon className="w-3 h-3" />
                           </span>
-                        )}
-                      </button>
-                    ))}
+                          {editingAccountTabId === account.id ? (
+                            <input
+                              autoFocus
+                              value={editingAccountLabel}
+                              onChange={(e) => setEditingAccountLabel(e.target.value)}
+                              onBlur={() => commitAccountLabel(account.id, editingAccountLabel)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  e.preventDefault();
+                                  commitAccountLabel(account.id, editingAccountLabel);
+                                }
+                                if (e.key === "Escape") {
+                                  e.preventDefault();
+                                  setEditingAccountTabId(null);
+                                }
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                              className="flex-1 max-w-[140px] bg-transparent border-b border-indigo-400 outline-none text-white text-[11px]"
+                            />
+                          ) : (
+                            <span className="text-[11px] text-gray-300 truncate flex-1">{getAccountLabel(account)}</span>
+                          )}
+                          {!!accountUnreadCounts[account.id] && (
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-indigo-600/30 text-indigo-300 shrink-0">
+                              {accountUnreadCounts[account.id]}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
                   </div>
 
-                  {/* All Mail stays mounted only to keep the unread badge count fed — it now
-                      always opens in a tab, so it's never shown inline in the sidebar. */}
-                  <div className="flex flex-col gap-1.5 min-h-[2rem]">
-                    <div style={{ display: "none" }}>
-                      {onOpenEmailTab && (
-                        <EmailAllMailList
+                  {/* Mounted hidden purely to keep the unread badge counts fed — mail now
+                      always opens in a tab, so these are never shown inline in the sidebar. */}
+                  <div style={{ display: "none" }}>
+                    {onOpenEmailTab && (
+                      <EmailAllMailList
+                        onOpenEmail={onOpenEmailTab}
+                        selectedGmailMessageId={openEmailTabId}
+                        onEmailArchived={onEmailArchived}
+                        onEmailTrashed={onEmailTrashed}
+                        onPinChanged={onEmailPinChanged}
+                        onUnreadCountChange={setTotalUnreadCount}
+                      />
+                    )}
+                    {emailAccounts.map((account) => (
+                      onOpenEmailTab && (
+                        <EmailFolderBrowser
+                          key={account.id}
+                          account={account}
                           onOpenEmail={onOpenEmailTab}
                           selectedGmailMessageId={openEmailTabId}
                           onEmailArchived={onEmailArchived}
                           onEmailTrashed={onEmailTrashed}
                           onPinChanged={onEmailPinChanged}
-                          onUnreadCountChange={setTotalUnreadCount}
+                          onUnreadCountChange={handleAccountUnreadCountChange}
                         />
-                      )}
-                    </div>
-
-                    {emailAccounts.map((account) => (
-                      <div key={account.id} style={{ display: selectedMailTab === account.id ? "block" : "none" }}>
-                        {onOpenEmailTab && (
-                          <EmailFolderBrowser
-                            account={account}
-                            onOpenEmail={onOpenEmailTab}
-                            selectedGmailMessageId={openEmailTabId}
-                            onEmailArchived={onEmailArchived}
-                            onEmailTrashed={onEmailTrashed}
-                            onPinChanged={onEmailPinChanged}
-                            onUnreadCountChange={handleAccountUnreadCountChange}
-                            onOpenFolderTab={onOpenEmailFolderTab ? (folder, folderLabel) => onOpenEmailFolderTab(account, folder, folderLabel) : undefined}
-                          />
-                        )}
-                      </div>
+                      )
                     ))}
                   </div>
                 </>
@@ -1012,9 +1038,12 @@ export function RightPanel({
           style={{ order: sectionOrder.indexOf("books") }}
           className={`border-b border-[var(--ml-bg-panel)] cursor-grab active:cursor-grabbing ${sectionDragOver === "books" ? "ring-1 ring-inset ring-indigo-500/50 bg-indigo-500/5" : ""}`}
         >
-          <button
+          <div
+            role="button"
+            tabIndex={0}
             onClick={() => setShowBooks((v) => !v)}
-            className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-[#1a1a24] transition text-left"
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setShowBooks((v) => !v); } }}
+            className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-[#1a1a24] transition text-left cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-400"
           >
             <div className="flex items-center gap-2">
               <SectionDragHandle />
@@ -1028,29 +1057,32 @@ export function RightPanel({
                 </span>
               )}
             </div>
-            <svg xmlns="http://www.w3.org/2000/svg" className={`w-3 h-3 text-gray-600 transition-transform ${showBooks ? "" : "-rotate-90"}`} fill="currentColor" viewBox="0 0 16 16">
-              <path d="M7.247 11.14 2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z"/>
-            </svg>
-          </button>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={(e) => { e.stopPropagation(); onOpenMyBooks?.(); }}
+                title="Open My Books"
+                className="w-5 h-5 flex items-center justify-center rounded-md text-gray-600 hover:text-indigo-400 hover:bg-[var(--ml-bg-hover)] transition shrink-0"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 8V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-2m8-5h8m-4-4v8" />
+                </svg>
+              </button>
+              <svg xmlns="http://www.w3.org/2000/svg" className={`w-3 h-3 text-gray-600 transition-transform ${showBooks ? "" : "-rotate-90"}`} fill="currentColor" viewBox="0 0 16 16">
+                <path d="M7.247 11.14 2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z"/>
+              </svg>
+            </div>
+          </div>
 
           {showBooks && (
             <div className="px-4 pb-3 flex flex-col gap-2">
-              <div className="flex gap-2">
-                <button
-                  onClick={onOpenBrowseBooks}
-                  className="flex-1 px-2.5 py-1.5 text-[11px] rounded-lg bg-indigo-600/20 text-indigo-300 hover:bg-indigo-600/30 transition"
-                >
-                  Browse Books
-                </button>
+              {myBooks.length === 0 ? (
                 <button
                   onClick={onOpenMyBooks}
-                  className="flex-1 px-2.5 py-1.5 text-[11px] rounded-lg text-gray-400 border border-[var(--ml-bg-hover)] hover:bg-[var(--ml-bg-hover)] transition"
+                  className="w-full px-2.5 py-2 text-[11px] text-center rounded-lg border border-[var(--ml-bg-hover)] text-gray-500 hover:text-indigo-300 hover:border-indigo-500/30 transition"
                 >
-                  My Books
+                  No books yet — open My Books to add some.
                 </button>
-              </div>
-
-              {myBooks.length > 0 && (
+              ) : (
                 <div className="flex flex-col gap-1 mt-1 max-h-64 overflow-y-auto pr-0.5">
                   <span className="text-[10px] text-gray-600 uppercase tracking-wider px-0.5">My Books</span>
                   {myBooks
@@ -1097,7 +1129,7 @@ export function RightPanel({
           >
             <div className="flex items-center gap-2">
               <SectionDragHandle />
-              <span className="text-sm leading-none">🎓</span>
+              <StudyCapIcon className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
               <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Study</span>
             </div>
             <svg xmlns="http://www.w3.org/2000/svg" className={`w-3 h-3 text-gray-600 transition-transform ${showStudy ? "" : "-rotate-90"}`} fill="currentColor" viewBox="0 0 16 16">
@@ -1107,16 +1139,73 @@ export function RightPanel({
 
           {showStudy && (
             <div className="px-4 pb-3 flex flex-col gap-1">
-              {STUDY_TABS.map(({ id, label, icon }) => (
-                <button
-                  key={id}
-                  onClick={() => onOpenStudyTool?.(id)}
-                  className="w-full flex items-center gap-2 text-left px-2 py-1.5 rounded-lg hover:bg-[#1a1a24] transition"
-                >
-                  <span className="text-sm leading-none shrink-0">{icon}</span>
-                  <span className="text-[11px] text-gray-300">{label}</span>
-                </button>
-              ))}
+              {STUDY_TABS.map(({ id, label }) => {
+                const style = getStudyToolStyle(id);
+                return (
+                  <button
+                    key={id}
+                    onClick={() => onOpenStudyTool?.(id)}
+                    className="w-full flex items-center gap-2 text-left px-2 py-1.5 rounded-lg hover:bg-[#1a1a24] transition"
+                  >
+                    <span className={`shrink-0 inline-flex items-center justify-center w-5 h-5 rounded-md ${style.bg} ${style.fg}`}>
+                      <StudyToolIcon tool={id} className="w-3 h-3" />
+                    </span>
+                    <span className="text-[11px] text-gray-300">{label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {memographEnabled && (
+        <div
+          draggable
+          onDragStart={() => handleSectionDragStart("memograph")}
+          onDragOver={(e) => { e.preventDefault(); if (sectionDragOver !== "memograph") setSectionDragOver("memograph"); }}
+          onDrop={(e) => { e.preventDefault(); handleSectionDrop("memograph"); }}
+          onDragEnd={handleSectionDragEnd}
+          style={{ order: sectionOrder.indexOf("memograph") }}
+          className={`border-b border-[var(--ml-bg-panel)] cursor-grab active:cursor-grabbing ${sectionDragOver === "memograph" ? "ring-1 ring-inset ring-indigo-500/50 bg-indigo-500/5" : ""}`}
+        >
+          <button
+            onClick={() => setShowMemoGraph((v) => !v)}
+            className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-[#1a1a24] transition text-left"
+          >
+            <div className="flex items-center gap-2">
+              <SectionDragHandle />
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 text-indigo-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.7}>
+                <circle cx="5" cy="12" r="2.5" /><circle cx="19" cy="5" r="2.5" /><circle cx="19" cy="19" r="2.5" />
+                <circle cx="12" cy="8" r="2.5" /><circle cx="12" cy="16" r="2.5" />
+                <line x1="7.2" y1="11" x2="10" y2="9" /><line x1="14" y1="9" x2="16.8" y2="6.5" />
+                <line x1="7.2" y1="13" x2="10" y2="15" /><line x1="14" y1="15" x2="16.8" y2="17.5" />
+                <line x1="12" y1="10.5" x2="12" y2="13.5" />
+              </svg>
+              <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">MemoGraph</span>
+            </div>
+            <svg xmlns="http://www.w3.org/2000/svg" className={`w-3 h-3 text-gray-600 transition-transform ${showMemoGraph ? "" : "-rotate-90"}`} fill="currentColor" viewBox="0 0 16 16">
+              <path d="M7.247 11.14 2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z"/>
+            </svg>
+          </button>
+
+          {showMemoGraph && (
+            <div className="px-4 pb-3 flex flex-col gap-1">
+              <button
+                onClick={() => onOpenMemoGraphTab?.()}
+                className="w-full flex items-center gap-2 text-left px-2 py-1.5 rounded-lg hover:bg-[#1a1a24] transition"
+              >
+                <span className="shrink-0 inline-flex items-center justify-center w-5 h-5 rounded-md bg-indigo-500/15 text-indigo-400">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.7}>
+                    <circle cx="5" cy="12" r="2.5" /><circle cx="19" cy="5" r="2.5" /><circle cx="19" cy="19" r="2.5" />
+                    <circle cx="12" cy="8" r="2.5" /><circle cx="12" cy="16" r="2.5" />
+                    <line x1="7.2" y1="11" x2="10" y2="9" /><line x1="14" y1="9" x2="16.8" y2="6.5" />
+                    <line x1="7.2" y1="13" x2="10" y2="15" /><line x1="14" y1="15" x2="16.8" y2="17.5" />
+                    <line x1="12" y1="10.5" x2="12" y2="13.5" />
+                  </svg>
+                </span>
+                <span className="text-[11px] text-gray-300">Open MemoGraph</span>
+              </button>
             </div>
           )}
         </div>

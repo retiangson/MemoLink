@@ -3,10 +3,20 @@ import {
   listBooks, listMyBooks, borrowBook, removeFromMyBooks,
   type Book, type UserBook,
 } from "../api/booksApi";
-import { getBookFormat, getBookCategory, BOOK_CATEGORY_LABELS, type BookCategory } from "./book-readers/format";
+import { getBookFormat, getBookCategory, BOOK_CATEGORY_LABELS, type BookCategory, type BookFormat } from "./book-readers/format";
 import { BookFormatIcon, getFormatStyle } from "./BookFormatIcon";
 
 const CATEGORY_OPTIONS: BookCategory[] = ["ebook", "pdf", "audiobook", "video", "comic", "presentation", "text"];
+
+const CATEGORY_ICON_FORMAT: Record<BookCategory, BookFormat> = {
+  ebook: "epub",
+  pdf: "pdf",
+  audiobook: "audio",
+  video: "video",
+  comic: "cbz",
+  presentation: "pptx",
+  text: "txt",
+};
 
 const COVER_PALETTES = [
   "from-indigo-400 to-indigo-950",
@@ -25,11 +35,60 @@ function paletteFor(seed: string): string {
   return COVER_PALETTES[h % COVER_PALETTES.length];
 }
 
-function BookCover({ book, overlay }: { book: Book; overlay?: React.ReactNode }) {
+function CircleIcon({ icon, dimmed }: { icon: "plus" | "play" | "spinner"; dimmed?: boolean }) {
+  return (
+    <div
+      className={`w-9 h-9 inline-flex items-center justify-center rounded-full border border-white/50 text-white transition-opacity ${
+        dimmed ? "opacity-0 group-hover:opacity-100" : "opacity-100"
+      }`}
+    >
+      {icon === "plus" && (
+        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 drop-shadow-[0_1px_3px_rgba(0,0,0,0.85)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+        </svg>
+      )}
+      {icon === "play" && (
+        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 translate-x-px drop-shadow-[0_1px_3px_rgba(0,0,0,0.85)]" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z" />
+        </svg>
+      )}
+      {icon === "spinner" && (
+        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 animate-spin drop-shadow-[0_1px_3px_rgba(0,0,0,0.85)]" viewBox="0 0 24 24" fill="none">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth={4} />
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+        </svg>
+      )}
+    </div>
+  );
+}
+
+function BookCover({
+  book, action, meta, onRemove, onActivate, activateDisabled, activateLabel,
+}: {
+  book: Book;
+  action?: React.ReactNode;
+  meta?: React.ReactNode;
+  onRemove?: () => void;
+  onActivate?: () => void;
+  activateDisabled?: boolean;
+  activateLabel?: string;
+}) {
   const format = getBookFormat(book);
   const style = getFormatStyle(format);
   return (
-    <div className="relative aspect-[2/3] w-full rounded-md overflow-hidden shadow-lg shadow-black/50 border border-white/10 transition-transform duration-200 ease-out group-hover:scale-[1.06] group-hover:-translate-y-1 will-change-transform">
+    <div
+      role={onActivate ? "button" : undefined}
+      tabIndex={onActivate ? 0 : undefined}
+      aria-label={activateLabel}
+      onClick={!activateDisabled ? onActivate : undefined}
+      onKeyDown={onActivate ? (e) => {
+        if (activateDisabled) return;
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onActivate(); }
+      } : undefined}
+      className={`relative aspect-[2/3] w-full rounded-md overflow-hidden shadow-lg shadow-black/50 border border-white/10 origin-left transition-transform duration-300 ease-out group-hover:[transform:rotateY(-8deg)_translateY(-4px)_scale(1.04)] will-change-transform focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-400 ${
+        onActivate ? "cursor-pointer" : ""
+      } ${activateDisabled ? "pointer-events-none" : ""}`}
+    >
       {book.cover_image_url ? (
         <img src={book.cover_image_url} alt="" className="w-full h-full object-cover" />
       ) : (
@@ -38,13 +97,39 @@ function BookCover({ book, overlay }: { book: Book; overlay?: React.ReactNode })
           <p className="text-[10.5px] font-semibold text-white leading-snug line-clamp-4 drop-shadow-sm">{book.title}</p>
         </div>
       )}
-      <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-black/25" />
-      <div className={`absolute top-1.5 right-1.5 inline-flex items-center justify-center w-5 h-5 rounded-md ${style.bg} ${style.fg} backdrop-blur-sm`} title={style.label}>
+      {/* page edges: thin striped strip mimicking stacked paper pages seen from the side */}
+      <div
+        className="absolute right-0 top-0.5 bottom-0.5 w-[3px] opacity-70"
+        style={{
+          backgroundImage:
+            "repeating-linear-gradient(to bottom, rgba(255,255,255,0.6) 0px, rgba(255,255,255,0.6) 1px, rgba(0,0,0,0.25) 1px, rgba(0,0,0,0.25) 2px)",
+        }}
+      />
+      {/* spine: darker bevel with a thin highlight to mimic a bound edge */}
+      <div className="absolute left-0 top-0 bottom-0 w-2 bg-gradient-to-r from-black/55 via-black/15 to-transparent" />
+      <div className="absolute left-0 top-0 bottom-0 w-px bg-white/15" />
+      <div className={`absolute top-1.5 left-1.5 inline-flex items-center justify-center w-5 h-5 rounded-md ${style.bg} ${style.fg} backdrop-blur-sm`} title={style.label}>
         <BookFormatIcon format={format} className="w-3 h-3" />
       </div>
-      {overlay && (
-        <div className="absolute inset-x-0 bottom-0 p-1.5 pt-6 bg-gradient-to-t from-black/90 via-black/55 to-transparent">
-          {overlay}
+      {onRemove && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onRemove(); }}
+          title="Remove from My Books"
+          className="absolute top-1.5 right-1.5 inline-flex items-center justify-center w-5 h-5 rounded-md bg-black/55 text-gray-200 hover:bg-red-500/80 hover:text-white backdrop-blur-sm transition pointer-events-auto"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+          </svg>
+        </button>
+      )}
+      {action && (
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          {action}
+        </div>
+      )}
+      {meta && (
+        <div className="absolute inset-x-0 bottom-0 px-1.5 pb-1.5 pt-6 bg-gradient-to-t from-black/70 to-transparent">
+          {meta}
         </div>
       )}
     </div>
@@ -132,6 +217,7 @@ export function BooksLibraryModal({ show, onClose, initialView = "browse", onMyB
     try {
       await borrowBook(book.id);
       await loadMyBooks();
+      openReader(book, 1);
     } catch {
       // ignore
     } finally {
@@ -216,10 +302,17 @@ export function BooksLibraryModal({ show, onClose, initialView = "browse", onMyB
     );
   }
 
-  function renderBookCard(book: Book, overlay: React.ReactNode) {
+  function renderBookCard(book: Book, opts: {
+    action: React.ReactNode;
+    meta?: React.ReactNode;
+    onRemove?: () => void;
+    onActivate?: () => void;
+    activateDisabled?: boolean;
+    activateLabel?: string;
+  }) {
     return (
-      <div className="group flex flex-col" title={`${book.title}${book.author ? ` — ${book.author}` : ""}`}>
-        <BookCover book={book} overlay={overlay} />
+      <div className="group flex flex-col [perspective:800px]" title={`${book.title}${book.author ? ` — ${book.author}` : ""}`}>
+        <BookCover book={book} {...opts} />
       </div>
     );
   }
@@ -255,19 +348,33 @@ export function BooksLibraryModal({ show, onClose, initialView = "browse", onMyB
         <div className="max-w-4xl mx-auto flex items-center gap-1.5 flex-wrap mt-2.5">
           <button
             onClick={() => setCategory("all")}
-            className={`px-2.5 py-1 text-[11px] rounded-full border transition ${category === "all" ? "bg-indigo-600 border-indigo-600 text-white" : "border-[var(--ml-bg-hover)] text-gray-400 hover:bg-[var(--ml-bg-hover)]"}`}
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] rounded-full border transition ${category === "all" ? "bg-indigo-600 border-indigo-600 text-white" : "border-[var(--ml-bg-hover)] text-gray-400 hover:bg-[var(--ml-bg-hover)]"}`}
           >
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.7}>
+              <rect x="3.5" y="3.5" width="7" height="7" rx="1.2" />
+              <rect x="13.5" y="3.5" width="7" height="7" rx="1.2" />
+              <rect x="3.5" y="13.5" width="7" height="7" rx="1.2" />
+              <rect x="13.5" y="13.5" width="7" height="7" rx="1.2" />
+            </svg>
             All
           </button>
-          {CATEGORY_OPTIONS.map((c) => (
-            <button
-              key={c}
-              onClick={() => setCategory((prev) => (prev === c ? "all" : c))}
-              className={`px-2.5 py-1 text-[11px] rounded-full border transition ${category === c ? "bg-indigo-600 border-indigo-600 text-white" : "border-[var(--ml-bg-hover)] text-gray-400 hover:bg-[var(--ml-bg-hover)]"}`}
-            >
-              {BOOK_CATEGORY_LABELS[c]}
-            </button>
-          ))}
+          {CATEGORY_OPTIONS.map((c) => {
+            const style = getFormatStyle(CATEGORY_ICON_FORMAT[c]);
+            const active = category === c;
+            return (
+              <button
+                key={c}
+                onClick={() => setCategory((prev) => (prev === c ? "all" : c))}
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] rounded-full border transition ${active ? "bg-indigo-600 border-indigo-600 text-white" : "border-[var(--ml-bg-hover)] text-gray-400 hover:bg-[var(--ml-bg-hover)]"}`}
+              >
+                <BookFormatIcon
+                  format={CATEGORY_ICON_FORMAT[c]}
+                  className={`w-3 h-3 ${active ? "text-white" : style.fg}`}
+                />
+                {BOOK_CATEGORY_LABELS[c]}
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -285,25 +392,18 @@ export function BooksLibraryModal({ show, onClose, initialView = "browse", onMyB
                 <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-x-4 gap-y-4">
                   {pagedBooks.map((book) => (
                     <React.Fragment key={book.id}>
-                      {renderBookCard(
-                        book,
-                        isBorrowed(book.id) ? (
-                          <button
-                            onClick={() => openReader(book, myBooks.find((m) => m.book_id === book.id)?.current_page ?? 1)}
-                            className="w-full px-2 py-1.5 text-[10.5px] rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white transition"
-                          >
-                            Read
-                          </button>
+                      {renderBookCard(book, {
+                        action: isBorrowed(book.id) ? (
+                          <CircleIcon icon="play" dimmed />
                         ) : (
-                          <button
-                            onClick={() => handleBorrow(book)}
-                            disabled={borrowingId === book.id}
-                            className="w-full px-2 py-1.5 text-[10.5px] rounded-lg bg-indigo-600/80 hover:bg-indigo-500 text-white transition disabled:opacity-50"
-                          >
-                            {borrowingId === book.id ? "Adding…" : "Add"}
-                          </button>
-                        )
-                      )}
+                          <CircleIcon icon={borrowingId === book.id ? "spinner" : "plus"} dimmed={borrowingId !== book.id} />
+                        ),
+                        onActivate: isBorrowed(book.id)
+                          ? () => openReader(book, myBooks.find((m) => m.book_id === book.id)?.current_page ?? 1)
+                          : () => handleBorrow(book),
+                        activateDisabled: borrowingId === book.id,
+                        activateLabel: isBorrowed(book.id) ? "Read" : "Add to My Books",
+                      })}
                     </React.Fragment>
                   ))}
                 </div>
@@ -329,31 +429,20 @@ export function BooksLibraryModal({ show, onClose, initialView = "browse", onMyB
                   {pagedMyBooks.map((ub) => (
                     ub.book ? (
                       <React.Fragment key={ub.id}>
-                        {renderBookCard(
-                          ub.book,
-                          <div className="flex flex-col gap-1">
-                            <div className="h-1 bg-white/25 rounded-full overflow-hidden">
-                              <div className="h-full bg-indigo-500" style={{ width: `${Math.min(100, Math.round(ub.progress_percent))}%` }} />
+                        {renderBookCard(ub.book, {
+                          action: <CircleIcon icon="play" dimmed />,
+                          meta: (
+                            <div className="flex flex-col gap-1">
+                              <p className="text-[9px] text-gray-300 leading-none">{Math.round(ub.progress_percent)}% read</p>
+                              <div className="h-1 bg-white/25 rounded-full overflow-hidden">
+                                <div className="h-full bg-indigo-500" style={{ width: `${Math.min(100, Math.round(ub.progress_percent))}%` }} />
+                              </div>
                             </div>
-                            <div className="flex items-center gap-1.5">
-                              <button
-                                onClick={() => openReader(ub.book!, ub.current_page || 1)}
-                                className="flex-1 px-2 py-1.5 text-[10.5px] rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white transition"
-                              >
-                                {ub.current_page > 0 ? "Continue" : "Read"}
-                              </button>
-                              <button
-                                onClick={() => handleRemove(ub.book!)}
-                                title="Remove from My Books"
-                                className="shrink-0 p-1.5 rounded-lg border border-red-500/40 text-red-300 bg-black/30 hover:bg-red-500/20 transition"
-                              >
-                                <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 7h12M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2m-8 0 1 13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1l1-13" />
-                                </svg>
-                              </button>
-                            </div>
-                          </div>
-                        )}
+                          ),
+                          onRemove: () => handleRemove(ub.book!),
+                          onActivate: () => openReader(ub.book!, ub.current_page || 1),
+                          activateLabel: ub.current_page > 0 ? "Continue reading" : "Start reading",
+                        })}
                       </React.Fragment>
                     ) : null
                   ))}

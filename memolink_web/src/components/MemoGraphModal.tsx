@@ -112,23 +112,20 @@ function nodeColor(type: string): string {
 
 // ── Props ──────────────────────────────────────────────────────────────────────
 
-interface MemoGraphModalProps {
-  show: boolean;
-  onClose: () => void;
+interface MemoGraphViewProps {
   workspaceId: number | null;
   workspaceName?: string;
   onOpenNote?: (noteId: number) => void;
 }
 
 // ── Component ──────────────────────────────────────────────────────────────────
+// Renders as in-app tab content (like StudyToolView) rather than a full-screen modal.
 
-export function MemoGraphModal({
-  show,
-  onClose,
+export function MemoGraphView({
   workspaceId,
   workspaceName,
   onOpenNote,
-}: MemoGraphModalProps) {
+}: MemoGraphViewProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const simRef = useRef<any>(null);
@@ -357,21 +354,21 @@ export function MemoGraphModal({
     draw();
   }, [workspaceId, draw]);
 
-  // ── On open ────────────────────────────────────────────────────────────────
+  // ── On mount ───────────────────────────────────────────────────────────────
 
   useEffect(() => {
-    if (show && workspaceId) {
+    if (workspaceId) {
       loadGraph();
     }
     return () => {
       if (simRef.current) simRef.current.stop();
       cancelAnimationFrame(rafRef.current);
     };
-  }, [show, workspaceId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workspaceId]);
 
-  // Resize canvas when modal opens
+  // Resize canvas on mount and on window resize
   useEffect(() => {
-    if (!show) return;
     const resize = () => {
       const canvas = canvasRef.current;
       if (!canvas) return;
@@ -383,7 +380,8 @@ export function MemoGraphModal({
     setTimeout(resize, 50); // wait for DOM layout
     window.addEventListener("resize", resize);
     return () => window.removeEventListener("resize", resize);
-  }, [show, draw]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draw]);
 
   // ── Mouse interactions ─────────────────────────────────────────────────────
 
@@ -536,7 +534,6 @@ export function MemoGraphModal({
     const node = getNodeAt(x, y);
     if (node?.type === "note" && node.source_id && onOpenNote) {
       onOpenNote(node.source_id);
-      onClose();
     }
   };
 
@@ -559,13 +556,11 @@ export function MemoGraphModal({
     draw();
   }, [activeTypes, draw]);
 
-  if (!show) return null;
-
   const nodeCount = nodesRef.current.length;
   const edgeCount = linksRef.current.length;
 
   return (
-    <div className="fixed inset-0 bg-black/80 z-50 flex flex-col">
+    <div className="flex-1 flex flex-col overflow-hidden">
       <div className="flex flex-col w-full h-full">
         {/* ── Header ── */}
         <div className="flex items-center gap-3 px-5 py-3 border-b border-[var(--ml-bg-hover)] bg-[var(--ml-bg-surface)] shrink-0">
@@ -641,15 +636,6 @@ export function MemoGraphModal({
                 </button>
               </>
             )}
-
-            <button
-              onClick={onClose}
-              className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-500 hover:text-gray-200 hover:bg-[var(--ml-bg-hover)] transition"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
           </div>
         </div>
 

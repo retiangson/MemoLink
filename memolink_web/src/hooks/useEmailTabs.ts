@@ -10,12 +10,14 @@ export interface ComposeDraft {
 
 const EMPTY_COMPOSE_DRAFT: ComposeDraft = { to: "", subject: "", body: "" };
 
+export type EmailFolder = "inbox" | "outbox" | "drafts" | "trash";
+
 export type EmailListScope =
   | { type: "all" }
-  | { type: "account"; accountId: number; folder: "inbox" | "outbox" | "drafts" | "trash"; folderLabel: string };
+  | { type: "account"; accountId: number };
 
 function listScopeKey(scope: EmailListScope): string {
-  return scope.type === "all" ? "all" : `${scope.accountId}:${scope.folder}`;
+  return scope.type === "all" ? "all" : `account:${scope.accountId}`;
 }
 
 export type OpenEmailTab =
@@ -24,9 +26,10 @@ export type OpenEmailTab =
   // different tab type (Chat/WhatsApp/Note) and back, which unmounts/remounts EmailTabContent.
   | { kind: "view"; email: BrowseEmailResult; replyDraft: string }
   | { kind: "compose"; composeId: string; draft: ComposeDraft }
-  // A "list" tab shows All Mail or a single account+folder list; selecting an email within it
-  // sets viewingEmail to show that email in the SAME tab, with a Back button to return to the list.
-  | { kind: "list"; scope: EmailListScope; viewingEmail: BrowseEmailResult | null; replyDraft: string };
+  // A "list" tab shows All Mail or a single account's folders (Inbox/Sent/Drafts/Deleted as
+  // sub-tabs via selectedFolder); selecting an email within it sets viewingEmail to show that
+  // email in the SAME tab, with a Back button to return to the list.
+  | { kind: "list"; scope: EmailListScope; selectedFolder: EmailFolder; viewingEmail: BrowseEmailResult | null; replyDraft: string };
 
 export function useEmailTabs() {
   const [openTabs, setOpenTabs] = useState<OpenEmailTab[]>([]);
@@ -71,7 +74,7 @@ export function useEmailTabs() {
         setActiveIndex(existing);
         return prev;
       }
-      const next: OpenEmailTab[] = [...prev, { kind: "list", scope, viewingEmail: null, replyDraft: "" }];
+      const next: OpenEmailTab[] = [...prev, { kind: "list", scope, selectedFolder: "inbox", viewingEmail: null, replyDraft: "" }];
       setActiveIndex(next.length - 1);
       return next;
     });
@@ -81,8 +84,14 @@ export function useEmailTabs() {
     openListTab({ type: "all" });
   }
 
-  function openFolderTab(accountId: number, folder: "inbox" | "outbox" | "drafts" | "trash", folderLabel: string) {
-    openListTab({ type: "account", accountId, folder, folderLabel });
+  function openAccountTab(accountId: number) {
+    openListTab({ type: "account", accountId });
+  }
+
+  function setListFolder(index: number, folder: EmailFolder) {
+    setOpenTabs((prev) =>
+      prev.map((t, i) => (i === index && t.kind === "list" ? { ...t, selectedFolder: folder, viewingEmail: null } : t))
+    );
   }
 
   // Shows an email inside an already-open list tab (in place of the list), instead of
@@ -184,7 +193,8 @@ export function useEmailTabs() {
     openEmailTab,
     openComposeTab,
     openAllMailTab,
-    openFolderTab,
+    openAccountTab,
+    setListFolder,
     viewEmailInListTab,
     backToListInTab,
     setListReplyDraft,

@@ -3,6 +3,7 @@ import {
   TABS, type Tab, type Note,
   FlashcardsTab, QuizTab, ExamReviewTab, StudyPlanTab, WeakTopicsTab, SummaryTab,
 } from "./study/StudyTabs";
+import { StudyToolIcon, StudyCapIcon, getStudyToolStyle } from "./StudyToolIcon";
 
 interface Props {
   show: boolean;
@@ -23,7 +24,9 @@ export function StudyModeModal({ show, onClose, workspaceId, notes }: Props) {
       {/* Header */}
       <div className="flex items-center justify-between px-6 py-3 border-b border-[var(--ml-bg-panel)] shrink-0">
         <div className="flex items-center gap-3">
-          <span className="text-xl">🎓</span>
+          <span className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-indigo-500/15 text-indigo-400">
+            <StudyCapIcon className="w-4 h-4" />
+          </span>
           <div>
             <span className="text-base font-semibold text-white">Study Mode</span>
             <span className="ml-2 text-xs text-gray-600">AI-powered study tools</span>
@@ -43,20 +46,26 @@ export function StudyModeModal({ show, onClose, workspaceId, notes }: Props) {
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar */}
         <nav className="w-52 shrink-0 border-r border-[var(--ml-bg-panel)] flex flex-col py-4 px-3 gap-1">
-          {TABS.map(({ id, label, icon }) => (
-            <button
-              key={id}
-              onClick={() => setTab(id)}
-              className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm text-left transition ${
-                tab === id
-                  ? "bg-indigo-600/20 text-indigo-300 font-medium"
-                  : "text-gray-500 hover:text-gray-200 hover:bg-[var(--ml-bg-panel)]"
-              }`}
-            >
-              <span className="text-base">{icon}</span>
-              {label}
-            </button>
-          ))}
+          {TABS.map(({ id, label }) => {
+            const style = getStudyToolStyle(id);
+            const active = tab === id;
+            return (
+              <button
+                key={id}
+                onClick={() => setTab(id)}
+                className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm text-left transition ${
+                  active
+                    ? "bg-indigo-600/20 text-indigo-300 font-medium"
+                    : "text-gray-500 hover:text-gray-200 hover:bg-[var(--ml-bg-panel)]"
+                }`}
+              >
+                <span className={`shrink-0 inline-flex items-center justify-center w-6 h-6 rounded-md ${active ? "bg-indigo-500/20 text-indigo-300" : `${style.bg} ${style.fg}`}`}>
+                  <StudyToolIcon tool={id} className="w-3.5 h-3.5" />
+                </span>
+                {label}
+              </button>
+            );
+          })}
 
           <div className="mt-auto px-3 py-3 border-t border-[var(--ml-bg-panel)]">
             <p className="text-[10px] text-gray-700 leading-relaxed">
@@ -67,8 +76,11 @@ export function StudyModeModal({ show, onClose, workspaceId, notes }: Props) {
 
         {/* Content */}
         <main className="flex-1 overflow-y-auto p-6">
-          <h2 className="text-base font-semibold text-white mb-5">
-            {TABS.find(t => t.id === tab)?.icon} {TABS.find(t => t.id === tab)?.label}
+          <h2 className="flex items-center gap-2 text-base font-semibold text-white mb-5">
+            <span className={`shrink-0 inline-flex items-center justify-center w-6 h-6 rounded-md ${getStudyToolStyle(tab).bg} ${getStudyToolStyle(tab).fg}`}>
+              <StudyToolIcon tool={tab} className="w-3.5 h-3.5" />
+            </span>
+            {TABS.find(t => t.id === tab)?.label}
           </h2>
 
           {tab === "flashcards" && <FlashcardsTab workspaceId={workspaceId} notes={notes} />}

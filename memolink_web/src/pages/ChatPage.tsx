@@ -24,7 +24,7 @@ import { WhatsappTabContent } from "../components/WhatsappTabContent";
 import { useWhatsappTabs } from "../hooks/useWhatsappTabs";
 import { archiveEmail, trashEmail, pinEmail, unpinEmail } from "../api/emailApi";
 import { HelpModal } from "../components/HelpModal";
-import { MemoGraphModal } from "../components/MemoGraphModal";
+import { MemoGraphView } from "../components/MemoGraphModal";
 import { SurveyModal } from "../components/SurveyModal";
 import { useEvaluationHeartbeat } from "../hooks/useEvaluationHeartbeat";
 import { getMyRatings } from "../api/evaluationApi";
@@ -72,10 +72,11 @@ import { DESKTOP_LAYOUT_MIN_WIDTH, useIsDesktop } from "../hooks/useIsDesktop";
 import { useStudyTabs } from "../hooks/useStudyTabs";
 import { StudyToolView } from "../components/StudyToolView";
 import { TABS as STUDY_TABS, type Tab as StudyTab } from "../components/study/StudyTabs";
+import { StudyToolIcon, getStudyToolStyle } from "../components/StudyToolIcon";
 
 type WorkspaceHook = ReturnType<typeof useWorkspace>;
 type LayoutMode = "stacked" | "columns" | "rows";
-type TabType = "chat" | "note" | "email" | "spotify" | "whatsapp" | "calendar" | "books" | "book" | "study";
+type TabType = "chat" | "note" | "email" | "spotify" | "whatsapp" | "calendar" | "books" | "book" | "study" | "memograph";
 type DraggableTabType = "chat" | "note" | "email" | "whatsapp";
 type AdminTab = "feedback" | "features" | "users" | "logs" | "survey" | "evaluation" | "books";
 
@@ -115,7 +116,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
   const { theme, setTheme } = useTheme();
   const [showSettings, setShowSettings] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
-  const [showMemoGraph, setShowMemoGraph] = useState(false);
+  const [memographTabOpen, setMemographTabOpen] = useState(false);
   const [showCoreMemory, setShowCoreMemory] = useState(false);
   const [showSurvey, setShowSurvey] = useState(false);
   const [workflowSuggestions, setWorkflowSuggestions] = useState<Record<number, WorkflowAction[]>>({});
@@ -512,6 +513,10 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
       setBooksTabOpen(true);
       if (desiredTabType === "books") setActiveTabType("books");
     }
+    if (localStorage.getItem("memolink_memograph_tab_open") === "true") {
+      setMemographTabOpen(true);
+      if (desiredTabType === "memograph") setActiveTabType("memograph");
+    }
   }, []);
 
   useEffect(() => {
@@ -529,6 +534,16 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
   useEffect(() => {
     localStorage.setItem("memolink_calendar_tab_open", String(calendarTabOpen));
   }, [calendarTabOpen]);
+
+  useEffect(() => {
+    if (!memographTabOpen && activeTabType === "memograph") {
+      setActiveTabType("chat");
+    }
+  }, [memographTabOpen, activeTabType]);
+
+  useEffect(() => {
+    localStorage.setItem("memolink_memograph_tab_open", String(memographTabOpen));
+  }, [memographTabOpen]);
 
   useEffect(() => {
     if (!booksTabOpen && activeTabType === "books") {
@@ -777,8 +792,8 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
     setActiveTabType("email");
   }
 
-  function openEmailFolderInTab(account: import("../api/emailApi").EmailAccount, folder: "inbox" | "outbox" | "drafts" | "trash", folderLabel: string) {
-    emailTabs.openFolderTab(account.id, folder, folderLabel);
+  function openEmailAccountInTab(account: import("../api/emailApi").EmailAccount) {
+    emailTabs.openAccountTab(account.id);
     setActiveTabType("email");
   }
 
@@ -790,6 +805,11 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
   function openCalendarInTab() {
     setCalendarTabOpen(true);
     setActiveTabType("calendar");
+  }
+
+  function openMemoGraphInTab() {
+    setMemographTabOpen(true);
+    setActiveTabType("memograph");
   }
 
   function openBrowseBooks() {
@@ -1063,6 +1083,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
   const isBooksActive = activeTabType === "books" && booksTabOpen;
   const isBookReaderActive = activeTabType === "book" && bookTabs.openTabs.length > 0;
   const isStudyActive = activeTabType === "study" && studyTabs.openTabs.length > 0;
+  const isMemoGraphActive = activeTabType === "memograph" && memographTabOpen;
 
   const _LEVEL_ORDER: Record<string, number> = { regular: 0, plus: 1, pro: 2 };
   const _userLevel = user.access_level ?? "regular";
@@ -1267,9 +1288,23 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
             {activeLayoutMode === "stacked" && emailTabs.openTabs.map((tab, i) => {
               const isActive = activeTabType === "email" && emailTabs.activeIndex === i;
               const isDragOver = dragOverTab?.type === "email" && dragOverTab.index === i && dragSrcRef.current?.index !== i;
+              let tabLabel: string;
+              if (tab.kind === "compose") {
+                tabLabel = "New Mail";
+              } else if (tab.kind === "list") {
+                const scope = tab.scope;
+                if (scope.type === "all") {
+                  tabLabel = "All Mail";
+                } else {
+                  const acc = emailAccounts.find((a) => a.id === scope.accountId);
+                  tabLabel = acc?.display_name || acc?.email || "Account";
+                }
+              } else {
+                tabLabel = tab.email.subject || "(no subject)";
+              }
               return (
                 <div
-                  key={tab.kind === "view" ? (tab.email.gmail_message_id ?? `email-${i}`) : tab.kind === "compose" ? tab.composeId : (tab.scope.type === "all" ? "list-all" : `list-${tab.scope.accountId}-${tab.scope.folder}`)}
+                  key={tab.kind === "view" ? (tab.email.gmail_message_id ?? `email-${i}`) : tab.kind === "compose" ? tab.composeId : (tab.scope.type === "all" ? "list-all" : `list-${tab.scope.accountId}`)}
                   draggable
                   onDragStart={() => { dragSrcRef.current = { type: "email", index: i }; }}
                   onDragOver={(e) => { e.preventDefault(); setDragOverTab({ type: "email", index: i }); }}
@@ -1289,9 +1324,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                       <path d="M0 4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2zm2-1a1 1 0 0 0-1 1v.217l7 4.2 7-4.2V4a1 1 0 0 0-1-1zm13 2.383-4.708 2.825L15 11.105zm-.034 6.876-5.64-3.471L8 9.583l-1.326-.795-5.64 3.47A1 1 0 0 0 2 13h12a1 1 0 0 0 .966-.741M1 11.105l4.708-2.897L1 5.383z"/>
                     </svg>
                   )}
-                  <span className="max-w-[120px] truncate">
-                    {tab.kind === "compose" ? "New Mail" : tab.kind === "list" ? (tab.scope.type === "all" ? "All Mail" : tab.scope.folderLabel) : (tab.email.subject || "(no subject)")}
-                  </span>
+                  <span className="max-w-[120px] truncate">{tabLabel}</span>
                   <button onClick={(e) => { e.stopPropagation(); emailTabs.closeEmailTab(i); }} className="text-gray-600 hover:text-gray-300 w-3.5 h-3.5 flex items-center justify-center rounded-sm hover:bg-[var(--ml-bg-hover)] transition leading-none">×</button>
                 </div>
               );
@@ -1411,10 +1444,36 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
               );
             })}
 
+            {/* MemoGraph app tab */}
+            {activeLayoutMode === "stacked" && memographTabOpen && (
+              <div
+                onClick={() => setActiveTabType("memograph")}
+                className={`flex items-center gap-1.5 px-3 h-10 text-xs cursor-pointer border-b-2 transition shrink-0 select-none ${
+                  activeTabType === "memograph" ? "border-indigo-500 text-white bg-[var(--ml-bg-base)]" : "border-transparent text-gray-500 hover:text-gray-300 hover:bg-[var(--ml-bg-base)]"
+                }`}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3 shrink-0 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                  <circle cx="5" cy="12" r="2.5" /><circle cx="19" cy="5" r="2.5" /><circle cx="19" cy="19" r="2.5" />
+                  <circle cx="12" cy="8" r="2.5" /><circle cx="12" cy="16" r="2.5" />
+                  <line x1="7.2" y1="11" x2="10" y2="9" /><line x1="14" y1="9" x2="16.8" y2="6.5" />
+                  <line x1="7.2" y1="13" x2="10" y2="15" /><line x1="14" y1="15" x2="16.8" y2="17.5" />
+                  <line x1="12" y1="10.5" x2="12" y2="13.5" />
+                </svg>
+                <span className="max-w-[120px] truncate">MemoGraph</span>
+                <button
+                  onClick={(e) => { e.stopPropagation(); setMemographTabOpen(false); }}
+                  className="text-gray-600 hover:text-gray-300 w-3.5 h-3.5 flex items-center justify-center rounded-sm hover:bg-[var(--ml-bg-hover)] transition leading-none"
+                >
+                  ×
+                </button>
+              </div>
+            )}
+
             {/* Study tool tabs — each opened study tool gets its own tab */}
             {activeLayoutMode === "stacked" && studyTabs.openTabs.map((tab, i) => {
               const isActive = activeTabType === "study" && studyTabs.activeIndex === i;
               const meta = STUDY_TABS.find((t) => t.id === tab.tool);
+              const style = getStudyToolStyle(tab.tool);
               return (
                 <div
                   key={tab.tool}
@@ -1423,7 +1482,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                     isActive ? "border-emerald-500 text-white bg-[var(--ml-bg-base)]" : "border-transparent text-gray-500 hover:text-gray-300 hover:bg-[var(--ml-bg-base)]"
                   }`}
                 >
-                  <span className="text-sm leading-none shrink-0">{meta?.icon}</span>
+                  <StudyToolIcon tool={tab.tool} className={`w-3.5 h-3.5 shrink-0 ${isActive ? style.fg : ""}`} />
                   <span className="max-w-[120px] truncate">{meta?.label}</span>
                   <button
                     onClick={(e) => { e.stopPropagation(); studyTabs.closeStudyTab(i); }}
@@ -1570,36 +1629,6 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                     Settings
                   </button>
 
-                  {/* Download Desktop App */}
-                  <a
-                    href={import.meta.env.VITE_DESKTOP_DOWNLOAD_URL || "https://github.com/retiangson/MemoLink/releases/latest/download/MemoLink-Setup.exe"}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={() => setUserMenuOpen(false)}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-300 hover:bg-[var(--ml-bg-hover)] hover:text-white transition outline-none"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-gray-500" fill="currentColor" viewBox="0 0 16 16">
-                      <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5"/>
-                      <path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708z"/>
-                    </svg>
-                    Download Desktop App
-                  </a>
-
-                  {/* Download Android App */}
-                  <a
-                    href={import.meta.env.VITE_ANDROID_DOWNLOAD_URL || "https://github.com/retiangson/MemoLink/releases/latest/download/MemoLink.apk"}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={() => setUserMenuOpen(false)}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-300 hover:bg-[var(--ml-bg-hover)] hover:text-white transition outline-none"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-gray-500" fill="currentColor" viewBox="0 0 16 16">
-                      <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5"/>
-                      <path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708z"/>
-                    </svg>
-                    Download Android App (APK)
-                  </a>
-
                   {/* Help */}
                   <button
                     onClick={() => { setUserMenuOpen(false); setShowHelp(true); }}
@@ -1611,34 +1640,6 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                     </svg>
                     Help
                   </button>
-
-                  {/* MemoGraph */}
-                  {flags.memograph_enabled && activeWorkspaceId && (
-                    <button
-                      onClick={() => { setUserMenuOpen(false); setShowMemoGraph(true); }}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-indigo-300 hover:bg-indigo-500/10 hover:text-indigo-200 transition"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-                        <circle cx="5" cy="12" r="2.5"/><circle cx="19" cy="5" r="2.5"/><circle cx="19" cy="19" r="2.5"/>
-                        <circle cx="12" cy="8" r="2.5"/><circle cx="12" cy="16" r="2.5"/>
-                        <line x1="7.2" y1="11" x2="10" y2="9"/><line x1="14" y1="9" x2="16.8" y2="6.5"/>
-                        <line x1="7.2" y1="13" x2="10" y2="15"/><line x1="14" y1="15" x2="16.8" y2="17.5"/>
-                        <line x1="12" y1="10.5" x2="12" y2="13.5"/>
-                      </svg>
-                      MemoGraph
-                    </button>
-                  )}
-
-                  {/* Core Memory */}
-                  {flags.core_memory_notes_enabled && (
-                    <button
-                      onClick={() => { setUserMenuOpen(false); setShowCoreMemory(true); }}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-yellow-300 hover:bg-yellow-500/10 hover:text-yellow-200 transition"
-                    >
-                      <span className="text-base leading-none">🧠</span>
-                      Core Memory
-                    </button>
-                  )}
 
                   {/* Admin Panel - only shown to admins */}
                   {user.is_admin && (
@@ -1769,6 +1770,15 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                 notes={notes.map((n) => ({ id: n.id, title: n.title }))}
               />
             )
+          ) : isMemoGraphActive ? (
+            <MemoGraphView
+              workspaceId={activeWorkspaceId}
+              workspaceName={workspaceHook.activeWorkspace?.name}
+              onOpenNote={(noteId) => {
+                const note = notes.find((n) => n.id === noteId);
+                if (note) handleOpenNote(note);
+              }}
+            />
           ) : isEmailActive ? (
             <main className="flex-1 overflow-hidden flex flex-col">
               {(() => {
@@ -1787,6 +1797,8 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                   return (
                     <EmailListTabContent
                       scope={activeEmailTab.scope}
+                      selectedFolder={activeEmailTab.selectedFolder}
+                      onFolderChange={(folder) => emailTabs.setListFolder(emailTabs.activeIndex, folder)}
                       viewingEmail={activeEmailTab.viewingEmail}
                       emailAccounts={emailAccounts}
                       onOpenEmail={(email) => emailTabs.viewEmailInListTab(emailTabs.activeIndex, email)}
@@ -2226,7 +2238,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
         onOpenEmailTab={openEmailInTab}
         onComposeNewMail={openComposeInTab}
         onOpenAllMailTab={openAllMailInTab}
-        onOpenEmailFolderTab={openEmailFolderInTab}
+        onOpenEmailAccountTab={openEmailAccountInTab}
         openEmailTabId={emailTabs.active?.kind === "view" ? (emailTabs.active.email.gmail_message_id ?? null) : null}
         onOpenWhatsappTab={openWhatsappInTab}
         openWhatsappChatId={whatsappTabs.active?.chat.id ?? null}
@@ -2266,6 +2278,8 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
         onOpenBookReader={openBookReader}
         studyEnabled={flags.study_mode_enabled}
         onOpenStudyTool={openStudyTool}
+        memographEnabled={flags.memograph_enabled && !!activeWorkspaceId}
+        onOpenMemoGraphTab={openMemoGraphInTab}
       />
 
       <DeleteModal
@@ -2292,19 +2306,11 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
 
       <SettingsModal show={showSettings} user={user} onClose={() => setShowSettings(false)} selectedModel={selectedModel} onModelChange={handleModelChange} modelSelectionEnabled={flags.model_selection_enabled} customApiKeysEnabled={flags.custom_api_keys_enabled} ttsEnabled={flags.tts_enabled} emailEnabled={flags.email_enabled} workflowEnabled={flags.workflow_enabled} publicPortfolioAgentEnabled={flags.public_portfolio_agent_enabled} onReplayTour={() => { localStorage.removeItem("memolink_walkthrough_done"); setShowTour(true); setShowSettings(false); }} whatsappAvailable={whatsappAvailable}
         onWhatsappConnected={() => { setWhatsappConnected(true); localStorage.setItem("memolink_wa_connected", "1"); }}
-        onWhatsappDisconnected={() => { setWhatsappConnected(false); localStorage.removeItem("memolink_wa_connected"); }} />
+        onWhatsappDisconnected={() => { setWhatsappConnected(false); localStorage.removeItem("memolink_wa_connected"); }}
+        coreMemoryEnabled={flags.core_memory_notes_enabled}
+        onOpenCoreMemory={() => { setShowSettings(false); setShowCoreMemory(true); }} />
       <HelpModal show={showHelp} onClose={() => setShowHelp(false)} />
       <FeedbackModal show={showFeedback} onClose={() => setShowFeedback(false)} />
-      <MemoGraphModal
-        show={showMemoGraph}
-        onClose={() => setShowMemoGraph(false)}
-        workspaceId={activeWorkspaceId}
-        workspaceName={workspaceHook.activeWorkspace?.name}
-        onOpenNote={(noteId) => {
-          const note = notes.find((n) => n.id === noteId);
-          if (note) handleOpenNote(note);
-        }}
-      />
 
       <SurveyModal
         show={showSurvey}

@@ -12,13 +12,13 @@ export interface Note { id: number; title: string | null; }
 
 export type Tab = "flashcards" | "quiz" | "exam" | "plan" | "weak" | "summary";
 
-export const TABS: { id: Tab; label: string; icon: string }[] = [
-  { id: "flashcards", label: "Flashcards",    icon: "🃏" },
-  { id: "quiz",       label: "Quiz",          icon: "❓" },
-  { id: "exam",       label: "Exam Review",   icon: "📋" },
-  { id: "plan",       label: "Study Plan",    icon: "📅" },
-  { id: "weak",       label: "Weak Topics",   icon: "🔍" },
-  { id: "summary",    label: "Summary",       icon: "📝" },
+export const TABS: { id: Tab; label: string }[] = [
+  { id: "flashcards", label: "Flashcards" },
+  { id: "quiz",       label: "Quiz" },
+  { id: "exam",       label: "Exam Review" },
+  { id: "plan",       label: "Study Plan" },
+  { id: "weak",       label: "Weak Topics" },
+  { id: "summary",    label: "Summary" },
 ];
 
 export function Spinner() {

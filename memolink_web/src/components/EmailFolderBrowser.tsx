@@ -13,13 +13,13 @@ import { initialsFor, avatarColorFor } from "../utils/avatar";
 
 const POLL_MS = 60000;
 
-interface FolderDef {
+export interface FolderDef {
   key: "inbox" | "outbox" | "drafts" | "trash";
   label: string;
   iconPath: string;
 }
 
-const FOLDERS: FolderDef[] = [
+export const FOLDERS: FolderDef[] = [
   {
     key: "inbox",
     label: "Inbox",
