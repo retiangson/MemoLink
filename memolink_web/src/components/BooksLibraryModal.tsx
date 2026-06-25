@@ -25,7 +25,7 @@ function paletteFor(seed: string): string {
   return COVER_PALETTES[h % COVER_PALETTES.length];
 }
 
-function BookCover({ book }: { book: Book }) {
+function BookCover({ book, overlay }: { book: Book; overlay?: React.ReactNode }) {
   const format = getBookFormat(book);
   const style = getFormatStyle(format);
   return (
@@ -42,6 +42,11 @@ function BookCover({ book }: { book: Book }) {
       <div className={`absolute top-1.5 right-1.5 inline-flex items-center justify-center w-5 h-5 rounded-md ${style.bg} ${style.fg} backdrop-blur-sm`} title={style.label}>
         <BookFormatIcon format={format} className="w-3 h-3" />
       </div>
+      {overlay && (
+        <div className="absolute inset-x-0 bottom-0 p-1.5 pt-6 bg-gradient-to-t from-black/90 via-black/55 to-transparent">
+          {overlay}
+        </div>
+      )}
     </div>
   );
 }
@@ -211,20 +216,10 @@ export function BooksLibraryModal({ show, onClose, initialView = "browse", onMyB
     );
   }
 
-  function renderBookCard(book: Book, actions: React.ReactNode, footer?: React.ReactNode) {
+  function renderBookCard(book: Book, overlay: React.ReactNode) {
     return (
-      <div className="group flex flex-col gap-2">
-        <BookCover book={book} />
-        <div className="h-1.5 mx-2 -mt-0.5 bg-black/35 rounded-full blur-[2px] transition group-hover:bg-black/50" />
-        <div className="flex flex-col gap-1 px-0.5">
-          <p className="text-xs font-medium text-gray-200 line-clamp-2" title={book.title}>{book.title}</p>
-          <p className="text-[10.5px] text-gray-500 truncate">{book.author || "Unknown author"}</p>
-          {book.category && (
-            <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-indigo-500/15 text-indigo-400 w-fit">{book.category}</span>
-          )}
-          {footer}
-        </div>
-        <div className="mt-auto pt-1">{actions}</div>
+      <div className="group flex flex-col" title={`${book.title}${book.author ? ` — ${book.author}` : ""}`}>
+        <BookCover book={book} overlay={overlay} />
       </div>
     );
   }
@@ -287,7 +282,7 @@ export function BooksLibraryModal({ show, onClose, initialView = "browse", onMyB
               </p>
             ) : (
               <>
-                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-x-4 gap-y-6">
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-x-4 gap-y-4">
                   {pagedBooks.map((book) => (
                     <React.Fragment key={book.id}>
                       {renderBookCard(
@@ -303,7 +298,7 @@ export function BooksLibraryModal({ show, onClose, initialView = "browse", onMyB
                           <button
                             onClick={() => handleBorrow(book)}
                             disabled={borrowingId === book.id}
-                            className="w-full px-2 py-1.5 text-[10.5px] rounded-lg bg-indigo-600/20 text-indigo-300 hover:bg-indigo-600/30 transition disabled:opacity-50"
+                            className="w-full px-2 py-1.5 text-[10.5px] rounded-lg bg-indigo-600/80 hover:bg-indigo-500 text-white transition disabled:opacity-50"
                           >
                             {borrowingId === book.id ? "Adding…" : "Add"}
                           </button>
@@ -330,34 +325,33 @@ export function BooksLibraryModal({ show, onClose, initialView = "browse", onMyB
               </p>
             ) : (
               <>
-                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-x-4 gap-y-6">
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-x-4 gap-y-4">
                   {pagedMyBooks.map((ub) => (
                     ub.book ? (
                       <React.Fragment key={ub.id}>
                         {renderBookCard(
                           ub.book,
-                          <div className="flex items-center gap-1.5">
-                            <button
-                              onClick={() => openReader(ub.book!, ub.current_page || 1)}
-                              className="flex-1 px-2 py-1.5 text-[10.5px] rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white transition"
-                            >
-                              {ub.current_page > 0 ? "Continue" : "Read"}
-                            </button>
-                            <button
-                              onClick={() => handleRemove(ub.book!)}
-                              title="Remove from My Books"
-                              className="shrink-0 p-1.5 rounded-lg border border-red-500/40 text-red-400 hover:bg-red-500/10 transition"
-                            >
-                              <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M6 7h12M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2m-8 0 1 13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1l1-13" />
-                              </svg>
-                            </button>
-                          </div>,
-                          <div>
-                            <div className="h-1 bg-[var(--ml-bg-hover)] rounded-full mt-1 overflow-hidden">
+                          <div className="flex flex-col gap-1">
+                            <div className="h-1 bg-white/25 rounded-full overflow-hidden">
                               <div className="h-full bg-indigo-500" style={{ width: `${Math.min(100, Math.round(ub.progress_percent))}%` }} />
                             </div>
-                            <p className="text-[10px] text-gray-600 mt-1">{Math.round(ub.progress_percent)}% read</p>
+                            <div className="flex items-center gap-1.5">
+                              <button
+                                onClick={() => openReader(ub.book!, ub.current_page || 1)}
+                                className="flex-1 px-2 py-1.5 text-[10.5px] rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white transition"
+                              >
+                                {ub.current_page > 0 ? "Continue" : "Read"}
+                              </button>
+                              <button
+                                onClick={() => handleRemove(ub.book!)}
+                                title="Remove from My Books"
+                                className="shrink-0 p-1.5 rounded-lg border border-red-500/40 text-red-300 bg-black/30 hover:bg-red-500/20 transition"
+                              >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 7h12M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2m-8 0 1 13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1l1-13" />
+                                </svg>
+                              </button>
+                            </div>
                           </div>
                         )}
                       </React.Fragment>
