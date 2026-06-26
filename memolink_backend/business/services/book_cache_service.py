@@ -14,6 +14,7 @@ from botocore.exceptions import ClientError
 from memolink_backend.core.config import settings
 from memolink_backend.domain.models.book import Book
 from memolink_backend.business.services.onedrive_service import OneDriveService
+from memolink_backend.business.services.archive_org_service import ArchiveOrgService
 
 # Presigned GET URLs are short-lived on purpose: long enough for a slow connection
 # to finish downloading, short enough to limit how long a leaked URL stays usable.
@@ -46,8 +47,9 @@ class BookCacheService:
         requires no changes between dev and prod.
     """
 
-    def __init__(self, onedrive_service: OneDriveService):
+    def __init__(self, onedrive_service: OneDriveService, archive_service: ArchiveOrgService):
         self._onedrive = onedrive_service
+        self._archive = archive_service
 
     # ── S3 helpers ────────────────────────────────────────────────────────────
 
@@ -106,6 +108,22 @@ class BookCacheService:
             (_LOCAL_CACHE_ROOT / str(book_id) / sig_hash).exists() else []
         return candidates[0] if candidates else None
 
+    # ── Source-agnostic file download ─────────────────────────────────────────
+
+    async def _download_book_bytes(self, book: Book) -> bytes:
+        """Download raw file bytes from whichever source the book came from."""
+        item_id = book.onedrive_item_id or ""
+        # Detect archive.org books by source field OR by the item_id prefix so
+        # that rows where source wasn't written correctly still route properly.
+        if getattr(book, "source", None) == "archive_org" or item_id.startswith("archiveorg:"):
+            # item_id format: "archiveorg:{identifier}/{filename_or_subdir/filename}"
+            rest = item_id[len("archiveorg:"):]
+            identifier, filename = rest.split("/", 1)
+            return await self._archive.download_file_bytes(identifier, filename)
+        return await self._onedrive.download_file_bytes(
+            drive_id=book.onedrive_drive_id, item_id=book.onedrive_item_id
+        )
+
     # ── Public API ────────────────────────────────────────────────────────────
 
     async def get_read_url(
@@ -147,9 +165,7 @@ class BookCacheService:
                 raise BookCacheServiceError(500, f"Could not check S3 book cache: {exc}")
 
         if not cache_hit:
-            content = await self._onedrive.download_file_bytes(
-                drive_id=book.onedrive_drive_id, item_id=book.onedrive_item_id
-            )
+            content = await self._download_book_bytes(book)
             try:
                 s3.put_object(Bucket=bucket, Key=key, Body=content, ContentType=mime_type)
             except ClientError as exc:
@@ -185,9 +201,7 @@ class BookCacheService:
         cache_hit = local_path.exists()
 
         if not cache_hit:
-            content = await self._onedrive.download_file_bytes(
-                drive_id=book.onedrive_drive_id, item_id=book.onedrive_item_id
-            )
+            content = await self._download_book_bytes(book)
             local_path.parent.mkdir(parents=True, exist_ok=True)
             local_path.write_bytes(content)
 

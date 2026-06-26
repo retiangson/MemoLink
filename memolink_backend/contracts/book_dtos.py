@@ -19,6 +19,8 @@ class BookResponseDTO(BaseModel):
     cover_image_url: Optional[str] = None
     onedrive_web_url: Optional[str] = None
     last_modified: Optional[datetime] = None
+    source: str = "onedrive"
+    source_location: Optional[str] = None
     is_published: bool
     sync_status: str
     sync_error: Optional[str] = None
@@ -153,3 +155,15 @@ class BookIdsDTO(BaseModel):
 
 class BulkPublishResultDTO(BaseModel):
     updated: int
+
+
+class ArchiveOrgSyncRequestDTO(BaseModel):
+    identifier: str  # e.g. "manga-2022-digital" or full URL (controller strips to identifier)
+
+
+class ArchiveOrgSyncResultDTO(BaseModel):
+    scanned: int
+    created: int
+    updated: int
+    skipped: int
+    source_location: str

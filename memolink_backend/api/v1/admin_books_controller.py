@@ -22,7 +22,10 @@ from memolink_backend.contracts.book_dtos import (
     OneDriveSyncPageResultDTO,
     BookIdsDTO,
     BulkPublishResultDTO,
+    ArchiveOrgSyncRequestDTO,
+    ArchiveOrgSyncResultDTO,
 )
+from memolink_backend.business.services.archive_org_service import ArchiveOrgServiceError
 
 router = APIRouter(prefix="/admin/books", tags=["admin-books"])
 logger = logging.getLogger(__name__)
@@ -145,6 +148,44 @@ async def sync_books_page(
     try:
         result = await c.book_sync().sync_page(admin_id, body.cursor)
     except OneDriveServiceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail)
+    return result
+
+
+# ── Archive.org sync ─────────────────────────────────────────────────────────
+
+def _extract_archive_identifier(raw: str) -> str:
+    """Accept a bare identifier or any archive.org URL and return just the identifier."""
+    raw = raw.strip().rstrip("/")
+    for prefix in (
+        "https://archive.org/details/",
+        "https://archive.org/download/",
+        "http://archive.org/details/",
+        "http://archive.org/download/",
+    ):
+        if raw.startswith(prefix):
+            return raw[len(prefix):].split("/")[0]
+    return raw.split("/")[-1] if "/" in raw else raw
+
+
+@router.post("/archive-sync", response_model=ArchiveOrgSyncResultDTO)
+async def sync_from_archive(
+    body: ArchiveOrgSyncRequestDTO,
+    admin_id: int = Depends(get_current_admin),
+    c: RequestContainer = Depends(get_request_container),
+):
+    """Sync all freely downloadable files from a single archive.org item.
+
+    Accepts a bare identifier (e.g. ``manga-2022-digital``) or any
+    archive.org URL pointing to the item.  Restricted / CDL-only items
+    are rejected with HTTP 403.
+    """
+    identifier = _extract_archive_identifier(body.identifier)
+    if not identifier:
+        raise HTTPException(status_code=400, detail="identifier is required.")
+    try:
+        result = await c.archive_sync().sync(identifier, admin_id)
+    except ArchiveOrgServiceError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail)
     return result
 

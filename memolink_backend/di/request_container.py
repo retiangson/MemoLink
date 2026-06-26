@@ -95,6 +95,9 @@ class RequestContainer:
     def book_highlights(self):
         return self.services.get_book_highlight_service()
 
+    def archive_sync(self):
+        return self.services.get_archive_sync_service()
+
     def book_cache(self):
         return self.services.get_book_cache_service()
 

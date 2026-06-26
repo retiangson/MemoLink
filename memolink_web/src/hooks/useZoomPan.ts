@@ -149,7 +149,108 @@ export function useZoomPan(active: boolean, options: UseZoomPanOptions = {}) {
     setIsDragging(false);
   }, [active]);
 
-  // Wheel + touch: native non-passive listeners so preventDefault actually works
+  // Touch handling — always registered (not gated on fullscreen/active) so that
+  // pinch-to-zoom intercepts the gesture on iPad in both normal and fullscreen modes
+  // and prevents the browser from zooming the entire viewport instead.
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    const onTouchStart = (e: TouchEvent) => {
+      for (const t of Array.from(e.changedTouches)) {
+        touchStateRef.current.set(t.identifier, { x: t.clientX, y: t.clientY });
+      }
+      if (e.touches.length === 1) {
+        touchStartXRef.current   = e.touches[0].clientX;
+        touchStartYRef.current   = e.touches[0].clientY;
+        lastPinchDistRef.current = null;
+      } else if (e.touches.length >= 2) {
+        // Prevent the browser from starting a viewport-zoom gesture on iPad/iOS.
+        // This must happen on touchstart (non-passive) for Safari to respect it.
+        e.preventDefault();
+        const [a, b] = [e.touches[0], e.touches[1]];
+        lastPinchDistRef.current = Math.hypot(b.clientX - a.clientX, b.clientY - a.clientY);
+        if (!boundsRef.current.effectiveW) {
+          boundsRef.current = measureBounds(el, transformRef.current.panX, transformRef.current.panY, transformRef.current.zoom);
+        }
+      }
+    };
+
+    const onTouchMove = (e: TouchEvent) => {
+      if (e.touches.length >= 2) {
+        // Pinch-to-zoom — always handled regardless of fullscreen state
+        e.preventDefault();
+        const [a, b] = [e.touches[0], e.touches[1]];
+        const dist = Math.hypot(b.clientX - a.clientX, b.clientY - a.clientY);
+        if (lastPinchDistRef.current !== null && dist > 0) {
+          const scale = dist / lastPinchDistRef.current;
+          const rect  = el.getBoundingClientRect();
+          const mx = (a.clientX + b.clientX) / 2 - rect.left;
+          const my = (a.clientY + b.clientY) / 2 - rect.top;
+          setTransform((prev) => {
+            const newZoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, prev.zoom * scale));
+            const ratio   = newZoom / prev.zoom;
+            const rawPanX = mx - (mx - prev.panX) * ratio;
+            const rawPanY = my - (my - prev.panY) * ratio;
+            if (!boundsRef.current.effectiveW) {
+              boundsRef.current = measureBounds(el, prev.panX, prev.panY, prev.zoom);
+            }
+            const clamped = clampPan(rawPanX, rawPanY, newZoom, el.clientWidth, el.clientHeight, boundsRef.current);
+            return { zoom: newZoom, ...clamped };
+          });
+        }
+        lastPinchDistRef.current = dist;
+        for (const t of Array.from(e.touches)) {
+          touchStateRef.current.set(t.identifier, { x: t.clientX, y: t.clientY });
+        }
+      } else if (e.touches.length === 1) {
+        const isZoomedIn = transformRef.current.zoom > 1.01;
+        // Pan with single touch only in fullscreen mode or when already zoomed in.
+        // At normal zoom (zoom≈1) outside fullscreen, let the browser handle scrolling.
+        if (!active && !isZoomedIn) return;
+        e.preventDefault();
+        const t    = e.touches[0];
+        const prev = touchStateRef.current.get(t.identifier);
+        if (prev) {
+          setTransform((p) => {
+            const rawPanX = p.panX + (t.clientX - prev.x);
+            const rawPanY = p.panY + (t.clientY - prev.y);
+            const clamped = clampPan(rawPanX, rawPanY, p.zoom, el.clientWidth, el.clientHeight, boundsRef.current);
+            return { ...p, ...clamped };
+          });
+        }
+        touchStateRef.current.set(t.identifier, { x: t.clientX, y: t.clientY });
+      }
+    };
+
+    const onTouchEnd = (e: TouchEvent) => {
+      for (const t of Array.from(e.changedTouches)) touchStateRef.current.delete(t.identifier);
+      if (e.touches.length < 2) lastPinchDistRef.current = null;
+
+      // Swipe-to-navigate only applies in fullscreen mode at near-1× zoom
+      if (active && e.touches.length === 0 && e.changedTouches.length === 1 && transformRef.current.zoom < 1.05) {
+        const dx = e.changedTouches[0].clientX - touchStartXRef.current;
+        const dy = Math.abs(e.changedTouches[0].clientY - touchStartYRef.current);
+        if (Math.abs(dx) > SWIPE_THRESHOLD_PX && Math.abs(dx) > dy) {
+          if (dx < 0) onSwipeLeftRef.current?.();
+          else        onSwipeRightRef.current?.();
+        }
+      }
+    };
+
+    // touchstart must be non-passive so we can call preventDefault for pinch
+    el.addEventListener("touchstart", onTouchStart, { passive: false });
+    el.addEventListener("touchmove",  onTouchMove,  { passive: false });
+    el.addEventListener("touchend",   onTouchEnd,   { passive: true  });
+
+    return () => {
+      el.removeEventListener("touchstart", onTouchStart);
+      el.removeEventListener("touchmove",  onTouchMove);
+      el.removeEventListener("touchend",   onTouchEnd);
+    };
+  }, [active, setTransform]); // re-register when active changes (swipe logic depends on it)
+
+  // Wheel zoom — only in fullscreen mode
   useEffect(() => {
     if (!active) return;
     const el = containerRef.current;
@@ -175,84 +276,8 @@ export function useZoomPan(active: boolean, options: UseZoomPanOptions = {}) {
       });
     };
 
-    const onTouchStart = (e: TouchEvent) => {
-      for (const t of Array.from(e.changedTouches)) {
-        touchStateRef.current.set(t.identifier, { x: t.clientX, y: t.clientY });
-      }
-      if (e.touches.length === 1) {
-        touchStartXRef.current   = e.touches[0].clientX;
-        touchStartYRef.current   = e.touches[0].clientY;
-        lastPinchDistRef.current = null;
-      } else if (e.touches.length === 2) {
-        const [a, b] = [e.touches[0], e.touches[1]];
-        lastPinchDistRef.current = Math.hypot(b.clientX - a.clientX, b.clientY - a.clientY);
-      }
-    };
-
-    const onTouchMove = (e: TouchEvent) => {
-      e.preventDefault();
-      if (e.touches.length >= 2) {
-        const [a, b] = [e.touches[0], e.touches[1]];
-        const dist = Math.hypot(b.clientX - a.clientX, b.clientY - a.clientY);
-        if (lastPinchDistRef.current !== null && dist > 0) {
-          const scale = dist / lastPinchDistRef.current;
-          const rect  = el.getBoundingClientRect();
-          const mx = (a.clientX + b.clientX) / 2 - rect.left;
-          const my = (a.clientY + b.clientY) / 2 - rect.top;
-          setTransform((prev) => {
-            const newZoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, prev.zoom * scale));
-            const ratio   = newZoom / prev.zoom;
-            const rawPanX = mx - (mx - prev.panX) * ratio;
-            const rawPanY = my - (my - prev.panY) * ratio;
-            const clamped = clampPan(rawPanX, rawPanY, newZoom, el.clientWidth, el.clientHeight, boundsRef.current);
-            return { zoom: newZoom, ...clamped };
-          });
-        }
-        lastPinchDistRef.current = dist;
-        for (const t of Array.from(e.touches)) {
-          touchStateRef.current.set(t.identifier, { x: t.clientX, y: t.clientY });
-        }
-      } else if (e.touches.length === 1) {
-        const t    = e.touches[0];
-        const prev = touchStateRef.current.get(t.identifier);
-        if (prev) {
-          setTransform((p) => {
-            const rawPanX = p.panX + (t.clientX - prev.x);
-            const rawPanY = p.panY + (t.clientY - prev.y);
-            const clamped = clampPan(rawPanX, rawPanY, p.zoom, el.clientWidth, el.clientHeight, boundsRef.current);
-            return { ...p, ...clamped };
-          });
-        }
-        touchStateRef.current.set(t.identifier, { x: t.clientX, y: t.clientY });
-      }
-    };
-
-    const onTouchEnd = (e: TouchEvent) => {
-      for (const t of Array.from(e.changedTouches)) touchStateRef.current.delete(t.identifier);
-      if (e.touches.length < 2) lastPinchDistRef.current = null;
-
-      // Horizontal swipe at low zoom → page navigation
-      if (e.touches.length === 0 && e.changedTouches.length === 1 && transformRef.current.zoom < 1.05) {
-        const dx = e.changedTouches[0].clientX - touchStartXRef.current;
-        const dy = Math.abs(e.changedTouches[0].clientY - touchStartYRef.current);
-        if (Math.abs(dx) > SWIPE_THRESHOLD_PX && Math.abs(dx) > dy) {
-          if (dx < 0) onSwipeLeftRef.current?.();
-          else        onSwipeRightRef.current?.();
-        }
-      }
-    };
-
-    el.addEventListener("wheel",      onWheel,      { passive: false });
-    el.addEventListener("touchstart", onTouchStart, { passive: true  });
-    el.addEventListener("touchmove",  onTouchMove,  { passive: false });
-    el.addEventListener("touchend",   onTouchEnd,   { passive: true  });
-
-    return () => {
-      el.removeEventListener("wheel",      onWheel);
-      el.removeEventListener("touchstart", onTouchStart);
-      el.removeEventListener("touchmove",  onTouchMove);
-      el.removeEventListener("touchend",   onTouchEnd);
-    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
   }, [active, setTransform]);
 
   // Global mousemove/mouseup — drag continues even when cursor leaves the container

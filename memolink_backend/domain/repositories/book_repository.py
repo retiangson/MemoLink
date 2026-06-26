@@ -88,7 +88,7 @@ class BookRepository:
     def upsert_from_sync(
         self,
         *,
-        onedrive_drive_id: str,
+        onedrive_drive_id: Optional[str],
         onedrive_item_id: str,
         file_name: str,
         file_extension: Optional[str],
@@ -98,6 +98,8 @@ class BookRepository:
         last_modified: Optional[datetime],
         created_by_admin_id: int,
         default_title: str,
+        source: str = "onedrive",
+        source_location: Optional[str] = None,
         existing: Optional[Book] = None,
         commit: bool = True,
     ) -> Book:
@@ -110,6 +112,9 @@ class BookRepository:
             book.file_size = file_size
             book.onedrive_web_url = onedrive_web_url
             book.last_modified = last_modified
+            book.source = source
+            if source_location:
+                book.source_location = source_location
             book.sync_status = "synced"
             book.sync_error = None
         else:
@@ -123,6 +128,8 @@ class BookRepository:
                 onedrive_item_id=onedrive_item_id,
                 onedrive_web_url=onedrive_web_url,
                 last_modified=last_modified,
+                source=source,
+                source_location=source_location,
                 created_by_admin_id=created_by_admin_id,
                 sync_status="synced",
                 is_published=True,

@@ -244,6 +244,21 @@ class ServiceInstaller:
             note_repo=self._domain.get_note_repository(),
         )
 
+    def get_archive_org_service(self):
+        from memolink_backend.business.services.archive_org_service import ArchiveOrgService
+        return ArchiveOrgService()
+
+    def get_archive_sync_service(self):
+        from memolink_backend.business.services.archive_sync_service import ArchiveSyncService
+        from memolink_backend.core.db import SessionLocal
+        return ArchiveSyncService(
+            session_factory=SessionLocal,
+            archive_service=self.get_archive_org_service(),
+        )
+
     def get_book_cache_service(self):
         from memolink_backend.business.services.book_cache_service import BookCacheService
-        return BookCacheService(onedrive_service=self.get_onedrive_service())
+        return BookCacheService(
+            onedrive_service=self.get_onedrive_service(),
+            archive_service=self.get_archive_org_service(),
+        )

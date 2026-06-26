@@ -18,8 +18,14 @@ class Book(Base):
     file_size = Column(BigInteger, nullable=True)
     cover_image_url = Column(String(1000), nullable=True)
 
-    onedrive_drive_id = Column(String(255), nullable=False)
-    onedrive_item_id = Column(String(255), nullable=False, unique=True, index=True)
+    # "onedrive" for OneDrive-sourced files, "archive_org" for Internet Archive, etc.
+    # SQL: ALTER TABLE books ADD COLUMN IF NOT EXISTS source VARCHAR(30) NOT NULL DEFAULT 'onedrive';
+    # SQL: ALTER TABLE books ADD COLUMN IF NOT EXISTS source_location VARCHAR(1000);
+    source = Column(String(30), nullable=False, default="onedrive", server_default="onedrive")
+    source_location = Column(String(1000), nullable=True)
+
+    onedrive_drive_id = Column(String(255), nullable=True)
+    onedrive_item_id = Column(String(500), nullable=False, unique=True, index=True)
     onedrive_web_url = Column(String(1000), nullable=True)
     onedrive_share_link = Column(String(1000), nullable=True)
     last_modified = Column(DateTime(timezone=True), nullable=True)

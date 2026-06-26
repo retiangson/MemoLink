@@ -3,7 +3,8 @@ import {
   listAdminBooks, getOneDriveStatus, getOneDriveAuthUrl, disconnectOneDrive,
   syncBooks, updateBookMetadata, publishBook, unpublishBook,
   publishAllBooks, unpublishAllBooks, publishSelectedBooks, unpublishSelectedBooks,
-  type OneDriveStatus, type BookSyncResult,
+  syncFromArchiveOrg,
+  type OneDriveStatus, type BookSyncResult, type ArchiveSyncResult,
 } from "../api/adminBooksApi";
 import { createDesktopCommand, getDesktopCommand, isDesktopOnline } from "../api/desktopApi";
 import type { Book } from "../api/booksApi";
@@ -20,6 +21,10 @@ export function AdminBooksPanel() {
   const [syncResult, setSyncResult] = useState<BookSyncResult | null>(null);
   const [desktopSync, setDesktopSync] = useState<{ status: "running" | "done" | "failed"; message: string } | null>(null);
   const desktopSyncStopRef = useRef(false);
+  const [archiveIdentifier, setArchiveIdentifier] = useState("");
+  const [archiveSync, setArchiveSync] = useState<{ status: "running" | "done" | "failed"; message: string } | null>(null);
+  const [archiveSyncResult, setArchiveSyncResult] = useState<ArchiveSyncResult | null>(null);
+  const archiveSyncStopRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editForm, setEditForm] = useState<{ title: string; author: string; description: string; category: string; tags: string }>({
@@ -39,7 +44,7 @@ export function AdminBooksPanel() {
       window.history.replaceState({}, "", window.location.pathname);
       loadStatusAndBooks(1);
     }
-    return () => { desktopSyncStopRef.current = true; };
+    return () => { desktopSyncStopRef.current = true; archiveSyncStopRef.current = true; };
   }, []);
 
   async function loadStatusAndBooks(targetPage: number) {
@@ -143,6 +148,56 @@ export function AdminBooksPanel() {
         status: "failed",
         message: err?.response?.data?.detail ?? err?.message ?? "Could not start desktop sync.",
       });
+    }
+  }
+
+  async function handleArchiveDesktopSync() {
+    const raw = archiveIdentifier.trim();
+    if (!raw) return;
+    setError(null);
+    setArchiveSyncResult(null);
+    const online = await isDesktopOnline();
+    if (!online) {
+      setError("MemoLink desktop app isn't connected. Open the desktop app and sign in as this admin, then try again.");
+      return;
+    }
+    archiveSyncStopRef.current = false;
+    setArchiveSync({ status: "running", message: "Starting…" });
+    try {
+      const cmd = await createDesktopCommand("archive-sync", { identifier: raw });
+      while (!archiveSyncStopRef.current) {
+        await new Promise((r) => setTimeout(r, 2000));
+        const updated = await getDesktopCommand(cmd.id);
+        const parsed = updated.result ? JSON.parse(updated.result) : null;
+        if (updated.status === "done") {
+          setArchiveSync({ status: "done", message: parsed?.output ?? "Sync complete." });
+          await loadBooks(1);
+          return;
+        }
+        if (updated.status === "failed") {
+          setArchiveSync({ status: "failed", message: parsed?.error ?? "Sync failed." });
+          return;
+        }
+        setArchiveSync({ status: "running", message: parsed?.output ?? "Syncing…" });
+      }
+    } catch (err: any) {
+      setArchiveSync({ status: "failed", message: err?.response?.data?.detail ?? err?.message ?? "Could not start archive sync." });
+    }
+  }
+
+  async function handleArchiveDirectSync() {
+    const raw = archiveIdentifier.trim();
+    if (!raw) return;
+    setError(null);
+    setArchiveSyncResult(null);
+    setArchiveSync({ status: "running", message: "Fetching from archive.org…" });
+    try {
+      const result = await syncFromArchiveOrg(raw);
+      setArchiveSyncResult(result);
+      setArchiveSync({ status: "done", message: `${result.scanned} files · ${result.created} new · ${result.updated} updated` });
+      await loadBooks(1);
+    } catch (err: any) {
+      setArchiveSync({ status: "failed", message: err?.response?.data?.detail ?? "Sync failed." });
     }
   }
 
@@ -298,6 +353,46 @@ export function AdminBooksPanel() {
         {error && <p className="text-xs text-red-400 mt-2">{error}</p>}
       </div>
 
+      {/* ── Internet Archive sync ── */}
+      <div className="bg-[var(--ml-bg-surface)] border border-[var(--ml-bg-hover)] rounded-xl p-4 mb-5">
+        <p className="text-sm text-gray-200 font-medium mb-1">Internet Archive</p>
+        <p className="text-xs text-gray-500 mb-3">
+          Paste an archive.org identifier or URL (e.g. <span className="font-mono text-gray-400">manga-2022-digital</span> or the full item URL).
+          Freely downloadable formats only — access-restricted / CDL items are skipped automatically.
+        </p>
+        <div className="flex gap-2 mb-2">
+          <input
+            value={archiveIdentifier}
+            onChange={(e) => setArchiveIdentifier(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") handleArchiveDirectSync(); }}
+            placeholder="identifier or archive.org URL…"
+            className="flex-1 bg-[var(--ml-bg-panel)] border border-[var(--ml-bg-hover)] rounded-lg px-3 py-1.5 text-sm text-gray-200 placeholder-gray-600"
+          />
+          <button
+            onClick={handleArchiveDirectSync}
+            disabled={!archiveIdentifier.trim() || archiveSync?.status === "running"}
+            className="px-3 py-1.5 text-xs rounded-lg bg-indigo-600/20 text-indigo-300 hover:bg-indigo-600/30 transition disabled:opacity-50 shrink-0"
+          >
+            {archiveSync?.status === "running" ? "Syncing…" : "Sync Now"}
+          </button>
+          <button
+            onClick={handleArchiveDesktopSync}
+            disabled={!archiveIdentifier.trim() || archiveSync?.status === "running"}
+            className="px-3 py-1.5 text-xs rounded-lg border border-amber-500/40 text-amber-400 hover:bg-amber-500/10 transition disabled:opacity-50 shrink-0"
+          >
+            Sync via Desktop App
+          </button>
+        </div>
+        {archiveSync && (
+          <p className={`text-xs mt-1 ${archiveSync.status === "failed" ? "text-red-400" : archiveSync.status === "done" ? "text-green-400" : "text-gray-500"}`}>
+            {archiveSync.message}
+          </p>
+        )}
+        {archiveSyncResult && archiveSync?.status === "done" && (
+          <p className="text-[10px] text-gray-600 mt-0.5">Source: {archiveSyncResult.source_location}{archiveSyncResult.skipped > 0 ? ` · ${archiveSyncResult.skipped} skipped` : ""}</p>
+        )}
+      </div>
+
       <input
         value={search}
         onChange={(e) => setSearch(e.target.value)}
@@ -418,6 +513,13 @@ export function AdminBooksPanel() {
                       <p className="text-xs text-gray-500 truncate">
                         {book.author || "Unknown author"} · {book.file_name}
                         {book.sync_status !== "synced" && <span className="text-amber-400"> · {book.sync_status}</span>}
+                      </p>
+                      <p className="text-[10px] text-gray-600 truncate mt-0.5">
+                        {book.source_location
+                          ? book.source_location
+                          : book.source === "archive_org"
+                          ? "Internet Archive"
+                          : "OneDrive"}
                       </p>
                     </div>
                   </div>

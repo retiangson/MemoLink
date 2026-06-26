@@ -13,6 +13,7 @@ from memolink_backend.core.db import get_db
 from memolink_backend.di.request_container import RequestContainer, get_request_container
 from memolink_backend.business.services.book_service import BookAccessError
 from memolink_backend.business.services.onedrive_service import OneDriveServiceError
+from memolink_backend.business.services.archive_org_service import ArchiveOrgServiceError
 from memolink_backend.business.services.book_cache_service import BookCacheServiceError
 from memolink_backend.business.services.book_note_source_service import run_book_note_source_job
 from memolink_backend.business.services.book_highlight_service import BookHighlightError
@@ -360,7 +361,7 @@ async def read_book(
         result = await c.book_cache().get_read_url(
             book, mime_type=mime_type, user_id=info.id, base_url=base_url
         )
-    except OneDriveServiceError as exc:
+    except (OneDriveServiceError, ArchiveOrgServiceError) as exc:
         details = {
             **audit_details,
             "status_code": exc.status_code,
@@ -368,7 +369,7 @@ async def read_book(
         }
         c.logs().error(
             "books.read",
-            f"OneDrive download failed for book #{book.id}: {exc.detail}",
+            f"File download failed for book #{book.id}: {exc.detail}",
             details,
             info.id,
         )

@@ -79,3 +79,15 @@ export async function publishSelectedBooks(bookIds: number[]): Promise<BulkPubli
 export async function unpublishSelectedBooks(bookIds: number[]): Promise<BulkPublishResult> {
   return (await api.post("/admin/books/unpublish-selected", { book_ids: bookIds })).data;
 }
+
+export interface ArchiveSyncResult {
+  scanned: number;
+  created: number;
+  updated: number;
+  skipped: number;
+  source_location: string;
+}
+
+export async function syncFromArchiveOrg(identifier: string): Promise<ArchiveSyncResult> {
+  return (await api.post("/admin/books/archive-sync", { identifier })).data;
+}

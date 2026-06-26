@@ -359,6 +359,36 @@ function postProgress(baseUrl: string, token: string, commandId: number, message
     .catch((err) => logToFile(`Failed to post progress for command ${commandId}: ${err?.message ?? err}`));
 }
 
+// ── Archive.org book sync: single backend call — the metadata endpoint returns
+// all files in one shot, so no loop / cursor is needed.
+async function runArchiveSync(
+  baseUrl: string,
+  token: string,
+  commandId: number,
+  payload: { identifier: string },
+) {
+  const { identifier } = payload;
+  try {
+    postProgress(baseUrl, token, commandId, `Fetching '${identifier}' from Internet Archive…`);
+    const raw = await bridgeRequest(
+      baseUrl, token, "POST", "/api/admin/books/archive-sync",
+      JSON.stringify({ identifier }),
+    );
+    const result = JSON.parse(raw);
+    const msg =
+      `Sync complete — ${result.scanned} scanned, ${result.created} new, ` +
+      `${result.updated} updated` +
+      (result.skipped ? `, ${result.skipped} skipped` : "") +
+      `. Source: ${result.source_location}`;
+    postResult(baseUrl, token, commandId, { ok: true, output: msg });
+  } catch (err: any) {
+    postResult(baseUrl, token, commandId, {
+      ok: false,
+      error: err?.message ?? "Archive.org sync failed.",
+    });
+  }
+}
+
 // ── OneDrive book sync: runs an unbounded local loop, one small backend call at a
 // time, so syncing any number of books is never subject to a serverless request
 // timeout. Resumable via an opaque cursor the backend hands back each call.
@@ -435,6 +465,13 @@ function startDesktopBridge(baseUrl: string, token: string) {
           if (syncRunning.has(cmd.id)) continue;
           syncRunning.add(cmd.id);
           runOneDriveSync(baseUrl, token, cmd.id).finally(() => syncRunning.delete(cmd.id));
+          continue;
+        }
+        if (cmd.command_type === "archive-sync") {
+          if (syncRunning.has(cmd.id)) continue;
+          syncRunning.add(cmd.id);
+          runArchiveSync(baseUrl, token, cmd.id, cmd.payload as { identifier: string })
+            .finally(() => syncRunning.delete(cmd.id));
           continue;
         }
         executeRemoteCommand(cmd.command_type, cmd.payload).then((result) => {

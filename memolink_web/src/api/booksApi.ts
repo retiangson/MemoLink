@@ -29,6 +29,8 @@ export interface Book {
   cover_image_url?: string | null;
   onedrive_web_url?: string | null;
   last_modified?: string | null;
+  source?: string | null;
+  source_location?: string | null;
   is_published: boolean;
   sync_status: string;
   sync_error?: string | null;

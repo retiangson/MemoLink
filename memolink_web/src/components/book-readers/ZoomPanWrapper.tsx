@@ -15,23 +15,30 @@ export function ZoomPanWrapper({ active, children, overlay, surfaceClass = "", o
   const { containerRef, transform, isDragging, handlers } = useZoomPan(active, { onSwipeLeft, onSwipeRight });
   const { zoom, panX, panY } = transform;
 
+  // At zoom=1 outside fullscreen, allow single-touch native scroll.
+  // Once pinched in (zoom > 1) or in fullscreen, intercept all touch so
+  // panning works correctly and the browser doesn't fight us.
+  const isZoomedIn = zoom > 1.01;
+  const touchAction = (active || isZoomedIn) ? "none" : "pan-x pan-y";
+
   // Always render the SAME two-level DOM structure regardless of active state.
   // Changing the wrapper structure causes React to re-mount children, which blanks
   // the PDF canvas, resets TTS playback state, and re-fetches book content.
   return (
     <div
       ref={containerRef}
-      className={`flex-1 relative min-h-0 flex flex-col ${active ? `overflow-hidden ${surfaceClass}` : ""}`}
+      className={`flex-1 relative min-h-0 flex flex-col overflow-hidden ${active ? surfaceClass : ""}`}
       style={{
         cursor: active ? (isDragging ? "grabbing" : "grab") : undefined,
-        touchAction: active ? "none" : undefined,
+        touchAction,
       }}
       onMouseDown={active ? handlers.onMouseDown : undefined}
     >
-      {/* Stable child-wrapper: transform applied in active mode, plain flex in passive */}
+      {/* Stable child-wrapper: transform always applied (no-op at zoom=1/pan=0),
+          so pinch-to-zoom works outside fullscreen without changing DOM structure. */}
       <div
         style={
-          active
+          (active || isZoomedIn)
             ? {
                 width: "100%",
                 height: "100%",
@@ -47,6 +54,10 @@ export function ZoomPanWrapper({ active, children, overlay, surfaceClass = "", o
                 display: "flex",
                 flexDirection: "column",
                 minHeight: 0,
+                // Keep transform in the DOM even at zoom=1 so the transition is
+                // smooth if the user pinches — but as a no-op value.
+                transform: `translate(${panX}px, ${panY}px) scale(${zoom})`,
+                transformOrigin: "0 0",
               }
         }
       >
