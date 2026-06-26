@@ -287,9 +287,15 @@ export function CaptionReaderView({
 
   return (
     <>
-      <ZoomPanWrapper active={!!isFullscreen}>
+      <ZoomPanWrapper
+        active={!!isFullscreen}
+        surfaceClass={readerSurfaceClass(colorMode)}
+        onSwipeLeft={() => goToPage(currentPage + 1)}
+        onSwipeRight={() => goToPage(currentPage - 1)}
+        overlay={!loading && !error ? <PageNavArrows onPrev={() => goToPage(currentPage - 1)} onNext={() => goToPage(currentPage + 1)} canPrev={currentPage > 1} canNext={currentPage < pages.length} /> : undefined}
+      >
       <div
-        className={`flex-1 overflow-auto flex justify-center py-6 px-4 relative transition-colors ${readerSurfaceClass(colorMode)}`}
+        className={`flex-1 ${isFullscreen ? "overflow-visible" : "overflow-auto"} flex justify-center py-6 px-4 relative transition-colors ${readerSurfaceClass(colorMode)}`}
         {...(!isFullscreen ? swipeHandlers : {})}
       >
         {loading ? (
@@ -297,30 +303,22 @@ export function CaptionReaderView({
         ) : error ? (
           <div className="flex items-center justify-center text-red-400 text-sm">{error}</div>
         ) : (
-          <>
-            <div
-              ref={containerRef}
-              onAnimationEnd={() => setPageAnim(null)}
-              onMouseUp={handleMouseUp}
-              className={`relative shadow-lg rounded-xl max-w-2xl w-full h-fit p-8 ${pageAnim === "next" ? "ml-page-anim-next" : pageAnim === "prev" ? "ml-page-anim-prev" : ""}`}
-              style={{ backgroundColor: colors.background, color: colors.foreground }}
-            >
-              {pageCues.map((cue) => (
-                <div key={cue.index} className="mb-3 flex gap-3 leading-relaxed" style={{ fontSize: `${readerFontSizePx(fontSize, 15)}px` }}>
-                  <span className="select-none shrink-0 w-20 pt-0.5 text-xs" style={{ color: colors.muted }}>
-                    {formatTimestamp(cue.startSeconds)}
-                  </span>
-                  <span className="cue-text flex-1">{cue.text}</span>
-                </div>
-              ))}
-            </div>
-            <PageNavArrows
-              onPrev={() => goToPage(currentPage - 1)}
-              onNext={() => goToPage(currentPage + 1)}
-              canPrev={currentPage > 1}
-              canNext={currentPage < pages.length}
-            />
-          </>
+          <div
+            ref={containerRef}
+            onAnimationEnd={() => setPageAnim(null)}
+            onMouseUp={handleMouseUp}
+            className={`relative shadow-lg rounded-xl max-w-2xl w-full h-fit p-8 ${pageAnim === "next" ? "ml-page-anim-next" : pageAnim === "prev" ? "ml-page-anim-prev" : ""}`}
+            style={{ backgroundColor: colors.background, color: colors.foreground }}
+          >
+            {pageCues.map((cue) => (
+              <div key={cue.index} className="mb-3 flex gap-3 leading-relaxed" style={{ fontSize: `${readerFontSizePx(fontSize, 15)}px` }}>
+                <span className="select-none shrink-0 w-20 pt-0.5 text-xs" style={{ color: colors.muted }}>
+                  {formatTimestamp(cue.startSeconds)}
+                </span>
+                <span className="cue-text flex-1">{cue.text}</span>
+              </div>
+            ))}
+          </div>
         )}
       </div>
       </ZoomPanWrapper>

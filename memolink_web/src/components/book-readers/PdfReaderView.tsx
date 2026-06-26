@@ -355,9 +355,15 @@ export function PdfReaderView({
 
   return (
     <>
-      <ZoomPanWrapper active={!!isFullscreen}>
+      <ZoomPanWrapper
+        active={!!isFullscreen}
+        surfaceClass={readerSurfaceClass(colorMode)}
+        onSwipeLeft={() => goToPage(currentPage + 1)}
+        onSwipeRight={() => goToPage(currentPage - 1)}
+        overlay={!loading && !error ? <PageNavArrows onPrev={() => goToPage(currentPage - 1)} onNext={() => goToPage(currentPage + 1)} canPrev={currentPage > 1} canNext={currentPage < numPages} /> : undefined}
+      >
       <div
-        className={`flex-1 overflow-auto flex justify-center py-6 px-4 relative transition-colors ${readerSurfaceClass(colorMode)}`}
+        className={`flex-1 ${isFullscreen ? "overflow-visible" : "overflow-auto"} flex justify-center py-6 px-4 relative transition-colors ${readerSurfaceClass(colorMode)}`}
         {...(!isFullscreen ? swipeHandlers : {})}
       >
         {loading ? (
@@ -365,51 +371,43 @@ export function PdfReaderView({
         ) : error ? (
           <div className="flex items-center justify-center text-red-400 text-sm">{error}</div>
         ) : (
-          <>
-            <div
-              onAnimationEnd={() => setPageAnim(null)}
-              className={`relative shadow-lg rounded bg-white max-w-full h-fit overflow-hidden ${pageAnim === "next" ? "ml-page-anim-next" : pageAnim === "prev" ? "ml-page-anim-prev" : ""}`}
-              style={{ width: viewportSize.width || undefined, height: viewportSize.height || undefined }}
-            >
-              <canvas
-                ref={canvasRef}
-                className="block w-full h-full transition-[filter]"
-                style={{ filter: pdfCanvasFilter(colorMode) }}
-              />
-              {/* pdf_viewer.css sets ::selection to transparent (pdf.js's own viewer draws its
-                  own highlight overlay instead) — without an override, dragging to select text
-                  here gives zero visual feedback, which looks identical to selection not working
-                  at all even though the underlying Range API is functioning correctly. */}
-              <style>{`
-                .textLayer ::selection, .textLayer ::-moz-selection {
-                  background: rgba(99, 102, 241, 0.4);
-                }
-              `}</style>
-              <div
-                ref={textLayerRef}
-                className="textLayer absolute inset-0 cursor-text"
-                title="Double-click a sentence to start reading from there"
-                onMouseUp={handleTextLayerMouseUp}
-                onDoubleClick={(e) => {
-                  const target = (e.target as HTMLElement).closest("span, div") as HTMLElement | null;
-                  window.getSelection()?.removeAllRanges();
-                  setPendingSelection(null);
-                  if (!target) return;
-                  const idx = textDivsRef.current.indexOf(target);
-                  if (idx === -1) return;
-                  const range = itemRangesRef.current[idx];
-                  if (!range) return;
-                  handleSentenceClick(range.start);
-                }}
-              />
-            </div>
-            <PageNavArrows
-              onPrev={() => goToPage(currentPage - 1)}
-              onNext={() => goToPage(currentPage + 1)}
-              canPrev={currentPage > 1}
-              canNext={currentPage < numPages}
+          <div
+            onAnimationEnd={() => setPageAnim(null)}
+            className={`relative shadow-lg rounded bg-white max-w-full h-fit overflow-hidden ${pageAnim === "next" ? "ml-page-anim-next" : pageAnim === "prev" ? "ml-page-anim-prev" : ""}`}
+            style={{ width: viewportSize.width || undefined, height: viewportSize.height || undefined }}
+          >
+            <canvas
+              ref={canvasRef}
+              className="block w-full h-full transition-[filter]"
+              style={{ filter: pdfCanvasFilter(colorMode) }}
             />
-          </>
+            {/* pdf_viewer.css sets ::selection to transparent (pdf.js's own viewer draws its
+                own highlight overlay instead) — without an override, dragging to select text
+                here gives zero visual feedback, which looks identical to selection not working
+                at all even though the underlying Range API is functioning correctly. */}
+            <style>{`
+              .textLayer ::selection, .textLayer ::-moz-selection {
+                background: rgba(99, 102, 241, 0.4);
+              }
+            `}</style>
+            <div
+              ref={textLayerRef}
+              className="textLayer absolute inset-0 cursor-text"
+              title="Double-click a sentence to start reading from there"
+              onMouseUp={handleTextLayerMouseUp}
+              onDoubleClick={(e) => {
+                const target = (e.target as HTMLElement).closest("span, div") as HTMLElement | null;
+                window.getSelection()?.removeAllRanges();
+                setPendingSelection(null);
+                if (!target) return;
+                const idx = textDivsRef.current.indexOf(target);
+                if (idx === -1) return;
+                const range = itemRangesRef.current[idx];
+                if (!range) return;
+                handleSentenceClick(range.start);
+              }}
+            />
+          </div>
         )}
       </div>
       </ZoomPanWrapper>

@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+/* Ensure the book reader div fills the display when it becomes the native fullscreen element */
+:fullscreen { display: flex; flex-direction: column; width: 100%; height: 100%; }
+:-webkit-full-screen { display: flex; flex-direction: column; width: 100%; height: 100%; }
+
 /* Counter-invert media inside a [data-rc-mode] panel whose whole subtree is flipped via
    richContentFilter() (light/sepia reader color modes), so images/video render normally. */
 [data-rc-mode="light"] img, [data-rc-mode="light"] video,

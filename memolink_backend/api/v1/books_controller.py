@@ -1,7 +1,9 @@
 import logging
+import mimetypes
 from typing import Optional
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from sqlalchemy import text
@@ -11,6 +13,7 @@ from memolink_backend.core.db import get_db
 from memolink_backend.di.request_container import RequestContainer, get_request_container
 from memolink_backend.business.services.book_service import BookAccessError
 from memolink_backend.business.services.onedrive_service import OneDriveServiceError
+from memolink_backend.business.services.archive_org_service import ArchiveOrgServiceError
 from memolink_backend.business.services.book_cache_service import BookCacheServiceError
 from memolink_backend.business.services.book_note_source_service import run_book_note_source_job
 from memolink_backend.business.services.book_highlight_service import BookHighlightError
@@ -280,18 +283,57 @@ def log_reader_error(
     return {"ok": True}
 
 
+@router.get("/{book_id}/local-stream")
+async def local_stream_book(
+    book_id: int,
+    tok: str,
+    uid: int,
+    h: str,
+    mt: str = "application/octet-stream",
+    c: RequestContainer = Depends(get_request_container),
+):
+    """Local-dev-only streaming endpoint. Replaces S3 presigned URLs when
+    S3_UPLOAD_BUCKET is not configured. Protected by a short-lived HMAC token
+    so no Authorization header is needed (mirrors the presigned-URL pattern)."""
+    svc = c.book_cache()
+    if not svc.verify_local_token(uid, book_id, h, tok):
+        raise HTTPException(status_code=403, detail="Invalid or expired token.")
+
+    local_path = svc.local_file(book_id, h)
+    if local_path is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Local book cache not found. Re-open the book to re-download it.",
+        )
+
+    # Guess mime from extension as fallback in case mt param is missing/wrong
+    guessed = mimetypes.guess_type(local_path.name)[0]
+    media_type = mt or guessed or "application/octet-stream"
+
+    return FileResponse(
+        path=str(local_path),
+        media_type=media_type,
+        filename=local_path.name,
+    )
+
+
 @router.get("/{book_id}/read", response_model=BookReadUrlResponseDTO)
 async def read_book(
     book_id: int,
+    request: Request,
     info: UserInfo = Depends(get_current_user_info),
     _access: int = Depends(require_books_access),
     c: RequestContainer = Depends(get_request_container),
 ):
-    """Returns a short-lived presigned S3 URL for the book file instead of streaming
-    bytes through the backend. Streaming breaks on Lambda for any book over a few MB
-    (its synchronous response payload is hard-capped at 6 MB), so the file is cached
-    in S3 on first read and served directly to the client from there instead. The
-    book is re-fetched from OneDrive only when the S3 cache is missing or stale."""
+    """Returns a short-lived signed URL for the book file.
+
+    Production (S3_UPLOAD_BUCKET set): caches the file in S3, returns a presigned
+    S3 GET URL so the client downloads directly — bypasses Lambda's 6 MB response cap.
+
+    Local dev (S3_UPLOAD_BUCKET empty): caches the file in the OS temp directory,
+    returns an HMAC-signed URL pointing to /local-stream on this server instead.
+    The frontend uses the same code path in both cases.
+    """
     try:
         book = c.books().get_book_for_reading(info.id, book_id, is_admin=info.is_admin)
     except BookAccessError as exc:
@@ -313,9 +355,13 @@ async def read_book(
     fallback_mime = _EXTENSION_MIME_FALLBACK.get((book.file_extension or "").lower(), "application/octet-stream")
     mime_type = book.mime_type or fallback_mime
 
+    base_url = str(request.base_url).rstrip("/")
+
     try:
-        result = await c.book_cache().get_read_url(book, mime_type=mime_type)
-    except OneDriveServiceError as exc:
+        result = await c.book_cache().get_read_url(
+            book, mime_type=mime_type, user_id=info.id, base_url=base_url
+        )
+    except (OneDriveServiceError, ArchiveOrgServiceError) as exc:
         details = {
             **audit_details,
             "status_code": exc.status_code,
@@ -323,7 +369,7 @@ async def read_book(
         }
         c.logs().error(
             "books.read",
-            f"OneDrive download failed for book #{book.id}: {exc.detail}",
+            f"File download failed for book #{book.id}: {exc.detail}",
             details,
             info.id,
         )
