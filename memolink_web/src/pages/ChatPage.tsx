@@ -1,4 +1,5 @@
 ﻿import React, { useCallback, useEffect, useRef, useState } from "react";
+import { Capacitor } from "@capacitor/core";
 import { saveUser, type User } from "../utils/auth";
 import { useNotes } from "../hooks/useNotes";
 import { useNoteEditor } from "../hooks/useNoteEditor";
@@ -888,6 +889,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
   }
 
   function closeActiveBookTab() {
+    setBookReaderFullscreen(false);
     bookTabs.closeBookTab();
     setBooksTabOpen(true);
     setActiveTabType("books");
@@ -1112,6 +1114,8 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
   const isCalendarActive = activeTabType === "calendar" && calendarTabOpen;
   const isBooksActive = activeTabType === "books" && booksTabOpen;
   const isBookReaderActive = activeTabType === "book" && bookTabs.openTabs.length > 0;
+  const [bookReaderFullscreen, setBookReaderFullscreen] = useState(false);
+  const isNativePlatform = Capacitor.isNativePlatform();
   const isStudyActive = activeTabType === "study" && studyTabs.openTabs.length > 0;
   const isMemoGraphActive = activeTabType === "memograph" && memographTabOpen;
 
@@ -1224,7 +1228,8 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
       <div className="flex-1 flex flex-col h-full overflow-hidden">
         <>
         {/* ── Unified tab bar ───────────────────────────────────────────── */}
-        <div id="tour-tab-bar" className="flex bg-[var(--ml-bg-bar)] border-b border-[var(--ml-bg-panel)] shrink-0" style={{ minHeight: 40 }}>
+        {/* Hidden on Capacitor when a book reader is in fullscreen so content fills the whole screen */}
+        <div id="tour-tab-bar" className={`flex bg-[var(--ml-bg-bar)] border-b border-[var(--ml-bg-panel)] shrink-0 ${isNativePlatform && bookReaderFullscreen ? "hidden" : ""}`} style={{ minHeight: 40 }}>
 
           {/* Sidebar toggle - all screen sizes, left of tabs */}
           {!sidebarOpen && (
@@ -1455,7 +1460,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
               return (
                 <div
                   key={tab.book.id}
-                  onClick={() => { bookTabs.setActiveIndex(i); setActiveTabType("book"); }}
+                  onClick={() => { bookTabs.setActiveIndex(i); setActiveTabType("book"); setBookReaderFullscreen(false); }}
                   className={`flex items-center gap-1.5 px-3 h-10 text-xs cursor-pointer border-b-2 transition shrink-0 select-none ${
                     isActive ? "border-amber-500 text-white bg-[var(--ml-bg-base)]" : "border-transparent text-gray-500 hover:text-gray-300 hover:bg-[var(--ml-bg-base)]"
                   }`}
@@ -1465,7 +1470,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                   </svg>
                   <span className="max-w-[120px] truncate">{tab.book.title}</span>
                   <button
-                    onClick={(e) => { e.stopPropagation(); bookTabs.closeBookTab(i); }}
+                    onClick={(e) => { e.stopPropagation(); setBookReaderFullscreen(false); bookTabs.closeBookTab(i); }}
                     className="text-gray-600 hover:text-gray-300 w-3.5 h-3.5 flex items-center justify-center rounded-sm hover:bg-[var(--ml-bg-hover)] transition leading-none"
                   >
                     ×
@@ -1764,6 +1769,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                   jumpToHighlight={tab.pendingHighlight}
                   onJumpToHighlightHandled={() => bookTabs.clearPendingHighlight(tab.book.id)}
                   onHighlightAdded={reloadNotes}
+                  onFullscreenChange={i === bookTabs.activeIndex ? setBookReaderFullscreen : undefined}
                 />
               </div>
             ))}

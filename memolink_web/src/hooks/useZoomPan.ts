@@ -1,4 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
+import { Capacitor } from "@capacitor/core";
+
+const isNativePlatform = Capacitor.isNativePlatform();
 
 export interface ZoomPanTransform {
   zoom: number;
@@ -165,8 +168,10 @@ export function useZoomPan(active: boolean, options: UseZoomPanOptions = {}) {
         touchStartYRef.current   = e.touches[0].clientY;
         lastPinchDistRef.current = null;
       } else if (e.touches.length >= 2) {
-        // Prevent the browser from starting a viewport-zoom gesture on iPad/iOS.
-        // This must happen on touchstart (non-passive) for Safari to respect it.
+        // On Capacitor/Android in non-fullscreen mode the WebView doesn't self-zoom,
+        // so let native scrolling handle the gesture. On iOS/Safari we must intercept
+        // here (non-passive) to stop the browser from zooming the entire viewport.
+        if (isNativePlatform && !active) return;
         e.preventDefault();
         const [a, b] = [e.touches[0], e.touches[1]];
         lastPinchDistRef.current = Math.hypot(b.clientX - a.clientX, b.clientY - a.clientY);
@@ -226,16 +231,7 @@ export function useZoomPan(active: boolean, options: UseZoomPanOptions = {}) {
     const onTouchEnd = (e: TouchEvent) => {
       for (const t of Array.from(e.changedTouches)) touchStateRef.current.delete(t.identifier);
       if (e.touches.length < 2) lastPinchDistRef.current = null;
-
-      // Swipe-to-navigate only applies in fullscreen mode at near-1× zoom
-      if (active && e.touches.length === 0 && e.changedTouches.length === 1 && transformRef.current.zoom < 1.05) {
-        const dx = e.changedTouches[0].clientX - touchStartXRef.current;
-        const dy = Math.abs(e.changedTouches[0].clientY - touchStartYRef.current);
-        if (Math.abs(dx) > SWIPE_THRESHOLD_PX && Math.abs(dx) > dy) {
-          if (dx < 0) onSwipeLeftRef.current?.();
-          else        onSwipeRightRef.current?.();
-        }
-      }
+      // Swipe-to-navigate removed: navigation buttons handle prev/next in fullscreen.
     };
 
     // touchstart must be non-passive so we can call preventDefault for pinch
