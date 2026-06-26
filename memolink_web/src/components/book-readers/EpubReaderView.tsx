@@ -19,6 +19,7 @@ import { NoteSourceButton } from "./NoteSourceButton";
 import { HighlightColorPicker } from "./HighlightColorPicker";
 import { PageNavArrows } from "./PageNavArrows";
 import { ReaderLoadingState } from "./ReaderLoadingState";
+import { ZoomPanWrapper } from "./ZoomPanWrapper";
 import { HIGHLIGHT_COLORS, highlightColorMark } from "./highlightColors";
 
 const HIGHLIGHT_NAME = "ml-tts";
@@ -224,7 +225,7 @@ function applyEpubContentsTheme(list: Contents[], mode: ReaderViewProps["colorMo
 export function EpubReaderView({
   book, initialPage, colorMode, fontSize, onProgress,
   noteStatus, noteStatusLoaded, savingNoteSource, onSaveAsNoteSource,
-  jumpToHighlight, onJumpToHighlightHandled, onHighlightAdded,
+  jumpToHighlight, onJumpToHighlightHandled, onHighlightAdded, isFullscreen,
 }: ReaderViewProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const epubBookRef = useRef<Book | null>(null);
@@ -863,7 +864,8 @@ export function EpubReaderView({
 
   return (
     <>
-      <div className={`flex-1 overflow-hidden relative transition-colors ${readerSurfaceClass(colorMode)}`} {...swipeHandlers}>
+      <ZoomPanWrapper active={!!isFullscreen}>
+      <div className={`flex-1 overflow-hidden relative transition-colors ${readerSurfaceClass(colorMode)}`} {...(!isFullscreen ? swipeHandlers : {})}>
         {loading && (
           <div className={`absolute inset-0 z-10 ${readerSurfaceClass(colorMode)}`}>
             <ReaderLoadingState book={book} colorMode={colorMode} label={loadingLabel} progress={progress} />
@@ -899,6 +901,7 @@ export function EpubReaderView({
           </>
         )}
       </div>
+      </ZoomPanWrapper>
 
       {tts.playing && (
         <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50">

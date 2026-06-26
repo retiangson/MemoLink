@@ -12,6 +12,7 @@ import { PageNavArrows } from "./PageNavArrows";
 import { ReaderLoadingState } from "./ReaderLoadingState";
 import { parseCaptions, type Cue } from "./captions";
 import { highlightColorMark } from "./highlightColors";
+import { ZoomPanWrapper } from "./ZoomPanWrapper";
 
 interface PendingSelection { x: number; y: number; start: number; end: number; }
 interface PersistedCueHighlight { id: number; start: number; end: number; color: string; }
@@ -147,7 +148,7 @@ function flashOrPulseCueRange(container: HTMLElement, anchor: Pick<HighlightAnch
 export function CaptionReaderView({
   book, initialPage, colorMode, fontSize, onProgress,
   noteStatus, noteStatusLoaded, savingNoteSource, onSaveAsNoteSource,
-  jumpToHighlight, onJumpToHighlightHandled, onHighlightAdded,
+  jumpToHighlight, onJumpToHighlightHandled, onHighlightAdded, isFullscreen,
 }: ReaderViewProps) {
   const ext = (book.file_extension || "").toLowerCase() === ".vtt" ? "vtt" : "srt";
 
@@ -286,9 +287,10 @@ export function CaptionReaderView({
 
   return (
     <>
+      <ZoomPanWrapper active={!!isFullscreen}>
       <div
         className={`flex-1 overflow-auto flex justify-center py-6 px-4 relative transition-colors ${readerSurfaceClass(colorMode)}`}
-        {...swipeHandlers}
+        {...(!isFullscreen ? swipeHandlers : {})}
       >
         {loading ? (
           <ReaderLoadingState book={book} colorMode={colorMode} progress={progress} />
@@ -321,6 +323,7 @@ export function CaptionReaderView({
           </>
         )}
       </div>
+      </ZoomPanWrapper>
 
       {tts.playing && (
         <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50">

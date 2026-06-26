@@ -11,6 +11,7 @@ import { readerSurfaceClass } from "./format";
 import { usePageSwipe } from "../../hooks/usePageSwipe";
 import { PageNavArrows } from "./PageNavArrows";
 import { ReaderLoadingState } from "./ReaderLoadingState";
+import { ZoomPanWrapper } from "./ZoomPanWrapper";
 
 interface ComicSource {
   names: string[];
@@ -72,7 +73,7 @@ async function buildCbrSource(buf: ArrayBuffer): Promise<ComicSource> {
 
 // Comics (.cbz/.cbr) are page-image archives with no extractable text, so this reader
 // has no TTS, highlight, or note-source UI — same reduced toolbar as AudioReaderView.
-export function ComicReaderView({ book, initialPage, colorMode, onProgress }: ReaderViewProps) {
+export function ComicReaderView({ book, initialPage, colorMode, onProgress, isFullscreen }: ReaderViewProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [pageCount, setPageCount] = useState(0);
@@ -181,9 +182,10 @@ export function ComicReaderView({ book, initialPage, colorMode, onProgress }: Re
 
   return (
     <>
+      <ZoomPanWrapper active={!!isFullscreen}>
       <div
         className={`flex-1 overflow-auto flex justify-center py-6 px-4 relative transition-colors ${readerSurfaceClass(colorMode)}`}
-        {...swipeHandlers}
+        {...(!isFullscreen ? swipeHandlers : {})}
       >
         {loading ? (
           <ReaderLoadingState book={book} colorMode={colorMode} label="Loading comic, please wait" progress={progress} />
@@ -213,6 +215,7 @@ export function ComicReaderView({ book, initialPage, colorMode, onProgress }: Re
           </>
         )}
       </div>
+      </ZoomPanWrapper>
 
       {!loading && !error && (
         <div className="flex items-center justify-between px-5 py-3 border-t border-[var(--ml-bg-hover)] shrink-0 gap-3">

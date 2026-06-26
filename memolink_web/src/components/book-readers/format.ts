@@ -36,6 +36,7 @@ export interface ReaderViewProps {
   jumpToHighlight?: HighlightAnchor | null;
   onJumpToHighlightHandled?: () => void;
   onHighlightAdded?: () => void;
+  isFullscreen?: boolean;
 }
 
 export const READER_COLOR_MODE_LABELS: Record<ReaderColorMode, string> = {
