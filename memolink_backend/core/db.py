@@ -7,14 +7,21 @@ class Base(DeclarativeBase):
     pass
 
 
+# QueuePool options (pool_size, max_overflow, pool_recycle) are only valid for
+# PostgreSQL/MySQL — SQLite uses SingletonThreadPool which rejects them.
+_is_postgres = settings.database_url.startswith(("postgresql", "postgres"))
+_pool_kwargs = (
+    {"pool_size": 10, "max_overflow": 20, "pool_recycle": 1800}
+    if _is_postgres
+    else {}
+)
+
 engine = create_engine(
     settings.database_url,
     echo=False,
     future=True,
     pool_pre_ping=True,
-    pool_size=10,
-    max_overflow=20,
-    pool_recycle=1800,
+    **_pool_kwargs,
 )
 
 SessionLocal = sessionmaker(
