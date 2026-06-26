@@ -1751,6 +1751,24 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
         </div>
 
 
+        {/* Book readers stay mounted when switching tab types (prevents canvas teardown / black screen) */}
+        {activeLayoutMode === "stacked" && bookTabs.openTabs.length > 0 && (
+          <div className={`flex-1 min-h-0 flex flex-col overflow-hidden ${isBookReaderActive ? "" : "hidden"}`}>
+            {bookTabs.openTabs.map((tab, i) => (
+              <div key={tab.book.id} className={`flex-1 flex flex-col min-h-0 h-full ${i === bookTabs.activeIndex ? "" : "hidden"}`}>
+                <BookReader
+                  book={tab.book}
+                  initialPage={tab.initialPage}
+                  onClose={closeActiveBookTab}
+                  onProgress={handleBookProgress}
+                  jumpToHighlight={tab.pendingHighlight}
+                  onJumpToHighlightHandled={() => bookTabs.clearPendingHighlight(tab.book.id)}
+                  onHighlightAdded={reloadNotes}
+                />
+              </div>
+            ))}
+          </div>
+        )}
         {/* ── Content area ─────────────────────────────────────────────── */}
         {activeLayoutMode === "stacked" ? (
           isSpotifyActive ? (
@@ -1779,18 +1797,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
               onOpenBook={openBookTab}
             />
           ) : isBookReaderActive ? (
-            bookTabs.active && (
-              <BookReader
-                key={bookTabs.active.book.id}
-                book={bookTabs.active.book}
-                initialPage={bookTabs.active.initialPage}
-                onClose={closeActiveBookTab}
-                onProgress={handleBookProgress}
-                jumpToHighlight={bookTabs.active.pendingHighlight}
-                onJumpToHighlightHandled={() => bookTabs.clearPendingHighlight(bookTabs.active!.book.id)}
-                onHighlightAdded={reloadNotes}
-              />
-            )
+            null
           ) : isStudyActive ? (
             studyTabs.active && (
               <StudyToolView
