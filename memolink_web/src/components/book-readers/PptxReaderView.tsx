@@ -11,6 +11,7 @@ import { HighlightColorPicker } from "./HighlightColorPicker";
 import { PageNavArrows } from "./PageNavArrows";
 import { ReaderLoadingState } from "./ReaderLoadingState";
 import { captureSelectionInContainer, applyPersistentMarks, flashOrPulseRange } from "./domTextHighlight";
+import { ZoomPanWrapper } from "./ZoomPanWrapper";
 
 interface PendingSelection { x: number; y: number; start: number; end: number; }
 
@@ -20,7 +21,7 @@ interface PendingSelection { x: number; y: number; start: number; end: number; }
 export function PptxReaderView({
   book, initialPage, colorMode, onProgress,
   noteStatus, noteStatusLoaded, savingNoteSource, onSaveAsNoteSource,
-  jumpToHighlight, onJumpToHighlightHandled, onHighlightAdded,
+  jumpToHighlight, onJumpToHighlightHandled, onHighlightAdded, isFullscreen,
 }: ReaderViewProps) {
   const [slides, setSlides] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -143,9 +144,10 @@ export function PptxReaderView({
 
   return (
     <>
+      <ZoomPanWrapper active={!!isFullscreen}>
       <div
         className={`flex-1 overflow-auto flex justify-center py-6 px-4 relative transition-colors ${readerSurfaceClass(colorMode)}`}
-        {...swipeHandlers}
+        {...(!isFullscreen ? swipeHandlers : {})}
       >
         {loading ? (
           <ReaderLoadingState book={book} colorMode={colorMode} label="Loading presentation, please wait" />
@@ -170,6 +172,7 @@ export function PptxReaderView({
           </>
         )}
       </div>
+      </ZoomPanWrapper>
 
       {tts.playing && (
         <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50">

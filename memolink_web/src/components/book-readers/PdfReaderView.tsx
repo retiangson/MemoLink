@@ -17,6 +17,7 @@ import { HighlightColorPicker } from "./HighlightColorPicker";
 import { PageNavArrows } from "./PageNavArrows";
 import { ReaderLoadingState } from "./ReaderLoadingState";
 import { highlightColorMark } from "./highlightColors";
+import { ZoomPanWrapper } from "./ZoomPanWrapper";
 
 interface PendingSelection { start: number; end: number; }
 
@@ -25,7 +26,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
 export function PdfReaderView({
   book, initialPage, colorMode, fontSize, onProgress,
   noteStatus, noteStatusLoaded, savingNoteSource, onSaveAsNoteSource,
-  jumpToHighlight, onJumpToHighlightHandled, onHighlightAdded,
+  jumpToHighlight, onJumpToHighlightHandled, onHighlightAdded, isFullscreen,
 }: ReaderViewProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const textLayerRef = useRef<HTMLDivElement | null>(null);
@@ -354,9 +355,10 @@ export function PdfReaderView({
 
   return (
     <>
+      <ZoomPanWrapper active={!!isFullscreen}>
       <div
         className={`flex-1 overflow-auto flex justify-center py-6 px-4 relative transition-colors ${readerSurfaceClass(colorMode)}`}
-        {...swipeHandlers}
+        {...(!isFullscreen ? swipeHandlers : {})}
       >
         {loading ? (
           <ReaderLoadingState book={book} colorMode={colorMode} progress={progress} />
@@ -410,6 +412,7 @@ export function PdfReaderView({
           </>
         )}
       </div>
+      </ZoomPanWrapper>
 
       {tts.playing && (
         <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50">
