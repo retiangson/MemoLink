@@ -62,7 +62,13 @@ export function useTTS() {
   }
 
   function _speak(idx: number) {
-    if (!window.speechSynthesis) { setPlaying(false); setPaused(false); return; }
+    if (!window.speechSynthesis) {
+      setPlaying(false); setPaused(false);
+      const cb = queueEndRef.current;
+      queueEndRef.current = null;
+      cb?.();
+      return;
+    }
     if (idx < 0 || idx >= sentences.current.length) {
       setPlaying(false); setPaused(false); return;
     }

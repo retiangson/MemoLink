@@ -305,10 +305,10 @@ export async function listMyBooks(): Promise<UserBook[]> {
     return result;
   } catch (error: any) {
     if (!error?.response) {
-      const cached = localStorage.getItem(MY_BOOKS_CACHE_KEY);
-      if (cached) {
-        try { return JSON.parse(cached); } catch {}
-      }
+      try {
+        const cached = localStorage.getItem(MY_BOOKS_CACHE_KEY);
+        if (cached) return JSON.parse(cached);
+      } catch {}
     }
     throw error;
   }
