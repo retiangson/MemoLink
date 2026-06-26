@@ -136,6 +136,24 @@ async function getCachedBookBlob(bookId: number, signature: string): Promise<Blo
   });
 }
 
+async function getAnyCachedBookBlob(bookId: number): Promise<Blob | null> {
+  const db = await openBookCache();
+  if (!db) return null;
+  return new Promise((resolve) => {
+    const tx = db.transaction(BOOK_CACHE_STORE, "readonly");
+    const store = tx.objectStore(BOOK_CACHE_STORE);
+    const request = store.get(bookId);
+    request.onsuccess = () => {
+      const cached = request.result as CachedBookBlob | undefined;
+      resolve(cached?.blob ?? null);
+    };
+    request.onerror = () => resolve(null);
+    tx.oncomplete = () => db.close();
+    tx.onerror = () => db.close();
+    tx.onabort = () => db.close();
+  });
+}
+
 export interface BookReaderErrorReport {
   book_id: number;
   format: string;
@@ -278,8 +296,22 @@ export async function listBooks(params?: {
   return (await api.get("/books", { params })).data;
 }
 
+const MY_BOOKS_CACHE_KEY = "memolink_my_books_cache";
+
 export async function listMyBooks(): Promise<UserBook[]> {
-  return (await api.get("/books/my")).data;
+  try {
+    const result = (await api.get("/books/my")).data;
+    try { localStorage.setItem(MY_BOOKS_CACHE_KEY, JSON.stringify(result)); } catch {}
+    return result;
+  } catch (error: any) {
+    if (!error?.response) {
+      try {
+        const cached = localStorage.getItem(MY_BOOKS_CACHE_KEY);
+        if (cached) return JSON.parse(cached);
+      } catch {}
+    }
+    throw error;
+  }
 }
 
 export async function getBook(bookId: number): Promise<Book> {
@@ -329,7 +361,12 @@ export async function fetchBookBlob(
   let readUrl: BookReadUrl;
   try {
     readUrl = (await api.get(`/books/${bookId}/read`)).data;
-  } catch (error) {
+  } catch (error: any) {
+    // On network failure, serve any previously-downloaded version from cache.
+    if (!error?.response) {
+      const stale = await getAnyCachedBookBlob(bookId);
+      if (stale) return stale;
+    }
     throw await normalizeBookDownloadError(error);
   }
 

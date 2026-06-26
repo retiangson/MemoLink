@@ -62,6 +62,13 @@ export function useTTS() {
   }
 
   function _speak(idx: number) {
+    if (!window.speechSynthesis) {
+      setPlaying(false); setPaused(false);
+      const cb = queueEndRef.current;
+      queueEndRef.current = null;
+      cb?.();
+      return;
+    }
     if (idx < 0 || idx >= sentences.current.length) {
       setPlaying(false); setPaused(false); return;
     }
@@ -99,14 +106,14 @@ export function useTTS() {
       }
     };
     u.onerror = () => { setPlaying(false); setPaused(false); setCurrentWord(null); };
-    window.speechSynthesis.speak(u);
+    window.speechSynthesis?.speak(u);
   }
 
   /** startIndex lets callers (e.g. "click a sentence to read from here") skip ahead.
    *  onQueueEnd fires once after the last sentence finishes naturally - used to
    *  auto-advance to the next page and keep reading. */
   function speak(text: string, startIndex = 0, onQueueEnd?: () => void) {
-    window.speechSynthesis.cancel();
+    window.speechSynthesis?.cancel();
     const sents = splitSentences(text);
     sentences.current = sents;
     setSentencesList(sents);
@@ -117,7 +124,7 @@ export function useTTS() {
   }
 
   function stop() {
-    window.speechSynthesis.cancel();
+    window.speechSynthesis?.cancel();
     sentences.current = []; cursor.current = 0;
     queueEndRef.current = null;
     setPlaying(false); setPaused(false);
@@ -125,8 +132,8 @@ export function useTTS() {
     setCurrentWord(null);
   }
 
-  function pause() { window.speechSynthesis.pause(); setPaused(true); }
-  function resume() { window.speechSynthesis.resume(); setPaused(false); }
+  function pause() { window.speechSynthesis?.pause(); setPaused(true); }
+  function resume() { window.speechSynthesis?.resume(); setPaused(false); }
 
   function forward() {
     const next = cursor.current + 1;

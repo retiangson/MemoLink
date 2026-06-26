@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { Capacitor } from "@capacitor/core";
 import { saveAsNoteSource, getNoteSourceStatus, type Book, type BookNoteSourceStatus } from "../api/booksApi";
 import { getBookFormat, type HighlightAnchor } from "./book-readers/format";
 import { PdfReaderView } from "./book-readers/PdfReaderView";
@@ -36,30 +37,37 @@ export function BookReader({ book, initialPage, onClose, onProgress, onAskAI, ju
   const containerRef = useRef<HTMLDivElement>(null);
   const format = getBookFormat(book);
   const canFullscreen = format !== "audio" && format !== "video" && format !== "unsupported";
+  const isNativePlatform = Capacitor.isNativePlatform();
 
   // Sync React state with native fullscreen changes (ESC key, focus loss, etc.)
+  // Not used on Capacitor/Android where requestFullscreen is unavailable.
   useEffect(() => {
+    if (isNativePlatform) return;
     const onFSChange = () => {
       setIsFullscreen(document.fullscreenElement === containerRef.current);
     };
     document.addEventListener("fullscreenchange", onFSChange);
     return () => document.removeEventListener("fullscreenchange", onFSChange);
-  }, []);
+  }, [isNativePlatform]);
 
   async function enterFullscreen() {
+    if (isNativePlatform) {
+      // Web Fullscreen API is not supported in Capacitor Android WebView — use CSS overlay.
+      setIsFullscreen(true);
+      return;
+    }
     try {
       await containerRef.current?.requestFullscreen();
     } catch {
-      // requestFullscreen can be rejected in sandboxed iframes — fall back to CSS overlay
       setIsFullscreen(true);
     }
   }
 
   function exitFullscreen() {
-    if (document.fullscreenElement) {
-      document.exitFullscreen().catch(() => {});
-    } else {
+    if (isNativePlatform || !document.fullscreenElement) {
       setIsFullscreen(false);
+    } else {
+      document.exitFullscreen().catch(() => {});
     }
   }
 
@@ -102,7 +110,7 @@ export function BookReader({ book, initialPage, onClose, onProgress, onAskAI, ju
   return (
     <div
       ref={containerRef}
-      className={`flex flex-col bg-[var(--ml-bg-base)] ${isFullscreen ? "w-full h-full" : "flex-1 min-h-0 h-full"}`}
+      className={`flex flex-col bg-[var(--ml-bg-base)] ${isFullscreen ? (isNativePlatform ? "fixed inset-0 z-50" : "w-full h-full") : "flex-1 min-h-0 h-full"}`}
     >
       {/* ── Top bar ──────────────────────────────────────────────── */}
       {isFullscreen ? (
