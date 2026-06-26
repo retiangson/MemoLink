@@ -1,6 +1,11 @@
 from __future__ import annotations
 
+import base64
 import hashlib
+import hmac
+import tempfile
+import time
+from pathlib import Path
 
 import boto3
 from botocore.config import Config
@@ -14,6 +19,10 @@ from memolink_backend.business.services.onedrive_service import OneDriveService
 # to finish downloading, short enough to limit how long a leaked URL stays usable.
 _PRESIGNED_URL_TTL_SECONDS = 900
 
+# Local dev cache lives under the OS temp directory; it's cleared on reboot and
+# does not persist across server restarts, which is intentional — no stale files.
+_LOCAL_CACHE_ROOT = Path(tempfile.gettempdir()) / "ml-book-cache"
+
 
 class BookCacheServiceError(Exception):
     def __init__(self, status_code: int, detail: str):
@@ -23,21 +32,28 @@ class BookCacheServiceError(Exception):
 
 
 class BookCacheService:
-    """Caches OneDrive book files in S3 and serves them via presigned URLs.
+    """Caches OneDrive book files and serves them via short-lived signed URLs.
 
-    Streaming book bytes through the backend breaks for any file over a few MB once
-    deployed on Lambda, whose synchronous response payload is hard-capped at 6 MB
-    (and Mangum's base64 encoding of binary bodies inflates that further). Routing
-    the download through S3 instead lets the client fetch the file directly,
-    bypassing that limit entirely.
+    Production path (S3_UPLOAD_BUCKET set):
+        Downloads → S3 cache → presigned S3 GET URL returned to client.
+        Streaming through the backend breaks on Lambda (6 MB response cap), so
+        the client always fetches the file directly from S3 instead.
+
+    Local dev path (S3_UPLOAD_BUCKET empty):
+        Downloads → local temp-dir cache → HMAC-signed URL pointing to the
+        /local-stream backend endpoint, which streams the file directly.
+        The signed URL mirrors the presigned-URL pattern so the frontend code
+        requires no changes between dev and prod.
     """
 
     def __init__(self, onedrive_service: OneDriveService):
         self._onedrive = onedrive_service
 
+    # ── S3 helpers ────────────────────────────────────────────────────────────
+
     def _s3(self):
-        # A new client is created on each call - Lambda may rotate credentials, so
-        # caching the client across invocations is intentionally avoided.
+        # A new client is created on each call — Lambda may rotate credentials,
+        # so caching across invocations is intentionally avoided.
         kwargs = {
             "region_name": settings.aws_region,
             "config": Config(signature_version="s3v4", s3={"addressing_style": "virtual"}),
@@ -57,11 +73,62 @@ class BookCacheService:
         signature_hash = hashlib.sha256(signature.encode()).hexdigest()[:16]
         return f"book-cache/{book.id}/{signature_hash}/{book.file_name}"
 
-    async def get_read_url(self, book: Book, *, mime_type: str) -> dict:
-        bucket = settings.s3_upload_bucket
-        if not bucket:
-            raise BookCacheServiceError(503, "S3 cache bucket is not configured on this server.")
+    # ── Local dev cache helpers ───────────────────────────────────────────────
 
+    def _sig_hash(self, book: Book) -> str:
+        """16-char content fingerprint — same hash used in both S3 key and local path."""
+        sig = f"{book.onedrive_item_id}|{book.last_modified.isoformat() if book.last_modified else ''}|{book.file_size or ''}"
+        return hashlib.sha256(sig.encode()).hexdigest()[:16]
+
+    def _local_path(self, book: Book) -> Path:
+        return _LOCAL_CACHE_ROOT / str(book.id) / self._sig_hash(book) / (book.file_name or "book")
+
+    def _make_local_token(self, user_id: int, book_id: int, sig_hash: str, time_bucket: int) -> str:
+        msg = f"{user_id}:{book_id}:{sig_hash}:{time_bucket}".encode()
+        digest = hmac.new(settings.jwt_secret_key.encode(), msg, "sha256").digest()
+        return base64.urlsafe_b64encode(digest).decode().rstrip("=")
+
+    def local_token(self, user_id: int, book_id: int, sig_hash: str) -> str:
+        return self._make_local_token(user_id, book_id, sig_hash, int(time.time()) // 900)
+
+    def verify_local_token(self, user_id: int, book_id: int, sig_hash: str, tok: str) -> bool:
+        """Accept tokens from the current and previous 15-minute window (≤ 30 min validity)."""
+        bucket = int(time.time()) // 900
+        for offset in (0, -1):
+            expected = self._make_local_token(user_id, book_id, sig_hash, bucket + offset)
+            if hmac.compare_digest(tok, expected):
+                return True
+        return False
+
+    def local_file(self, book_id: int, sig_hash: str) -> Path | None:
+        """Return the cached local path if it exists, or None."""
+        candidates = list((_LOCAL_CACHE_ROOT / str(book_id) / sig_hash).glob("*")) if \
+            (_LOCAL_CACHE_ROOT / str(book_id) / sig_hash).exists() else []
+        return candidates[0] if candidates else None
+
+    # ── Public API ────────────────────────────────────────────────────────────
+
+    async def get_read_url(
+        self,
+        book: Book,
+        *,
+        mime_type: str,
+        user_id: int = 0,
+        base_url: str = "",
+    ) -> dict:
+        """Return ``{ url, expires_in, cache_hit }`` for the book file.
+
+        Selects S3 (production) or local-stream (dev) automatically based on
+        whether ``S3_UPLOAD_BUCKET`` is configured.
+        """
+        if not settings.s3_upload_bucket:
+            return await self._get_read_url_local(book, mime_type=mime_type, user_id=user_id, base_url=base_url)
+        return await self._get_read_url_s3(book, mime_type=mime_type)
+
+    # ── S3 path ───────────────────────────────────────────────────────────────
+
+    async def _get_read_url_s3(self, book: Book, *, mime_type: str) -> dict:
+        bucket = settings.s3_upload_bucket
         s3 = self._s3()
         key = self._cache_key(book)
 
@@ -102,4 +169,33 @@ class BookCacheService:
         except ClientError as exc:
             raise BookCacheServiceError(500, f"Could not generate book download URL: {exc}")
 
+        return {"url": url, "expires_in": _PRESIGNED_URL_TTL_SECONDS, "cache_hit": cache_hit}
+
+    # ── Local dev path ────────────────────────────────────────────────────────
+
+    async def _get_read_url_local(
+        self,
+        book: Book,
+        *,
+        mime_type: str,
+        user_id: int,
+        base_url: str,
+    ) -> dict:
+        local_path = self._local_path(book)
+        cache_hit = local_path.exists()
+
+        if not cache_hit:
+            content = await self._onedrive.download_file_bytes(
+                drive_id=book.onedrive_drive_id, item_id=book.onedrive_item_id
+            )
+            local_path.parent.mkdir(parents=True, exist_ok=True)
+            local_path.write_bytes(content)
+
+        sig_hash = self._sig_hash(book)
+        tok = self.local_token(user_id, book.id, sig_hash)
+        from urllib.parse import quote
+        url = (
+            f"{base_url}/api/books/{book.id}/local-stream"
+            f"?tok={tok}&uid={user_id}&h={sig_hash}&mt={quote(mime_type)}"
+        )
         return {"url": url, "expires_in": _PRESIGNED_URL_TTL_SECONDS, "cache_hit": cache_hit}

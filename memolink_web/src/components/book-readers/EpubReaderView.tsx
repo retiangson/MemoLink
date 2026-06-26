@@ -864,7 +864,7 @@ export function EpubReaderView({
 
   return (
     <>
-      <ZoomPanWrapper active={!!isFullscreen}>
+      <ZoomPanWrapper active={!!isFullscreen} surfaceClass={readerSurfaceClass(colorMode)}>
       <div className={`flex-1 overflow-hidden relative transition-colors ${readerSurfaceClass(colorMode)}`} {...(!isFullscreen ? swipeHandlers : {})}>
         {loading && (
           <div className={`absolute inset-0 z-10 ${readerSurfaceClass(colorMode)}`}>

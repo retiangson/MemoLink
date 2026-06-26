@@ -33,28 +33,35 @@ export function BookReader({ book, initialPage, onClose, onProgress, onAskAI, ju
   const [colorMode, setColorMode] = useReaderColorMode();
   const [fontSize, setFontSize] = useReaderFontSize();
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
   const format = getBookFormat(book);
   const canFullscreen = format !== "audio" && format !== "video" && format !== "unsupported";
 
-  // Exit fullscreen on Escape
+  // Sync React state with native fullscreen changes (ESC key, focus loss, etc.)
   useEffect(() => {
-    if (!isFullscreen) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setIsFullscreen(false); };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [isFullscreen]);
+    const onFSChange = () => {
+      setIsFullscreen(document.fullscreenElement === containerRef.current);
+    };
+    document.addEventListener("fullscreenchange", onFSChange);
+    return () => document.removeEventListener("fullscreenchange", onFSChange);
+  }, []);
 
-  // Prevent body scroll while in fullscreen
-  const prevOverflow = useRef("");
-  useEffect(() => {
-    if (isFullscreen) {
-      prevOverflow.current = document.body.style.overflow;
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = prevOverflow.current;
+  async function enterFullscreen() {
+    try {
+      await containerRef.current?.requestFullscreen();
+    } catch {
+      // requestFullscreen can be rejected in sandboxed iframes — fall back to CSS overlay
+      setIsFullscreen(true);
     }
-    return () => { document.body.style.overflow = prevOverflow.current; };
-  }, [isFullscreen]);
+  }
+
+  function exitFullscreen() {
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(() => {});
+    } else {
+      setIsFullscreen(false);
+    }
+  }
 
   useEffect(() => {
     getNoteSourceStatus(book.id)
@@ -93,7 +100,10 @@ export function BookReader({ book, initialPage, onClose, onProgress, onAskAI, ju
     : {};
 
   return (
-    <div className={`flex flex-col bg-[var(--ml-bg-base)] ${isFullscreen ? "fixed inset-0 z-[9999]" : "flex-1 min-h-0 h-full"}`}>
+    <div
+      ref={containerRef}
+      className={`flex flex-col bg-[var(--ml-bg-base)] ${isFullscreen ? "w-full h-full" : "flex-1 min-h-0 h-full"}`}
+    >
       {/* ── Top bar ──────────────────────────────────────────────── */}
       {isFullscreen ? (
         <div className="flex items-center justify-between px-4 py-2 border-b border-[var(--ml-bg-hover)] shrink-0">
@@ -104,7 +114,7 @@ export function BookReader({ book, initialPage, onClose, onProgress, onAskAI, ju
             <FontSizePicker value={fontSize} onChange={setFontSize} />
             <ColorModePicker value={colorMode} onChange={setColorMode} />
             <button
-              onClick={() => setIsFullscreen(false)}
+              onClick={exitFullscreen}
               title="Exit fullscreen (Esc)"
               className="p-1.5 rounded-lg text-gray-400 hover:text-gray-200 hover:bg-[var(--ml-bg-hover)] transition"
             >
@@ -134,7 +144,7 @@ export function BookReader({ book, initialPage, onClose, onProgress, onAskAI, ju
             <ColorModePicker value={colorMode} onChange={setColorMode} />
             {canFullscreen && (
               <button
-                onClick={() => setIsFullscreen(true)}
+                onClick={enterFullscreen}
                 title="Fullscreen reading mode"
                 className="p-1.5 rounded-lg text-gray-400 hover:text-gray-200 hover:bg-[var(--ml-bg-hover)] transition"
               >

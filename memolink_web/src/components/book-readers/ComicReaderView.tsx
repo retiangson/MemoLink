@@ -182,9 +182,15 @@ export function ComicReaderView({ book, initialPage, colorMode, onProgress, isFu
 
   return (
     <>
-      <ZoomPanWrapper active={!!isFullscreen}>
+      <ZoomPanWrapper
+        active={!!isFullscreen}
+        surfaceClass={readerSurfaceClass(colorMode)}
+        onSwipeLeft={() => goToPage(currentPage + 1)}
+        onSwipeRight={() => goToPage(currentPage - 1)}
+        overlay={!loading && !error ? <PageNavArrows onPrev={() => goToPage(currentPage - 1)} onNext={() => goToPage(currentPage + 1)} canPrev={currentPage > 1} canNext={currentPage < pageCount} /> : undefined}
+      >
       <div
-        className={`flex-1 overflow-auto flex justify-center py-6 px-4 relative transition-colors ${readerSurfaceClass(colorMode)}`}
+        className={`flex-1 ${isFullscreen ? "overflow-visible" : "overflow-auto"} flex justify-center py-6 px-4 relative transition-colors ${readerSurfaceClass(colorMode)}`}
         {...(!isFullscreen ? swipeHandlers : {})}
       >
         {loading ? (
@@ -192,27 +198,19 @@ export function ComicReaderView({ book, initialPage, colorMode, onProgress, isFu
         ) : error ? (
           <div className="flex items-center justify-center text-red-400 text-sm">{error}</div>
         ) : (
-          <>
-            <div
-              onAnimationEnd={() => setPageAnim(null)}
-              className={`relative shadow-lg rounded bg-black/20 max-w-full h-fit overflow-hidden flex items-center justify-center ${pageAnim === "next" ? "ml-page-anim-next" : pageAnim === "prev" ? "ml-page-anim-prev" : ""}`}
-            >
-              {imgUrl && (
-                <img src={imgUrl} alt={`Page ${currentPage}`} className="max-w-full max-h-[80vh] object-contain" />
-              )}
-              {pageLoading && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/30 text-xs text-gray-300">
-                  Loading page…
-                </div>
-              )}
-            </div>
-            <PageNavArrows
-              onPrev={() => goToPage(currentPage - 1)}
-              onNext={() => goToPage(currentPage + 1)}
-              canPrev={currentPage > 1}
-              canNext={currentPage < pageCount}
-            />
-          </>
+          <div
+            onAnimationEnd={() => setPageAnim(null)}
+            className={`relative shadow-lg rounded bg-black/20 max-w-full h-fit overflow-hidden flex items-center justify-center ${pageAnim === "next" ? "ml-page-anim-next" : pageAnim === "prev" ? "ml-page-anim-prev" : ""}`}
+          >
+            {imgUrl && (
+              <img src={imgUrl} alt={`Page ${currentPage}`} className="max-w-full max-h-[80vh] object-contain" />
+            )}
+            {pageLoading && (
+              <div className="absolute inset-0 flex items-center justify-center bg-black/30 text-xs text-gray-300">
+                Loading page…
+              </div>
+            )}
+          </div>
         )}
       </div>
       </ZoomPanWrapper>

@@ -144,9 +144,15 @@ export function PptxReaderView({
 
   return (
     <>
-      <ZoomPanWrapper active={!!isFullscreen}>
+      <ZoomPanWrapper
+        active={!!isFullscreen}
+        surfaceClass={readerSurfaceClass(colorMode)}
+        onSwipeLeft={() => goToSlide(currentSlide + 1)}
+        onSwipeRight={() => goToSlide(currentSlide - 1)}
+        overlay={!loading && !error ? <PageNavArrows onPrev={() => goToSlide(currentSlide - 1)} onNext={() => goToSlide(currentSlide + 1)} canPrev={currentSlide > 1} canNext={currentSlide < slides.length} /> : undefined}
+      >
       <div
-        className={`flex-1 overflow-auto flex justify-center py-6 px-4 relative transition-colors ${readerSurfaceClass(colorMode)}`}
+        className={`flex-1 ${isFullscreen ? "overflow-visible" : "overflow-auto"} flex justify-center py-6 px-4 relative transition-colors ${readerSurfaceClass(colorMode)}`}
         {...(!isFullscreen ? swipeHandlers : {})}
       >
         {loading ? (
@@ -154,22 +160,14 @@ export function PptxReaderView({
         ) : error ? (
           <div className="flex items-center justify-center text-red-400 text-sm">{error}</div>
         ) : (
-          <>
-            <div
-              ref={slideRef}
-              onAnimationEnd={() => setSlideAnim(null)}
-              onMouseUp={handleSlideMouseUp}
-              className={`pptx-slide relative shadow-lg rounded-xl max-w-2xl w-full h-fit p-10 ${slideAnim === "next" ? "ml-page-anim-next" : slideAnim === "prev" ? "ml-page-anim-prev" : ""}`}
-              style={{ backgroundColor: colors.background, color: colors.foreground }}
-              dangerouslySetInnerHTML={{ __html: slides[currentSlide - 1] || "" }}
-            />
-            <PageNavArrows
-              onPrev={() => goToSlide(currentSlide - 1)}
-              onNext={() => goToSlide(currentSlide + 1)}
-              canPrev={currentSlide > 1}
-              canNext={currentSlide < slides.length}
-            />
-          </>
+          <div
+            ref={slideRef}
+            onAnimationEnd={() => setSlideAnim(null)}
+            onMouseUp={handleSlideMouseUp}
+            className={`pptx-slide relative shadow-lg rounded-xl max-w-2xl w-full h-fit p-10 ${slideAnim === "next" ? "ml-page-anim-next" : slideAnim === "prev" ? "ml-page-anim-prev" : ""}`}
+            style={{ backgroundColor: colors.background, color: colors.foreground }}
+            dangerouslySetInnerHTML={{ __html: slides[currentSlide - 1] || "" }}
+          />
         )}
       </div>
       </ZoomPanWrapper>
