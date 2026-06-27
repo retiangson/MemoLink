@@ -107,7 +107,7 @@ export function TxtReaderView({
   }, [currentPage, pages.length, loading, book.id, onProgress]);
 
   useEffect(() => {
-    return () => { window.speechSynthesis.cancel(); };
+    return () => { window.speechSynthesis?.cancel(); };
   }, []);
 
   function goToPage(p: number) {

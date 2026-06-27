@@ -1,5 +1,7 @@
 ﻿import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Capacitor } from "@capacitor/core";
+import { disposeReaderAfterPaint } from "../components/book-readers/nativeReaderLifecycle";
+import { getBookFormat } from "../components/book-readers/format";
 import { saveUser, type User } from "../utils/auth";
 import { useNotes } from "../hooks/useNotes";
 import { useNoteEditor } from "../hooks/useNoteEditor";
@@ -904,12 +906,20 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
   const bookTabsRef = useRef(bookTabs);
   bookTabsRef.current = bookTabs;
 
-  function closeBookTabNextFrame(index = bookTabsRef.current.activeIndex) {
-    const bookId = bookTabsRef.current.openTabs[index]?.book.id;
+  function closeBookTabAfterPaint(index = bookTabsRef.current.activeIndex) {
+    const book = bookTabsRef.current.openTabs[index]?.book;
+    const bookId = book?.id;
     if (bookId == null) return;
+    const needsNativeSettleDelay = book != null && ["pdf", "epub", "mobi"].includes(getBookFormat(book));
     requestAnimationFrame(() => {
-      const currentIndex = bookTabsRef.current.openTabs.findIndex((tab) => tab.book.id === bookId);
-      if (currentIndex >= 0) bookTabsRef.current.closeBookTab(currentIndex);
+      const closeTab = () => {
+        const currentIndex = bookTabsRef.current.openTabs.findIndex((tab) => tab.book.id === bookId);
+        if (currentIndex >= 0) bookTabsRef.current.closeBookTab(currentIndex);
+      };
+      // Browser paints settle within the frame. Android WebView needs extra time
+      // before removing canvas/iframe-backed readers or its whole surface can go black.
+      if (needsNativeSettleDelay) disposeReaderAfterPaint(closeTab);
+      else closeTab();
     });
   }
 
@@ -918,8 +928,11 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
     if (index === bookTabs.activeIndex && bookTabs.openTabs.length === 1) {
       setBooksTabOpen(true);
       setActiveTabType("books");
+    } else if (index === bookTabs.activeIndex) {
+      const nextVisibleIndex = index < bookTabs.openTabs.length - 1 ? index + 1 : index - 1;
+      bookTabs.setActiveIndex(nextVisibleIndex);
     }
-    closeBookTabNextFrame(index);
+    closeBookTabAfterPaint(index);
   }
 
   function closeActiveBookTab() {
@@ -931,7 +944,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
     // BEFORE BookReader unmounts its canvas / epub.js iframes. On Android WebView,
     // GPU canvas teardown and epub.js destroy() can flash a blank frame when they
     // race with the display:none that hides the reader in the same paint.
-    closeBookTabNextFrame();
+    closeBookTabAfterPaint();
   }
 
   // Readers persist progress to the backend themselves; this just mirrors it into the

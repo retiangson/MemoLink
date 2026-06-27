@@ -76,7 +76,7 @@ export function PptxReaderView({
   }, [currentSlide, slides.length, loading, book.id, onProgress]);
 
   useEffect(() => {
-    return () => { window.speechSynthesis.cancel(); };
+    return () => { window.speechSynthesis?.cancel(); };
   }, []);
 
   function goToSlide(p: number) {

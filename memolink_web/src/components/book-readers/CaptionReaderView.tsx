@@ -198,7 +198,7 @@ export function CaptionReaderView({
   }, [currentPage, pages.length, loading, book.id, onProgress]);
 
   useEffect(() => {
-    return () => { window.speechSynthesis.cancel(); };
+    return () => { window.speechSynthesis?.cancel(); };
   }, []);
 
   useEffect(() => {

@@ -21,6 +21,7 @@ import { PageNavArrows } from "./PageNavArrows";
 import { ReaderLoadingState } from "./ReaderLoadingState";
 import { ZoomPanWrapper } from "./ZoomPanWrapper";
 import { HIGHLIGHT_COLORS, highlightColorMark } from "./highlightColors";
+import { disposeReaderAfterPaint, isNativeReaderPlatform } from "./nativeReaderLifecycle";
 
 const HIGHLIGHT_NAME = "ml-tts";
 const JUMP_HIGHLIGHT_NAME = "ml-jump";
@@ -470,7 +471,11 @@ export function EpubReaderView({
         if (openError || !epubBook) throw openError;
 
         if (cancelled || !containerRef.current) {
-          epubBook.destroy();
+          const destroyCancelledBook = () => {
+            try { epubBook.destroy(); } catch { /* best-effort teardown */ }
+          };
+          if (cancelled && isNativeReaderPlatform()) disposeReaderAfterPaint(destroyCancelledBook);
+          else destroyCancelledBook();
           return;
         }
         epubBookRef.current = epubBook;
@@ -562,10 +567,18 @@ export function EpubReaderView({
       clearClickListeners();
       clearSelectionListeners();
       clearSwipeListeners();
-      renditionRef.current?.destroy();
-      epubBookRef.current?.destroy();
+      const rendition = renditionRef.current;
+      const epubBook = epubBookRef.current;
       renditionRef.current = null;
       epubBookRef.current = null;
+      const destroyReader = () => {
+        try { rendition?.destroy(); } catch { /* best-effort teardown */ }
+        try { epubBook?.destroy(); } catch { /* best-effort teardown */ }
+      };
+      // Android WebView can blank its GPU surface when epub.js iframe teardown
+      // races the React paint that reveals the library. Browser teardown remains
+      // synchronous; only the native shell waits until the next screen is stable.
+      disposeReaderAfterPaint(destroyReader);
     };
   }, [book.id]);
 
@@ -596,7 +609,7 @@ export function EpubReaderView({
   }, [currentPage, numPages, loading, book.id, onProgress]);
 
   useEffect(() => {
-    return () => { window.speechSynthesis.cancel(); };
+    return () => { window.speechSynthesis?.cancel(); };
   }, []);
 
   function clearHighlight() {
