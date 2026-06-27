@@ -1,16 +1,26 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 
 const LS_VOICE = "memolink_tts_voice";
 const LS_RATE  = "memolink_tts_rate";
+const DEFAULT_TTS_RATE = 1;
+const MIN_TTS_RATE = 0.1;
+const MAX_TTS_RATE = 10;
+const TTS_SILENT_FAILURE_THRESHOLD_MS = 200;
+
+function normalizeRate(value: string | number | null): number {
+  const parsed = typeof value === "number" ? value : Number.parseFloat(value ?? "");
+  if (!Number.isFinite(parsed)) return DEFAULT_TTS_RATE;
+  return Math.min(MAX_TTS_RATE, Math.max(MIN_TTS_RATE, parsed));
+}
 
 export function splitSentences(text: string): string[] {
-  return text.match(/[^.!?\n]+[.!?\n]+|[^.!?\n]+$/g)?.map(s => s.trim()).filter(Boolean) ?? [text];
+  return text.match(/[^.!?\n]+[.!?\n]+|[^.!?\n]+$/g)?.map(s => s.trim()).filter(Boolean) ?? [];
 }
 
 export function useTTS() {
   const [playing, setPlaying] = useState(false);
   const [paused, setPaused] = useState(false);
-  const [rate, setRateState] = useState<number>(() => parseFloat(localStorage.getItem(LS_RATE) ?? "1.0"));
+  const [rate, setRateState] = useState<number>(() => normalizeRate(localStorage.getItem(LS_RATE)));
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [selectedVoice, setSelectedVoiceState] = useState<SpeechSynthesisVoice | null>(null);
   const [currentSentenceIdx, setCurrentSentenceIdx] = useState(-1);
@@ -20,10 +30,13 @@ export function useTTS() {
 
   const sentences = useRef<string[]>([]);
   const cursor = useRef(0);
-  const rateRef = useRef<number>(parseFloat(localStorage.getItem(LS_RATE) ?? "1.0"));
+  const rateRef = useRef<number>(normalizeRate(localStorage.getItem(LS_RATE)));
   const voiceRef = useRef<SpeechSynthesisVoice | null>(null);
   // Fired once when the whole sentence queue finishes playing (not on manual stop/pause).
   const queueEndRef = useRef<(() => void) | null>(null);
+  // Invalidates callbacks from utterances cancelled by stop, seek, rate changes,
+  // or a newer speak request. Some engines dispatch onend after cancel().
+  const playbackGenerationRef = useRef(0);
 
   // Load voices and restore saved voice - async in some browsers
   useEffect(() => {
@@ -38,7 +51,7 @@ export function useTTS() {
       const match = savedName ? (v.find(x => x.name === savedName) ?? null) : null;
       voiceRef.current = match;
       setSelectedVoiceState(match);
-      const savedRate = parseFloat(localStorage.getItem(LS_RATE) ?? "1.0");
+      const savedRate = normalizeRate(localStorage.getItem(LS_RATE));
       rateRef.current = savedRate;
       setRateState(savedRate);
     }
@@ -54,23 +67,29 @@ export function useTTS() {
     };
   }, []);
 
-  function setSelectedVoice(v: SpeechSynthesisVoice | null) {
+  const setSelectedVoice = useCallback((v: SpeechSynthesisVoice | null) => {
     voiceRef.current = v;
     setSelectedVoiceState(v);
     if (v) localStorage.setItem(LS_VOICE, v.name);
     else localStorage.removeItem(LS_VOICE);
-  }
+  }, []);
 
-  function _speak(idx: number) {
+  useEffect(() => () => {
+    playbackGenerationRef.current += 1;
+    queueEndRef.current = null;
+  }, []);
+
+  const speakSentence = useCallback(function playSentence(idx: number, generation: number) {
+    if (generation !== playbackGenerationRef.current) return;
     if (!window.speechSynthesis) {
       setPlaying(false); setPaused(false);
-      const cb = queueEndRef.current;
       queueEndRef.current = null;
-      cb?.();
       return;
     }
     if (idx < 0 || idx >= sentences.current.length) {
-      setPlaying(false); setPaused(false); return;
+      setPlaying(false); setPaused(false); setCurrentSentenceIdx(-1);
+      queueEndRef.current = null;
+      return;
     }
     window.speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(sentences.current[idx]);
@@ -107,8 +126,9 @@ export function useTTS() {
     // played (onstart just didn't fire), so continue to the next sentence.
     const startTime = Date.now();
     u.onend = () => {
+      if (generation !== playbackGenerationRef.current) return;
       setCurrentWord(null);
-      if (!started && Date.now() - startTime < 200) {
+      if (!started && Date.now() - startTime < TTS_SILENT_FAILURE_THRESHOLD_MS) {
         // onend fired almost immediately without onstart — TTS silently failed.
         // Abort rather than draining the sentence queue instantly.
         if (typeof window !== "undefined") window.speechSynthesis?.cancel();
@@ -117,7 +137,7 @@ export function useTTS() {
         return;
       }
       if (cursor.current + 1 < sentences.current.length) {
-        _speak(cursor.current + 1);
+        playSentence(cursor.current + 1, generation);
       } else {
         setPlaying(false); setPaused(false); setCurrentSentenceIdx(-1);
         const cb = queueEndRef.current;
@@ -125,48 +145,68 @@ export function useTTS() {
         cb?.();
       }
     };
-    u.onerror = () => { setPlaying(false); setPaused(false); setCurrentWord(null); queueEndRef.current = null; };
+    u.onerror = () => {
+      if (generation !== playbackGenerationRef.current) return;
+      setPlaying(false); setPaused(false); setCurrentSentenceIdx(-1); setCurrentWord(null); queueEndRef.current = null;
+    };
     window.speechSynthesis?.speak(u);
-  }
+  }, []);
 
   /** startIndex lets callers (e.g. "click a sentence to read from here") skip ahead.
    *  onQueueEnd fires once after the last sentence finishes naturally - used to
    *  auto-advance to the next page and keep reading. */
-  function speak(text: string, startIndex = 0, onQueueEnd?: () => void) {
+  const speak = useCallback((text: string, startIndex = 0, onQueueEnd?: () => void) => {
+    const generation = ++playbackGenerationRef.current;
     window.speechSynthesis?.cancel();
     const sents = splitSentences(text);
     sentences.current = sents;
     setSentencesList(sents);
+    if (sents.length === 0) {
+      queueEndRef.current = null;
+      setPlaying(false); setPaused(false); setCurrentSentenceIdx(-1); setCurrentWord(null);
+      return;
+    }
     const start = sents.length === 0 ? 0 : Math.min(Math.max(0, startIndex), sents.length - 1);
     cursor.current = start;
     queueEndRef.current = onQueueEnd ?? null;
-    _speak(start);
-  }
+    speakSentence(start, generation);
+  }, [speakSentence]);
 
-  function stop() {
+  const stop = useCallback(() => {
+    playbackGenerationRef.current += 1;
     window.speechSynthesis?.cancel();
     sentences.current = []; cursor.current = 0;
     queueEndRef.current = null;
     setPlaying(false); setPaused(false);
     setCurrentSentenceIdx(-1);
     setCurrentWord(null);
-  }
+  }, []);
 
-  function pause() { window.speechSynthesis?.pause(); setPaused(true); }
-  function resume() { window.speechSynthesis?.resume(); setPaused(false); }
+  const pause = useCallback(() => { window.speechSynthesis?.pause(); setPaused(true); }, []);
+  const resume = useCallback(() => { window.speechSynthesis?.resume(); setPaused(false); }, []);
 
-  function forward() {
+  const forward = useCallback(() => {
     const next = cursor.current + 1;
-    if (next < sentences.current.length) _speak(next);
-  }
+    if (next < sentences.current.length) {
+      const generation = ++playbackGenerationRef.current;
+      speakSentence(next, generation);
+    }
+  }, [speakSentence]);
 
-  function back() { _speak(Math.max(0, cursor.current - 1)); }
+  const back = useCallback(() => {
+    const generation = ++playbackGenerationRef.current;
+    speakSentence(Math.max(0, cursor.current - 1), generation);
+  }, [speakSentence]);
 
-  function setRate(r: number) {
-    rateRef.current = r; setRateState(r);
-    localStorage.setItem(LS_RATE, String(r));
-    if (playing && !paused) _speak(cursor.current);
-  }
+  const setRate = useCallback((r: number) => {
+    const normalizedRate = normalizeRate(r);
+    rateRef.current = normalizedRate; setRateState(normalizedRate);
+    localStorage.setItem(LS_RATE, String(normalizedRate));
+    if (window.speechSynthesis?.speaking && !window.speechSynthesis.paused) {
+      const generation = ++playbackGenerationRef.current;
+      speakSentence(cursor.current, generation);
+    }
+  }, [speakSentence]);
 
   return {
     playing, paused, rate, voices, selectedVoice,
