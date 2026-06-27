@@ -25,9 +25,11 @@ interface Props {
   jumpToHighlight?: HighlightAnchor | null;
   onJumpToHighlightHandled?: () => void;
   onHighlightAdded?: () => void;
+  /** Called on Capacitor when fullscreen state changes so the parent can hide/show the tab bar. */
+  onFullscreenChange?: (isFullscreen: boolean) => void;
 }
 
-export function BookReader({ book, initialPage, onClose, onProgress, onAskAI, jumpToHighlight, onJumpToHighlightHandled, onHighlightAdded }: Props) {
+export function BookReader({ book, initialPage, onClose, onProgress, onAskAI, jumpToHighlight, onJumpToHighlightHandled, onHighlightAdded, onFullscreenChange }: Props) {
   const [noteStatus, setNoteStatus] = useState<BookNoteSourceStatus | null>(null);
   const [noteStatusLoaded, setNoteStatusLoaded] = useState(false);
   const [savingNoteSource, setSavingNoteSource] = useState(false);
@@ -50,9 +52,17 @@ export function BookReader({ book, initialPage, onClose, onProgress, onAskAI, ju
     return () => document.removeEventListener("fullscreenchange", onFSChange);
   }, [isNativePlatform]);
 
+  // On Capacitor, notify parent so it can hide the tab bar (giving a true full-screen
+  // reading area without using position:fixed, which causes a black-screen flash on
+  // Android WebView when the element is removed).
+  useEffect(() => {
+    if (!isNativePlatform) return;
+    onFullscreenChange?.(isFullscreen);
+    return () => { onFullscreenChange?.(false); };
+  }, [isFullscreen, isNativePlatform, onFullscreenChange]);
+
   async function enterFullscreen() {
     if (isNativePlatform) {
-      // Web Fullscreen API is not supported in Capacitor Android WebView — use CSS overlay.
       setIsFullscreen(true);
       return;
     }
@@ -110,7 +120,7 @@ export function BookReader({ book, initialPage, onClose, onProgress, onAskAI, ju
   return (
     <div
       ref={containerRef}
-      className={`flex flex-col bg-[var(--ml-bg-base)] ${isFullscreen ? (isNativePlatform ? "fixed inset-0 z-50" : "w-full h-full") : "flex-1 min-h-0 h-full"}`}
+      className={`flex flex-col bg-[var(--ml-bg-base)] ${(isFullscreen && !isNativePlatform) ? "w-full h-full" : "flex-1 min-h-0 h-full"}`}
     >
       {/* ── Top bar ──────────────────────────────────────────────── */}
       {isFullscreen ? (

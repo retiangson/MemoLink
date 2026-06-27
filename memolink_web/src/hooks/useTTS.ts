@@ -77,7 +77,12 @@ export function useTTS() {
     u.rate = rateRef.current;
     if (voiceRef.current) u.voice = voiceRef.current;
     cursor.current = idx;
-    u.onstart = () => { setPlaying(true); setPaused(false); setCurrentSentenceIdx(idx); setCurrentWord(null); };
+    // Track whether the utterance actually started producing audio.
+    // On Android WebView, onend can fire immediately without onstart if TTS silently
+    // fails (no voice loaded) — without this guard, the sentence queue drains
+    // instantly and onQueueEnd jumps the reader to the last page.
+    let started = false;
+    u.onstart = () => { started = true; setPlaying(true); setPaused(false); setCurrentSentenceIdx(idx); setCurrentWord(null); };
     // Word-level highlight: fires at each word boundary with a char offset
     // into the current sentence. charLength isn't reported by every browser,
     // so fall back to scanning to the next whitespace.
@@ -96,6 +101,13 @@ export function useTTS() {
     };
     u.onend = () => {
       setCurrentWord(null);
+      if (!started) {
+        // onend fired without onstart — TTS silently failed; abort to avoid cascading.
+        if (typeof window !== "undefined") window.speechSynthesis?.cancel();
+        setPlaying(false); setPaused(false); setCurrentSentenceIdx(-1);
+        queueEndRef.current = null;
+        return;
+      }
       if (cursor.current + 1 < sentences.current.length) {
         _speak(cursor.current + 1);
       } else {
@@ -105,7 +117,7 @@ export function useTTS() {
         cb?.();
       }
     };
-    u.onerror = () => { setPlaying(false); setPaused(false); setCurrentWord(null); };
+    u.onerror = () => { setPlaying(false); setPaused(false); setCurrentWord(null); queueEndRef.current = null; };
     window.speechSynthesis?.speak(u);
   }
 
