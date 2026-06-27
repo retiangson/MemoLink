@@ -103,6 +103,7 @@ export function useTTS() {
       setCurrentWord(null);
       if (!started) {
         // onend fired without onstart — TTS silently failed; abort to avoid cascading.
+        if (typeof window !== "undefined") window.speechSynthesis?.cancel();
         setPlaying(false); setPaused(false); setCurrentSentenceIdx(-1);
         queueEndRef.current = null;
         return;

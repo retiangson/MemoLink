@@ -1229,7 +1229,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
         <>
         {/* ── Unified tab bar ───────────────────────────────────────────── */}
         {/* Hidden on Capacitor when a book reader is in fullscreen so content fills the whole screen */}
-        <div id="tour-tab-bar" className={`flex bg-[var(--ml-bg-bar)] border-b border-[var(--ml-bg-panel)] shrink-0 ${isNativePlatform && bookReaderFullscreen ? "hidden" : ""}`} style={{ minHeight: 40 }}>
+        <div id="tour-tab-bar" className={`flex bg-[var(--ml-bg-bar)] border-b border-[var(--ml-bg-panel)] shrink-0 ${isNativePlatform && isBookReaderActive && bookReaderFullscreen ? "hidden" : ""}`} style={{ minHeight: 40 }}>
 
           {/* Sidebar toggle - all screen sizes, left of tabs */}
           {!sidebarOpen && (
