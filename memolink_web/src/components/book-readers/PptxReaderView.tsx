@@ -10,7 +10,8 @@ import { NoteSourceButton } from "./NoteSourceButton";
 import { HighlightColorPicker } from "./HighlightColorPicker";
 import { PageNavArrows } from "./PageNavArrows";
 import { ReaderLoadingState } from "./ReaderLoadingState";
-import { captureSelectionInContainer, captureSettledTouchSelection, applyPersistentMarks, flashOrPulseRange } from "./domTextHighlight";
+import { captureSelectionInContainer, applyPersistentMarks, flashOrPulseRange } from "./domTextHighlight";
+import { useSelectionChangeCapture } from "../../hooks/useSelectionChangeCapture";
 import { ZoomPanWrapper } from "./ZoomPanWrapper";
 
 interface PendingSelection { x: number; y: number; start: number; end: number; }
@@ -95,8 +96,11 @@ export function PptxReaderView({
       setPendingSelection(null);
       return;
     }
-    setPendingSelection(captureSelectionInContainer(container));
+    const selection = captureSelectionInContainer(container);
+    setPendingSelection(selection);
   }
+
+  useSelectionChangeCapture(slideRef, captureCurrentSelection);
 
   async function handleAddHighlight(colorId: string) {
     if (!pendingSelection || !slideRef.current) return;
@@ -110,7 +114,7 @@ export function PptxReaderView({
       color: colorId,
     });
     setHighlights((prev) => [...prev, created]);
-    onHighlightAdded?.();
+    void onHighlightAdded?.(created.note_id);
     window.getSelection()?.removeAllRanges();
     setPendingSelection(null);
   }
@@ -163,8 +167,6 @@ export function PptxReaderView({
           <div
             ref={slideRef}
             onAnimationEnd={() => setSlideAnim(null)}
-            onMouseUp={captureCurrentSelection}
-            onTouchEnd={() => captureSettledTouchSelection(captureCurrentSelection)}
             className={`pptx-slide relative shadow-lg rounded-xl max-w-2xl w-full h-fit p-10 ${slideAnim === "next" ? "ml-page-anim-next" : slideAnim === "prev" ? "ml-page-anim-prev" : ""}`}
             style={{ backgroundColor: colors.background, color: colors.foreground }}
             dangerouslySetInnerHTML={{ __html: slides[currentSlide - 1] || "" }}

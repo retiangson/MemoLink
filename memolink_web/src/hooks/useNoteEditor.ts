@@ -115,6 +115,32 @@ export function useNoteEditor() {
     );
   }
 
+  // Refresh a note changed by another feature (for example, a book highlight) without
+  // discarding unsaved editor work. When the server update only appended content, merge
+  // that suffix into a dirty draft so the new highlight appears immediately.
+  function syncExternallyUpdatedNote(id: number, fresh: NoteEditState) {
+    setOpenNotes((prev) =>
+      prev.map((t) => {
+        if (t.note.id !== id) return t;
+        const titleDirty = t.titleDraft !== (t.note.title ?? "");
+        const contentDirty = t.contentDraft !== (t.note.content ?? "");
+        const oldContent = t.note.content ?? "";
+        const freshContent = fresh.content ?? "";
+        const appendedContent = freshContent.startsWith(oldContent)
+          ? freshContent.slice(oldContent.length)
+          : "";
+        return {
+          ...t,
+          note: fresh,
+          titleDraft: titleDirty ? t.titleDraft : (fresh.title ?? ""),
+          contentDraft: contentDirty
+            ? t.contentDraft + appendedContent
+            : freshContent,
+        };
+      })
+    );
+  }
+
   // Update only the saved title baseline after a title-only rename, leaving any
   // in-progress contentDraft edits untouched.
   function syncNoteTitle(id: number, title: string) {
@@ -189,7 +215,7 @@ export function useNoteEditor() {
     noteContentDraft, setNoteContentDraft,
     isNoteDirty,
     noteTab, setNoteTab,
-    openNote, closeNote, closeNoteById, closeAllNotes, reorderNotes, updateActiveNote, syncNoteById, syncNoteTitle, discardChanges, applyFormat,
+    openNote, closeNote, closeNoteById, closeAllNotes, reorderNotes, updateActiveNote, syncNoteById, syncExternallyUpdatedNote, syncNoteTitle, discardChanges, applyFormat,
     selectedNote: active?.note ?? null,
   };
 }

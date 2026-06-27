@@ -13,7 +13,7 @@ import { ReaderLoadingState } from "./ReaderLoadingState";
 import { parseCaptions, type Cue } from "./captions";
 import { highlightColorMark } from "./highlightColors";
 import { ZoomPanWrapper } from "./ZoomPanWrapper";
-import { captureSettledTouchSelection } from "./domTextHighlight";
+import { useSelectionChangeCapture } from "../../hooks/useSelectionChangeCapture";
 
 interface PendingSelection { x: number; y: number; start: number; end: number; }
 interface PersistedCueHighlight { id: number; start: number; end: number; color: string; }
@@ -240,6 +240,8 @@ export function CaptionReaderView({
     setPendingSelection({ x: rect.left + rect.width / 2, y: rect.top, start, end });
   }
 
+  useSelectionChangeCapture(containerRef, captureCurrentSelection);
+
   async function handleAddHighlight(colorId: string) {
     if (!pendingSelection) return;
     const fullText = pageJoinedText(pages[currentPage - 1] || []);
@@ -253,7 +255,7 @@ export function CaptionReaderView({
       color: colorId,
     });
     setHighlights((prev) => [...prev, created]);
-    onHighlightAdded?.();
+    void onHighlightAdded?.(created.note_id);
     window.getSelection()?.removeAllRanges();
     setPendingSelection(null);
   }
@@ -307,8 +309,6 @@ export function CaptionReaderView({
           <div
             ref={containerRef}
             onAnimationEnd={() => setPageAnim(null)}
-            onMouseUp={captureCurrentSelection}
-            onTouchEnd={() => captureSettledTouchSelection(captureCurrentSelection)}
             className={`relative shadow-lg rounded-xl max-w-2xl w-full h-fit p-8 ${pageAnim === "next" ? "ml-page-anim-next" : pageAnim === "prev" ? "ml-page-anim-prev" : ""}`}
             style={{ backgroundColor: colors.background, color: colors.foreground }}
           >

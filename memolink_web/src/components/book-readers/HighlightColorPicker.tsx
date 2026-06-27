@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { isAxiosError } from "axios";
 import { HIGHLIGHT_COLORS } from "./highlightColors";
 
 interface Props {
@@ -14,38 +15,51 @@ interface Props {
 // it as the default swatch shown next time.
 export function HighlightColorPicker({ value, onChange, disabled = false, onApply }: Props) {
   const [open, setOpen] = useState(false);
-  const [status, setStatus] = useState<"idle" | "saving" | "done">("idle");
+  const [status, setStatus] = useState<"idle" | "saving" | "done" | "error">("idle");
+  const [errorMessage, setErrorMessage] = useState("");
   const current = HIGHLIGHT_COLORS.find((c) => c.id === value) ?? HIGHLIGHT_COLORS[0];
-  const isDisabled = disabled || status !== "idle";
+  const isDisabled = disabled || status === "saving" || status === "done";
 
   async function pick(colorId: string) {
     setOpen(false);
     onChange(colorId);
     if (!onApply) return;
     setStatus("saving");
+    setErrorMessage("");
     try {
       await onApply(colorId);
       setStatus("done");
       setTimeout(() => setStatus("idle"), 1200);
-    } catch {
-      setStatus("idle");
+    } catch (error: unknown) {
+      const apiDetail = isAxiosError(error) && typeof error.response?.data?.detail === "string"
+        ? error.response.data.detail
+        : null;
+      setErrorMessage(apiDetail || (error instanceof Error ? error.message : null) || "Could not save the highlight. Check your connection and retry.");
+      setStatus("error");
     }
   }
 
   return (
     <div className="relative">
       <button
-        onClick={() => !isDisabled && setOpen((v) => !v)}
+        onClick={() => {
+          if (isDisabled) return;
+          if (status === "error") setStatus("idle");
+          setOpen((v) => !v);
+        }}
         disabled={isDisabled}
-        title={disabled ? "Select text to highlight" : `Highlight color: ${current.label}`}
+        title={disabled ? "Select text to highlight" : errorMessage || `Highlight color: ${current.label}`}
+        aria-live="polite"
         className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-lg border transition ${
           isDisabled
             ? "border-[var(--ml-bg-hover)] text-gray-600 opacity-50 cursor-not-allowed"
+            : status === "error"
+              ? "border-red-500/50 text-red-400 hover:bg-red-500/10"
             : "border-[var(--ml-bg-hover)] text-gray-300 hover:bg-[var(--ml-bg-hover)]"
         }`}
       >
         <span className="w-3 h-3 rounded-full ring-1 ring-black/20 shrink-0" style={{ backgroundColor: current.swatch }} />
-        {status === "done" ? "Added ✓" : status === "saving" ? "Saving…" : "Highlight"}
+        {status === "done" ? "Added ✓" : status === "saving" ? "Saving…" : status === "error" ? "Save failed — retry" : "Highlight"}
       </button>
       {open && !isDisabled && (
         <>

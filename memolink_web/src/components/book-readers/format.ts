@@ -35,7 +35,7 @@ export interface ReaderViewProps {
   onSaveAsNoteSource?: () => void;
   jumpToHighlight?: HighlightAnchor | null;
   onJumpToHighlightHandled?: () => void;
-  onHighlightAdded?: () => void;
+  onHighlightAdded?: (noteId: number) => Promise<void> | void;
   isFullscreen?: boolean;
   /** True only when this reader is the currently visible tab. PdfReaderView uses this to
    *  re-render the canvas when becoming visible after a display:none hide cycle, since
