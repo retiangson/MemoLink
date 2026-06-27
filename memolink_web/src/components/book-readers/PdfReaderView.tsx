@@ -275,25 +275,24 @@ export function PdfReaderView({
     const sel = window.getSelection();
     if (!sel || sel.isCollapsed || sel.rangeCount === 0 || !textLayerRef.current?.contains(sel.anchorNode)) {
       setPendingSelection(null);
-      return false;
+      return;
     }
     const startOffset = domNodeToOffset(sel.anchorNode, sel.anchorOffset);
     const endOffset = domNodeToOffset(sel.focusNode, sel.focusOffset);
     if (startOffset == null || endOffset == null) {
       setPendingSelection(null);
-      return false;
+      return;
     }
     const start = Math.min(startOffset, endOffset);
     const end = Math.max(startOffset, endOffset);
     if (end <= start) {
       setPendingSelection(null);
-      return false;
+      return;
     }
     setPendingSelection({ start, end });
-    return true;
   }
 
-  useSelectionChangeCapture(captureCurrentSelection);
+  useSelectionChangeCapture(textLayerRef, captureCurrentSelection);
 
   async function handleAddHighlight(colorId: string) {
     if (!pendingSelection) return;
@@ -420,8 +419,6 @@ export function PdfReaderView({
               ref={textLayerRef}
               className="textLayer absolute inset-0 cursor-text"
               title="Double-click a sentence to start reading from there"
-              onMouseUp={captureCurrentSelection}
-              onTouchEnd={() => captureCurrentSelection()}
               onDoubleClick={(e) => {
                 const target = (e.target as HTMLElement).closest("span, div") as HTMLElement | null;
                 window.getSelection()?.removeAllRanges();

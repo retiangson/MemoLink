@@ -320,14 +320,13 @@ export function MobiReaderView({
     const container = chapterRef.current;
     if (!container) {
       setPendingSelection(null);
-      return false;
+      return;
     }
     const selection = captureSelectionInContainer(container);
     setPendingSelection(selection);
-    return selection !== null;
   }
 
-  useSelectionChangeCapture(captureCurrentSelection);
+  useSelectionChangeCapture(chapterRef, captureCurrentSelection);
 
   async function handleAddHighlight(colorId: string) {
     if (!pendingSelection || !chapterRef.current) return;
@@ -452,8 +451,6 @@ export function MobiReaderView({
           <div
             ref={chapterRef}
             onAnimationEnd={() => setPageAnim(null)}
-            onMouseUp={captureCurrentSelection}
-            onTouchEnd={() => captureCurrentSelection()}
             onDoubleClick={handleDoubleClick}
             title="Double-click or double-tap a sentence to start reading from there"
             className={`relative shadow-lg rounded-xl max-w-2xl w-full h-fit p-10 leading-relaxed ${pageAnim === "next" ? "ml-page-anim-next" : pageAnim === "prev" ? "ml-page-anim-prev" : ""}`}

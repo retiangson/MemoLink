@@ -94,14 +94,13 @@ export function PptxReaderView({
     const container = slideRef.current;
     if (!container) {
       setPendingSelection(null);
-      return false;
+      return;
     }
     const selection = captureSelectionInContainer(container);
     setPendingSelection(selection);
-    return selection !== null;
   }
 
-  useSelectionChangeCapture(captureCurrentSelection);
+  useSelectionChangeCapture(slideRef, captureCurrentSelection);
 
   async function handleAddHighlight(colorId: string) {
     if (!pendingSelection || !slideRef.current) return;
@@ -168,8 +167,6 @@ export function PptxReaderView({
           <div
             ref={slideRef}
             onAnimationEnd={() => setSlideAnim(null)}
-            onMouseUp={captureCurrentSelection}
-            onTouchEnd={() => captureCurrentSelection()}
             className={`pptx-slide relative shadow-lg rounded-xl max-w-2xl w-full h-fit p-10 ${slideAnim === "next" ? "ml-page-anim-next" : slideAnim === "prev" ? "ml-page-anim-prev" : ""}`}
             style={{ backgroundColor: colors.background, color: colors.foreground }}
             dangerouslySetInnerHTML={{ __html: slides[currentSlide - 1] || "" }}

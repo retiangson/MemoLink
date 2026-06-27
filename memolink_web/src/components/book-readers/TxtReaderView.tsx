@@ -147,14 +147,13 @@ export function TxtReaderView({
     const container = pageRef.current;
     if (!container) {
       setPendingSelection(null);
-      return false;
+      return;
     }
     const selection = captureSelectionInContainer(container);
     setPendingSelection(selection);
-    return selection !== null;
   }
 
-  useSelectionChangeCapture(captureCurrentSelection);
+  useSelectionChangeCapture(pageRef, captureCurrentSelection);
 
   async function handleAddHighlight(colorId: string) {
     if (!pendingSelection || !pageRef.current) return;
@@ -245,8 +244,6 @@ export function TxtReaderView({
           <div
             ref={pageRef}
             onAnimationEnd={() => setPageAnim(null)}
-            onMouseUp={captureCurrentSelection}
-            onTouchEnd={() => captureCurrentSelection()}
             onDoubleClick={handleDoubleClick}
             title="Double-click a sentence to start reading from there"
             className={`relative shadow-lg rounded-xl max-w-2xl w-full h-fit p-10 whitespace-pre-wrap leading-relaxed cursor-text ${pageAnim === "next" ? "ml-page-anim-next" : pageAnim === "prev" ? "ml-page-anim-prev" : ""}`}

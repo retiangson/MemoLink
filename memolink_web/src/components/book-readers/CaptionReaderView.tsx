@@ -227,21 +227,20 @@ export function CaptionReaderView({
     const sel = window.getSelection();
     if (!container || !sel || sel.isCollapsed || sel.rangeCount === 0 || !container.contains(sel.anchorNode)) {
       setPendingSelection(null);
-      return false;
+      return;
     }
     const range = sel.getRangeAt(0);
     const start = offsetInCueText(container, range.startContainer, range.startOffset);
     const end = offsetInCueText(container, range.endContainer, range.endOffset);
     if (start == null || end == null || end <= start) {
       setPendingSelection(null);
-      return false;
+      return;
     }
     const rect = range.getBoundingClientRect();
     setPendingSelection({ x: rect.left + rect.width / 2, y: rect.top, start, end });
-    return true;
   }
 
-  useSelectionChangeCapture(captureCurrentSelection);
+  useSelectionChangeCapture(containerRef, captureCurrentSelection);
 
   async function handleAddHighlight(colorId: string) {
     if (!pendingSelection) return;
@@ -310,8 +309,6 @@ export function CaptionReaderView({
           <div
             ref={containerRef}
             onAnimationEnd={() => setPageAnim(null)}
-            onMouseUp={captureCurrentSelection}
-            onTouchEnd={() => captureCurrentSelection()}
             className={`relative shadow-lg rounded-xl max-w-2xl w-full h-fit p-8 ${pageAnim === "next" ? "ml-page-anim-next" : pageAnim === "prev" ? "ml-page-anim-prev" : ""}`}
             style={{ backgroundColor: colors.background, color: colors.foreground }}
           >
