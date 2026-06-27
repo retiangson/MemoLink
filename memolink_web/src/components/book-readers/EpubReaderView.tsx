@@ -128,6 +128,8 @@ function browserConnectionDetail(): Record<string, unknown> | null {
 
 interface TextNodeEntry {
   node: Text;
+  nodeStart: number;
+  nodeEnd: number;
   start: number;
   end: number;
   doc: Document;
@@ -147,7 +149,7 @@ function buildCombinedTextMap(list: Contents[]): { text: string; nodes: TextNode
       const tn = n as Text;
       const value = tn.nodeValue || "";
       if (!value) continue;
-      nodes.push({ node: tn, start: text.length, end: text.length + value.length, doc, win: c.window });
+      nodes.push({ node: tn, nodeStart: 0, nodeEnd: value.length, start: text.length, end: text.length + value.length, doc, win: c.window });
       text += value;
     }
     if (ci < list.length - 1) text += " ";
@@ -178,12 +180,64 @@ function buildVisibleTextMap(list: Contents[]): { text: string; nodes: TextNodeE
       ));
       if (!visible) continue;
       if (text && !/\s$/.test(text) && !/^\s/.test(value)) text += " ";
-      nodes.push({ node: tn, start: text.length, end: text.length + value.length, doc, win });
+      nodes.push({ node: tn, nodeStart: 0, nodeEnd: value.length, start: text.length, end: text.length + value.length, doc, win });
       text += value;
     }
     if (ci < list.length - 1 && text) text += " ";
   });
   return text.trim() ? { text, nodes } : buildCombinedTextMap(list);
+}
+
+function buildCurrentLocationTextMap(rendition: Rendition, list: Contents[]): { text: string; nodes: TextNodeEntry[] } {
+  const location: any = (rendition as any).currentLocation?.();
+  const startRange: Range | undefined = location?.start?.cfi ? rendition.getRange(location.start.cfi) : undefined;
+  const endRange: Range | undefined = location?.end?.cfi ? rendition.getRange(location.end.cfi) : undefined;
+  const doc = startRange?.startContainer?.ownerDocument;
+  if (!startRange || !endRange || !doc || endRange.startContainer.ownerDocument !== doc) {
+    return buildVisibleTextMap(list);
+  }
+  const root = doc.body || doc.documentElement;
+  const offsetTo = (container: Node, offset: number) => {
+    const range = doc.createRange();
+    range.selectNodeContents(root);
+    range.setEnd(container, offset);
+    return range.toString().length;
+  };
+  const startOffset = offsetTo(startRange.startContainer, startRange.startOffset);
+  const endOffset = offsetTo(endRange.startContainer, endRange.startOffset);
+  if (endOffset <= startOffset) return buildVisibleTextMap(list);
+  const content = list.find((item: any) => item?.document === doc) as any;
+  let absoluteOffset = 0;
+  let text = "";
+  const nodes: TextNodeEntry[] = [];
+  const walker = doc.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  let node: Node | null;
+  while ((node = walker.nextNode())) {
+    const textNode = node as Text;
+    const value = textNode.nodeValue || "";
+    const absoluteEnd = absoluteOffset + value.length;
+    if (absoluteEnd > startOffset && absoluteOffset < endOffset) {
+      const nodeStart = Math.max(0, startOffset - absoluteOffset);
+      const nodeEnd = Math.min(value.length, endOffset - absoluteOffset);
+      const slice = value.slice(nodeStart, nodeEnd);
+      if (slice) {
+        if (text && !/\s$/.test(text) && !/^\s/.test(slice)) text += " ";
+        nodes.push({
+          node: textNode,
+          nodeStart,
+          nodeEnd,
+          start: text.length,
+          end: text.length + slice.length,
+          doc,
+          win: content?.window ?? doc.defaultView,
+        });
+        text += slice;
+      }
+    }
+    absoluteOffset = absoluteEnd;
+    if (absoluteOffset >= endOffset) break;
+  }
+  return text.trim() ? { text, nodes } : buildVisibleTextMap(list);
 }
 
 function ensureHighlightStyle(doc: Document) {
@@ -539,8 +593,8 @@ export function EpubReaderView({
     for (const n of textNodesRef.current) {
       if (n.end <= range.start || n.start >= range.end) continue;
       if (!n.win?.CSS?.highlights || !n.win?.Highlight) continue;
-      const s = Math.max(0, range.start - n.start);
-      const e = Math.min(n.node.length, range.end - n.start);
+      const s = n.nodeStart + Math.max(0, range.start - n.start);
+      const e = n.nodeStart + Math.min(n.nodeEnd - n.nodeStart, range.end - n.start);
       if (e <= s) continue;
       const r = n.doc.createRange();
       r.setStart(n.node, s);
@@ -577,8 +631,8 @@ export function EpubReaderView({
     for (const n of textNodesRef.current) {
       if (n.end <= range.start || n.start >= range.end) continue;
       if (!n.win?.CSS?.highlights || !n.win?.Highlight) continue;
-      const s = Math.max(0, range.start - n.start);
-      const e = Math.min(n.node.length, range.end - n.start);
+      const s = n.nodeStart + Math.max(0, range.start - n.start);
+      const e = n.nodeStart + Math.min(n.nodeEnd - n.nodeStart, range.end - n.start);
       if (e <= s) continue;
       const r = n.doc.createRange();
       r.setStart(n.node, s);
@@ -625,8 +679,8 @@ export function EpubReaderView({
       for (const n of textNodesRef.current) {
         if (n.end <= h.start_offset || n.start >= h.end_offset) continue;
         if (!n.win?.CSS?.highlights || !n.win?.Highlight) continue;
-        const s = Math.max(0, h.start_offset - n.start);
-        const e = Math.min(n.node.length, h.end_offset - n.start);
+        const s = n.nodeStart + Math.max(0, h.start_offset - n.start);
+        const e = n.nodeStart + Math.min(n.nodeEnd - n.nodeStart, h.end_offset - n.start);
         if (e <= s) continue;
         const r = n.doc.createRange();
         r.setStart(n.node, s);
@@ -693,7 +747,7 @@ export function EpubReaderView({
     // epub.js keeps an entire spine item in the iframe and reveals one CSS column.
     // Reading the whole iframe makes speech run ahead while the visual page remains
     // unchanged, so TTS and page-relative highlights use only visible text nodes.
-    const { text, nodes } = buildVisibleTextMap(list);
+    const { text, nodes } = buildCurrentLocationTextMap(rendition, list);
     pageTextRef.current = text;
     textNodesRef.current = nodes;
     attachClickListeners(list);
@@ -719,7 +773,7 @@ export function EpubReaderView({
         if (!range) return;
         const entry = textNodesRef.current.find((n) => n.node === range!.startContainer);
         if (!entry) return;
-        handleSentenceClick(entry.start + range!.startOffset);
+        handleSentenceClick(entry.start + range!.startOffset - entry.nodeStart);
       };
       doc.addEventListener("dblclick", fn);
       clickListenersRef.current.push({ doc, fn });
@@ -745,8 +799,8 @@ export function EpubReaderView({
           setPendingSelection(null);
           return;
         }
-        const start = startEntry.start + range.startOffset;
-        const end = endEntry.start + range.endOffset;
+        const start = startEntry.start + range.startOffset - startEntry.nodeStart;
+        const end = endEntry.start + range.endOffset - endEntry.nodeStart;
         if (end <= start) {
           setPendingSelection(null);
           return;
@@ -817,7 +871,7 @@ export function EpubReaderView({
     const curPage = currentPageRef.current;
     if (!epubBook || !rendition || p < 1 || p === curPage) return;
     if (p < curPage && !canMovePrevRef.current) return;
-    if (p > curPage && p === curPage + 1 && !canMoveNextRef.current) return;
+    if (!continueReading && p > curPage && p === curPage + 1 && !canMoveNextRef.current) return;
     if (p > curPage + 1 && p > numPagesNow) return;
     if (navigatingRef.current) return;
     navigatingRef.current = true;
@@ -827,17 +881,25 @@ export function EpubReaderView({
       setPendingSelection(null);
       setPageAnim(p > curPage ? "next" : "prev");
       if (p === curPage + 1) {
+        const beforeCfi = ((rendition as any).currentLocation?.() as any)?.start?.cfi;
         await rendition.next();
+        const afterLocation: any = (rendition as any).currentLocation?.();
+        if (continueReading && beforeCfi && afterLocation?.start?.cfi === beforeCfi) return;
       } else if (p === curPage - 1) {
         await rendition.prev();
       } else {
         await rendition.display(epubBook.locations.cfiFromLocation(p - 1));
       }
-      setCurrentPageValue(p);
-      canMovePrevRef.current = p > 1;
-      setCanMovePrev(p > 1);
+      const location: any = (rendition as any).currentLocation?.();
+      const resolvedPage = Number.isFinite(location?.start?.location) ? location.start.location + 1 : p;
+      setCurrentPageValue(resolvedPage);
+      setMoveBounds(location);
       refreshTextMap();
-      if (continueReading) speakPage(0);
+      if (continueReading) {
+        await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+        refreshTextMap();
+        speakPage(0);
+      }
     } finally {
       navigatingRef.current = false;
     }
@@ -863,7 +925,8 @@ export function EpubReaderView({
 
   function handleAutoAdvanceRead(outcome: TTSQueueOutcome) {
     if (outcome !== "completed") return;
-    if (!canMoveNextRef.current) return;
+    const location: any = (renditionRef.current as any)?.currentLocation?.();
+    if (location?.atEnd) return;
     void navigateTo(currentPageRef.current + 1, true);
   }
 

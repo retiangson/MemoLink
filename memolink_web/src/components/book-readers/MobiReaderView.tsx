@@ -2,11 +2,11 @@ import React, { useEffect, useRef, useState } from "react";
 import { initMobiFile } from "@lingo-reader/mobi-parser";
 import type { Mobi } from "@lingo-reader/mobi-parser";
 import {
-  fetchBookBlob, updateBookProgress, addBookHighlight, listBookHighlights, reportBookReaderError,
-  BookDownloadError, type BookHighlight,
+  fetchBookBlob, updateBookProgress, addBookmark, listBookmarks, addBookHighlight, listBookHighlights, reportBookReaderError,
+  BookDownloadError, type Bookmark, type BookHighlight,
 } from "../../api/booksApi";
 import type { ReaderViewProps } from "./format";
-import { readerSurfaceClass, readerThemeColors, readerFontSizePx, findSentenceIndexForOffset } from "./format";
+import { currentHighlightRange, readerSurfaceClass, readerThemeColors, readerFontSizePx, findSentenceIndexForOffset } from "./format";
 import { useTTS, splitSentences, type TTSQueueOutcome } from "../../hooks/useTTS";
 import { usePageSwipe } from "../../hooks/usePageSwipe";
 import { useHighlightColor } from "../../hooks/useHighlightColor";
@@ -14,7 +14,7 @@ import { TTSPlayerBar } from "../TTSPlayerBar";
 import { HighlightColorPicker } from "./HighlightColorPicker";
 import { PageNavArrows } from "./PageNavArrows";
 import { ReaderLoadingState } from "./ReaderLoadingState";
-import { captureSelectionInContainer, applyPersistentMarks, flashOrPulseRange, offsetOfNodeInContainer } from "./domTextHighlight";
+import { applySpeechHighlight, captureSelectionInContainer, applyPersistentMarks, flashOrPulseRange, offsetOfNodeInContainer } from "./domTextHighlight";
 import { ZoomPanWrapper } from "./ZoomPanWrapper";
 
 interface PendingSelection { x: number; y: number; start: number; end: number; }
@@ -127,6 +127,8 @@ export function MobiReaderView({
   const [pageAnim, setPageAnim] = useState<"next" | "prev" | null>(null);
   const [pendingSelection, setPendingSelection] = useState<PendingSelection | null>(null);
   const [chapterHtml, setChapterHtml] = useState("");
+  const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
+  const [showBookmarks, setShowBookmarks] = useState(false);
   const [highlights, setHighlights] = useState<BookHighlight[]>([]);
   const [progress, setProgress] = useState<{ loaded: number; total: number | null } | null>(null);
 
@@ -195,6 +197,10 @@ export function MobiReaderView({
     listBookHighlights(book.id).then(setHighlights).catch(() => {});
   }, [book.id]);
 
+  useEffect(() => {
+    listBookmarks(book.id).then(setBookmarks).catch(() => {});
+  }, [book.id]);
+
   // Re-paint persisted highlights every time the chapter content actually changes —
   // dangerouslySetInnerHTML replaces the DOM wholesale, wiping any previous marks.
   useEffect(() => {
@@ -217,10 +223,30 @@ export function MobiReaderView({
   }, []);
 
   useEffect(() => {
-    if (!autoContinueRef.current || !chapterHtml) return;
-    autoContinueRef.current = false;
-    speakChapter(0);
+    const expectedHtml = pagesRef.current[currentPage - 1] ?? "";
+    if (!autoContinueRef.current || !chapterHtml || chapterHtml !== expectedHtml) return;
+    const frame = requestAnimationFrame(() => {
+      autoContinueRef.current = false;
+      speakChapter(0);
+    });
+    return () => cancelAnimationFrame(frame);
   }, [currentPage, chapterHtml]);
+
+  useEffect(() => {
+    const container = chapterRef.current;
+    if (!container || !tts.playing) {
+      if (container) applySpeechHighlight(container, null);
+      return;
+    }
+    const range = currentHighlightRange(
+      container.textContent || "",
+      tts.sentencesList,
+      tts.currentSentenceIdx,
+      tts.currentWord,
+    );
+    applySpeechHighlight(container, range);
+    return () => applySpeechHighlight(container, null);
+  }, [chapterHtml, tts.playing, tts.currentSentenceIdx, tts.currentWord, tts.sentencesList]);
 
   function goToPage(p: number) {
     if (p < 1 || p > pageCount || p === currentPage) return;
@@ -282,6 +308,15 @@ export function MobiReaderView({
     setCurrentPage((page) => Math.min(page + 1, pageCount));
   }
 
+  async function handleBookmark() {
+    try {
+      const bookmark = await addBookmark(book.id, currentPage);
+      setBookmarks((previous) => [bookmark, ...previous.filter((item) => item.page_number !== currentPage)]);
+    } catch {
+      // Bookmark failures are non-fatal; the reader remains usable.
+    }
+  }
+
   function speakChapter(startIdx: number) {
     const text = chapterRef.current?.textContent || "";
     if (text.trim()) tts.speak(text, startIdx, handleAutoAdvanceRead);
@@ -295,11 +330,33 @@ export function MobiReaderView({
     speakChapter(0);
   }
 
-  function handleDoubleClick() {
+  function handleDoubleClick(event: React.MouseEvent<HTMLDivElement>) {
     const container = chapterRef.current;
-    const sel = window.getSelection();
-    if (!container || !sel || sel.rangeCount === 0) return;
-    const offset = offsetOfNodeInContainer(container, sel.anchorNode as Node, sel.anchorOffset);
+    if (!container) return;
+    const doc = container.ownerDocument as Document & {
+      caretRangeFromPoint?: (x: number, y: number) => Range | null;
+      caretPositionFromPoint?: (x: number, y: number) => { offsetNode: Node; offset: number } | null;
+    };
+    let node: Node | null = null;
+    let nodeOffset = 0;
+    const pointRange = doc.caretRangeFromPoint?.(event.clientX, event.clientY);
+    if (pointRange) {
+      node = pointRange.startContainer;
+      nodeOffset = pointRange.startOffset;
+    } else {
+      const pointPosition = doc.caretPositionFromPoint?.(event.clientX, event.clientY);
+      if (pointPosition) {
+        node = pointPosition.offsetNode;
+        nodeOffset = pointPosition.offset;
+      }
+    }
+    if (!node || !container.contains(node)) {
+      const selection = window.getSelection();
+      if (!selection || selection.rangeCount === 0 || !container.contains(selection.anchorNode)) return;
+      node = selection.anchorNode;
+      nodeOffset = selection.anchorOffset;
+    }
+    const offset = offsetOfNodeInContainer(container, node, nodeOffset);
     window.getSelection()?.removeAllRanges();
     setPendingSelection(null);
     if (offset == null) return;
@@ -311,6 +368,7 @@ export function MobiReaderView({
   }
 
   const colors = readerThemeColors(colorMode);
+  const isBookmarked = bookmarks.some((bookmark) => bookmark.page_number === currentPage);
 
   return (
     <>
@@ -335,6 +393,7 @@ export function MobiReaderView({
             onAnimationEnd={() => setPageAnim(null)}
             onMouseUp={handleMouseUp}
             onDoubleClick={handleDoubleClick}
+            title="Double-click or double-tap a sentence to start reading from there"
             className={`relative shadow-lg rounded-xl max-w-2xl w-full h-fit p-10 leading-relaxed ${pageAnim === "next" ? "ml-page-anim-next" : pageAnim === "prev" ? "ml-page-anim-prev" : ""}`}
             style={{ backgroundColor: colors.background, color: colors.foreground, fontSize: `${readerFontSizePx(fontSize, 15)}px` }}
             dangerouslySetInnerHTML={{ __html: chapterHtml }}
@@ -363,6 +422,37 @@ export function MobiReaderView({
       {!loading && !error && (
         <div className="flex items-center justify-between px-5 py-3 border-t border-[var(--ml-bg-hover)] shrink-0 gap-3">
           <div className="flex items-center gap-2">
+            <button
+              onClick={handleBookmark}
+              className={`px-2.5 py-1.5 text-xs rounded-lg border transition ${isBookmarked ? "border-indigo-500/40 text-indigo-400 bg-indigo-500/10" : "border-[var(--ml-bg-hover)] text-gray-400 hover:bg-[var(--ml-bg-hover)]"}`}
+            >
+              {isBookmarked ? "★ Bookmarked" : "☆ Bookmark"}
+            </button>
+            <div className="relative">
+              <button
+                onClick={() => setShowBookmarks((visible) => !visible)}
+                className="px-2.5 py-1.5 text-xs rounded-lg text-gray-400 border border-[var(--ml-bg-hover)] hover:bg-[var(--ml-bg-hover)] transition"
+              >
+                Bookmarks ({bookmarks.length})
+              </button>
+              {showBookmarks && (
+                <div className="absolute bottom-full left-0 mb-2 w-48 max-h-56 overflow-auto bg-[var(--ml-bg-surface)] border border-[var(--ml-bg-hover)] rounded-lg shadow-xl p-1.5 flex flex-col gap-0.5">
+                  {bookmarks.length === 0 ? (
+                    <p className="text-xs text-gray-600 px-2 py-1.5">No bookmarks yet.</p>
+                  ) : (
+                    bookmarks.map((bookmark) => (
+                      <button
+                        key={bookmark.id}
+                        onClick={() => { goToPage(bookmark.page_number); setShowBookmarks(false); }}
+                        className="text-left text-xs text-gray-300 hover:bg-[#1a1a24] rounded-md px-2 py-1.5 transition"
+                      >
+                        Page {bookmark.page_number}
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
             <button
               onClick={handleReadAloud}
               className="px-2.5 py-1.5 text-xs rounded-lg text-gray-400 border border-[var(--ml-bg-hover)] hover:bg-[var(--ml-bg-hover)] transition"

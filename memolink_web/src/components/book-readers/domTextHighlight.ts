@@ -17,6 +17,7 @@ export interface PersistedHighlight {
 
 const PERSIST_CLASS = "ml-persist-hl";
 const PULSE_CLASS = "ml-hl-pulse";
+const SPEECH_HIGHLIGHT_NAME = "ml-current-speech";
 
 // Walks all text nodes inside container to convert a (node, offsetInNode) selection
 // boundary into an absolute char offset into container.textContent — used by readers
@@ -159,4 +160,30 @@ export function pulsePersistentMark(container: HTMLElement, start: number, end: 
 export function flashOrPulseRange(container: HTMLElement, anchor: Pick<HighlightAnchor, "start" | "end">): void {
   if (pulsePersistentMark(container, anchor.start, anchor.end)) return;
   flashTextRange(container, anchor);
+}
+
+export function applySpeechHighlight(
+  container: HTMLElement,
+  range: { start: number; end: number } | null,
+): void {
+  const css = (window.CSS as any)?.highlights;
+  if (!css) return;
+  css.delete(SPEECH_HIGHLIGHT_NAME);
+  if (!range || range.end <= range.start) return;
+  const ranges = findSegments(container, range.start, range.end).map((segment) => {
+    const domRange = document.createRange();
+    domRange.setStart(segment.node, segment.start);
+    domRange.setEnd(segment.node, segment.end);
+    return domRange;
+  });
+  const HighlightCtor = (window as any).Highlight;
+  if (!HighlightCtor || ranges.length === 0) return;
+  css.set(SPEECH_HIGHLIGHT_NAME, new HighlightCtor(...ranges));
+  let style = document.getElementById("ml-current-speech-style") as HTMLStyleElement | null;
+  if (!style) {
+    style = document.createElement("style");
+    style.id = "ml-current-speech-style";
+    style.textContent = `::highlight(${SPEECH_HIGHLIGHT_NAME}) { background-color: rgba(99,102,241,0.45); }`;
+    document.head.appendChild(style);
+  }
 }
