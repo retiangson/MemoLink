@@ -89,7 +89,7 @@ export function PptxReaderView({
 
   const swipeHandlers = usePageSwipe(() => goToSlide(currentSlide - 1), () => goToSlide(currentSlide + 1));
 
-  function handleSlideMouseUp() {
+  function captureCurrentSelection() {
     const container = slideRef.current;
     if (!container) {
       setPendingSelection(null);
@@ -163,8 +163,8 @@ export function PptxReaderView({
           <div
             ref={slideRef}
             onAnimationEnd={() => setSlideAnim(null)}
-            onMouseUp={handleSlideMouseUp}
-            onTouchEnd={() => captureSettledTouchSelection(handleSlideMouseUp)}
+            onMouseUp={captureCurrentSelection}
+            onTouchEnd={() => captureSettledTouchSelection(captureCurrentSelection)}
             className={`pptx-slide relative shadow-lg rounded-xl max-w-2xl w-full h-fit p-10 ${slideAnim === "next" ? "ml-page-anim-next" : slideAnim === "prev" ? "ml-page-anim-prev" : ""}`}
             style={{ backgroundColor: colors.background, color: colors.foreground }}
             dangerouslySetInnerHTML={{ __html: slides[currentSlide - 1] || "" }}

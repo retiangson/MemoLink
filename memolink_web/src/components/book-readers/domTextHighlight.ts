@@ -20,9 +20,12 @@ const PULSE_CLASS = "ml-hl-pulse";
 const SPEECH_HIGHLIGHT_NAME = "ml-current-speech";
 const TOUCH_SELECTION_SETTLE_DELAY_MS = 100;
 
+export type SelectionCapture = () => void;
+
 // Android browsers update the Selection after touchend when the native selection handles
-// finish settling. Reading it synchronously (or relying on mouseup) misses the selection.
-export function captureSettledTouchSelection(capture: () => void): void {
+// finish settling. The callback intentionally receives no event: it must read the final
+// Selection from its owning document rather than a stale mouse/touch event.
+export function captureSettledTouchSelection(capture: SelectionCapture): void {
   setTimeout(capture, TOUCH_SELECTION_SETTLE_DELAY_MS);
 }
 

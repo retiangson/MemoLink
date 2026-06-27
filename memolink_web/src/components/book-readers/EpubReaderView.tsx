@@ -823,15 +823,17 @@ export function EpubReaderView({
       const doc: Document | undefined = c?.document;
       const win: any = c?.window;
       if (!doc || !win) return;
-      const selection = () => {
+      const captureSelection = (clearInvalid: boolean) => {
         const sel = doc.getSelection?.() ?? win.getSelection?.();
         if (!sel || sel.isCollapsed || sel.rangeCount === 0) {
+          if (clearInvalid && doc.hasFocus()) setPendingSelection(null);
           return;
         }
         const range = sel.getRangeAt(0);
         const startEntry = textNodesRef.current.find((n) => n.node === range.startContainer);
         const endEntry = textNodesRef.current.find((n) => n.node === range.endContainer);
         if (!startEntry || !endEntry) {
+          if (clearInvalid && doc.hasFocus()) setPendingSelection(null);
           return;
         }
         const firstOffset = startEntry.start + range.startOffset - startEntry.nodeStart;
@@ -839,11 +841,16 @@ export function EpubReaderView({
         const start = Math.min(firstOffset, secondOffset);
         const end = Math.max(firstOffset, secondOffset);
         if (end <= start) {
+          if (clearInvalid && doc.hasFocus()) setPendingSelection(null);
           return;
         }
         setPendingSelection({ start, end });
       };
-      const touchEnd = () => captureSettledTouchSelection(selection);
+      const selection = () => {
+        captureSelection(false);
+        captureSettledTouchSelection(() => captureSelection(true));
+      };
+      const touchEnd = () => captureSettledTouchSelection(() => captureSelection(true));
       doc.addEventListener("selectionchange", selection);
       doc.addEventListener("touchend", touchEnd);
       selectionListenersRef.current.push({ doc, selection, touchEnd });

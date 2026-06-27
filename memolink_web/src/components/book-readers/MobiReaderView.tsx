@@ -315,7 +315,7 @@ export function MobiReaderView({
 
   const swipeHandlers = usePageSwipe(() => goToPage(currentPage - 1), () => goToPage(currentPage + 1));
 
-  function handleMouseUp() {
+  function captureCurrentSelection() {
     const container = chapterRef.current;
     if (!container) {
       setPendingSelection(null);
@@ -447,8 +447,8 @@ export function MobiReaderView({
           <div
             ref={chapterRef}
             onAnimationEnd={() => setPageAnim(null)}
-            onMouseUp={handleMouseUp}
-            onTouchEnd={() => captureSettledTouchSelection(handleMouseUp)}
+            onMouseUp={captureCurrentSelection}
+            onTouchEnd={() => captureSettledTouchSelection(captureCurrentSelection)}
             onDoubleClick={handleDoubleClick}
             title="Double-click or double-tap a sentence to start reading from there"
             className={`relative shadow-lg rounded-xl max-w-2xl w-full h-fit p-10 leading-relaxed ${pageAnim === "next" ? "ml-page-anim-next" : pageAnim === "prev" ? "ml-page-anim-prev" : ""}`}
