@@ -7,6 +7,8 @@ const MIN_TTS_RATE = 0.1;
 const MAX_TTS_RATE = 10;
 const TTS_SILENT_FAILURE_THRESHOLD_MS = 200;
 
+export type TTSQueueOutcome = "completed" | "unavailable" | "failed";
+
 function normalizeRate(value: string | number | null): number {
   const parsed = typeof value === "number" ? value : Number.parseFloat(value ?? "");
   if (!Number.isFinite(parsed)) return DEFAULT_TTS_RATE;
@@ -33,7 +35,7 @@ export function useTTS() {
   const rateRef = useRef<number>(normalizeRate(localStorage.getItem(LS_RATE)));
   const voiceRef = useRef<SpeechSynthesisVoice | null>(null);
   // Fired once when the whole sentence queue finishes playing (not on manual stop/pause).
-  const queueEndRef = useRef<(() => void) | null>(null);
+  const queueEndRef = useRef<((outcome: TTSQueueOutcome) => void) | null>(null);
   // Invalidates callbacks from utterances cancelled by stop, seek, rate changes,
   // or a newer speak request. Some engines dispatch onend after cancel().
   const playbackGenerationRef = useRef(0);
@@ -83,12 +85,16 @@ export function useTTS() {
     if (generation !== playbackGenerationRef.current) return;
     if (!window.speechSynthesis) {
       setPlaying(false); setPaused(false);
+      const cb = queueEndRef.current;
       queueEndRef.current = null;
+      cb?.("unavailable");
       return;
     }
     if (idx < 0 || idx >= sentences.current.length) {
       setPlaying(false); setPaused(false); setCurrentSentenceIdx(-1);
+      const cb = queueEndRef.current;
       queueEndRef.current = null;
+      cb?.("failed");
       return;
     }
     window.speechSynthesis.cancel();
@@ -133,7 +139,9 @@ export function useTTS() {
         // Abort rather than draining the sentence queue instantly.
         if (typeof window !== "undefined") window.speechSynthesis?.cancel();
         setPlaying(false); setPaused(false); setCurrentSentenceIdx(-1);
+        const cb = queueEndRef.current;
         queueEndRef.current = null;
+        cb?.("failed");
         return;
       }
       if (cursor.current + 1 < sentences.current.length) {
@@ -142,28 +150,33 @@ export function useTTS() {
         setPlaying(false); setPaused(false); setCurrentSentenceIdx(-1);
         const cb = queueEndRef.current;
         queueEndRef.current = null;
-        cb?.();
+        cb?.("completed");
       }
     };
     u.onerror = () => {
       if (generation !== playbackGenerationRef.current) return;
-      setPlaying(false); setPaused(false); setCurrentSentenceIdx(-1); setCurrentWord(null); queueEndRef.current = null;
+      setPlaying(false); setPaused(false); setCurrentSentenceIdx(-1); setCurrentWord(null);
+      const cb = queueEndRef.current;
+      queueEndRef.current = null;
+      cb?.("failed");
     };
     window.speechSynthesis?.speak(u);
   }, []);
 
   /** startIndex lets callers (e.g. "click a sentence to read from here") skip ahead.
-   *  onQueueEnd fires once after the last sentence finishes naturally - used to
-   *  auto-advance to the next page and keep reading. */
-  const speak = useCallback((text: string, startIndex = 0, onQueueEnd?: () => void) => {
+   *  onQueueEnd settles once with an explicit outcome. Auto-advance callers must
+   *  advance only on "completed", never when speech is unavailable or fails. */
+  const speak = useCallback((text: string, startIndex = 0, onQueueEnd?: (outcome: TTSQueueOutcome) => void) => {
     const generation = ++playbackGenerationRef.current;
     window.speechSynthesis?.cancel();
     const sents = splitSentences(text);
     sentences.current = sents;
     setSentencesList(sents);
     if (sents.length === 0) {
+      const cb = onQueueEnd;
       queueEndRef.current = null;
       setPlaying(false); setPaused(false); setCurrentSentenceIdx(-1); setCurrentWord(null);
+      cb?.("completed");
       return;
     }
     const start = sents.length === 0 ? 0 : Math.min(Math.max(0, startIndex), sents.length - 1);

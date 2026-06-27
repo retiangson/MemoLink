@@ -8,7 +8,7 @@ import {
 } from "../../api/booksApi";
 import type { ReaderViewProps, HighlightAnchor } from "./format";
 import { currentHighlightRange, findSentenceIndexForOffset, pdfCanvasFilter, readerFontScale, readerSurfaceClass } from "./format";
-import { useTTS, splitSentences } from "../../hooks/useTTS";
+import { useTTS, splitSentences, type TTSQueueOutcome } from "../../hooks/useTTS";
 import { usePageSwipe } from "../../hooks/usePageSwipe";
 import { useHighlightColor } from "../../hooks/useHighlightColor";
 import { TTSPlayerBar } from "../TTSPlayerBar";
@@ -326,7 +326,8 @@ export function PdfReaderView({
     }
   }
 
-  function handleAutoAdvanceRead() {
+  function handleAutoAdvanceRead(outcome: TTSQueueOutcome) {
+    if (outcome !== "completed") return;
     if (currentPage >= numPages) return;
     autoContinueRef.current = true;
     setPageAnim("next");

@@ -5,7 +5,7 @@ import {
 } from "../../api/booksApi";
 import type { ReaderViewProps } from "./format";
 import { readerSurfaceClass, readerThemeColors, readerFontSizePx, findSentenceIndexForOffset } from "./format";
-import { useTTS, splitSentences } from "../../hooks/useTTS";
+import { useTTS, splitSentences, type TTSQueueOutcome } from "../../hooks/useTTS";
 import { usePageSwipe } from "../../hooks/usePageSwipe";
 import { useHighlightColor } from "../../hooks/useHighlightColor";
 import { TTSPlayerBar } from "../TTSPlayerBar";
@@ -119,7 +119,8 @@ export function TxtReaderView({
     setCurrentPage(p);
   }
 
-  const handleAutoAdvanceRead = useCallback(() => {
+  const handleAutoAdvanceRead = useCallback((outcome: TTSQueueOutcome) => {
+    if (outcome !== "completed") return;
     if (currentPage >= pages.length) return;
     autoContinueRef.current = true;
     setPageAnim("next");
