@@ -16,6 +16,7 @@ import { PageNavArrows } from "./PageNavArrows";
 import { ReaderLoadingState } from "./ReaderLoadingState";
 import { applySpeechHighlight, captureSelectionInContainer, applyPersistentMarks, flashOrPulseRange, offsetOfNodeInContainer } from "./domTextHighlight";
 import { ZoomPanWrapper } from "./ZoomPanWrapper";
+import { disposeReaderAfterPaint, isNativeReaderPlatform } from "./nativeReaderLifecycle";
 
 interface PendingSelection { x: number; y: number; start: number; end: number; }
 
@@ -201,7 +202,8 @@ export function MobiReaderView({
         const buf = new Uint8Array(await blob.arrayBuffer());
         const mobi = await initMobiFile(buf);
         if (cancelled) {
-          mobi.destroy();
+          if (isNativeReaderPlatform()) disposeReaderAfterPaint(() => mobi.destroy());
+          else mobi.destroy();
           return;
         }
         mobiRef.current = mobi;
@@ -233,8 +235,12 @@ export function MobiReaderView({
     })();
     return () => {
       cancelled = true;
-      mobiRef.current?.destroy();
+      const mobi = mobiRef.current;
       mobiRef.current = null;
+      const destroyReader = () => {
+        try { mobi?.destroy(); } catch { /* best-effort teardown */ }
+      };
+      disposeReaderAfterPaint(destroyReader);
     };
   }, [book.id]);
 
@@ -269,7 +275,7 @@ export function MobiReaderView({
   }, [currentPage, pageCount, loading, book.id, onProgress]);
 
   useEffect(() => {
-    return () => { window.speechSynthesis.cancel(); };
+    return () => { window.speechSynthesis?.cancel(); };
   }, []);
 
   useEffect(() => {

@@ -18,6 +18,7 @@ import { PageNavArrows } from "./PageNavArrows";
 import { ReaderLoadingState } from "./ReaderLoadingState";
 import { highlightColorMark } from "./highlightColors";
 import { ZoomPanWrapper } from "./ZoomPanWrapper";
+import { disposeReaderAfterPaint, isNativeReaderPlatform } from "./nativeReaderLifecycle";
 
 interface PendingSelection { start: number; end: number; }
 
@@ -64,7 +65,12 @@ export function PdfReaderView({
         const blob = await fetchBookBlob(book, (loaded, total) => { if (!cancelled) setProgress({ loaded, total }); });
         const buf = await blob.arrayBuffer();
         const doc = await pdfjsLib.getDocument({ data: buf }).promise;
-        if (cancelled) return;
+        if (cancelled) {
+          if (isNativeReaderPlatform()) {
+            disposeReaderAfterPaint(() => { void doc.destroy().catch(() => {}); });
+          }
+          return;
+        }
         pdfDocRef.current = doc;
         setNumPages(doc.numPages);
         setCurrentPage((p) => Math.min(Math.max(1, p), doc.numPages));
@@ -74,7 +80,18 @@ export function PdfReaderView({
         if (!cancelled) setLoading(false);
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      if (!isNativeReaderPlatform()) return;
+      const renderTask = renderTaskRef.current;
+      const pdfDoc = pdfDocRef.current;
+      renderTaskRef.current = null;
+      pdfDocRef.current = null;
+      disposeReaderAfterPaint(() => {
+        try { renderTask?.cancel(); } catch { /* best-effort teardown */ }
+        void pdfDoc?.destroy().catch(() => {});
+      });
+    };
   }, [book.id]);
 
   useEffect(() => {
@@ -206,7 +223,7 @@ export function PdfReaderView({
   }, [currentPage, numPages, loading, book.id, onProgress]);
 
   useEffect(() => {
-    return () => { window.speechSynthesis.cancel(); };
+    return () => { window.speechSynthesis?.cancel(); };
   }, []);
 
   // Highlight the text currently being read aloud, synced to TTS playback position.

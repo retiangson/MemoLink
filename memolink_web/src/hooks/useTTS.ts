@@ -1,4 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
+import { Capacitor } from "@capacitor/core";
+import { TextToSpeech } from "@capacitor-community/text-to-speech";
 
 const LS_VOICE = "memolink_tts_voice";
 const LS_RATE  = "memolink_tts_rate";
@@ -6,6 +8,7 @@ const DEFAULT_TTS_RATE = 1;
 const MIN_TTS_RATE = 0.1;
 const MAX_TTS_RATE = 10;
 const TTS_SILENT_FAILURE_THRESHOLD_MS = 200;
+const isNativePlatform = Capacitor.isNativePlatform();
 
 export type TTSQueueOutcome = "completed" | "unavailable" | "failed";
 
@@ -34,6 +37,9 @@ export function useTTS() {
   const cursor = useRef(0);
   const rateRef = useRef<number>(normalizeRate(localStorage.getItem(LS_RATE)));
   const voiceRef = useRef<SpeechSynthesisVoice | null>(null);
+  const nativeVoicesRef = useRef<SpeechSynthesisVoice[]>([]);
+  const nativeActiveRef = useRef(false);
+  const nativePausedRef = useRef(false);
   // Fired once when the whole sentence queue finishes playing (not on manual stop/pause).
   const queueEndRef = useRef<((outcome: TTSQueueOutcome) => void) | null>(null);
   // Invalidates callbacks from utterances cancelled by stop, seek, rate changes,
@@ -42,12 +48,6 @@ export function useTTS() {
 
   // Load voices and restore saved voice - async in some browsers
   useEffect(() => {
-    function load() {
-      const v = window.speechSynthesis?.getVoices() ?? [];
-      if (v.length === 0) return;
-      setVoices(v);
-      applyStoredPrefs(v);
-    }
     function applyStoredPrefs(v: SpeechSynthesisVoice[]) {
       const savedName = localStorage.getItem(LS_VOICE);
       const match = savedName ? (v.find(x => x.name === savedName) ?? null) : null;
@@ -56,6 +56,37 @@ export function useTTS() {
       const savedRate = normalizeRate(localStorage.getItem(LS_RATE));
       rateRef.current = savedRate;
       setRateState(savedRate);
+    }
+    if (isNativePlatform) {
+      let disposed = false;
+      let rangeListener: { remove: () => Promise<void> } | undefined;
+      TextToSpeech.getSupportedVoices()
+        .then(({ voices: supportedVoices }) => {
+          if (disposed) return;
+          const nativeVoices = supportedVoices as SpeechSynthesisVoice[];
+          nativeVoicesRef.current = nativeVoices;
+          setVoices(nativeVoices);
+          applyStoredPrefs(nativeVoices);
+        })
+        .catch(() => {
+          if (!disposed) setVoices([]);
+        });
+      void TextToSpeech.addListener("onRangeStart", ({ start, end }) => {
+        if (nativeActiveRef.current && end > start) setCurrentWord({ start, end });
+      }).then((listener) => { rangeListener = listener; });
+      const onSettingsChanged = () => applyStoredPrefs(nativeVoicesRef.current);
+      window.addEventListener("memolink_tts_changed", onSettingsChanged);
+      return () => {
+        disposed = true;
+        window.removeEventListener("memolink_tts_changed", onSettingsChanged);
+        void rangeListener?.remove();
+      };
+    }
+    function load() {
+      const v = window.speechSynthesis?.getVoices() ?? [];
+      if (v.length === 0) return;
+      setVoices(v);
+      applyStoredPrefs(v);
     }
     function onSettingsChanged() {
       applyStoredPrefs(window.speechSynthesis?.getVoices() ?? []);
@@ -78,23 +109,62 @@ export function useTTS() {
 
   useEffect(() => () => {
     playbackGenerationRef.current += 1;
+    nativeActiveRef.current = false;
+    if (isNativePlatform) void TextToSpeech.stop().catch(() => {});
     queueEndRef.current = null;
   }, []);
 
   const speakSentence = useCallback(function playSentence(idx: number, generation: number) {
     if (generation !== playbackGenerationRef.current) return;
-    if (!window.speechSynthesis) {
-      setPlaying(false); setPaused(false);
-      const cb = queueEndRef.current;
-      queueEndRef.current = null;
-      cb?.("unavailable");
-      return;
-    }
     if (idx < 0 || idx >= sentences.current.length) {
       setPlaying(false); setPaused(false); setCurrentSentenceIdx(-1);
       const cb = queueEndRef.current;
       queueEndRef.current = null;
       cb?.("failed");
+      return;
+    }
+    if (isNativePlatform) {
+      cursor.current = idx;
+      nativeActiveRef.current = true;
+      nativePausedRef.current = false;
+      setPlaying(true); setPaused(false); setCurrentSentenceIdx(idx); setCurrentWord(null);
+      const selectedVoiceIndex = voiceRef.current
+        ? nativeVoicesRef.current.findIndex((voice) => voice.name === voiceRef.current?.name)
+        : -1;
+      void TextToSpeech.speak({
+        text: sentences.current[idx],
+        lang: voiceRef.current?.lang || "en-US",
+        rate: rateRef.current,
+        pitch: 1,
+        volume: 1,
+        ...(selectedVoiceIndex >= 0 ? { voice: selectedVoiceIndex } : {}),
+      }).then(() => {
+        if (generation !== playbackGenerationRef.current) return;
+        setCurrentWord(null);
+        if (cursor.current + 1 < sentences.current.length) {
+          playSentence(cursor.current + 1, generation);
+        } else {
+          nativeActiveRef.current = false;
+          setPlaying(false); setPaused(false); setCurrentSentenceIdx(-1);
+          const cb = queueEndRef.current;
+          queueEndRef.current = null;
+          cb?.("completed");
+        }
+      }).catch(() => {
+        if (generation !== playbackGenerationRef.current) return;
+        nativeActiveRef.current = false;
+        setPlaying(false); setPaused(false); setCurrentSentenceIdx(-1); setCurrentWord(null);
+        const cb = queueEndRef.current;
+        queueEndRef.current = null;
+        cb?.("failed");
+      });
+      return;
+    }
+    if (!window.speechSynthesis) {
+      setPlaying(false); setPaused(false);
+      const cb = queueEndRef.current;
+      queueEndRef.current = null;
+      cb?.("unavailable");
       return;
     }
     window.speechSynthesis.cancel();
@@ -168,7 +238,8 @@ export function useTTS() {
    *  advance only on "completed", never when speech is unavailable or fails. */
   const speak = useCallback((text: string, startIndex = 0, onQueueEnd?: (outcome: TTSQueueOutcome) => void) => {
     const generation = ++playbackGenerationRef.current;
-    window.speechSynthesis?.cancel();
+    if (isNativePlatform) void TextToSpeech.stop().catch(() => {});
+    else window.speechSynthesis?.cancel();
     const sents = splitSentences(text);
     sentences.current = sents;
     setSentencesList(sents);
@@ -187,7 +258,10 @@ export function useTTS() {
 
   const stop = useCallback(() => {
     playbackGenerationRef.current += 1;
-    window.speechSynthesis?.cancel();
+    nativeActiveRef.current = false;
+    nativePausedRef.current = false;
+    if (isNativePlatform) void TextToSpeech.stop().catch(() => {});
+    else window.speechSynthesis?.cancel();
     sentences.current = []; cursor.current = 0;
     queueEndRef.current = null;
     setPlaying(false); setPaused(false);
@@ -195,8 +269,27 @@ export function useTTS() {
     setCurrentWord(null);
   }, []);
 
-  const pause = useCallback(() => { window.speechSynthesis?.pause(); setPaused(true); }, []);
-  const resume = useCallback(() => { window.speechSynthesis?.resume(); setPaused(false); }, []);
+  const pause = useCallback(() => {
+    if (isNativePlatform) {
+      playbackGenerationRef.current += 1;
+      nativeActiveRef.current = false;
+      nativePausedRef.current = true;
+      void TextToSpeech.stop().catch(() => {});
+    } else {
+      window.speechSynthesis?.pause();
+    }
+    setPaused(true);
+  }, []);
+  const resume = useCallback(() => {
+    if (isNativePlatform) {
+      if (!nativePausedRef.current || sentences.current.length === 0) return;
+      const generation = ++playbackGenerationRef.current;
+      speakSentence(cursor.current, generation);
+    } else {
+      window.speechSynthesis?.resume();
+      setPaused(false);
+    }
+  }, [speakSentence]);
 
   const forward = useCallback(() => {
     const next = cursor.current + 1;
@@ -215,8 +308,10 @@ export function useTTS() {
     const normalizedRate = normalizeRate(r);
     rateRef.current = normalizedRate; setRateState(normalizedRate);
     localStorage.setItem(LS_RATE, String(normalizedRate));
-    if (window.speechSynthesis?.speaking && !window.speechSynthesis.paused) {
+    if ((isNativePlatform && nativeActiveRef.current && !nativePausedRef.current) ||
+        (!isNativePlatform && window.speechSynthesis?.speaking && !window.speechSynthesis.paused)) {
       const generation = ++playbackGenerationRef.current;
+      if (isNativePlatform) void TextToSpeech.stop().catch(() => {});
       speakSentence(cursor.current, generation);
     }
   }, [speakSentence]);

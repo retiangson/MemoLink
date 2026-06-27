@@ -1,4 +1,6 @@
 ﻿import React, { useState, useEffect, useRef } from "react";
+import { Capacitor } from "@capacitor/core";
+import { TextToSpeech } from "@capacitor-community/text-to-speech";
 import { changePassword } from "../api/client";
 import { getProviders, addProvider, updateProvider, deleteProvider } from "../api/settingsApi";
 import type { CustomProvider } from "../api/settingsApi";
@@ -532,6 +534,13 @@ export function SettingsModal({
   const [ttsSearch, setTtsSearch] = useState("");
 
   useEffect(() => {
+    if (Capacitor.isNativePlatform()) {
+      let cancelled = false;
+      TextToSpeech.getSupportedVoices()
+        .then(({ voices }) => { if (!cancelled) setTtsVoices(voices as SpeechSynthesisVoice[]); })
+        .catch(() => { if (!cancelled) setTtsVoices([]); });
+      return () => { cancelled = true; };
+    }
     function loadVoices() {
       const v = window.speechSynthesis?.getVoices() ?? [];
       if (v.length > 0) setTtsVoices(v);
