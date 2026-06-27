@@ -1769,7 +1769,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
             display:none keeps inactive epub.js iframes dormant; PdfReaderView re-paints its
             canvas when isActive flips to true (Chromium frees the canvas GPU texture under
             display:none, so we skip the render while hidden and re-fire it on reveal). */}
-        {activeLayoutMode === "stacked" && bookTabs.openTabs.length > 0 && (
+        {activeLayoutMode === "stacked" && (
           <div {...readerTabProps("flex-1 min-h-0 flex flex-col overflow-hidden", isBookReaderActive)}>
             {bookTabs.openTabs.map((tab, i) => (
               <div
