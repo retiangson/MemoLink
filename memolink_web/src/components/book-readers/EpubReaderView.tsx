@@ -155,6 +155,37 @@ function buildCombinedTextMap(list: Contents[]): { text: string; nodes: TextNode
   return { text, nodes };
 }
 
+function buildVisibleTextMap(list: Contents[]): { text: string; nodes: TextNodeEntry[] } {
+  let text = "";
+  const nodes: TextNodeEntry[] = [];
+  list.forEach((c: any, ci: number) => {
+    const root: Element | undefined = c?.content;
+    const doc: Document | undefined = c?.document;
+    const win: Window | undefined = c?.window;
+    if (!root || !doc || !win) return;
+    const viewportWidth = doc.documentElement.clientWidth || win.innerWidth;
+    const viewportHeight = doc.documentElement.clientHeight || win.innerHeight;
+    const walker = doc.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    let n: Node | null;
+    while ((n = walker.nextNode())) {
+      const tn = n as Text;
+      const value = tn.nodeValue || "";
+      if (!value.trim()) continue;
+      const range = doc.createRange();
+      range.selectNodeContents(tn);
+      const visible = Array.from(range.getClientRects()).some((rect) => (
+        rect.right > 0 && rect.left < viewportWidth && rect.bottom > 0 && rect.top < viewportHeight
+      ));
+      if (!visible) continue;
+      if (text && !/\s$/.test(text) && !/^\s/.test(value)) text += " ";
+      nodes.push({ node: tn, start: text.length, end: text.length + value.length, doc, win });
+      text += value;
+    }
+    if (ci < list.length - 1 && text) text += " ";
+  });
+  return text.trim() ? { text, nodes } : buildCombinedTextMap(list);
+}
+
 function ensureHighlightStyle(doc: Document) {
   if (doc.getElementById("ml-tts-highlight-style")) return;
   const style = doc.createElement("style");
@@ -238,7 +269,6 @@ export function EpubReaderView({
   const clickListenersRef = useRef<{ doc: Document; fn: (e: MouseEvent) => void }[]>([]);
   const selectionListenersRef = useRef<{ doc: Document; fn: () => void }[]>([]);
   const swipeListenersRef = useRef<{ doc: Document; start: (e: TouchEvent) => void; end: (e: TouchEvent) => void }[]>([]);
-  const autoContinueRef = useRef(false);
   // epub.js callbacks (rendition.on("relocated", ...), iframe doc listeners) are registered
   // once outside React's render cycle, so they'd otherwise close over stale currentPage/numPages
   // state from whenever they were attached. These refs are updated synchronously alongside the
@@ -424,10 +454,6 @@ export function EpubReaderView({
           // Only use this event for move-bounds/text-map bookkeeping, never for the page #.
           setMoveBounds(location);
           refreshTextMap();
-          if (autoContinueRef.current) {
-            autoContinueRef.current = false;
-            speakPage(0);
-          }
         });
 
         setLoading(false);
@@ -664,7 +690,10 @@ export function EpubReaderView({
     const contents = rendition.getContents();
     const list = (Array.isArray(contents) ? contents : [contents]) as Contents[];
     applyEpubContentsTheme(list, colorModeRef.current, fontSizeRef.current);
-    const { text, nodes } = buildCombinedTextMap(list);
+    // epub.js keeps an entire spine item in the iframe and reveals one CSS column.
+    // Reading the whole iframe makes speech run ahead while the visual page remains
+    // unchanged, so TTS and page-relative highlights use only visible text nodes.
+    const { text, nodes } = buildVisibleTextMap(list);
     pageTextRef.current = text;
     textNodesRef.current = nodes;
     attachClickListeners(list);
@@ -781,7 +810,7 @@ export function EpubReaderView({
     });
   }
 
-  async function navigateTo(p: number) {
+  async function navigateTo(p: number, continueReading = false) {
     const epubBook = epubBookRef.current;
     const rendition = renditionRef.current;
     const numPagesNow = numPagesRef.current;
@@ -808,13 +837,13 @@ export function EpubReaderView({
       canMovePrevRef.current = p > 1;
       setCanMovePrev(p > 1);
       refreshTextMap();
+      if (continueReading) speakPage(0);
     } finally {
       navigatingRef.current = false;
     }
   }
 
   async function goToPage(p: number) {
-    autoContinueRef.current = false;
     await navigateTo(p);
   }
 
@@ -835,8 +864,7 @@ export function EpubReaderView({
   function handleAutoAdvanceRead(outcome: TTSQueueOutcome) {
     if (outcome !== "completed") return;
     if (!canMoveNextRef.current) return;
-    autoContinueRef.current = true;
-    void navigateTo(currentPageRef.current + 1);
+    void navigateTo(currentPageRef.current + 1, true);
   }
 
   function speakPage(startIdx: number) {
