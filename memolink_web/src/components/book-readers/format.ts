@@ -37,6 +37,10 @@ export interface ReaderViewProps {
   onJumpToHighlightHandled?: () => void;
   onHighlightAdded?: () => void;
   isFullscreen?: boolean;
+  /** True only when this reader is the currently visible tab. PdfReaderView uses this to
+   *  re-render the canvas when becoming visible after a display:none hide cycle, since
+   *  Chromium frees the canvas GPU texture while the element is not displayed. */
+  isActive?: boolean;
 }
 
 export const READER_COLOR_MODE_LABELS: Record<ReaderColorMode, string> = {

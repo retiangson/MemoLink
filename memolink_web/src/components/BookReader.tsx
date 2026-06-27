@@ -27,9 +27,13 @@ interface Props {
   onHighlightAdded?: () => void;
   /** Called on Capacitor when fullscreen state changes so the parent can hide/show the tab bar. */
   onFullscreenChange?: (isFullscreen: boolean) => void;
+  /** True only when this reader tab is the currently visible one. Passed to PdfReaderView so it
+   *  can skip canvas renders while hidden (display:none frees the GPU texture) and re-paint
+   *  the page when it becomes active again. */
+  isActive?: boolean;
 }
 
-export function BookReader({ book, initialPage, onClose, onProgress, onAskAI, jumpToHighlight, onJumpToHighlightHandled, onHighlightAdded, onFullscreenChange }: Props) {
+export function BookReader({ book, initialPage, onClose, onProgress, onAskAI, jumpToHighlight, onJumpToHighlightHandled, onHighlightAdded, onFullscreenChange, isActive }: Props) {
   const [noteStatus, setNoteStatus] = useState<BookNoteSourceStatus | null>(null);
   const [noteStatusLoaded, setNoteStatusLoaded] = useState(false);
   const [savingNoteSource, setSavingNoteSource] = useState(false);
@@ -190,7 +194,7 @@ export function BookReader({ book, initialPage, onClose, onProgress, onAskAI, ju
         </div>
       )}
 
-      {format === "pdf" && <PdfReaderView book={book} initialPage={initialPage} colorMode={colorMode} fontSize={fontSize} onProgress={onProgress} jumpToHighlight={jumpToHighlight} onJumpToHighlightHandled={onJumpToHighlightHandled} onHighlightAdded={onHighlightAdded} isFullscreen={isFullscreen} {...noteSourceProps} />}
+      {format === "pdf" && <PdfReaderView book={book} initialPage={initialPage} colorMode={colorMode} fontSize={fontSize} onProgress={onProgress} jumpToHighlight={jumpToHighlight} onJumpToHighlightHandled={onJumpToHighlightHandled} onHighlightAdded={onHighlightAdded} isFullscreen={isFullscreen} isActive={isActive} {...noteSourceProps} />}
       {format === "epub" && <EpubReaderView book={book} initialPage={initialPage} colorMode={colorMode} fontSize={fontSize} onProgress={onProgress} jumpToHighlight={jumpToHighlight} onJumpToHighlightHandled={onJumpToHighlightHandled} onHighlightAdded={onHighlightAdded} isFullscreen={isFullscreen} {...noteSourceProps} />}
       {format === "pptx" && <PptxReaderView book={book} initialPage={initialPage} colorMode={colorMode} fontSize={fontSize} onProgress={onProgress} jumpToHighlight={jumpToHighlight} onJumpToHighlightHandled={onJumpToHighlightHandled} onHighlightAdded={onHighlightAdded} isFullscreen={isFullscreen} {...noteSourceProps} />}
       {format === "audio" && <AudioReaderView book={book} initialPage={initialPage} colorMode={colorMode} fontSize={fontSize} onProgress={onProgress} />}
