@@ -19,6 +19,7 @@ import { ReaderLoadingState } from "./ReaderLoadingState";
 import { highlightColorMark } from "./highlightColors";
 import { ZoomPanWrapper } from "./ZoomPanWrapper";
 import { disposeReaderAfterPaint, isNativeReaderPlatform } from "./nativeReaderLifecycle";
+import { captureSettledTouchSelection } from "./domTextHighlight";
 
 interface PendingSelection { start: number; end: number; }
 
@@ -417,6 +418,7 @@ export function PdfReaderView({
               className="textLayer absolute inset-0 cursor-text"
               title="Double-click a sentence to start reading from there"
               onMouseUp={handleTextLayerMouseUp}
+              onTouchEnd={() => captureSettledTouchSelection(handleTextLayerMouseUp)}
               onDoubleClick={(e) => {
                 const target = (e.target as HTMLElement).closest("span, div") as HTMLElement | null;
                 window.getSelection()?.removeAllRanges();

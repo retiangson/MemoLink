@@ -9,6 +9,6 @@ export function isNativeReaderPlatform(): boolean {
 }
 
 export function disposeReaderAfterPaint(dispose: () => void): void {
-  if (isNativeReaderPlatform()) window.setTimeout(dispose, NATIVE_READER_SETTLE_DELAY_MS);
+  if (isNativeReaderPlatform()) setTimeout(dispose, NATIVE_READER_SETTLE_DELAY_MS);
   else dispose();
 }

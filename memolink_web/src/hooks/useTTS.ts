@@ -283,6 +283,8 @@ export function useTTS() {
   const resume = useCallback(() => {
     if (isNativePlatform) {
       if (!nativePausedRef.current || sentences.current.length === 0) return;
+      nativePausedRef.current = false;
+      setPaused(false);
       const generation = ++playbackGenerationRef.current;
       speakSentence(cursor.current, generation);
     } else {

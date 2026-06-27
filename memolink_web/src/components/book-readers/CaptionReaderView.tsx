@@ -13,6 +13,7 @@ import { ReaderLoadingState } from "./ReaderLoadingState";
 import { parseCaptions, type Cue } from "./captions";
 import { highlightColorMark } from "./highlightColors";
 import { ZoomPanWrapper } from "./ZoomPanWrapper";
+import { captureSettledTouchSelection } from "./domTextHighlight";
 
 interface PendingSelection { x: number; y: number; start: number; end: number; }
 interface PersistedCueHighlight { id: number; start: number; end: number; color: string; }
@@ -307,6 +308,7 @@ export function CaptionReaderView({
             ref={containerRef}
             onAnimationEnd={() => setPageAnim(null)}
             onMouseUp={handleMouseUp}
+            onTouchEnd={() => captureSettledTouchSelection(handleMouseUp)}
             className={`relative shadow-lg rounded-xl max-w-2xl w-full h-fit p-8 ${pageAnim === "next" ? "ml-page-anim-next" : pageAnim === "prev" ? "ml-page-anim-prev" : ""}`}
             style={{ backgroundColor: colors.background, color: colors.foreground }}
           >

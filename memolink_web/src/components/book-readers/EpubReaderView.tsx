@@ -22,6 +22,7 @@ import { ReaderLoadingState } from "./ReaderLoadingState";
 import { ZoomPanWrapper } from "./ZoomPanWrapper";
 import { HIGHLIGHT_COLORS, highlightColorMark } from "./highlightColors";
 import { disposeReaderAfterPaint, isNativeReaderPlatform } from "./nativeReaderLifecycle";
+import { captureSettledTouchSelection } from "./domTextHighlight";
 
 const HIGHLIGHT_NAME = "ml-tts";
 const JUMP_HIGHLIGHT_NAME = "ml-jump";
@@ -342,7 +343,7 @@ export function EpubReaderView({
   const activeJumpWinsRef = useRef<Set<any>>(new Set());
   const persistentWinsRef = useRef<Set<any>>(new Set());
   const clickListenersRef = useRef<{ doc: Document; fn: (e: MouseEvent) => void }[]>([]);
-  const selectionListenersRef = useRef<{ doc: Document; fn: () => void }[]>([]);
+  const selectionListenersRef = useRef<{ doc: Document; selection: () => void; touchEnd: () => void }[]>([]);
   const swipeListenersRef = useRef<{ doc: Document; start: (e: TouchEvent) => void; end: (e: TouchEvent) => void }[]>([]);
   // epub.js callbacks (rendition.on("relocated", ...), iframe doc listeners) are registered
   // once outside React's render cycle, so they'd otherwise close over stale currentPage/numPages
@@ -759,7 +760,10 @@ export function EpubReaderView({
   }
 
   function clearSelectionListeners() {
-    selectionListenersRef.current.forEach(({ doc, fn }) => doc.removeEventListener("selectionchange", fn));
+    selectionListenersRef.current.forEach(({ doc, selection, touchEnd }) => {
+      doc.removeEventListener("selectionchange", selection);
+      doc.removeEventListener("touchend", touchEnd);
+    });
     selectionListenersRef.current = [];
   }
 
@@ -819,29 +823,30 @@ export function EpubReaderView({
       const doc: Document | undefined = c?.document;
       const win: any = c?.window;
       if (!doc || !win) return;
-      const fn = () => {
+      const selection = () => {
         const sel = doc.getSelection?.() ?? win.getSelection?.();
         if (!sel || sel.isCollapsed || sel.rangeCount === 0) {
-          setPendingSelection(null);
           return;
         }
         const range = sel.getRangeAt(0);
         const startEntry = textNodesRef.current.find((n) => n.node === range.startContainer);
         const endEntry = textNodesRef.current.find((n) => n.node === range.endContainer);
         if (!startEntry || !endEntry) {
-          setPendingSelection(null);
           return;
         }
-        const start = startEntry.start + range.startOffset - startEntry.nodeStart;
-        const end = endEntry.start + range.endOffset - endEntry.nodeStart;
+        const firstOffset = startEntry.start + range.startOffset - startEntry.nodeStart;
+        const secondOffset = endEntry.start + range.endOffset - endEntry.nodeStart;
+        const start = Math.min(firstOffset, secondOffset);
+        const end = Math.max(firstOffset, secondOffset);
         if (end <= start) {
-          setPendingSelection(null);
           return;
         }
         setPendingSelection({ start, end });
       };
-      doc.addEventListener("selectionchange", fn);
-      selectionListenersRef.current.push({ doc, fn });
+      const touchEnd = () => captureSettledTouchSelection(selection);
+      doc.addEventListener("selectionchange", selection);
+      doc.addEventListener("touchend", touchEnd);
+      selectionListenersRef.current.push({ doc, selection, touchEnd });
     });
   }
 
