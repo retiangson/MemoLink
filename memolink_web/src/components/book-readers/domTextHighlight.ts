@@ -166,24 +166,26 @@ export function applySpeechHighlight(
   container: HTMLElement,
   range: { start: number; end: number } | null,
 ): void {
-  const css = (window.CSS as any)?.highlights;
+  const doc = container.ownerDocument;
+  const ownerWindow = doc.defaultView;
+  const css = (ownerWindow?.CSS as any)?.highlights;
   if (!css) return;
   css.delete(SPEECH_HIGHLIGHT_NAME);
   if (!range || range.end <= range.start) return;
   const ranges = findSegments(container, range.start, range.end).map((segment) => {
-    const domRange = document.createRange();
+    const domRange = doc.createRange();
     domRange.setStart(segment.node, segment.start);
     domRange.setEnd(segment.node, segment.end);
     return domRange;
   });
-  const HighlightCtor = (window as any).Highlight;
+  const HighlightCtor = (ownerWindow as any)?.Highlight;
   if (!HighlightCtor || ranges.length === 0) return;
   css.set(SPEECH_HIGHLIGHT_NAME, new HighlightCtor(...ranges));
-  let style = document.getElementById("ml-current-speech-style") as HTMLStyleElement | null;
+  let style = doc.getElementById("ml-current-speech-style") as HTMLStyleElement | null;
   if (!style) {
-    style = document.createElement("style");
+    style = doc.createElement("style");
     style.id = "ml-current-speech-style";
     style.textContent = `::highlight(${SPEECH_HIGHLIGHT_NAME}) { background-color: rgba(99,102,241,0.45); }`;
-    document.head.appendChild(style);
+    doc.head?.appendChild(style);
   }
 }

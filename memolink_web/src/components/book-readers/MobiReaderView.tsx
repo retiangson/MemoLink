@@ -23,7 +23,7 @@ const MOBI_PAGE_CHAR_LIMIT = 2000;
 
 function sanitizeMobiElement(element: Element): void {
   element.querySelectorAll('script, iframe, object, embed, style, link[rel="stylesheet"]').forEach((node) => node.remove());
-  element.querySelectorAll("*").forEach((node) => {
+  [element, ...Array.from(element.querySelectorAll("*"))].forEach((node) => {
     Array.from(node.attributes).forEach((attribute) => {
       if (attribute.name.toLowerCase().startsWith("on")) node.removeAttribute(attribute.name);
       if ((attribute.name === "href" || attribute.name === "src") && /^\s*javascript:/i.test(attribute.value)) {
@@ -52,6 +52,52 @@ function splitTextIntoPages(text: string): string[] {
   return pages;
 }
 
+function textBoundaryPoint(root: Element, offset: number): { node: Node; offset: number } {
+  const walker = root.ownerDocument.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  let consumed = 0;
+  let lastText: Text | null = null;
+  let node: Node | null;
+  while ((node = walker.nextNode())) {
+    const textNode = node as Text;
+    const length = textNode.nodeValue?.length ?? 0;
+    lastText = textNode;
+    if (offset <= consumed + length) {
+      return { node: textNode, offset: Math.max(0, offset - consumed) };
+    }
+    consumed += length;
+  }
+  return lastText
+    ? { node: lastText, offset: lastText.nodeValue?.length ?? 0 }
+    : { node: root, offset: root.childNodes.length };
+}
+
+function splitElementIntoPages(element: Element): string[] {
+  const text = element.textContent || "";
+  const pages: string[] = [];
+  let start = 0;
+  while (start < text.length) {
+    let end = Math.min(text.length, start + MOBI_PAGE_CHAR_LIMIT);
+    if (end < text.length) {
+      const whitespace = text.lastIndexOf(" ", end);
+      if (whitespace > start + MOBI_PAGE_CHAR_LIMIT / 2) end = whitespace;
+    }
+    const startPoint = textBoundaryPoint(element, start);
+    const endPoint = textBoundaryPoint(element, end);
+    const range = element.ownerDocument.createRange();
+    range.setStart(startPoint.node, startPoint.offset);
+    range.setEnd(endPoint.node, endPoint.offset);
+    const pageElement = element.cloneNode(false) as Element;
+    // A source element split across pages must not duplicate document IDs.
+    pageElement.removeAttribute("id");
+    pageElement.appendChild(range.cloneContents());
+    if (pageElement.textContent?.trim() || pageElement.querySelector("img, svg, video, audio")) {
+      pages.push(pageElement.outerHTML);
+    }
+    start = end;
+  }
+  return pages;
+}
+
 function paginateMobiChapter(html: string): string[] {
   const doc = new DOMParser().parseFromString(html, "text/html");
   sanitizeMobiElement(doc.body);
@@ -69,7 +115,11 @@ function paginateMobiChapter(html: string): string[] {
     const chars = content.length;
     if (chars > MOBI_PAGE_CHAR_LIMIT) {
       flush();
-      pages.push(...splitTextIntoPages(content));
+      pages.push(...(
+        node.nodeType === Node.ELEMENT_NODE
+          ? splitElementIntoPages(node as Element)
+          : splitTextIntoPages(content)
+      ));
       return;
     }
     if (pageChars > 0 && pageChars + chars > MOBI_PAGE_CHAR_LIMIT) flush();

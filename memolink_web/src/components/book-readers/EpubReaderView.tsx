@@ -197,15 +197,35 @@ function buildCurrentLocationTextMap(rendition: Rendition, list: Contents[]): { 
     return buildVisibleTextMap(list);
   }
   const root = doc.body || doc.documentElement;
-  const offsetTo = (container: Node, offset: number) => {
-    const range = doc.createRange();
-    range.selectNodeContents(root);
-    range.setEnd(container, offset);
-    return range.toString().length;
+  const nodeStarts = new WeakMap<Node, number>();
+  const nodeLengths = new WeakMap<Node, number>();
+  let indexedLength = 0;
+  const indexNode = (node: Node): void => {
+    const start = indexedLength;
+    nodeStarts.set(node, start);
+    if (node.nodeType === Node.TEXT_NODE) {
+      indexedLength += node.nodeValue?.length ?? 0;
+    } else {
+      node.childNodes.forEach(indexNode);
+    }
+    nodeLengths.set(node, indexedLength - start);
+  };
+  indexNode(root);
+  const offsetTo = (container: Node, offset: number): number | null => {
+    const start = nodeStarts.get(container);
+    const length = nodeLengths.get(container);
+    if (start == null || length == null) return null;
+    if (container.nodeType === Node.TEXT_NODE) {
+      return start + Math.min(Math.max(0, offset), length);
+    }
+    const childCount = container.childNodes.length;
+    if (offset <= 0) return start;
+    if (offset >= childCount) return start + length;
+    return nodeStarts.get(container.childNodes[offset]) ?? null;
   };
   const startOffset = offsetTo(startRange.startContainer, startRange.startOffset);
   const endOffset = offsetTo(endRange.startContainer, endRange.startOffset);
-  if (endOffset <= startOffset) return buildVisibleTextMap(list);
+  if (startOffset == null || endOffset == null || endOffset <= startOffset) return buildVisibleTextMap(list);
   const content = list.find((item: any) => item?.document === doc) as any;
   let absoluteOffset = 0;
   let text = "";
