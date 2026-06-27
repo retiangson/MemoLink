@@ -159,6 +159,12 @@ export function useZoomPan(active: boolean, options: UseZoomPanOptions = {}) {
     const el = containerRef.current;
     if (!el) return;
 
+    // True when pinch gestures should be intercepted (preventDefault) but NOT handled
+    // by our zoom logic — blocks the Android WebView from zooming the whole viewport
+    // in non-fullscreen mode. Centralised here so both onTouchStart and onTouchMove
+    // stay consistent if this condition ever needs to change.
+    const blockNativePinch = isNativePlatform && !active;
+
     const onTouchStart = (e: TouchEvent) => {
       for (const t of Array.from(e.changedTouches)) {
         touchStateRef.current.set(t.identifier, { x: t.clientX, y: t.clientY });
@@ -167,12 +173,18 @@ export function useZoomPan(active: boolean, options: UseZoomPanOptions = {}) {
         touchStartXRef.current   = e.touches[0].clientX;
         touchStartYRef.current   = e.touches[0].clientY;
         lastPinchDistRef.current = null;
+        // Measure bounds at the start of a drag in fullscreen so clampPan works
+        // immediately. boundsRef resets to EMPTY_BOUNDS on fullscreen entry and is
+        // otherwise only populated during pinch — without this the fallback clamp
+        // allows unlimited up/left pan on the very first drag after going fullscreen.
+        if (active && !boundsRef.current.effectiveW && el) {
+          boundsRef.current = measureBounds(el, transformRef.current.panX, transformRef.current.panY, transformRef.current.zoom);
+        }
       } else if (e.touches.length >= 2) {
-        // On Capacitor/Android in non-fullscreen mode the WebView doesn't self-zoom,
-        // so let native scrolling handle the gesture. On iOS/Safari we must intercept
-        // here (non-passive) to stop the browser from zooming the entire viewport.
-        if (isNativePlatform && !active) return;
+        // Always preventDefault to block Android WebView viewport zoom on pinch,
+        // even in non-fullscreen where we don't apply our own zoom logic.
         e.preventDefault();
+        if (blockNativePinch) return;
         const [a, b] = [e.touches[0], e.touches[1]];
         lastPinchDistRef.current = Math.hypot(b.clientX - a.clientX, b.clientY - a.clientY);
         if (!boundsRef.current.effectiveW) {
@@ -183,8 +195,11 @@ export function useZoomPan(active: boolean, options: UseZoomPanOptions = {}) {
 
     const onTouchMove = (e: TouchEvent) => {
       if (e.touches.length >= 2) {
-        // Pinch-to-zoom — always handled regardless of fullscreen state
+        // Always preventDefault to block Android WebView viewport zoom.
         e.preventDefault();
+        // In non-fullscreen on Capacitor, don't apply zoom and don't update
+        // lastPinchDistRef (avoids zoom triggering on the second touchmove event).
+        if (blockNativePinch) return;
         const [a, b] = [e.touches[0], e.touches[1]];
         const dist = Math.hypot(b.clientX - a.clientX, b.clientY - a.clientY);
         if (lastPinchDistRef.current !== null && dist > 0) {
