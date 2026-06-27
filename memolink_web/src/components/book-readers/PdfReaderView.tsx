@@ -26,7 +26,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
 export function PdfReaderView({
   book, initialPage, colorMode, fontSize, onProgress,
   noteStatus, noteStatusLoaded, savingNoteSource, onSaveAsNoteSource,
-  jumpToHighlight, onJumpToHighlightHandled, onHighlightAdded, isFullscreen,
+  jumpToHighlight, onJumpToHighlightHandled, onHighlightAdded, isFullscreen, isActive,
 }: ReaderViewProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const textLayerRef = useRef<HTMLDivElement | null>(null);
@@ -168,6 +168,10 @@ export function PdfReaderView({
 
   useEffect(() => {
     if (loading || !pdfDocRef.current) return;
+    // Skip rendering while the reader is hidden with display:none (isActive===false).
+    // Chromium frees the canvas GPU texture under display:none, so rendering is wasted.
+    // When isActive flips back to true this effect re-fires and re-paints the page.
+    if (isActive === false) return;
     renderPage(currentPage).then(() => {
       applyPersistentHighlights();
       if (autoContinueRef.current) {
@@ -180,7 +184,7 @@ export function PdfReaderView({
       }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentPage, loading, renderPage]);
+  }, [currentPage, loading, renderPage, isActive]);
 
   // Arrival from a Note double-click: jump to the highlight's page if we're not
   // already there (the render effect above handles the flash once that page loads).
