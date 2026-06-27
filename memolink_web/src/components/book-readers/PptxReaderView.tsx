@@ -10,7 +10,8 @@ import { NoteSourceButton } from "./NoteSourceButton";
 import { HighlightColorPicker } from "./HighlightColorPicker";
 import { PageNavArrows } from "./PageNavArrows";
 import { ReaderLoadingState } from "./ReaderLoadingState";
-import { captureSelectionInContainer, captureSettledTouchSelection, applyPersistentMarks, flashOrPulseRange } from "./domTextHighlight";
+import { captureSelectionInContainer, applyPersistentMarks, flashOrPulseRange } from "./domTextHighlight";
+import { useSelectionChangeCapture } from "../../hooks/useSelectionChangeCapture";
 import { ZoomPanWrapper } from "./ZoomPanWrapper";
 
 interface PendingSelection { x: number; y: number; start: number; end: number; }
@@ -100,6 +101,8 @@ export function PptxReaderView({
     return selection !== null;
   }
 
+  useSelectionChangeCapture(captureCurrentSelection);
+
   async function handleAddHighlight(colorId: string) {
     if (!pendingSelection || !slideRef.current) return;
     const snippet = (slideRef.current.textContent || "").slice(pendingSelection.start, pendingSelection.end);
@@ -166,7 +169,7 @@ export function PptxReaderView({
             ref={slideRef}
             onAnimationEnd={() => setSlideAnim(null)}
             onMouseUp={captureCurrentSelection}
-            onTouchEnd={() => captureSettledTouchSelection(captureCurrentSelection)}
+            onTouchEnd={() => captureCurrentSelection()}
             className={`pptx-slide relative shadow-lg rounded-xl max-w-2xl w-full h-fit p-10 ${slideAnim === "next" ? "ml-page-anim-next" : slideAnim === "prev" ? "ml-page-anim-prev" : ""}`}
             style={{ backgroundColor: colors.background, color: colors.foreground }}
             dangerouslySetInnerHTML={{ __html: slides[currentSlide - 1] || "" }}

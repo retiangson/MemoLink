@@ -13,7 +13,8 @@ import { NoteSourceButton } from "./NoteSourceButton";
 import { HighlightColorPicker } from "./HighlightColorPicker";
 import { PageNavArrows } from "./PageNavArrows";
 import { ReaderLoadingState } from "./ReaderLoadingState";
-import { captureSelectionInContainer, captureSettledTouchSelection, applyPersistentMarks, flashOrPulseRange, offsetOfNodeInContainer } from "./domTextHighlight";
+import { captureSelectionInContainer, applyPersistentMarks, flashOrPulseRange, offsetOfNodeInContainer } from "./domTextHighlight";
+import { useSelectionChangeCapture } from "../../hooks/useSelectionChangeCapture";
 import { ZoomPanWrapper } from "./ZoomPanWrapper";
 
 interface PendingSelection { x: number; y: number; start: number; end: number; }
@@ -153,6 +154,8 @@ export function TxtReaderView({
     return selection !== null;
   }
 
+  useSelectionChangeCapture(captureCurrentSelection);
+
   async function handleAddHighlight(colorId: string) {
     if (!pendingSelection || !pageRef.current) return;
     const snippet = (pageRef.current.textContent || "").slice(pendingSelection.start, pendingSelection.end);
@@ -243,7 +246,7 @@ export function TxtReaderView({
             ref={pageRef}
             onAnimationEnd={() => setPageAnim(null)}
             onMouseUp={captureCurrentSelection}
-            onTouchEnd={() => captureSettledTouchSelection(captureCurrentSelection)}
+            onTouchEnd={() => captureCurrentSelection()}
             onDoubleClick={handleDoubleClick}
             title="Double-click a sentence to start reading from there"
             className={`relative shadow-lg rounded-xl max-w-2xl w-full h-fit p-10 whitespace-pre-wrap leading-relaxed cursor-text ${pageAnim === "next" ? "ml-page-anim-next" : pageAnim === "prev" ? "ml-page-anim-prev" : ""}`}

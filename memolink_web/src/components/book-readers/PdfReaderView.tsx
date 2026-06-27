@@ -19,7 +19,7 @@ import { ReaderLoadingState } from "./ReaderLoadingState";
 import { highlightColorMark } from "./highlightColors";
 import { ZoomPanWrapper } from "./ZoomPanWrapper";
 import { disposeReaderAfterPaint, isNativeReaderPlatform } from "./nativeReaderLifecycle";
-import { captureSettledTouchSelection } from "./domTextHighlight";
+import { useSelectionChangeCapture } from "../../hooks/useSelectionChangeCapture";
 
 interface PendingSelection { start: number; end: number; }
 
@@ -293,6 +293,8 @@ export function PdfReaderView({
     return true;
   }
 
+  useSelectionChangeCapture(captureCurrentSelection);
+
   async function handleAddHighlight(colorId: string) {
     if (!pendingSelection) return;
     const snippet = pageTextRef.current.slice(pendingSelection.start, pendingSelection.end);
@@ -419,7 +421,7 @@ export function PdfReaderView({
               className="textLayer absolute inset-0 cursor-text"
               title="Double-click a sentence to start reading from there"
               onMouseUp={captureCurrentSelection}
-              onTouchEnd={() => captureSettledTouchSelection(captureCurrentSelection)}
+              onTouchEnd={() => captureCurrentSelection()}
               onDoubleClick={(e) => {
                 const target = (e.target as HTMLElement).closest("span, div") as HTMLElement | null;
                 window.getSelection()?.removeAllRanges();

@@ -18,23 +18,6 @@ export interface PersistedHighlight {
 const PERSIST_CLASS = "ml-persist-hl";
 const PULSE_CLASS = "ml-hl-pulse";
 const SPEECH_HIGHLIGHT_NAME = "ml-current-speech";
-const TOUCH_SELECTION_RETRY_DELAYS_MS = [100, 250, 500] as const;
-
-export type SelectionCapture = () => boolean;
-
-// Android browsers update the Selection after touchend when the native selection handles
-// finish settling. The callback intentionally receives no event: it must read the final
-// Selection from its owning document rather than a stale mouse/touch event.
-export function captureSettledTouchSelection(capture: SelectionCapture): void {
-  let attempt = 0;
-  const tryCapture = () => {
-    if (capture() || attempt >= TOUCH_SELECTION_RETRY_DELAYS_MS.length - 1) return;
-    attempt += 1;
-    setTimeout(tryCapture, TOUCH_SELECTION_RETRY_DELAYS_MS[attempt]);
-  };
-  setTimeout(tryCapture, TOUCH_SELECTION_RETRY_DELAYS_MS[attempt]);
-}
-
 // Walks all text nodes inside container to convert a (node, offsetInNode) selection
 // boundary into an absolute char offset into container.textContent — used by readers
 // (slides/text/mobi chapters) that have no existing text-mapping infra (unlike PDF/EPUB)

@@ -22,7 +22,6 @@ import { ReaderLoadingState } from "./ReaderLoadingState";
 import { ZoomPanWrapper } from "./ZoomPanWrapper";
 import { HIGHLIGHT_COLORS, highlightColorMark } from "./highlightColors";
 import { disposeReaderAfterPaint, isNativeReaderPlatform } from "./nativeReaderLifecycle";
-import { captureSettledTouchSelection } from "./domTextHighlight";
 
 const HIGHLIGHT_NAME = "ml-tts";
 const JUMP_HIGHLIGHT_NAME = "ml-jump";
@@ -847,11 +846,8 @@ export function EpubReaderView({
         setPendingSelection({ start, end });
         return true;
       };
-      const selection = () => {
-        captureSelection(false);
-        captureSettledTouchSelection(() => captureSelection(true));
-      };
-      const touchEnd = () => captureSettledTouchSelection(() => captureSelection(true));
+      const selection = () => { captureSelection(true); };
+      const touchEnd = () => { captureSelection(true); };
       doc.addEventListener("selectionchange", selection);
       doc.addEventListener("touchend", touchEnd);
       selectionListenersRef.current.push({ doc, selection, touchEnd });
