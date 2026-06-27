@@ -129,6 +129,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
   const [booksTabOpen, setBooksTabOpen] = useState(false);
   const [booksInitialView, setBooksInitialView] = useState<"browse" | "my">("browse");
   const bookTabs = useBookTabs();
+  const [bookReaderFullscreen, setBookReaderFullscreen] = useState(false);
   const [myBooks, setMyBooks] = useState<import("../api/booksApi").UserBook[]>([]);
   const studyTabs = useStudyTabs();
   const [chatReminderSuggestion, setChatReminderSuggestion] = useState<{
@@ -1114,7 +1115,6 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
   const isCalendarActive = activeTabType === "calendar" && calendarTabOpen;
   const isBooksActive = activeTabType === "books" && booksTabOpen;
   const isBookReaderActive = activeTabType === "book" && bookTabs.openTabs.length > 0;
-  const [bookReaderFullscreen, setBookReaderFullscreen] = useState(false);
   const isNativePlatform = Capacitor.isNativePlatform();
   const isStudyActive = activeTabType === "study" && studyTabs.openTabs.length > 0;
   const isMemoGraphActive = activeTabType === "memograph" && memographTabOpen;
