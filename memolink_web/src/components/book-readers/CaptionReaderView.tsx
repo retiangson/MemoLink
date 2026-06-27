@@ -13,6 +13,7 @@ import { ReaderLoadingState } from "./ReaderLoadingState";
 import { parseCaptions, type Cue } from "./captions";
 import { highlightColorMark } from "./highlightColors";
 import { ZoomPanWrapper } from "./ZoomPanWrapper";
+import { captureSettledTouchSelection } from "./domTextHighlight";
 
 interface PendingSelection { x: number; y: number; start: number; end: number; }
 interface PersistedCueHighlight { id: number; start: number; end: number; color: string; }
@@ -221,7 +222,7 @@ export function CaptionReaderView({
 
   const swipeHandlers = usePageSwipe(() => goToPage(currentPage - 1), () => goToPage(currentPage + 1));
 
-  function handleMouseUp() {
+  function captureCurrentSelection() {
     const container = containerRef.current;
     const sel = window.getSelection();
     if (!container || !sel || sel.isCollapsed || sel.rangeCount === 0 || !container.contains(sel.anchorNode)) {
@@ -306,7 +307,8 @@ export function CaptionReaderView({
           <div
             ref={containerRef}
             onAnimationEnd={() => setPageAnim(null)}
-            onMouseUp={handleMouseUp}
+            onMouseUp={captureCurrentSelection}
+            onTouchEnd={() => captureSettledTouchSelection(captureCurrentSelection)}
             className={`relative shadow-lg rounded-xl max-w-2xl w-full h-fit p-8 ${pageAnim === "next" ? "ml-page-anim-next" : pageAnim === "prev" ? "ml-page-anim-prev" : ""}`}
             style={{ backgroundColor: colors.background, color: colors.foreground }}
           >

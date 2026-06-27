@@ -14,7 +14,7 @@ import { TTSPlayerBar } from "../TTSPlayerBar";
 import { HighlightColorPicker } from "./HighlightColorPicker";
 import { PageNavArrows } from "./PageNavArrows";
 import { ReaderLoadingState } from "./ReaderLoadingState";
-import { applySpeechHighlight, captureSelectionInContainer, applyPersistentMarks, flashOrPulseRange, offsetOfNodeInContainer } from "./domTextHighlight";
+import { applySpeechHighlight, captureSelectionInContainer, captureSettledTouchSelection, applyPersistentMarks, flashOrPulseRange, offsetOfNodeInContainer } from "./domTextHighlight";
 import { ZoomPanWrapper } from "./ZoomPanWrapper";
 import { disposeReaderAfterPaint, isNativeReaderPlatform } from "./nativeReaderLifecycle";
 
@@ -315,7 +315,7 @@ export function MobiReaderView({
 
   const swipeHandlers = usePageSwipe(() => goToPage(currentPage - 1), () => goToPage(currentPage + 1));
 
-  function handleMouseUp() {
+  function captureCurrentSelection() {
     const container = chapterRef.current;
     if (!container) {
       setPendingSelection(null);
@@ -447,7 +447,8 @@ export function MobiReaderView({
           <div
             ref={chapterRef}
             onAnimationEnd={() => setPageAnim(null)}
-            onMouseUp={handleMouseUp}
+            onMouseUp={captureCurrentSelection}
+            onTouchEnd={() => captureSettledTouchSelection(captureCurrentSelection)}
             onDoubleClick={handleDoubleClick}
             title="Double-click or double-tap a sentence to start reading from there"
             className={`relative shadow-lg rounded-xl max-w-2xl w-full h-fit p-10 leading-relaxed ${pageAnim === "next" ? "ml-page-anim-next" : pageAnim === "prev" ? "ml-page-anim-prev" : ""}`}
