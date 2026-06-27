@@ -227,17 +227,18 @@ export function CaptionReaderView({
     const sel = window.getSelection();
     if (!container || !sel || sel.isCollapsed || sel.rangeCount === 0 || !container.contains(sel.anchorNode)) {
       setPendingSelection(null);
-      return;
+      return false;
     }
     const range = sel.getRangeAt(0);
     const start = offsetInCueText(container, range.startContainer, range.startOffset);
     const end = offsetInCueText(container, range.endContainer, range.endOffset);
     if (start == null || end == null || end <= start) {
       setPendingSelection(null);
-      return;
+      return false;
     }
     const rect = range.getBoundingClientRect();
     setPendingSelection({ x: rect.left + rect.width / 2, y: rect.top, start, end });
+    return true;
   }
 
   async function handleAddHighlight(colorId: string) {
@@ -253,7 +254,7 @@ export function CaptionReaderView({
       color: colorId,
     });
     setHighlights((prev) => [...prev, created]);
-    onHighlightAdded?.();
+    void onHighlightAdded?.(created.note_id);
     window.getSelection()?.removeAllRanges();
     setPendingSelection(null);
   }

@@ -827,14 +827,14 @@ export function EpubReaderView({
         const sel = doc.getSelection?.() ?? win.getSelection?.();
         if (!sel || sel.isCollapsed || sel.rangeCount === 0) {
           if (clearInvalid && doc.hasFocus()) setPendingSelection(null);
-          return;
+          return false;
         }
         const range = sel.getRangeAt(0);
         const startEntry = textNodesRef.current.find((n) => n.node === range.startContainer);
         const endEntry = textNodesRef.current.find((n) => n.node === range.endContainer);
         if (!startEntry || !endEntry) {
           if (clearInvalid && doc.hasFocus()) setPendingSelection(null);
-          return;
+          return false;
         }
         const firstOffset = startEntry.start + range.startOffset - startEntry.nodeStart;
         const secondOffset = endEntry.start + range.endOffset - endEntry.nodeStart;
@@ -842,9 +842,10 @@ export function EpubReaderView({
         const end = Math.max(firstOffset, secondOffset);
         if (end <= start) {
           if (clearInvalid && doc.hasFocus()) setPendingSelection(null);
-          return;
+          return false;
         }
         setPendingSelection({ start, end });
+        return true;
       };
       const selection = () => {
         captureSelection(false);
@@ -872,7 +873,7 @@ export function EpubReaderView({
       color: colorId,
     });
     setHighlights((prev) => [...prev, created]);
-    onHighlightAdded?.();
+    void onHighlightAdded?.(created.note_id);
     const contents = renditionRef.current?.getContents();
     const list = (Array.isArray(contents) ? contents : contents ? [contents] : []) as Contents[];
     list.forEach((c: any) => c?.window?.getSelection?.()?.removeAllRanges());

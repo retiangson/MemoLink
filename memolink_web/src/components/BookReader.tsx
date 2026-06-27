@@ -24,7 +24,7 @@ interface Props {
   onAskAI?: (book: Book) => void;
   jumpToHighlight?: HighlightAnchor | null;
   onJumpToHighlightHandled?: () => void;
-  onHighlightAdded?: () => void;
+  onHighlightAdded?: (noteId: number) => Promise<void> | void;
   /** Called on Capacitor when fullscreen state changes so the parent can hide/show the tab bar. */
   onFullscreenChange?: (isFullscreen: boolean) => void;
   /** True only when this reader tab is the currently visible one. Passed to PdfReaderView so it

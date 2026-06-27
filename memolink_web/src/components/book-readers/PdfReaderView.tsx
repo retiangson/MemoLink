@@ -275,21 +275,22 @@ export function PdfReaderView({
     const sel = window.getSelection();
     if (!sel || sel.isCollapsed || sel.rangeCount === 0 || !textLayerRef.current?.contains(sel.anchorNode)) {
       setPendingSelection(null);
-      return;
+      return false;
     }
     const startOffset = domNodeToOffset(sel.anchorNode, sel.anchorOffset);
     const endOffset = domNodeToOffset(sel.focusNode, sel.focusOffset);
     if (startOffset == null || endOffset == null) {
       setPendingSelection(null);
-      return;
+      return false;
     }
     const start = Math.min(startOffset, endOffset);
     const end = Math.max(startOffset, endOffset);
     if (end <= start) {
       setPendingSelection(null);
-      return;
+      return false;
     }
     setPendingSelection({ start, end });
+    return true;
   }
 
   async function handleAddHighlight(colorId: string) {
@@ -304,7 +305,7 @@ export function PdfReaderView({
       color: colorId,
     });
     setHighlights((prev) => [...prev, created]);
-    onHighlightAdded?.();
+    void onHighlightAdded?.(created.note_id);
     window.getSelection()?.removeAllRanges();
     setPendingSelection(null);
   }

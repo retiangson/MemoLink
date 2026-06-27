@@ -93,9 +93,11 @@ export function PptxReaderView({
     const container = slideRef.current;
     if (!container) {
       setPendingSelection(null);
-      return;
+      return false;
     }
-    setPendingSelection(captureSelectionInContainer(container));
+    const selection = captureSelectionInContainer(container);
+    setPendingSelection(selection);
+    return selection !== null;
   }
 
   async function handleAddHighlight(colorId: string) {
@@ -110,7 +112,7 @@ export function PptxReaderView({
       color: colorId,
     });
     setHighlights((prev) => [...prev, created]);
-    onHighlightAdded?.();
+    void onHighlightAdded?.(created.note_id);
     window.getSelection()?.removeAllRanges();
     setPendingSelection(null);
   }

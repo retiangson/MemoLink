@@ -79,6 +79,7 @@ import { StudyToolIcon, getStudyToolStyle } from "../components/StudyToolIcon";
 
 type WorkspaceHook = ReturnType<typeof useWorkspace>;
 type LayoutMode = "stacked" | "columns" | "rows";
+const NOTE_REFRESH_RETRY_DELAYS_MS = [0, 250, 1000] as const;
 type TabType = "chat" | "note" | "email" | "spotify" | "whatsapp" | "calendar" | "books" | "book" | "study" | "memograph";
 type DraggableTabType = "chat" | "note" | "email" | "whatsapp";
 type AdminTab = "feedback" | "features" | "users" | "logs" | "survey" | "evaluation" | "books";
@@ -359,6 +360,21 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
   const { permission: notifPermission, requestPermission: requestNotifPermission } = useReminderNotifications(suggestions.items);
   const editor = useNoteEditor();
   const convs = useConversations(activeWorkspaceId);
+
+  async function handleBookHighlightAdded(noteId: number) {
+    for (const delay of NOTE_REFRESH_RETRY_DELAYS_MS) {
+      if (delay) await new Promise((resolve) => setTimeout(resolve, delay));
+      try {
+        const fresh = await getNote(noteId);
+        await reloadNotes();
+        editor.syncExternallyUpdatedNote(noteId, fresh);
+        return;
+      } catch {
+        // The highlight itself is already committed. Retry only the UI refresh so a
+        // transient mobile-network failure cannot turn a successful save into a duplicate.
+      }
+    }
+  }
 
   // Load the user's saved answer ratings so selections persist across reloads.
   useEffect(() => {
@@ -1818,7 +1834,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                   onProgress={handleBookProgress}
                   jumpToHighlight={tab.pendingHighlight}
                   onJumpToHighlightHandled={() => bookTabs.clearPendingHighlight(tab.book.id)}
-                  onHighlightAdded={reloadNotes}
+                  onHighlightAdded={handleBookHighlightAdded}
                   onFullscreenChange={i === bookTabs.activeIndex ? setBookReaderFullscreen : undefined}
                   isActive={isBookReaderActive && i === bookTabs.activeIndex}
                 />
