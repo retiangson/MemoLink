@@ -88,6 +88,15 @@ function getSavedRatio(key: string): number {
   return parseFloat(localStorage.getItem(key) ?? "0.5");
 }
 
+/** Returns spreadable props that hide a mounted reader tab without unmounting it.
+ *  Keeps className + aria-hidden in sync so both are updated from one call site. */
+function readerTabProps(baseClass: string, active: boolean) {
+  return {
+    className: active ? baseClass : `${baseClass} hidden`,
+    "aria-hidden": active ? (undefined as undefined) : true,
+  };
+}
+
 export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: WorkspaceHook }) {
   const isDesktop = useIsDesktop();
   const [sidebarOpen, setSidebarOpen] = useState(isDesktop);
@@ -1761,15 +1770,11 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
             canvas when isActive flips to true (Chromium frees the canvas GPU texture under
             display:none, so we skip the render while hidden and re-fire it on reveal). */}
         {activeLayoutMode === "stacked" && bookTabs.openTabs.length > 0 && (
-          <div
-            className={`flex-1 min-h-0 flex flex-col overflow-hidden ${isBookReaderActive ? "" : "hidden"}`}
-            aria-hidden={isBookReaderActive ? undefined : true}
-          >
+          <div {...readerTabProps("flex-1 min-h-0 flex flex-col overflow-hidden", isBookReaderActive)}>
             {bookTabs.openTabs.map((tab, i) => (
               <div
                 key={tab.book.id}
-                className={`flex-1 flex flex-col min-h-0 h-full ${i === bookTabs.activeIndex ? "" : "hidden"}`}
-                aria-hidden={i === bookTabs.activeIndex ? undefined : true}
+                {...readerTabProps("flex-1 flex flex-col min-h-0 h-full", i === bookTabs.activeIndex)}
               >
                 <BookReader
                   book={tab.book}
