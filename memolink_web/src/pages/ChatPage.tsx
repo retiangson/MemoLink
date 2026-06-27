@@ -88,6 +88,17 @@ function getSavedRatio(key: string): number {
   return parseFloat(localStorage.getItem(key) ?? "0.5");
 }
 
+// Hides an element without display:none so Chromium preserves the canvas GPU texture.
+// display:none causes a black screen on reveal; visibility:hidden + position:absolute does not.
+const HIDDEN_CANVAS_STYLE: React.CSSProperties = {
+  position: "absolute",
+  visibility: "hidden",
+  width: 0,
+  height: 0,
+  overflow: "hidden",
+  pointerEvents: "none",
+};
+
 export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: WorkspaceHook }) {
   const isDesktop = useIsDesktop();
   const [sidebarOpen, setSidebarOpen] = useState(isDesktop);
@@ -1756,11 +1767,22 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
         </div>
 
 
-        {/* Book readers stay mounted when switching tab types (prevents canvas teardown / black screen) */}
+        {/* Book readers stay mounted when switching tab types (prevents canvas teardown / black screen).
+            Using position:absolute+visibility:hidden instead of display:none because Chromium frees the
+            canvas GPU texture on display:none, causing a black screen when the element is revealed. */}
         {activeLayoutMode === "stacked" && bookTabs.openTabs.length > 0 && (
-          <div className={`flex-1 min-h-0 flex flex-col overflow-hidden ${isBookReaderActive ? "" : "hidden"}`}>
+          <div
+            className="flex-1 min-h-0 flex flex-col overflow-hidden"
+            style={isBookReaderActive ? undefined : HIDDEN_CANVAS_STYLE}
+            aria-hidden={isBookReaderActive ? undefined : true}
+          >
             {bookTabs.openTabs.map((tab, i) => (
-              <div key={tab.book.id} className={`flex-1 flex flex-col min-h-0 h-full ${i === bookTabs.activeIndex ? "" : "hidden"}`}>
+              <div
+                key={tab.book.id}
+                className="flex-1 flex flex-col min-h-0 h-full"
+                style={i === bookTabs.activeIndex ? undefined : HIDDEN_CANVAS_STYLE}
+                aria-hidden={i === bookTabs.activeIndex ? undefined : true}
+              >
                 <BookReader
                   book={tab.book}
                   initialPage={tab.initialPage}
