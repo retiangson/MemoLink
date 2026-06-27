@@ -99,10 +99,18 @@ export function useTTS() {
       }
       setCurrentWord({ start, end });
     };
+    // Timestamp captured right before speak() is called. Android WebView's
+    // speechSynthesis fires onend without onstart when TTS silently fails (no
+    // voice available) — but on some Android builds onstart legitimately never
+    // fires even though the speech DID play. Using elapsed time to distinguish:
+    // < 200 ms with no onstart = genuine silent failure; ≥ 200 ms = speech
+    // played (onstart just didn't fire), so continue to the next sentence.
+    const startTime = Date.now();
     u.onend = () => {
       setCurrentWord(null);
-      if (!started) {
-        // onend fired without onstart — TTS silently failed; abort to avoid cascading.
+      if (!started && Date.now() - startTime < 200) {
+        // onend fired almost immediately without onstart — TTS silently failed.
+        // Abort rather than draining the sentence queue instantly.
         if (typeof window !== "undefined") window.speechSynthesis?.cancel();
         setPlaying(false); setPaused(false); setCurrentSentenceIdx(-1);
         queueEndRef.current = null;

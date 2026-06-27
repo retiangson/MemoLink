@@ -900,9 +900,14 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
 
   function closeActiveBookTab() {
     setBookReaderFullscreen(false);
-    bookTabs.closeBookTab();
     setBooksTabOpen(true);
     setActiveTabType("books");
+    // Defer the actual unmount by one animation frame. This lets React hide the
+    // reader container (isBookReaderActive → false) and paint the books library
+    // BEFORE BookReader unmounts its canvas / epub.js iframes. On Android WebView,
+    // GPU canvas teardown and epub.js destroy() can flash a blank frame when they
+    // race with the display:none that hides the reader in the same paint.
+    requestAnimationFrame(() => bookTabsRef.current.closeBookTab());
   }
 
   // bookTabs is a freshly-built object every render (useBookTabs isn't memoized), so a
@@ -1479,7 +1484,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                   </svg>
                   <span className="max-w-[120px] truncate">{tab.book.title}</span>
                   <button
-                    onClick={(e) => { e.stopPropagation(); setBookReaderFullscreen(false); bookTabs.closeBookTab(i); }}
+                    onClick={(e) => { e.stopPropagation(); setBookReaderFullscreen(false); const tabIdx = i; requestAnimationFrame(() => bookTabsRef.current.closeBookTab(tabIdx)); }}
                     className="text-gray-600 hover:text-gray-300 w-3.5 h-3.5 flex items-center justify-center rounded-sm hover:bg-[var(--ml-bg-hover)] transition leading-none"
                   >
                     ×

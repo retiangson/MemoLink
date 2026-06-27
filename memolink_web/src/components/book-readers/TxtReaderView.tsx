@@ -56,6 +56,7 @@ export function TxtReaderView({
   const [highlights, setHighlights] = useState<BookHighlight[]>([]);
   const [progress, setProgress] = useState<{ loaded: number; total: number | null } | null>(null);
   const pageRef = useRef<HTMLDivElement | null>(null);
+  const autoContinueRef = useRef(false);
 
   const tts = useTTS();
   const [highlightColor, setHighlightColor] = useHighlightColor();
@@ -111,11 +112,27 @@ export function TxtReaderView({
 
   function goToPage(p: number) {
     if (p < 1 || p > pages.length || p === currentPage) return;
+    autoContinueRef.current = false;
     tts.stop();
     setPendingSelection(null);
     setPageAnim(p > currentPage ? "next" : "prev");
     setCurrentPage(p);
   }
+
+  function handleAutoAdvanceRead() {
+    if (currentPage >= pages.length) return;
+    autoContinueRef.current = true;
+    setPageAnim("next");
+    setCurrentPage((p) => Math.min(p + 1, pages.length));
+  }
+
+  // When auto-continue is armed, start reading the new page once currentPage updates.
+  useEffect(() => {
+    if (!autoContinueRef.current) return;
+    autoContinueRef.current = false;
+    speakPage(0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPage]);
 
   const swipeHandlers = usePageSwipe(() => goToPage(currentPage - 1), () => goToPage(currentPage + 1));
 
@@ -173,7 +190,7 @@ export function TxtReaderView({
   function speakPage(startIdx: number) {
     const text = pages[currentPage - 1] || "";
     if (!text.trim()) return;
-    tts.speak(text, startIdx);
+    tts.speak(text, startIdx, handleAutoAdvanceRead);
   }
 
   function handleReadAloud() {
