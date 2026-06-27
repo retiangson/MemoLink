@@ -128,6 +128,8 @@ function browserConnectionDetail(): Record<string, unknown> | null {
 
 interface TextNodeEntry {
   node: Text;
+  nodeStart: number;
+  nodeEnd: number;
   start: number;
   end: number;
   doc: Document;
@@ -147,12 +149,115 @@ function buildCombinedTextMap(list: Contents[]): { text: string; nodes: TextNode
       const tn = n as Text;
       const value = tn.nodeValue || "";
       if (!value) continue;
-      nodes.push({ node: tn, start: text.length, end: text.length + value.length, doc, win: c.window });
+      nodes.push({ node: tn, nodeStart: 0, nodeEnd: value.length, start: text.length, end: text.length + value.length, doc, win: c.window });
       text += value;
     }
     if (ci < list.length - 1) text += " ";
   });
   return { text, nodes };
+}
+
+function buildVisibleTextMap(list: Contents[]): { text: string; nodes: TextNodeEntry[] } {
+  let text = "";
+  const nodes: TextNodeEntry[] = [];
+  list.forEach((c: any, ci: number) => {
+    const root: Element | undefined = c?.content;
+    const doc: Document | undefined = c?.document;
+    const win: Window | undefined = c?.window;
+    if (!root || !doc || !win) return;
+    const viewportWidth = doc.documentElement.clientWidth || win.innerWidth;
+    const viewportHeight = doc.documentElement.clientHeight || win.innerHeight;
+    const walker = doc.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    let n: Node | null;
+    while ((n = walker.nextNode())) {
+      const tn = n as Text;
+      const value = tn.nodeValue || "";
+      if (!value.trim()) continue;
+      const range = doc.createRange();
+      range.selectNodeContents(tn);
+      const visible = Array.from(range.getClientRects()).some((rect) => (
+        rect.right > 0 && rect.left < viewportWidth && rect.bottom > 0 && rect.top < viewportHeight
+      ));
+      if (!visible) continue;
+      if (text && !/\s$/.test(text) && !/^\s/.test(value)) text += " ";
+      nodes.push({ node: tn, nodeStart: 0, nodeEnd: value.length, start: text.length, end: text.length + value.length, doc, win });
+      text += value;
+    }
+    if (ci < list.length - 1 && text) text += " ";
+  });
+  return text.trim() ? { text, nodes } : buildCombinedTextMap(list);
+}
+
+function buildCurrentLocationTextMap(rendition: Rendition, list: Contents[]): { text: string; nodes: TextNodeEntry[] } {
+  const location: any = (rendition as any).currentLocation?.();
+  const startRange: Range | undefined = location?.start?.cfi ? rendition.getRange(location.start.cfi) : undefined;
+  const endRange: Range | undefined = location?.end?.cfi ? rendition.getRange(location.end.cfi) : undefined;
+  const doc = startRange?.startContainer?.ownerDocument;
+  if (!startRange || !endRange || !doc || endRange.startContainer.ownerDocument !== doc) {
+    return buildVisibleTextMap(list);
+  }
+  const root = doc.body || doc.documentElement;
+  const nodeStarts = new WeakMap<Node, number>();
+  const nodeLengths = new WeakMap<Node, number>();
+  let indexedLength = 0;
+  const indexNode = (node: Node): void => {
+    const start = indexedLength;
+    nodeStarts.set(node, start);
+    if (node.nodeType === Node.TEXT_NODE) {
+      indexedLength += node.nodeValue?.length ?? 0;
+    } else {
+      node.childNodes.forEach(indexNode);
+    }
+    nodeLengths.set(node, indexedLength - start);
+  };
+  indexNode(root);
+  const offsetTo = (container: Node, offset: number): number | null => {
+    const start = nodeStarts.get(container);
+    const length = nodeLengths.get(container);
+    if (start == null || length == null) return null;
+    if (container.nodeType === Node.TEXT_NODE) {
+      return start + Math.min(Math.max(0, offset), length);
+    }
+    const childCount = container.childNodes.length;
+    if (offset <= 0) return start;
+    if (offset >= childCount) return start + length;
+    return nodeStarts.get(container.childNodes[offset]) ?? null;
+  };
+  const startOffset = offsetTo(startRange.startContainer, startRange.startOffset);
+  const endOffset = offsetTo(endRange.startContainer, endRange.startOffset);
+  if (startOffset == null || endOffset == null || endOffset <= startOffset) return buildVisibleTextMap(list);
+  const content = list.find((item: any) => item?.document === doc) as any;
+  let absoluteOffset = 0;
+  let text = "";
+  const nodes: TextNodeEntry[] = [];
+  const walker = doc.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  let node: Node | null;
+  while ((node = walker.nextNode())) {
+    const textNode = node as Text;
+    const value = textNode.nodeValue || "";
+    const absoluteEnd = absoluteOffset + value.length;
+    if (absoluteEnd > startOffset && absoluteOffset < endOffset) {
+      const nodeStart = Math.max(0, startOffset - absoluteOffset);
+      const nodeEnd = Math.min(value.length, endOffset - absoluteOffset);
+      const slice = value.slice(nodeStart, nodeEnd);
+      if (slice) {
+        if (text && !/\s$/.test(text) && !/^\s/.test(slice)) text += " ";
+        nodes.push({
+          node: textNode,
+          nodeStart,
+          nodeEnd,
+          start: text.length,
+          end: text.length + slice.length,
+          doc,
+          win: content?.window ?? doc.defaultView,
+        });
+        text += slice;
+      }
+    }
+    absoluteOffset = absoluteEnd;
+    if (absoluteOffset >= endOffset) break;
+  }
+  return text.trim() ? { text, nodes } : buildVisibleTextMap(list);
 }
 
 function ensureHighlightStyle(doc: Document) {
@@ -238,7 +343,6 @@ export function EpubReaderView({
   const clickListenersRef = useRef<{ doc: Document; fn: (e: MouseEvent) => void }[]>([]);
   const selectionListenersRef = useRef<{ doc: Document; fn: () => void }[]>([]);
   const swipeListenersRef = useRef<{ doc: Document; start: (e: TouchEvent) => void; end: (e: TouchEvent) => void }[]>([]);
-  const autoContinueRef = useRef(false);
   // epub.js callbacks (rendition.on("relocated", ...), iframe doc listeners) are registered
   // once outside React's render cycle, so they'd otherwise close over stale currentPage/numPages
   // state from whenever they were attached. These refs are updated synchronously alongside the
@@ -424,10 +528,6 @@ export function EpubReaderView({
           // Only use this event for move-bounds/text-map bookkeeping, never for the page #.
           setMoveBounds(location);
           refreshTextMap();
-          if (autoContinueRef.current) {
-            autoContinueRef.current = false;
-            speakPage(0);
-          }
         });
 
         setLoading(false);
@@ -513,8 +613,8 @@ export function EpubReaderView({
     for (const n of textNodesRef.current) {
       if (n.end <= range.start || n.start >= range.end) continue;
       if (!n.win?.CSS?.highlights || !n.win?.Highlight) continue;
-      const s = Math.max(0, range.start - n.start);
-      const e = Math.min(n.node.length, range.end - n.start);
+      const s = n.nodeStart + Math.max(0, range.start - n.start);
+      const e = n.nodeStart + Math.min(n.nodeEnd - n.nodeStart, range.end - n.start);
       if (e <= s) continue;
       const r = n.doc.createRange();
       r.setStart(n.node, s);
@@ -551,8 +651,8 @@ export function EpubReaderView({
     for (const n of textNodesRef.current) {
       if (n.end <= range.start || n.start >= range.end) continue;
       if (!n.win?.CSS?.highlights || !n.win?.Highlight) continue;
-      const s = Math.max(0, range.start - n.start);
-      const e = Math.min(n.node.length, range.end - n.start);
+      const s = n.nodeStart + Math.max(0, range.start - n.start);
+      const e = n.nodeStart + Math.min(n.nodeEnd - n.nodeStart, range.end - n.start);
       if (e <= s) continue;
       const r = n.doc.createRange();
       r.setStart(n.node, s);
@@ -599,8 +699,8 @@ export function EpubReaderView({
       for (const n of textNodesRef.current) {
         if (n.end <= h.start_offset || n.start >= h.end_offset) continue;
         if (!n.win?.CSS?.highlights || !n.win?.Highlight) continue;
-        const s = Math.max(0, h.start_offset - n.start);
-        const e = Math.min(n.node.length, h.end_offset - n.start);
+        const s = n.nodeStart + Math.max(0, h.start_offset - n.start);
+        const e = n.nodeStart + Math.min(n.nodeEnd - n.nodeStart, h.end_offset - n.start);
         if (e <= s) continue;
         const r = n.doc.createRange();
         r.setStart(n.node, s);
@@ -664,7 +764,10 @@ export function EpubReaderView({
     const contents = rendition.getContents();
     const list = (Array.isArray(contents) ? contents : [contents]) as Contents[];
     applyEpubContentsTheme(list, colorModeRef.current, fontSizeRef.current);
-    const { text, nodes } = buildCombinedTextMap(list);
+    // epub.js keeps an entire spine item in the iframe and reveals one CSS column.
+    // Reading the whole iframe makes speech run ahead while the visual page remains
+    // unchanged, so TTS and page-relative highlights use only visible text nodes.
+    const { text, nodes } = buildCurrentLocationTextMap(rendition, list);
     pageTextRef.current = text;
     textNodesRef.current = nodes;
     attachClickListeners(list);
@@ -690,7 +793,7 @@ export function EpubReaderView({
         if (!range) return;
         const entry = textNodesRef.current.find((n) => n.node === range!.startContainer);
         if (!entry) return;
-        handleSentenceClick(entry.start + range!.startOffset);
+        handleSentenceClick(entry.start + range!.startOffset - entry.nodeStart);
       };
       doc.addEventListener("dblclick", fn);
       clickListenersRef.current.push({ doc, fn });
@@ -716,8 +819,8 @@ export function EpubReaderView({
           setPendingSelection(null);
           return;
         }
-        const start = startEntry.start + range.startOffset;
-        const end = endEntry.start + range.endOffset;
+        const start = startEntry.start + range.startOffset - startEntry.nodeStart;
+        const end = endEntry.start + range.endOffset - endEntry.nodeStart;
         if (end <= start) {
           setPendingSelection(null);
           return;
@@ -781,14 +884,14 @@ export function EpubReaderView({
     });
   }
 
-  async function navigateTo(p: number) {
+  async function navigateTo(p: number, continueReading = false) {
     const epubBook = epubBookRef.current;
     const rendition = renditionRef.current;
     const numPagesNow = numPagesRef.current;
     const curPage = currentPageRef.current;
     if (!epubBook || !rendition || p < 1 || p === curPage) return;
     if (p < curPage && !canMovePrevRef.current) return;
-    if (p > curPage && p === curPage + 1 && !canMoveNextRef.current) return;
+    if (!continueReading && p > curPage && p === curPage + 1 && !canMoveNextRef.current) return;
     if (p > curPage + 1 && p > numPagesNow) return;
     if (navigatingRef.current) return;
     navigatingRef.current = true;
@@ -798,23 +901,31 @@ export function EpubReaderView({
       setPendingSelection(null);
       setPageAnim(p > curPage ? "next" : "prev");
       if (p === curPage + 1) {
+        const beforeCfi = ((rendition as any).currentLocation?.() as any)?.start?.cfi;
         await rendition.next();
+        const afterLocation: any = (rendition as any).currentLocation?.();
+        if (continueReading && beforeCfi && afterLocation?.start?.cfi === beforeCfi) return;
       } else if (p === curPage - 1) {
         await rendition.prev();
       } else {
         await rendition.display(epubBook.locations.cfiFromLocation(p - 1));
       }
-      setCurrentPageValue(p);
-      canMovePrevRef.current = p > 1;
-      setCanMovePrev(p > 1);
+      const location: any = (rendition as any).currentLocation?.();
+      const resolvedPage = Number.isFinite(location?.start?.location) ? location.start.location + 1 : p;
+      setCurrentPageValue(resolvedPage);
+      setMoveBounds(location);
       refreshTextMap();
+      if (continueReading) {
+        await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+        refreshTextMap();
+        speakPage(0);
+      }
     } finally {
       navigatingRef.current = false;
     }
   }
 
   async function goToPage(p: number) {
-    autoContinueRef.current = false;
     await navigateTo(p);
   }
 
@@ -834,9 +945,9 @@ export function EpubReaderView({
 
   function handleAutoAdvanceRead(outcome: TTSQueueOutcome) {
     if (outcome !== "completed") return;
-    if (!canMoveNextRef.current) return;
-    autoContinueRef.current = true;
-    void navigateTo(currentPageRef.current + 1);
+    const location: any = (renditionRef.current as any)?.currentLocation?.();
+    if (location?.atEnd) return;
+    void navigateTo(currentPageRef.current + 1, true);
   }
 
   function speakPage(startIdx: number) {

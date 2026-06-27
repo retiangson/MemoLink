@@ -2,22 +2,134 @@ import React, { useEffect, useRef, useState } from "react";
 import { initMobiFile } from "@lingo-reader/mobi-parser";
 import type { Mobi } from "@lingo-reader/mobi-parser";
 import {
-  fetchBookBlob, updateBookProgress, addBookHighlight, listBookHighlights, reportBookReaderError,
-  BookDownloadError, type BookHighlight,
+  fetchBookBlob, updateBookProgress, addBookmark, listBookmarks, addBookHighlight, listBookHighlights, reportBookReaderError,
+  BookDownloadError, type Bookmark, type BookHighlight,
 } from "../../api/booksApi";
 import type { ReaderViewProps } from "./format";
-import { readerSurfaceClass, readerThemeColors, readerFontSizePx, findSentenceIndexForOffset } from "./format";
-import { useTTS, splitSentences } from "../../hooks/useTTS";
+import { currentHighlightRange, readerSurfaceClass, readerThemeColors, readerFontSizePx, findSentenceIndexForOffset } from "./format";
+import { useTTS, splitSentences, type TTSQueueOutcome } from "../../hooks/useTTS";
 import { usePageSwipe } from "../../hooks/usePageSwipe";
 import { useHighlightColor } from "../../hooks/useHighlightColor";
 import { TTSPlayerBar } from "../TTSPlayerBar";
 import { HighlightColorPicker } from "./HighlightColorPicker";
 import { PageNavArrows } from "./PageNavArrows";
 import { ReaderLoadingState } from "./ReaderLoadingState";
-import { captureSelectionInContainer, applyPersistentMarks, flashOrPulseRange, offsetOfNodeInContainer } from "./domTextHighlight";
+import { applySpeechHighlight, captureSelectionInContainer, applyPersistentMarks, flashOrPulseRange, offsetOfNodeInContainer } from "./domTextHighlight";
 import { ZoomPanWrapper } from "./ZoomPanWrapper";
 
 interface PendingSelection { x: number; y: number; start: number; end: number; }
+
+const MOBI_PAGE_CHAR_LIMIT = 2000;
+
+function sanitizeMobiElement(element: Element): void {
+  element.querySelectorAll('script, iframe, object, embed, style, link[rel="stylesheet"]').forEach((node) => node.remove());
+  [element, ...Array.from(element.querySelectorAll("*"))].forEach((node) => {
+    Array.from(node.attributes).forEach((attribute) => {
+      if (attribute.name.toLowerCase().startsWith("on")) node.removeAttribute(attribute.name);
+      if ((attribute.name === "href" || attribute.name === "src") && /^\s*javascript:/i.test(attribute.value)) {
+        node.removeAttribute(attribute.name);
+      }
+    });
+  });
+}
+
+function textPageHtml(text: string): string {
+  const paragraph = document.createElement("p");
+  paragraph.textContent = text;
+  return paragraph.outerHTML;
+}
+
+function splitTextIntoPages(text: string): string[] {
+  const pages: string[] = [];
+  let remaining = text.trim();
+  while (remaining.length > MOBI_PAGE_CHAR_LIMIT) {
+    let boundary = remaining.lastIndexOf(" ", MOBI_PAGE_CHAR_LIMIT);
+    if (boundary < MOBI_PAGE_CHAR_LIMIT / 2) boundary = MOBI_PAGE_CHAR_LIMIT;
+    pages.push(textPageHtml(remaining.slice(0, boundary).trim()));
+    remaining = remaining.slice(boundary).trim();
+  }
+  if (remaining) pages.push(textPageHtml(remaining));
+  return pages;
+}
+
+function textBoundaryPoint(root: Element, offset: number): { node: Node; offset: number } {
+  const walker = root.ownerDocument.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  let consumed = 0;
+  let lastText: Text | null = null;
+  let node: Node | null;
+  while ((node = walker.nextNode())) {
+    const textNode = node as Text;
+    const length = textNode.nodeValue?.length ?? 0;
+    lastText = textNode;
+    if (offset <= consumed + length) {
+      return { node: textNode, offset: Math.max(0, offset - consumed) };
+    }
+    consumed += length;
+  }
+  return lastText
+    ? { node: lastText, offset: lastText.nodeValue?.length ?? 0 }
+    : { node: root, offset: root.childNodes.length };
+}
+
+function splitElementIntoPages(element: Element): string[] {
+  const text = element.textContent || "";
+  const pages: string[] = [];
+  let start = 0;
+  while (start < text.length) {
+    let end = Math.min(text.length, start + MOBI_PAGE_CHAR_LIMIT);
+    if (end < text.length) {
+      const whitespace = text.lastIndexOf(" ", end);
+      if (whitespace > start + MOBI_PAGE_CHAR_LIMIT / 2) end = whitespace;
+    }
+    const startPoint = textBoundaryPoint(element, start);
+    const endPoint = textBoundaryPoint(element, end);
+    const range = element.ownerDocument.createRange();
+    range.setStart(startPoint.node, startPoint.offset);
+    range.setEnd(endPoint.node, endPoint.offset);
+    const pageElement = element.cloneNode(false) as Element;
+    // A source element split across pages must not duplicate document IDs.
+    pageElement.removeAttribute("id");
+    pageElement.appendChild(range.cloneContents());
+    if (pageElement.textContent?.trim() || pageElement.querySelector("img, svg, video, audio")) {
+      pages.push(pageElement.outerHTML);
+    }
+    start = end;
+  }
+  return pages;
+}
+
+function paginateMobiChapter(html: string): string[] {
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  sanitizeMobiElement(doc.body);
+  const pages: string[] = [];
+  let pageParts: string[] = [];
+  let pageChars = 0;
+  const flush = () => {
+    if (pageParts.length) pages.push(pageParts.join(""));
+    pageParts = [];
+    pageChars = 0;
+  };
+  Array.from(doc.body.childNodes).forEach((node) => {
+    const content = (node.textContent || "").trim();
+    if (!content && node.nodeType !== Node.ELEMENT_NODE) return;
+    const chars = content.length;
+    if (chars > MOBI_PAGE_CHAR_LIMIT) {
+      flush();
+      pages.push(...(
+        node.nodeType === Node.ELEMENT_NODE
+          ? splitElementIntoPages(node as Element)
+          : splitTextIntoPages(content)
+      ));
+      return;
+    }
+    if (pageChars > 0 && pageChars + chars > MOBI_PAGE_CHAR_LIMIT) flush();
+    pageParts.push(node.nodeType === Node.ELEMENT_NODE ? (node as Element).outerHTML : textPageHtml(content));
+    pageChars += chars;
+  });
+  flush();
+  if (pages.length === 0 && doc.body.textContent?.trim()) return splitTextIntoPages(doc.body.textContent);
+  return pages;
+}
 
 function describeMobiLoadError(error: unknown): string {
   if (error instanceof BookDownloadError) {
@@ -60,17 +172,20 @@ export function MobiReaderView({
 }: ReaderViewProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [chapterCount, setChapterCount] = useState(0);
+  const [pageCount, setPageCount] = useState(0);
   const [currentPage, setCurrentPage] = useState(Math.max(1, initialPage || 1));
   const [pageAnim, setPageAnim] = useState<"next" | "prev" | null>(null);
   const [pendingSelection, setPendingSelection] = useState<PendingSelection | null>(null);
   const [chapterHtml, setChapterHtml] = useState("");
+  const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
+  const [showBookmarks, setShowBookmarks] = useState(false);
   const [highlights, setHighlights] = useState<BookHighlight[]>([]);
   const [progress, setProgress] = useState<{ loaded: number; total: number | null } | null>(null);
 
   const mobiRef = useRef<Mobi | null>(null);
-  const spineRef = useRef<{ id: string }[]>([]);
+  const pagesRef = useRef<string[]>([]);
   const chapterRef = useRef<HTMLDivElement | null>(null);
+  const autoContinueRef = useRef(false);
 
   const tts = useTTS();
   const [highlightColor, setHighlightColor] = useHighlightColor();
@@ -91,9 +206,11 @@ export function MobiReaderView({
         }
         mobiRef.current = mobi;
         const spine = mobi.getSpine();
-        spineRef.current = spine;
-        setChapterCount(spine.length);
-        setCurrentPage((p) => Math.min(Math.max(1, p), Math.max(1, spine.length)));
+        const pages = spine.flatMap((chapter) => paginateMobiChapter(mobi.loadChapter(chapter.id)?.html ?? ""));
+        if (pages.length === 0) throw new Error("The MOBI file contains no readable pages.");
+        pagesRef.current = pages;
+        setPageCount(pages.length);
+        setCurrentPage((p) => Math.min(Math.max(1, p), Math.max(1, pages.length)));
       } catch (loadError) {
         if (!cancelled) {
           console.error("MOBI reader failed", loadError);
@@ -122,15 +239,16 @@ export function MobiReaderView({
   }, [book.id]);
 
   useEffect(() => {
-    if (loading || !mobiRef.current || spineRef.current.length === 0) return;
-    const chapter = spineRef.current[currentPage - 1];
-    if (!chapter) return;
-    const processed = mobiRef.current.loadChapter(chapter.id);
-    setChapterHtml(processed?.html ?? "");
+    if (loading || pagesRef.current.length === 0) return;
+    setChapterHtml(pagesRef.current[currentPage - 1] ?? "");
   }, [currentPage, loading]);
 
   useEffect(() => {
     listBookHighlights(book.id).then(setHighlights).catch(() => {});
+  }, [book.id]);
+
+  useEffect(() => {
+    listBookmarks(book.id).then(setBookmarks).catch(() => {});
   }, [book.id]);
 
   // Re-paint persisted highlights every time the chapter content actually changes —
@@ -142,20 +260,47 @@ export function MobiReaderView({
   }, [highlights, currentPage, chapterHtml]);
 
   useEffect(() => {
-    if (loading || chapterCount === 0) return;
+    if (loading || pageCount === 0) return;
     const t = setTimeout(() => {
-      updateBookProgress(book.id, currentPage, chapterCount).catch(() => {});
-      onProgress?.(currentPage, chapterCount);
+      updateBookProgress(book.id, currentPage, pageCount).catch(() => {});
+      onProgress?.(currentPage, pageCount);
     }, 600);
     return () => clearTimeout(t);
-  }, [currentPage, chapterCount, loading, book.id, onProgress]);
+  }, [currentPage, pageCount, loading, book.id, onProgress]);
 
   useEffect(() => {
     return () => { window.speechSynthesis.cancel(); };
   }, []);
 
+  useEffect(() => {
+    const expectedHtml = pagesRef.current[currentPage - 1] ?? "";
+    if (!autoContinueRef.current || !chapterHtml || chapterHtml !== expectedHtml) return;
+    const frame = requestAnimationFrame(() => {
+      autoContinueRef.current = false;
+      speakChapter(0);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [currentPage, chapterHtml]);
+
+  useEffect(() => {
+    const container = chapterRef.current;
+    if (!container || !tts.playing) {
+      if (container) applySpeechHighlight(container, null);
+      return;
+    }
+    const range = currentHighlightRange(
+      container.textContent || "",
+      tts.sentencesList,
+      tts.currentSentenceIdx,
+      tts.currentWord,
+    );
+    applySpeechHighlight(container, range);
+    return () => applySpeechHighlight(container, null);
+  }, [chapterHtml, tts.playing, tts.currentSentenceIdx, tts.currentWord, tts.sentencesList]);
+
   function goToPage(p: number) {
-    if (p < 1 || p > chapterCount || p === currentPage) return;
+    if (p < 1 || p > pageCount || p === currentPage) return;
+    autoContinueRef.current = false;
     tts.stop();
     setPendingSelection(null);
     setPageAnim(p > currentPage ? "next" : "prev");
@@ -206,9 +351,25 @@ export function MobiReaderView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [jumpToHighlight, currentPage, loading]);
 
+  function handleAutoAdvanceRead(outcome: TTSQueueOutcome) {
+    if (outcome !== "completed" || currentPage >= pageCount) return;
+    autoContinueRef.current = true;
+    setPageAnim("next");
+    setCurrentPage((page) => Math.min(page + 1, pageCount));
+  }
+
+  async function handleBookmark() {
+    try {
+      const bookmark = await addBookmark(book.id, currentPage);
+      setBookmarks((previous) => [bookmark, ...previous.filter((item) => item.page_number !== currentPage)]);
+    } catch {
+      // Bookmark failures are non-fatal; the reader remains usable.
+    }
+  }
+
   function speakChapter(startIdx: number) {
     const text = chapterRef.current?.textContent || "";
-    if (text.trim()) tts.speak(text, startIdx);
+    if (text.trim()) tts.speak(text, startIdx, handleAutoAdvanceRead);
   }
 
   function handleReadAloud() {
@@ -219,11 +380,33 @@ export function MobiReaderView({
     speakChapter(0);
   }
 
-  function handleDoubleClick() {
+  function handleDoubleClick(event: React.MouseEvent<HTMLDivElement>) {
     const container = chapterRef.current;
-    const sel = window.getSelection();
-    if (!container || !sel || sel.rangeCount === 0) return;
-    const offset = offsetOfNodeInContainer(container, sel.anchorNode as Node, sel.anchorOffset);
+    if (!container) return;
+    const doc = container.ownerDocument as Document & {
+      caretRangeFromPoint?: (x: number, y: number) => Range | null;
+      caretPositionFromPoint?: (x: number, y: number) => { offsetNode: Node; offset: number } | null;
+    };
+    let node: Node | null = null;
+    let nodeOffset = 0;
+    const pointRange = doc.caretRangeFromPoint?.(event.clientX, event.clientY);
+    if (pointRange) {
+      node = pointRange.startContainer;
+      nodeOffset = pointRange.startOffset;
+    } else {
+      const pointPosition = doc.caretPositionFromPoint?.(event.clientX, event.clientY);
+      if (pointPosition) {
+        node = pointPosition.offsetNode;
+        nodeOffset = pointPosition.offset;
+      }
+    }
+    if (!node || !container.contains(node)) {
+      const selection = window.getSelection();
+      if (!selection || selection.rangeCount === 0 || !container.contains(selection.anchorNode)) return;
+      node = selection.anchorNode;
+      nodeOffset = selection.anchorOffset;
+    }
+    const offset = offsetOfNodeInContainer(container, node, nodeOffset);
     window.getSelection()?.removeAllRanges();
     setPendingSelection(null);
     if (offset == null) return;
@@ -235,6 +418,7 @@ export function MobiReaderView({
   }
 
   const colors = readerThemeColors(colorMode);
+  const isBookmarked = bookmarks.some((bookmark) => bookmark.page_number === currentPage);
 
   return (
     <>
@@ -243,7 +427,7 @@ export function MobiReaderView({
         surfaceClass={readerSurfaceClass(colorMode)}
         onSwipeLeft={() => goToPage(currentPage + 1)}
         onSwipeRight={() => goToPage(currentPage - 1)}
-        overlay={!loading && !error ? <PageNavArrows onPrev={() => goToPage(currentPage - 1)} onNext={() => goToPage(currentPage + 1)} canPrev={currentPage > 1} canNext={currentPage < chapterCount} /> : undefined}
+        overlay={!loading && !error ? <PageNavArrows onPrev={() => goToPage(currentPage - 1)} onNext={() => goToPage(currentPage + 1)} canPrev={currentPage > 1} canNext={currentPage < pageCount} /> : undefined}
       >
       <div
         className={`flex-1 ${isFullscreen ? "overflow-visible" : "overflow-auto"} flex justify-center py-6 px-4 relative transition-colors ${readerSurfaceClass(colorMode)}`}
@@ -259,6 +443,7 @@ export function MobiReaderView({
             onAnimationEnd={() => setPageAnim(null)}
             onMouseUp={handleMouseUp}
             onDoubleClick={handleDoubleClick}
+            title="Double-click or double-tap a sentence to start reading from there"
             className={`relative shadow-lg rounded-xl max-w-2xl w-full h-fit p-10 leading-relaxed ${pageAnim === "next" ? "ml-page-anim-next" : pageAnim === "prev" ? "ml-page-anim-prev" : ""}`}
             style={{ backgroundColor: colors.background, color: colors.foreground, fontSize: `${readerFontSizePx(fontSize, 15)}px` }}
             dangerouslySetInnerHTML={{ __html: chapterHtml }}
@@ -288,6 +473,37 @@ export function MobiReaderView({
         <div className="flex items-center justify-between px-5 py-3 border-t border-[var(--ml-bg-hover)] shrink-0 gap-3">
           <div className="flex items-center gap-2">
             <button
+              onClick={handleBookmark}
+              className={`px-2.5 py-1.5 text-xs rounded-lg border transition ${isBookmarked ? "border-indigo-500/40 text-indigo-400 bg-indigo-500/10" : "border-[var(--ml-bg-hover)] text-gray-400 hover:bg-[var(--ml-bg-hover)]"}`}
+            >
+              {isBookmarked ? "★ Bookmarked" : "☆ Bookmark"}
+            </button>
+            <div className="relative">
+              <button
+                onClick={() => setShowBookmarks((visible) => !visible)}
+                className="px-2.5 py-1.5 text-xs rounded-lg text-gray-400 border border-[var(--ml-bg-hover)] hover:bg-[var(--ml-bg-hover)] transition"
+              >
+                Bookmarks ({bookmarks.length})
+              </button>
+              {showBookmarks && (
+                <div className="absolute bottom-full left-0 mb-2 w-48 max-h-56 overflow-auto bg-[var(--ml-bg-surface)] border border-[var(--ml-bg-hover)] rounded-lg shadow-xl p-1.5 flex flex-col gap-0.5">
+                  {bookmarks.length === 0 ? (
+                    <p className="text-xs text-gray-600 px-2 py-1.5">No bookmarks yet.</p>
+                  ) : (
+                    bookmarks.map((bookmark) => (
+                      <button
+                        key={bookmark.id}
+                        onClick={() => { goToPage(bookmark.page_number); setShowBookmarks(false); }}
+                        className="text-left text-xs text-gray-300 hover:bg-[#1a1a24] rounded-md px-2 py-1.5 transition"
+                      >
+                        Page {bookmark.page_number}
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+            <button
               onClick={handleReadAloud}
               className="px-2.5 py-1.5 text-xs rounded-lg text-gray-400 border border-[var(--ml-bg-hover)] hover:bg-[var(--ml-bg-hover)] transition"
             >
@@ -305,11 +521,11 @@ export function MobiReaderView({
               Prev
             </button>
             <span className="text-xs text-gray-500 w-24 text-center shrink-0">
-              Chapter {currentPage} / {chapterCount}
+              Page {currentPage} / {pageCount}
             </span>
             <button
               onClick={() => goToPage(currentPage + 1)}
-              disabled={currentPage >= chapterCount}
+              disabled={currentPage >= pageCount}
               className="px-2.5 py-1.5 text-xs rounded-lg text-gray-400 border border-[var(--ml-bg-hover)] hover:bg-[var(--ml-bg-hover)] transition disabled:opacity-30"
             >
               Next
