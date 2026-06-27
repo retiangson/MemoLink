@@ -898,6 +898,30 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
     }
   }
 
+  // useBookTabs returns a new object each render. Deferred callbacks must resolve
+  // against the latest tabs, while the captured book ID remains stable if another
+  // tab is closed before the animation frame runs.
+  const bookTabsRef = useRef(bookTabs);
+  bookTabsRef.current = bookTabs;
+
+  function closeBookTabNextFrame(index = bookTabsRef.current.activeIndex) {
+    const bookId = bookTabsRef.current.openTabs[index]?.book.id;
+    if (bookId == null) return;
+    requestAnimationFrame(() => {
+      const currentIndex = bookTabsRef.current.openTabs.findIndex((tab) => tab.book.id === bookId);
+      if (currentIndex >= 0) bookTabsRef.current.closeBookTab(currentIndex);
+    });
+  }
+
+  function closeBookTabFromTabBar(index: number) {
+    setBookReaderFullscreen(false);
+    if (index === bookTabs.activeIndex && bookTabs.openTabs.length === 1) {
+      setBooksTabOpen(true);
+      setActiveTabType("books");
+    }
+    closeBookTabNextFrame(index);
+  }
+
   function closeActiveBookTab() {
     setBookReaderFullscreen(false);
     setBooksTabOpen(true);
@@ -907,15 +931,8 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
     // BEFORE BookReader unmounts its canvas / epub.js iframes. On Android WebView,
     // GPU canvas teardown and epub.js destroy() can flash a blank frame when they
     // race with the display:none that hides the reader in the same paint.
-    requestAnimationFrame(() => bookTabsRef.current.closeBookTab());
+    closeBookTabNextFrame();
   }
-
-  // bookTabs is a freshly-built object every render (useBookTabs isn't memoized), so a
-  // ref is needed to read its latest value from a stable callback below — the readers'
-  // own debounce effects depend on onProgress's identity, so a new function each render
-  // would keep resetting their save timer and progress would rarely persist.
-  const bookTabsRef = useRef(bookTabs);
-  bookTabsRef.current = bookTabs;
 
   // Readers persist progress to the backend themselves; this just mirrors it into the
   // local myBooks list immediately so the right panel's Continue Reading list (and any
@@ -1484,7 +1501,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                   </svg>
                   <span className="max-w-[120px] truncate">{tab.book.title}</span>
                   <button
-                    onClick={(e) => { e.stopPropagation(); setBookReaderFullscreen(false); const tabIdx = i; requestAnimationFrame(() => bookTabsRef.current.closeBookTab(tabIdx)); }}
+                    onClick={(e) => { e.stopPropagation(); closeBookTabFromTabBar(i); }}
                     className="text-gray-600 hover:text-gray-300 w-3.5 h-3.5 flex items-center justify-center rounded-sm hover:bg-[var(--ml-bg-hover)] transition leading-none"
                   >
                     ×

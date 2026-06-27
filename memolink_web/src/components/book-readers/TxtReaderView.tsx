@@ -1,11 +1,11 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   fetchBookBlob, updateBookProgress, addBookmark, listBookmarks, addBookHighlight, listBookHighlights,
   type Bookmark, type BookHighlight,
 } from "../../api/booksApi";
 import type { ReaderViewProps } from "./format";
 import { readerSurfaceClass, readerThemeColors, readerFontSizePx, findSentenceIndexForOffset } from "./format";
-import { useTTS, splitSentences } from "../../hooks/useTTS";
+import { useTTS, splitSentences, type TTSQueueOutcome } from "../../hooks/useTTS";
 import { usePageSwipe } from "../../hooks/usePageSwipe";
 import { useHighlightColor } from "../../hooks/useHighlightColor";
 import { TTSPlayerBar } from "../TTSPlayerBar";
@@ -119,20 +119,26 @@ export function TxtReaderView({
     setCurrentPage(p);
   }
 
-  function handleAutoAdvanceRead() {
+  const handleAutoAdvanceRead = useCallback((outcome: TTSQueueOutcome) => {
+    if (outcome !== "completed") return;
     if (currentPage >= pages.length) return;
     autoContinueRef.current = true;
     setPageAnim("next");
     setCurrentPage((p) => Math.min(p + 1, pages.length));
-  }
+  }, [currentPage, pages.length]);
+
+  const speakPage = useCallback((startIdx: number) => {
+    const text = pages[currentPage - 1] || "";
+    if (!text.trim()) return;
+    tts.speak(text, startIdx, handleAutoAdvanceRead);
+  }, [currentPage, handleAutoAdvanceRead, pages, tts.speak]);
 
   // When auto-continue is armed, start reading the new page once currentPage updates.
   useEffect(() => {
     if (!autoContinueRef.current) return;
     autoContinueRef.current = false;
     speakPage(0);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentPage]);
+  }, [currentPage, speakPage]);
 
   const swipeHandlers = usePageSwipe(() => goToPage(currentPage - 1), () => goToPage(currentPage + 1));
 
@@ -185,12 +191,6 @@ export function TxtReaderView({
     } catch {
       // ignore
     }
-  }
-
-  function speakPage(startIdx: number) {
-    const text = pages[currentPage - 1] || "";
-    if (!text.trim()) return;
-    tts.speak(text, startIdx, handleAutoAdvanceRead);
   }
 
   function handleReadAloud() {

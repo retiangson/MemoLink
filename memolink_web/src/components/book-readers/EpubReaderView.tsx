@@ -11,7 +11,7 @@ import {
 } from "../../api/booksApi";
 import type { ReaderViewProps, HighlightAnchor } from "./format";
 import { currentHighlightRange, readerThemeColors, readerFontScale, findSentenceIndexForOffset, readerSurfaceClass } from "./format";
-import { useTTS, splitSentences } from "../../hooks/useTTS";
+import { useTTS, splitSentences, type TTSQueueOutcome } from "../../hooks/useTTS";
 import { usePageSwipe, computeSwipeDirection } from "../../hooks/usePageSwipe";
 import { useHighlightColor } from "../../hooks/useHighlightColor";
 import { TTSPlayerBar } from "../TTSPlayerBar";
@@ -832,7 +832,8 @@ export function EpubReaderView({
     }
   }
 
-  function handleAutoAdvanceRead() {
+  function handleAutoAdvanceRead(outcome: TTSQueueOutcome) {
+    if (outcome !== "completed") return;
     if (!canMoveNextRef.current) return;
     autoContinueRef.current = true;
     void navigateTo(currentPageRef.current + 1);
