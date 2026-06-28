@@ -174,5 +174,21 @@ jobs:
             --timeout 300 \
             --memory-size 512
 
+      - name: Allow Lambda to dispatch durable background jobs to itself
+        shell: bash
+        run: |
+          FUNCTION_NAME="${{ secrets.LAMBDA_FUNCTION_NAME }}"
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          FUNCTION_ARN=$(aws lambda get-function --function-name "$FUNCTION_NAME" --query Configuration.FunctionArn --output text)
+          aws lambda remove-permission \
+            --function-name "$FUNCTION_NAME" \
+            --statement-id memolink-self-invoke 2>/dev/null || true
+          aws lambda add-permission \
+            --function-name "$FUNCTION_NAME" \
+            --statement-id memolink-self-invoke \
+            --action lambda:InvokeFunction \
+            --principal "$ACCOUNT_ID" \
+            --source-arn "$FUNCTION_ARN"
+
       - name: Print deployed image
         run: echo "Deployed ${{ steps.build.outputs.image_uri }} to Lambda"

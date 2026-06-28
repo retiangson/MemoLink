@@ -4,6 +4,8 @@ import re
 from memolink_backend.business.services import slash_command_service as scs
 from memolink_backend.business.services.slash_command_service import SlashCommandService, _parse
 from memolink_backend.contracts.slash_command_dtos import SlashCommandRequestDTO
+from memolink_backend.contracts.slash_command_dtos import EquationSolveRequestDTO
+from pydantic import ValidationError
 from tests.fakes.conversation_repository import FakeConversationRepository
 from tests.fakes.embedding_service import FakeEmbeddingService
 from tests.fakes.note_repository import FakeNoteRepository
@@ -112,7 +114,8 @@ def test_solve_equation_appends_escaped_step_by_step_solution(monkeypatch):
     assert "Equation Solution" in updated.content
     assert "&lt;script&gt;alert(1)&lt;/script&gt;" in updated.content
     assert "<script>" not in updated.content
-    assert "<strong>Answer:</strong> x = 3" in updated.content
+    assert 'data-equation-label="Final answer"' in updated.content
+    assert 'data-memolink-equation-latex="x = 3"' in updated.content
 
 
 def test_solve_equation_rejects_note_owned_by_another_user():
@@ -140,6 +143,88 @@ def test_solve_equation_rejects_invalid_ai_response(monkeypatch):
         assert "invalid" in str(exc)
     else:
         raise AssertionError("Expected malformed AI output to be rejected")
+
+
+def test_complete_equation_appends_escaped_completion(monkeypatch):
+    repo = FakeNoteRepository()
+    note = repo.create_note(7, "Sequence", "<p>1 + 2 + 3 + ...</p>", "manual")
+    service = _build_service(repo)
+    monkeypatch.setattr(
+        service,
+        "_ai",
+        lambda *args, **kwargs: '{"original":"1 + 2 + 3 + ...","completed":"1 + 2 + 3 + ... + n = n(n+1)/2","steps":["Pair first and last terms","There are n/2 pairs"],"explanation":"Works for positive integer <script>n</script>."}',
+    )
+
+    updated = service.complete_equation(7, note.id, "gpt-5")
+
+    assert "Equation Completion" in updated.content
+    assert "n(n+1)/2" in updated.content
+    assert "&lt;script&gt;n&lt;/script&gt;" in updated.content
+    assert "<script>" not in updated.content
+
+
+def test_complete_equation_rejects_ambiguous_ai_response(monkeypatch):
+    repo = FakeNoteRepository()
+    note = repo.create_note(7, "Incomplete", "x +", "manual")
+    service = _build_service(repo)
+    monkeypatch.setattr(service, "_ai", lambda *args, **kwargs: '{"original":"x +","completed":"","steps":[]}')
+
+    try:
+        service.complete_equation(7, note.id)
+    except RuntimeError as exc:
+        assert "incomplete" in str(exc)
+    else:
+        raise AssertionError("Expected incomplete AI output to be rejected")
+
+
+def test_solve_equation_accepts_temporary_handwriting_image_for_empty_note(monkeypatch):
+    repo = FakeNoteRepository()
+    note = repo.create_note(7, "Handwritten", "", "manual")
+    service = _build_service(repo)
+    captured = {}
+
+    def fake_ai(model, messages, user_id):
+        captured["content"] = messages[-1]["content"]
+        return '{"equation":"x + 2 = 5","steps":["Subtract 2"],"answer":"x = 3","verification":"3 + 2 = 5"}'
+
+    monkeypatch.setattr(service, "_ai", fake_ai)
+    image = "data:image/png;base64,AAAA"
+    updated = service.solve_equation(7, note.id, "gpt-5", image, 2)
+
+    assert "Equation Solution" in updated.content
+    assert updated.content.startswith("<p><br></p><p><br></p>")
+    assert captured["content"][1]["image_url"]["url"] == image
+
+
+def test_solve_equation_rejects_empty_note_without_image():
+    repo = FakeNoteRepository()
+    note = repo.create_note(7, "Handwritten", "", "manual")
+    service = _build_service(repo)
+
+    try:
+        service.solve_equation(7, note.id, "gpt-5")
+    except ValueError as exc:
+        assert str(exc) == "Add an equation to the note before solving it"
+    else:
+        raise AssertionError("Expected empty note without image to be rejected")
+
+
+def test_equation_prompt_omits_image_for_text_only_model():
+    prompt = "Solve x + 2 = 5"
+    image = "data:image/png;base64,AAAA"
+
+    content = SlashCommandService._equation_user_content(prompt, image, "gpt-3.5-turbo")
+
+    assert content == prompt
+
+
+def test_equation_request_rejects_non_image_data_url():
+    try:
+        EquationSolveRequestDTO(note_id=1, drawing_image_data_url="data:text/plain;base64,AAAA")
+    except ValidationError as exc:
+        assert "PNG or JPEG" in str(exc)
+    else:
+        raise AssertionError("Expected non-image data URL to be rejected")
 
 
 def test_parse_discussion_bare_question_keeps_question_text():

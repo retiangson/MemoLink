@@ -145,7 +145,17 @@ interface Props {
 }
 
 type View = "browse" | "my";
-const PAGE_SIZE = 12;
+const PAGE_SIZE_OPTIONS = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100] as const;
+const BOOKS_PAGE_SIZE_KEY = "memolink-books-page-size";
+
+function initialPageSize(): number {
+  try {
+    const saved = Number(localStorage.getItem(BOOKS_PAGE_SIZE_KEY));
+    return PAGE_SIZE_OPTIONS.includes(saved as typeof PAGE_SIZE_OPTIONS[number]) ? saved : 20;
+  } catch {
+    return 20;
+  }
+}
 
 export function BooksLibraryModal({ show, onClose, initialView = "browse", onMyBooksChanged, onOpenBook }: Props) {
   const [view, setView] = useState<View>(initialView);
@@ -154,6 +164,7 @@ export function BooksLibraryModal({ show, onClose, initialView = "browse", onMyB
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState<BookCategory | "all">("all");
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(initialPageSize);
   const [browseTotal, setBrowseTotal] = useState(0);
   const [availableTotal, setAvailableTotal] = useState(0);
   const [browsePages, setBrowsePages] = useState(1);
@@ -167,7 +178,7 @@ export function BooksLibraryModal({ show, onClose, initialView = "browse", onMyB
         search: search || undefined,
         format: category !== "all" ? category : undefined,
         page,
-        page_size: PAGE_SIZE,
+        page_size: pageSize,
       });
       setBooks(result.items);
       setBrowseTotal(result.total);
@@ -182,7 +193,7 @@ export function BooksLibraryModal({ show, onClose, initialView = "browse", onMyB
     } finally {
       setLoading(false);
     }
-  }, [search, category, page]);
+  }, [search, category, page, pageSize]);
 
   const loadMyBooks = useCallback(async () => {
     setLoading(true);
@@ -213,7 +224,11 @@ export function BooksLibraryModal({ show, onClose, initialView = "browse", onMyB
 
   useEffect(() => {
     setPage(1);
-  }, [view, search, category]);
+  }, [view, search, category, pageSize]);
+
+  useEffect(() => {
+    try { localStorage.setItem(BOOKS_PAGE_SIZE_KEY, String(pageSize)); } catch { /* storage can be unavailable */ }
+  }, [pageSize]);
 
   async function handleBorrow(book: Book) {
     setBorrowingId(book.id);
@@ -270,17 +285,17 @@ export function BooksLibraryModal({ show, onClose, initialView = "browse", onMyB
   }, [myBooks, search, category]);
 
   const activeItemsCount = view === "browse" ? browseTotal : filteredMyBooks.length;
-  const totalPages = view === "browse" ? browsePages : Math.max(1, Math.ceil(filteredMyBooks.length / PAGE_SIZE));
+  const totalPages = view === "browse" ? browsePages : Math.max(1, Math.ceil(filteredMyBooks.length / pageSize));
   const safePage = Math.min(page, totalPages);
   const pagedBooks = books;
-  const pagedMyBooks = filteredMyBooks.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+  const pagedMyBooks = filteredMyBooks.slice((safePage - 1) * pageSize, safePage * pageSize);
 
   function renderPager() {
-    if (loading || activeItemsCount <= PAGE_SIZE) return null;
+    if (loading || activeItemsCount <= pageSize) return null;
     return (
       <div className="flex items-center justify-between gap-3 pt-4">
         <p className="text-xs text-gray-500">
-          Showing {(safePage - 1) * PAGE_SIZE + 1}-{Math.min(safePage * PAGE_SIZE, activeItemsCount)} of {activeItemsCount}
+          Showing {(safePage - 1) * pageSize + 1}-{Math.min(safePage * pageSize, activeItemsCount)} of {activeItemsCount}
         </p>
         <div className="flex items-center gap-2">
           <button
@@ -378,6 +393,21 @@ export function BooksLibraryModal({ show, onClose, initialView = "browse", onMyB
               </button>
             );
           })}
+          <label className="ml-auto inline-flex items-center gap-2 text-[11px] text-gray-500">
+            Books per page
+            <select
+              value={pageSize}
+              onChange={(event) => {
+                setPage(1);
+                setPageSize(Number(event.target.value));
+              }}
+              className="rounded-lg border border-[var(--ml-bg-hover)] bg-[var(--ml-bg-surface)] px-2 py-1 text-xs text-gray-300 focus:border-indigo-500/50 focus:outline-none"
+            >
+              {PAGE_SIZE_OPTIONS.map((size) => (
+                <option key={size} value={size}>{size}</option>
+              ))}
+            </select>
+          </label>
         </div>
         {view === "browse" && !loading && (
           <p className="max-w-4xl mx-auto mt-2 text-[11px] text-gray-500">

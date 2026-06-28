@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import type { useCalendar } from "../hooks/useCalendar";
 import type { CalendarOccurrence } from "../api/calendarApi";
 import { CalendarEventModal, type CalendarEventFields } from "./CalendarEventModal";
@@ -6,6 +6,38 @@ import { describeRecurrence } from "../utils/recurrence";
 
 const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 const WEEKDAY_HEADERS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const EVENTS_PER_DAY_STORAGE_KEY = "memolink-calendar-events-per-day";
+const MONTHS_TO_DISPLAY_STORAGE_KEY = "memolink-calendar-months-to-display";
+const DEFAULT_EVENTS_PER_DAY = 3;
+const DEFAULT_MONTHS_TO_DISPLAY = 1;
+
+function readEventsPerDay(): number {
+  if (typeof window === "undefined") return DEFAULT_EVENTS_PER_DAY;
+  try {
+    const value = Number(window.localStorage.getItem(EVENTS_PER_DAY_STORAGE_KEY));
+    return Number.isInteger(value) && value >= 1 && value <= 12 ? value : DEFAULT_EVENTS_PER_DAY;
+  } catch {
+    return DEFAULT_EVENTS_PER_DAY;
+  }
+}
+
+function readMonthsToDisplay(): number {
+  if (typeof window === "undefined") return DEFAULT_MONTHS_TO_DISPLAY;
+  try {
+    const value = Number(window.localStorage.getItem(MONTHS_TO_DISPLAY_STORAGE_KEY));
+    return Number.isInteger(value) && value >= 1 && value <= 12 ? value : DEFAULT_MONTHS_TO_DISPLAY;
+  } catch {
+    return DEFAULT_MONTHS_TO_DISPLAY;
+  }
+}
+
+function monthGridDays(anchor: Date): Date[] {
+  const firstOfMonth = new Date(anchor.getFullYear(), anchor.getMonth(), 1);
+  const gridStart = new Date(anchor.getFullYear(), anchor.getMonth(), 1 - firstOfMonth.getDay());
+  return Array.from({ length: 42 }, (_, index) => (
+    new Date(gridStart.getFullYear(), gridStart.getMonth(), gridStart.getDate() + index)
+  ));
+}
 
 function toISO(d: Date): string {
   return [d.getFullYear(), String(d.getMonth() + 1).padStart(2, "0"), String(d.getDate()).padStart(2, "0")].join("-");
@@ -27,6 +59,20 @@ export function CalendarTabContent({ calendar }: CalendarTabContentProps) {
   const [view, setView] = useState<"month" | "agenda">("month");
   const [modalState, setModalState] = useState<{ event: CalendarOccurrence | null; defaultDate: string | null } | null>(null);
   const [expandedDate, setExpandedDate] = useState<string | null>(null);
+  const [eventsPerDay, setEventsPerDay] = useState(readEventsPerDay);
+  const [monthsToDisplay, setMonthsToDisplay] = useState(readMonthsToDisplay);
+
+  function changeEventsPerDay(value: number) {
+    const safeValue = Math.min(12, Math.max(1, Math.trunc(value)));
+    setEventsPerDay(safeValue);
+    try { window.localStorage.setItem(EVENTS_PER_DAY_STORAGE_KEY, String(safeValue)); } catch { /* local preferences are best effort */ }
+  }
+
+  function changeMonthsToDisplay(value: number) {
+    const safeValue = Math.min(12, Math.max(1, Math.trunc(value)));
+    setMonthsToDisplay(safeValue);
+    try { window.localStorage.setItem(MONTHS_TO_DISPLAY_STORAGE_KEY, String(safeValue)); } catch { /* local preferences are best effort */ }
+  }
 
   const monthAnchor = range.start;
   const today = useMemo(() => new Date(), []);
@@ -45,25 +91,25 @@ export function CalendarTabContent({ calendar }: CalendarTabContentProps) {
     return map;
   }, [events]);
 
-  const gridDays = useMemo(() => {
-    const year = monthAnchor.getFullYear();
-    const month = monthAnchor.getMonth();
-    const firstOfMonth = new Date(year, month, 1);
-    const startOffset = firstOfMonth.getDay();
-    const gridStart = new Date(year, month, 1 - startOffset);
-    const days: Date[] = [];
-    for (let i = 0; i < 42; i++) {
-      days.push(new Date(gridStart.getFullYear(), gridStart.getMonth(), gridStart.getDate() + i));
-    }
-    return days;
-  }, [monthAnchor]);
+  const visibleMonths = useMemo(() => Array.from({ length: monthsToDisplay }, (_, index) => {
+    const anchor = new Date(monthAnchor.getFullYear(), monthAnchor.getMonth() + index, 1);
+    return { anchor, days: monthGridDays(anchor) };
+  }), [monthAnchor, monthsToDisplay]);
+
+  useEffect(() => {
+    const expectedEnd = new Date(monthAnchor.getFullYear(), monthAnchor.getMonth() + monthsToDisplay, 0);
+    if (range.end.getFullYear() === expectedEnd.getFullYear()
+      && range.end.getMonth() === expectedEnd.getMonth()
+      && range.end.getDate() === expectedEnd.getDate()) return;
+    setRange({ start: new Date(monthAnchor.getFullYear(), monthAnchor.getMonth(), 1), end: expectedEnd });
+  }, [monthAnchor, monthsToDisplay, range.end, setRange]);
 
   function goToMonth(offset: number) {
     const year = monthAnchor.getFullYear();
     const month = monthAnchor.getMonth() + offset;
     setRange({
       start: new Date(year, month, 1),
-      end: new Date(year, month + 1, 0),
+      end: new Date(year, month + monthsToDisplay, 0),
     });
   }
 
@@ -71,7 +117,7 @@ export function CalendarTabContent({ calendar }: CalendarTabContentProps) {
     const now = new Date();
     setRange({
       start: new Date(now.getFullYear(), now.getMonth(), 1),
-      end: new Date(now.getFullYear(), now.getMonth() + 1, 0),
+      end: new Date(now.getFullYear(), now.getMonth() + monthsToDisplay, 0),
     });
   }
 
@@ -108,16 +154,22 @@ export function CalendarTabContent({ calendar }: CalendarTabContentProps) {
     const sortedDates = Array.from(eventsByDate.keys()).filter((d) => d >= todayISO).sort();
     return sortedDates.map((d) => ({ date: d, items: eventsByDate.get(d)! }));
   }, [eventsByDate, todayISO]);
+  const lastVisibleMonth = visibleMonths[visibleMonths.length - 1]?.anchor ?? monthAnchor;
+  const visibleMonthLabel = monthsToDisplay === 1
+    ? `${MONTH_NAMES[monthAnchor.getMonth()]} ${monthAnchor.getFullYear()}`
+    : monthAnchor.getFullYear() === lastVisibleMonth.getFullYear()
+      ? `${MONTH_NAMES[monthAnchor.getMonth()]} – ${MONTH_NAMES[lastVisibleMonth.getMonth()]} ${monthAnchor.getFullYear()}`
+      : `${MONTH_NAMES[monthAnchor.getMonth()]} ${monthAnchor.getFullYear()} – ${MONTH_NAMES[lastVisibleMonth.getMonth()]} ${lastVisibleMonth.getFullYear()}`;
 
   return (
     <div className="flex-1 overflow-y-auto flex flex-col h-full bg-[var(--ml-bg-base)]">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--ml-bg-panel)] shrink-0">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-b border-[var(--ml-bg-panel)] shrink-0">
+        <div className="flex min-w-0 flex-wrap items-center gap-3">
           <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-indigo-400" fill="currentColor" viewBox="0 0 16 16">
             <path d="M3.5 0a.5.5 0 0 1 .5.5V1h8V.5a.5.5 0 0 1 1 0V1h1a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2h1V.5a.5.5 0 0 1 .5-.5M1 4v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V4z"/>
           </svg>
-          <h1 className="text-sm font-semibold text-white">{MONTH_NAMES[monthAnchor.getMonth()]} {monthAnchor.getFullYear()}</h1>
+          <h1 className="text-sm font-semibold text-white">{visibleMonthLabel}</h1>
           <div className="flex items-center gap-1">
             <button onClick={() => goToMonth(-1)} className="w-6 h-6 flex items-center justify-center rounded-md text-gray-500 hover:text-gray-200 hover:bg-[var(--ml-bg-hover)] transition">
               <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -138,7 +190,33 @@ export function CalendarTabContent({ calendar }: CalendarTabContentProps) {
           )}
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {view === "month" && (
+            <>
+              <label className="flex items-center gap-1.5 text-[11px] text-gray-500">
+                <span>Months</span>
+                <select
+                  aria-label="Months displayed at once"
+                  value={monthsToDisplay}
+                  onChange={(event) => changeMonthsToDisplay(Number(event.target.value))}
+                  className="rounded-md border border-[var(--ml-bg-hover)] bg-[var(--ml-bg-base)] px-1.5 py-1 text-[11px] text-gray-300 focus:border-indigo-500 focus:outline-none"
+                >
+                  {Array.from({ length: 12 }, (_, index) => index + 1).map((count) => <option key={count} value={count}>{count}</option>)}
+                </select>
+              </label>
+              <label className="flex items-center gap-1.5 text-[11px] text-gray-500">
+                <span className="hidden sm:inline">Events/day</span>
+                <select
+                  aria-label="Events displayed per calendar day"
+                  value={eventsPerDay}
+                  onChange={(event) => changeEventsPerDay(Number(event.target.value))}
+                  className="rounded-md border border-[var(--ml-bg-hover)] bg-[var(--ml-bg-base)] px-1.5 py-1 text-[11px] text-gray-300 focus:border-indigo-500 focus:outline-none"
+                >
+                  {Array.from({ length: 12 }, (_, index) => index + 1).map((count) => <option key={count} value={count}>{count}</option>)}
+                </select>
+              </label>
+            </>
+          )}
           <div className="flex items-center rounded-lg border border-[var(--ml-bg-hover)] overflow-hidden">
             <button
               onClick={() => setView("month")}
@@ -172,60 +250,74 @@ export function CalendarTabContent({ calendar }: CalendarTabContentProps) {
       )}
 
       {view === "month" ? (
-        <div className="flex-1 flex flex-col p-3 min-h-0">
-          <div className="grid grid-cols-7 shrink-0">
-            {WEEKDAY_HEADERS.map((d) => (
-              <div key={d} className="text-center text-[10px] font-semibold text-gray-600 uppercase tracking-wider py-1.5">{d}</div>
-            ))}
-          </div>
-          <div className="grid grid-cols-7 grid-rows-6 flex-1 gap-1 min-h-0">
-            {gridDays.map((day) => {
-              const iso = toISO(day);
-              const inMonth = day.getMonth() === monthAnchor.getMonth();
-              const isToday = iso === todayISO;
-              const dayEvents = eventsByDate.get(iso) ?? [];
-              const visible = dayEvents.slice(0, 3);
-              const overflow = dayEvents.length - visible.length;
-              return (
-                <div
-                  key={iso}
-                  onClick={() => openCreate(iso)}
-                  className={`rounded-lg border p-1.5 flex flex-col gap-0.5 overflow-hidden cursor-pointer transition ${
-                    inMonth ? "border-[var(--ml-bg-hover)] hover:border-indigo-500/30" : "border-[var(--ml-bg-panel)] opacity-40"
-                  } ${isToday ? "bg-indigo-500/5 border-indigo-500/40" : "bg-[#1a1a24]"}`}
-                >
-                  <span className={`text-[11px] shrink-0 ${isToday ? "text-indigo-300 font-semibold" : inMonth ? "text-gray-400" : "text-gray-700"}`}>
-                    {day.getDate()}
-                  </span>
-                  <div className="flex flex-col gap-0.5 overflow-hidden">
-                    {visible.map((ev) => (
-                      <button
-                        key={`${ev.reminder_id}-${ev.occurrence_date}`}
-                        onClick={(e) => { e.stopPropagation(); openEdit(ev); }}
-                        title={ev.text}
-                        className={`text-left text-[10px] truncate px-1.5 py-0.5 rounded transition ${
-                          ev.done
-                            ? "bg-[var(--ml-bg-hover)] text-gray-600 line-through"
-                            : ev.source === "google"
-                              ? "bg-blue-500/15 text-blue-300 hover:bg-blue-500/25"
-                              : "bg-indigo-500/15 text-indigo-300 hover:bg-indigo-500/25"
-                        }`}
-                      >
-                        {ev.all_day ? "" : ev.due_time ? `${formatTime12h(ev.due_time)} ` : ""}{ev.text}
-                      </button>
-                    ))}
-                    {overflow > 0 && (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); setExpandedDate(iso); }}
-                        className="text-left text-[10px] text-gray-500 hover:text-indigo-300 px-1.5 transition"
-                      >
-                        +{overflow} more
-                      </button>
-                    )}
-                  </div>
+        <div className="flex-1 overflow-auto p-3 min-h-0">
+          <div className={`grid grid-cols-1 gap-4 ${monthsToDisplay > 1 ? "2xl:grid-cols-2" : ""}`}>
+            {visibleMonths.map(({ anchor, days }) => (
+              <section key={`${anchor.getFullYear()}-${anchor.getMonth()}`} className="min-w-0 rounded-xl border border-[var(--ml-bg-panel)] bg-[var(--ml-bg-base)] p-2">
+                {monthsToDisplay > 1 && (
+                  <h2 className="px-1 pb-1 text-center text-xs font-semibold text-gray-300">
+                    {MONTH_NAMES[anchor.getMonth()]} {anchor.getFullYear()}
+                  </h2>
+                )}
+                <div className="grid grid-cols-7 shrink-0">
+                  {WEEKDAY_HEADERS.map((dayName) => (
+                    <div key={dayName} className="py-1.5 text-center text-[10px] font-semibold uppercase tracking-wider text-gray-600">{dayName}</div>
+                  ))}
                 </div>
-              );
-            })}
+                <div
+                  className="grid grid-cols-7 gap-1"
+                  style={{ gridAutoRows: `${Math.max(90, 48 + eventsPerDay * 22)}px` }}
+                >
+                  {days.map((day) => {
+                    const iso = toISO(day);
+                    const inMonth = day.getMonth() === anchor.getMonth() && day.getFullYear() === anchor.getFullYear();
+                    const isToday = iso === todayISO;
+                    const dayEvents = eventsByDate.get(iso) ?? [];
+                    const visible = dayEvents.slice(0, eventsPerDay);
+                    const overflow = dayEvents.length - visible.length;
+                    return (
+                      <div
+                        key={iso}
+                        onClick={() => openCreate(iso)}
+                        className={`rounded-lg border p-1.5 flex flex-col gap-0.5 overflow-hidden cursor-pointer transition ${
+                          inMonth ? "border-[var(--ml-bg-hover)] hover:border-indigo-500/30" : "border-[var(--ml-bg-panel)] opacity-40"
+                        } ${isToday ? "bg-indigo-500/5 border-indigo-500/40" : "bg-[#1a1a24]"}`}
+                      >
+                        <span className={`text-[11px] shrink-0 ${isToday ? "text-indigo-300 font-semibold" : inMonth ? "text-gray-400" : "text-gray-700"}`}>
+                          {day.getDate()}
+                        </span>
+                        <div className="flex flex-col gap-0.5 overflow-hidden">
+                          {visible.map((event) => (
+                            <button
+                              key={`${event.reminder_id}-${event.occurrence_date}`}
+                              onClick={(clickEvent) => { clickEvent.stopPropagation(); openEdit(event); }}
+                              title={event.text}
+                              className={`text-left text-[10px] truncate px-1.5 py-0.5 rounded transition ${
+                                event.done
+                                  ? "bg-[var(--ml-bg-hover)] text-gray-600 line-through"
+                                  : event.source === "google"
+                                    ? "bg-blue-500/15 text-blue-300 hover:bg-blue-500/25"
+                                    : "bg-indigo-500/15 text-indigo-300 hover:bg-indigo-500/25"
+                              }`}
+                            >
+                              {event.all_day ? "" : event.due_time ? `${formatTime12h(event.due_time)} ` : ""}{event.text}
+                            </button>
+                          ))}
+                          {overflow > 0 && (
+                            <button
+                              onClick={(clickEvent) => { clickEvent.stopPropagation(); setExpandedDate(iso); }}
+                              className="text-left text-[10px] text-gray-500 hover:text-indigo-300 px-1.5 transition"
+                            >
+                              +{overflow} more
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+            ))}
           </div>
         </div>
       ) : (

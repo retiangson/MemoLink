@@ -934,7 +934,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
     }
   }
 
-  async function handleAutosaveNote(noteKey: string, snapshot: NoteSnapshot, sourceLinked: boolean) {
+  async function persistNoteSnapshot(noteKey: string, snapshot: NoteSnapshot, sourceLinked: boolean): Promise<number> {
     let noteId = noteIdentityRef.current.get(noteKey) ?? null;
     if (noteId == null) {
       let creation = draftCreationRef.current.get(noteKey);
@@ -951,7 +951,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
       } finally {
         draftCreationRef.current.delete(noteKey);
       }
-      return;
+      return noteId;
     }
 
     const fresh = sourceLinked
@@ -959,6 +959,11 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
       : await autosaveNote(noteId, snapshot.title, snapshot.content);
     setNotes((previous) => previous.map((note) => note.id === noteId ? fresh : note));
     editor.markDraftSaved(noteKey, fresh, snapshot.title, snapshot.content);
+    return noteId;
+  }
+
+  async function handleAutosaveNote(noteKey: string, snapshot: NoteSnapshot, sourceLinked: boolean): Promise<void> {
+    await persistNoteSnapshot(noteKey, snapshot, sourceLinked);
   }
 
   function handleAutosaveNoteOnPageExit(noteKey: string, snapshot: NoteSnapshot) {
@@ -1990,6 +1995,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                 setNoteContentDraft={editor.setNoteContentDraft}
                 isNoteDirty={editor.isNoteDirty}
                 onAutosave={handleAutosaveNote}
+                onEnsurePersisted={persistNoteSnapshot}
                 onAutosavePageExit={handleAutosaveNoteOnPageExit}
                 onEquationSolved={handleEquationSolved}
                 aiModel={selectedModel}
@@ -2319,6 +2325,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                       setNoteContentDraft={editor.setNoteContentDraft}
                       isNoteDirty={editor.isNoteDirty}
                       onAutosave={handleAutosaveNote}
+                      onEnsurePersisted={persistNoteSnapshot}
                       onAutosavePageExit={handleAutosaveNoteOnPageExit}
                       onEquationSolved={handleEquationSolved}
                       aiModel={selectedModel}

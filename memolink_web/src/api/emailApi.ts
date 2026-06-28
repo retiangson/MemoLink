@@ -1,5 +1,6 @@
 import { api, API_BASE } from "./client";
 import { getToken } from "../utils/auth";
+import { notifyNoteChanged } from "../utils/noteEvents";
 
 export interface EmailAccount {
   id: number;
@@ -131,6 +132,7 @@ export async function deleteEmail(id: number): Promise<void> {
 
 export async function emailToNote(id: number): Promise<{ note_id: number; title: string }> {
   const res = await api.post(`/email/emails/${id}/to-note`);
+  notifyNoteChanged({ noteId: res.data.note_id });
   return res.data;
 }
 
@@ -213,6 +215,7 @@ export async function sendGmailReply(gmailMessageId: string, body: string, email
 export async function gmailEmailToNote(gmailMessageId: string, emailAccountId?: number): Promise<{ note_id: number; title: string }> {
   const params = emailAccountId != null ? { email_account_id: emailAccountId } : {};
   const res = await api.post(`/email/gmail/${gmailMessageId}/to-note`, null, { params });
+  notifyNoteChanged({ noteId: res.data.note_id });
   return res.data;
 }
 

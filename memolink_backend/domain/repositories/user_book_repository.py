@@ -163,6 +163,22 @@ class UserBookRepository:
         row.error_message = error_message
         self.db.commit()
 
+    def claim_pending_note_source(self, source_id: int) -> bool:
+        updated = (
+            self.db.query(BookNoteSource)
+            .filter(BookNoteSource.id == source_id, BookNoteSource.status == "pending")
+            .update(
+                {
+                    BookNoteSource.status: "processing",
+                    BookNoteSource.error_message: None,
+                    BookNoteSource.updated_at: datetime.now(timezone.utc),
+                },
+                synchronize_session=False,
+            )
+        )
+        self.db.commit()
+        return updated == 1
+
     def add_note_chunk(self, book_note_source_id: int, note_id: int, book_id: int, page_number: Optional[int]) -> BookNoteChunk:
         row = BookNoteChunk(
             book_note_source_id=book_note_source_id,

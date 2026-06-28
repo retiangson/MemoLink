@@ -3422,7 +3422,7 @@ data: <span class="json-str">[DONE]</span></pre>
           <span class="ep-toggle">&#x25BC;</span>
         </div>
         <div class="ep-body">
-          <p class="ep-desc">Available for PDF, EPUB, PPTX, TXT, and SRT/VTT formats only (not MOBI, comic archives, or audio). Creates/reuses a <code>book_note_sources</code> row (unique on <code>user_id</code> + <code>book_id</code>) and schedules a background task that extracts the full book text, splits it into <code>book_note_chunks</code>, embeds each chunk, and marks the job <code>ready</code> so the content becomes citable in AI Chat retrieval. The job transitions through <code>pending</code> &rarr; <code>processing</code> &rarr; <code>ready</code>/<code>failed</code>; calling this endpoint again while a job is already <code>processing</code> does not start a duplicate background task.</p>
+          <p class="ep-desc">Available for PDF, EPUB, MOBI, PPTX, TXT, and SRT/VTT formats (not comic archives, audio, or video). Creates/reuses a <code>book_note_sources</code> row and dispatches a durable asynchronous Lambda invocation that extracts and embeds the full text before marking the job <code>ready</code>. The atomic pending-job claim prevents duplicate workers. Jobs transition through <code>pending</code> &rarr; <code>processing</code> &rarr; <code>ready</code>/<code>failed</code>; an interrupted processing state becomes retryable after its lease is stale.</p>
           <div class="schema-row">
             <div class="schema-box">
               <div class="schema-box-title">Path Param</div>

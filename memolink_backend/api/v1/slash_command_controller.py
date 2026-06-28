@@ -29,7 +29,23 @@ def solve_equation(
     c: RequestContainer = Depends(get_request_container),
 ):
     try:
-        return c.commands().solve_equation(user_id, dto.note_id, dto.model)
+        return c.commands().solve_equation(user_id, dto.note_id, dto.model, dto.drawing_image_data_url, dto.drawing_spacing_lines)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@router.post("/complete-equation", response_model=NoteResponseDTO)
+def complete_equation(
+    dto: EquationSolveRequestDTO,
+    user_id: int = Depends(get_current_user),
+    c: RequestContainer = Depends(get_request_container),
+):
+    try:
+        return c.commands().complete_equation(user_id, dto.note_id, dto.model, dto.drawing_image_data_url, dto.drawing_spacing_lines)
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ValueError as exc:

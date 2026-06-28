@@ -1,4 +1,5 @@
 import { api } from "./client";
+import { notifyNoteChanged } from "../utils/noteEvents";
 
 export async function getConversations(workspace_id?: number | null) {
   return (await api.post("/conversation/list", { workspace_id: workspace_id ?? null })).data;
@@ -29,5 +30,7 @@ export async function deleteMessage(messageId: number) {
   return (await api.post("/conversation/delete-message", { message_id: messageId })).data;
 }
 export async function addMessageToNoteAPI(content: string, title = "Chat Snippet") {
-  return (await api.post("/conversation/add-to-note", { content, title })).data;
+  const note = (await api.post("/conversation/add-to-note", { content, title })).data;
+  notifyNoteChanged({ noteId: note.id });
+  return note;
 }

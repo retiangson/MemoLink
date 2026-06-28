@@ -14,7 +14,7 @@ import { useReaderColorMode } from "../hooks/useReaderColorMode";
 import { useReaderFontSize } from "../hooks/useReaderFontSize";
 import { richContentFilter, readerFontScale } from "./book-readers/format";
 import { SmartSourceWorkspace, type WorkspaceTab } from "./smart-source/SmartSourceWorkspace";
-import { getNote, solveNoteEquation } from "../api/client";
+import { completeNoteEquation, getNote, solveNoteEquation } from "../api/client";
 import { useSmartSourceWorkspace } from "../hooks/useSmartSourceWorkspace";
 import { useNoteAutosave, type NoteSnapshot } from "../hooks/useNoteAutosave";
 import { useLocalRecordingStorage } from "../hooks/useLocalRecordingStorage";
@@ -30,6 +30,7 @@ interface NoteEditorViewProps {
   setNoteContentDraft: (v: string | ((prev: string) => string)) => void;
   isNoteDirty: boolean;
   onAutosave: (noteKey: string, snapshot: NoteSnapshot, sourceLinked: boolean) => Promise<void>;
+  onEnsurePersisted: (noteKey: string, snapshot: NoteSnapshot, sourceLinked: boolean) => Promise<number>;
   onAutosavePageExit: (noteKey: string, snapshot: NoteSnapshot) => void;
   onEquationSolved: (noteId: number, freshNote: Note) => void;
   aiModel?: string;
@@ -62,7 +63,7 @@ export function NoteEditorView({
   noteKey,
   noteTitleDraft, setNoteTitleDraft,
   noteContentDraft, setNoteContentDraft,
-  isNoteDirty, onAutosave, onAutosavePageExit, onEquationSolved, aiModel,
+  isNoteDirty, onAutosave, onEnsurePersisted, onAutosavePageExit, onEquationSolved, aiModel,
   onPlay, ttsPlaying, ttsPaused, onTtsStop, onTtsPauseResume,
   onTtsBack, onTtsForward, ttsRate = 1.0, ttsVoices = [], ttsSelectedVoice = null,
   onTtsRateChange, onTtsVoiceChange,
@@ -84,9 +85,11 @@ export function NoteEditorView({
   const [autoStopOnSilence, setAutoStopOnSilence] = useState(false);
   const recordingStorage = useLocalRecordingStorage();
   const [recordingFileStatus, setRecordingFileStatus] = useState<string | null>(null);
-  const [solvingEquation, setSolvingEquation] = useState(false);
+  const [equationAction, setEquationAction] = useState<"solve" | "complete" | null>(null);
   const [equationError, setEquationError] = useState<string | null>(null);
+  const [persistedNoteId, setPersistedNoteId] = useState<number | null>(noteId);
   const editorRef = useRef<any>(null);
+  const inkSnapshotRef = useRef<(() => { dataUrl: string; spacingLines: number } | null) | null>(null);
   const speakStartDocPos = useRef(0);
   const speakDocText = useRef("");
   const speakDocTrimOffset = useRef(0);
@@ -264,8 +267,10 @@ export function NoteEditorView({
   const [exporting, setExporting] = useState<ExportFormat | null>(null);
   const [rawContent, setRawContent] = useState(noteContentDraft);
   const [workspaceTab, setWorkspaceTab] = useState<WorkspaceTab>("editor");
-  const workspace = useSmartSourceWorkspace(noteId);
+  const effectiveNoteId = noteId ?? persistedNoteId;
+  const workspace = useSmartSourceWorkspace(effectiveNoteId);
   const hasSourceWorkspace = workspace.data.source_files.length > 0;
+  const hasNoteInk = workspace.data.annotations.some((annotation) => annotation.source_file_id == null && annotation.book_id == null && annotation.strokes_json?.points.length);
   const isLegacyNote = !workspace.loading && !hasSourceWorkspace;
   const autosave = useNoteAutosave({
     noteKey: String(noteKey),
@@ -280,14 +285,33 @@ export function NoteEditorView({
     },
   });
 
-  async function handleSolveEquation() {
-    if (noteId == null || solvingEquation) return;
-    setSolvingEquation(true);
+  useEffect(() => {
+    setPersistedNoteId(noteId);
+  }, [noteId, noteKey]);
+
+  async function ensureNotePersisted(): Promise<number> {
+    await autosave.flush();
+    if (effectiveNoteId != null) return effectiveNoteId;
+    const id = await onEnsurePersisted(String(noteKey), {
+      title: noteTitleDraft,
+      content: noteContentDraft,
+      updatedAt: Date.now(),
+    }, hasSourceWorkspace);
+    setPersistedNoteId(id);
+    return id;
+  }
+
+  async function handleEquation(action: "solve" | "complete") {
+    if ((!noteContentDraft.trim() && !hasNoteInk) || equationAction) return;
+    setEquationAction(action);
     setEquationError(null);
     try {
-      await autosave.flush();
-      const fresh = await solveNoteEquation(noteId, aiModel);
-      onEquationSolved(noteId, fresh);
+      const id = await ensureNotePersisted();
+      const drawingSnapshot = inkSnapshotRef.current?.() ?? null;
+      const fresh = action === "solve"
+        ? await solveNoteEquation(id, aiModel, drawingSnapshot?.dataUrl, drawingSnapshot?.spacingLines)
+        : await completeNoteEquation(id, aiModel, drawingSnapshot?.dataUrl, drawingSnapshot?.spacingLines);
+      onEquationSolved(id, fresh);
     } catch (caught: unknown) {
       const error = caught as { response?: { data?: { detail?: unknown } }; message?: unknown };
       const detail = error.response?.data?.detail;
@@ -296,10 +320,10 @@ export function NoteEditorView({
           ? detail
           : typeof error.message === "string"
             ? error.message
-            : "Could not solve the equation",
+            : `Could not ${action} the equation`,
       );
     } finally {
-      setSolvingEquation(false);
+      setEquationAction(null);
     }
   }
 
@@ -378,13 +402,13 @@ export function NoteEditorView({
           ))}
         </div>
         <div className="flex items-center gap-2">
-          {isLegacyNote && noteId && (
+          {isLegacyNote && effectiveNoteId && (
             <SourceUploadButton
-              noteId={noteId}
+              noteId={effectiveNoteId}
               disabled={isNoteDirty}
               onComplete={() => {
                 void workspace.reload();
-                void getNote(noteId).then((fresh) => {
+                void getNote(effectiveNoteId).then((fresh) => {
                   setNoteContentDraft(fresh.content || "");
                   setRawContent(fresh.content || "");
                 });
@@ -399,23 +423,37 @@ export function NoteEditorView({
       {hasSourceWorkspace ? (
         <SmartSourceWorkspace
           workspace={workspace}
-          noteId={noteId}
+          noteId={effectiveNoteId}
           noteKey={noteKey}
           rawContent={rawContent}
           activeTab={workspaceTab}
           onTabChange={setWorkspaceTab}
           onSourceChanged={() => {
-            if (!noteId) return;
-            void getNote(noteId).then((fresh) => {
+            if (!effectiveNoteId) return;
+            void getNote(effectiveNoteId).then((fresh) => {
               setNoteContentDraft(fresh.content || "");
               setRawContent(fresh.content || "");
             });
           }}
           sourceUploadDisabled={isNoteDirty}
-          timelineSupplement={timelineEnabled && noteId ? <div className="border-t border-[var(--ml-bg-hover)] p-4"><TimelinePanel noteId={noteId} onJump={jumpToText} /></div> : null}
+          timelineSupplement={timelineEnabled && effectiveNoteId ? <div className="border-t border-[var(--ml-bg-hover)] p-4"><TimelinePanel noteId={effectiveNoteId} onJump={jumpToText} /></div> : null}
           editor={(
             <div data-rc-mode={colorMode} style={{ filter: richContentFilter(colorMode), ...noteFontSizeVar }} className="flex h-full flex-col overflow-hidden bg-[var(--ml-bg-bar)] transition-[filter]">
-              <RichNoteEditor key={String(noteKey)} noteKey={noteKey} value={noteContentDraft} onChange={(html) => setNoteContentDraft(html)} editorRef={editorRef} onOpenHighlight={onOpenHighlight} />
+              <RichNoteEditor
+                key={String(noteKey)}
+                noteKey={noteKey}
+                value={noteContentDraft}
+                onChange={(html) => setNoteContentDraft(html)}
+                editorRef={editorRef}
+                onOpenHighlight={onOpenHighlight}
+                drawing={{
+                  noteId: effectiveNoteId,
+                  annotations: workspace.data.annotations,
+                  onAnnotationsChanged: () => void workspace.reload(),
+                  onEnsurePersisted: ensureNotePersisted,
+                  inkSnapshotRef,
+                }}
+              />
             </div>
           )}
         />
@@ -425,7 +463,21 @@ export function NoteEditorView({
           style={{ filter: richContentFilter(colorMode), ...noteFontSizeVar }}
           className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-[var(--ml-bg-panel)] bg-[var(--ml-bg-bar)] transition-[filter]"
         >
-          <RichNoteEditor key={String(noteKey)} noteKey={noteKey} value={noteContentDraft} onChange={(html) => setNoteContentDraft(html)} editorRef={editorRef} onOpenHighlight={onOpenHighlight} />
+          <RichNoteEditor
+            key={String(noteKey)}
+            noteKey={noteKey}
+            value={noteContentDraft}
+            onChange={(html) => setNoteContentDraft(html)}
+            editorRef={editorRef}
+            onOpenHighlight={onOpenHighlight}
+            drawing={{
+              noteId: effectiveNoteId,
+              annotations: workspace.data.annotations,
+              onAnnotationsChanged: () => void workspace.reload(),
+              onEnsurePersisted: ensureNotePersisted,
+              inkSnapshotRef,
+            }}
+          />
         </div>
       ) : workspaceTab === "source" ? (
         <div data-rc-mode={colorMode} style={{ filter: richContentFilter(colorMode) }} className="min-h-0 flex-1 overflow-hidden rounded-xl border border-[var(--ml-bg-panel)] bg-[var(--ml-bg-bar)]">
@@ -433,7 +485,7 @@ export function NoteEditorView({
         </div>
       ) : (
         <div data-rc-mode={colorMode} style={{ filter: richContentFilter(colorMode) }} className="min-h-0 flex-1 overflow-y-auto rounded-xl border border-[var(--ml-bg-panel)] bg-[var(--ml-bg-bar)] p-4">
-          {noteId && <TimelinePanel noteId={noteId} onJump={jumpToText} />}
+          {effectiveNoteId && <TimelinePanel noteId={effectiveNoteId} onJump={jumpToText} />}
         </div>
       )}
 
@@ -627,12 +679,31 @@ export function NoteEditorView({
         </button>}
 
         <button
-          onClick={() => void handleSolveEquation()}
-          disabled={noteId == null || !noteContentDraft.trim() || solvingEquation}
-          title={noteId == null ? "Waiting for the new note to autosave" : "Ask AI to solve the equation in this note step by step"}
-          className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs text-gray-500 hover:text-violet-400 hover:bg-violet-400/10 border border-transparent hover:border-violet-400/20 disabled:opacity-30 disabled:cursor-not-allowed transition shrink-0"
+          onClick={() => void handleEquation("complete")}
+          disabled={(!noteContentDraft.trim() && !hasNoteInk) || equationAction != null}
+          title="Ask AI to complete the unfinished equation and write the result into this note"
+          aria-label="Complete equation with AI"
+          className="flex h-7 w-8 items-center justify-center rounded-lg text-gray-500 hover:text-violet-400 hover:bg-violet-400/10 border border-transparent hover:border-violet-400/20 disabled:opacity-30 disabled:cursor-not-allowed transition shrink-0"
         >
-          {solvingEquation ? "Solving…" : "Solve Equation"}
+          {equationAction === "complete" ? (
+            <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 12a9 9 0 1 1-3-6.7"/></svg>
+          ) : (
+            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 4h9l-5 8 5 8H5"/><path d="M17 8h4M19 6v4"/></svg>
+          )}
+        </button>
+
+        <button
+          onClick={() => void handleEquation("solve")}
+          disabled={(!noteContentDraft.trim() && !hasNoteInk) || equationAction != null}
+          title="Ask AI to solve the equation in this note step by step"
+          aria-label="Solve equation with AI"
+          className="flex h-7 w-8 items-center justify-center rounded-lg text-gray-500 hover:text-violet-400 hover:bg-violet-400/10 border border-transparent hover:border-violet-400/20 disabled:opacity-30 disabled:cursor-not-allowed transition shrink-0"
+        >
+          {equationAction === "solve" ? (
+            <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 12a9 9 0 1 1-3-6.7"/></svg>
+          ) : (
+            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 7h8M8 12h2m4 0h2M8 16h2m4 0h2"/></svg>
+          )}
         </button>
 
         {/* Public Portfolio Agent toggle */}

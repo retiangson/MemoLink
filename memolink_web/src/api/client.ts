@@ -1,5 +1,6 @@
 import axios from "axios";
 import { getToken, getUser, logout } from "../utils/auth";
+import { notifyNoteChanged } from "../utils/noteEvents";
 
 export const API_BASE = (import.meta.env.VITE_API_BASE_URL as string)?.replace(/\/$/, "") ?? "";
 
@@ -28,7 +29,9 @@ api.interceptors.response.use(
 
 // Notes
 export async function createNote(title: string | null, content: string, source: string | null = null, workspace_id?: number | null) {
-  return (await api.post("/notes", { title, content, source, workspace_id: workspace_id ?? null })).data;
+  const note = (await api.post("/notes", { title, content, source, workspace_id: workspace_id ?? null })).data;
+  notifyNoteChanged({ note, noteId: note.id });
+  return note;
 }
 export async function getNote(note_id: number) {
   return (await api.post("/notes/get", { note_id })).data;
@@ -64,8 +67,11 @@ export function createNoteOnPageExit(title: string, content: string, workspace_i
   keepaliveRequest("/notes", "POST", { title, content, source: "manual", workspace_id: workspace_id ?? null });
 }
 
-export async function solveNoteEquation(note_id: number, model?: string) {
-  return (await api.post("/commands/solve-equation", { note_id, model: model || null })).data;
+export async function solveNoteEquation(note_id: number, model?: string, drawing_image_data_url?: string | null, drawing_spacing_lines?: number) {
+  return (await api.post("/commands/solve-equation", { note_id, model: model || null, drawing_image_data_url: drawing_image_data_url || null, drawing_spacing_lines: drawing_spacing_lines || 0 })).data;
+}
+export async function completeNoteEquation(note_id: number, model?: string, drawing_image_data_url?: string | null, drawing_spacing_lines?: number) {
+  return (await api.post("/commands/complete-equation", { note_id, model: model || null, drawing_image_data_url: drawing_image_data_url || null, drawing_spacing_lines: drawing_spacing_lines || 0 })).data;
 }
 export async function deleteNote(note_id: number) {
   return (await api.post("/notes/delete", { note_id })).data;

@@ -17,6 +17,11 @@ import { Extension } from "@tiptap/core";
 import { Plugin, PluginKey } from "prosemirror-state";
 import { Decoration, DecorationSet } from "prosemirror-view";
 import { marked } from "marked";
+import type { SourceAnnotation } from "../api/smartSourceApi";
+import { useAnnotationCanvas } from "../hooks/useAnnotationCanvas";
+import { AnnotationSurface, inkBottomPx, renderInkToDataUrl } from "./smart-source/AnnotationCanvas";
+import { AnnotationToolbar } from "./smart-source/AnnotationToolbar";
+import { EquationDisplayBlock } from "./EquationDisplayBlock";
 import "../styles/editor.css";
 
 interface RichNoteEditorProps {
@@ -26,6 +31,13 @@ interface RichNoteEditorProps {
   disabled?: boolean;
   editorRef?: React.MutableRefObject<any>;
   onOpenHighlight?: (highlightId: number) => void;
+  drawing?: {
+    noteId: number | null;
+    annotations: SourceAnnotation[];
+    onAnnotationsChanged: () => void;
+    onEnsurePersisted: () => Promise<number>;
+    inkSnapshotRef?: React.MutableRefObject<(() => { dataUrl: string; spacingLines: number } | null) | null>;
+  };
 }
 
 // Book highlights are appended to their "{Title} - Highlights" note as
@@ -99,7 +111,7 @@ function unwrapMarkdownFence(s: string) {
 }
 
 function hasRichHtmlStructure(s: string) {
-  return /<(h[1-6]|ul|ol|li|strong|em|blockquote|pre|code|table|thead|tbody|tr|th|td|img)\b/i.test(s);
+  return /data-note-drawing-page/i.test(s) || /<(h[1-6]|ul|ol|li|strong|em|blockquote|pre|code|table|thead|tbody|tr|th|td|img)\b/i.test(s);
 }
 
 async function toHtml(content: string): Promise<string> {
@@ -168,14 +180,28 @@ const ttsHighlightPlugin = new Plugin({
   },
 });
 
-export function RichNoteEditor({ value, onChange, noteKey, disabled, editorRef, onOpenHighlight }: RichNoteEditorProps) {
+export function RichNoteEditor({ value, onChange, noteKey, disabled, editorRef, onOpenHighlight, drawing }: RichNoteEditorProps) {
   const lastSent = useRef<string>("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [toolbarMode, setToolbarMode] = React.useState<"text" | "pen">("text");
+  const [preparedDrawingNoteId, setPreparedDrawingNoteId] = React.useState<number | null>(null);
+  const [preparingDrawing, setPreparingDrawing] = React.useState(false);
+  const [drawingError, setDrawingError] = React.useState<string | null>(null);
+  const [screenLocked, setScreenLocked] = React.useState(true);
+  const inkSurfaceHeightRef = useRef(1000);
+  const ink = useAnnotationCanvas(
+    drawing?.noteId ?? preparedDrawingNoteId ?? 0,
+    null,
+    null,
+    drawing?.annotations ?? [],
+    drawing?.onAnnotationsChanged ?? (() => undefined),
+  );
 
   const editor = useEditor({
     extensions: [
       StarterKit.configure({ heading: { levels: [1, 2, 3, 4] } }),
       BookHighlightBlock,
+      EquationDisplayBlock,
       Underline,
       Highlight.configure({ multicolor: false }),
       TextAlign.configure({ types: ["heading", "paragraph"] }),
@@ -288,6 +314,44 @@ export function RichNoteEditor({ value, onChange, noteKey, disabled, editorRef, 
     editor?.chain().focus().setLink({ href: url }).run();
   }
 
+  async function switchToPen() {
+    if (!drawing || disabled || preparingDrawing) return;
+    setPreparingDrawing(true);
+    setDrawingError(null);
+    try {
+      const noteId = await drawing.onEnsurePersisted();
+      setPreparedDrawingNoteId(noteId);
+      ink.setTool("pen");
+      setToolbarMode("pen");
+    } catch (caught) {
+      setDrawingError(caught instanceof Error ? caught.message : "Could not enable pen mode");
+    } finally {
+      setPreparingDrawing(false);
+    }
+  }
+
+  function switchToText() {
+    ink.setTool("view");
+    setToolbarMode("text");
+  }
+
+  useEffect(() => {
+    if (!drawing?.inkSnapshotRef) return;
+    const snapshotRef = drawing.inkSnapshotRef;
+    snapshotRef.current = () => {
+      const dataUrl = renderInkToDataUrl(ink.annotations, inkSurfaceHeightRef.current);
+      if (!dataUrl) return null;
+      const editorRoot = editor?.view.dom;
+      const lastBlock = editorRoot?.lastElementChild as HTMLElement | null;
+      const contentTop = editorRoot?.getBoundingClientRect().top ?? 0;
+      const contentBottom = lastBlock ? lastBlock.getBoundingClientRect().bottom - contentTop : 0;
+      const inkBottom = inkBottomPx(ink.annotations, inkSurfaceHeightRef.current);
+      const spacingLines = Math.min(80, Math.max(0, Math.ceil((inkBottom - contentBottom + 24) / 30)));
+      return { dataUrl, spacingLines };
+    };
+    return () => { snapshotRef.current = null; };
+  }, [drawing?.inkSnapshotRef, editor, ink.annotations]);
+
   if (!editor) return null;
 
   const e = editor;
@@ -297,6 +361,31 @@ export function RichNoteEditor({ value, onChange, noteKey, disabled, editorRef, 
       {/* ── Toolbar — single swipeable strip ────────────────────────── */}
       <div className="relative border-b border-[var(--ml-bg-panel)] shrink-0 bg-[#0d0d12]">
         <div className="flex items-center gap-0.5 px-1 py-1.5 overflow-x-auto scrollbar-none">
+          {drawing && (
+            <div className="sticky left-0 z-20 flex shrink-0 items-center rounded-lg border border-[#303043] bg-[#0d0d12] p-0.5 shadow-lg" aria-label="Note input mode">
+              <button
+                type="button"
+                onMouseDown={(event) => { event.preventDefault(); switchToText(); }}
+                title="Type and format text"
+                aria-label="Text tools"
+                aria-pressed={toolbarMode === "text"}
+                className={`flex h-6 w-7 items-center justify-center rounded text-xs font-semibold ${toolbarMode === "text" ? "bg-indigo-600 text-white" : "text-gray-500 hover:text-gray-200"}`}
+              >T</button>
+              <button
+                type="button"
+                onMouseDown={(event) => { event.preventDefault(); void switchToPen(); }}
+                disabled={preparingDrawing}
+                title="Pen and drawing tools"
+                aria-label="Pen tools"
+                aria-pressed={toolbarMode === "pen"}
+                className={`flex h-6 w-7 items-center justify-center rounded ${toolbarMode === "pen" ? "bg-indigo-600 text-white" : "text-gray-500 hover:text-gray-200"}`}
+              >
+                <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2"><path d="m4 20 4.5-1 10-10a2.1 2.1 0 0 0-3-3l-10 10L4 20Z"/><path d="m13.5 8 3 3"/></svg>
+              </button>
+            </div>
+          )}
+          {drawing && <Divider />}
+          {toolbarMode === "text" ? <div className="contents">
           {/* Most used -------------------------------------------------- */}
           <Btn title="Undo" onClick={() => e.chain().focus().undo().run()} disabled={!e.can().undo()}>
             <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" fill="currentColor" viewBox="0 0 16 16"><path d="M8 3a5 5 0 1 1-4.546 2.914.5.5 0 0 0-.908-.417A6 6 0 1 0 8 2z"/><path d="M8 4.466V.534a.25.25 0 0 0-.41-.192L5.23 2.308a.25.25 0 0 0 0 .384l2.36 1.966A.25.25 0 0 0 8 4.466"/></svg>
@@ -366,6 +455,25 @@ export function RichNoteEditor({ value, onChange, noteKey, disabled, editorRef, 
           <Btn title="Clear formatting" onClick={() => e.chain().focus().unsetAllMarks().clearNodes().run()}>
             <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" fill="currentColor" viewBox="0 0 16 16"><path d="M8.086 2.207a2 2 0 0 1 2.828 0l3.879 3.879a2 2 0 0 1 0 2.828l-5.5 5.5A2 2 0 0 1 7.879 15H5.12a2 2 0 0 1-1.414-.586l-2.5-2.5a2 2 0 0 1 0-2.828zm.66 11.34L3.453 8.254 1.914 9.793a1 1 0 0 0 0 1.414l2.5 2.5a1 1 0 0 0 .707.293H7.88a1 1 0 0 0 .707-.293z"/></svg>
           </Btn>
+          </div> : (
+            <AnnotationToolbar
+              embedded
+              tool={ink.tool}
+              onToolChange={ink.setTool}
+              color={ink.color}
+              onColorChange={ink.setColor}
+              penSize={ink.penSize}
+              onPenSizeChange={ink.setPenSize}
+              onUndo={() => void ink.undo()}
+              onRedo={() => void ink.redo()}
+              canUndo={ink.canUndo}
+              canRedo={ink.canRedo}
+              saving={ink.saving}
+              screenLocked={screenLocked}
+              onScreenLockedChange={setScreenLocked}
+            />
+          )}
+          {drawingError && <span className="whitespace-nowrap px-2 text-[11px] text-amber-400" title={drawingError}>{drawingError}</span>}
         </div>
         {/* Fade hint — shows more content is available by scrolling */}
         <div className="pointer-events-none absolute right-0 top-0 h-full w-8 bg-gradient-to-l from-[#0d0d12] to-transparent" />
@@ -387,8 +495,25 @@ export function RichNoteEditor({ value, onChange, noteKey, disabled, editorRef, 
       </div>
 
       {/* ── Editor area ─────────────────────────────────────────────── */}
-      <div className="flex-1 overflow-y-auto py-3 cursor-text" onClick={() => e.commands.focus()}>
-        <EditorContent editor={editor} />
+      <div
+        className="flex-1 overflow-y-auto py-3 cursor-text"
+        onClick={(event) => {
+          if (toolbarMode === "pen") return;
+          e.commands.focus();
+        }}
+      >
+        <div className="relative mx-auto min-h-full max-w-[680px]">
+          <EditorContent editor={editor} />
+          {drawing && (
+            <AnnotationSurface
+              canvas={ink}
+              active={toolbarMode === "pen" && (drawing.noteId ?? preparedDrawingNoteId) != null}
+              documentCoordinates
+              surfaceHeightRef={inkSurfaceHeightRef}
+              screenLocked={screenLocked}
+            />
+          )}
+        </div>
       </div>
     </div>
   );
