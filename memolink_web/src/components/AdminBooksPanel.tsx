@@ -4,6 +4,7 @@ import {
   syncBooks, updateBookMetadata, publishBook, unpublishBook,
   publishAllBooks, unpublishAllBooks, publishSelectedBooks, unpublishSelectedBooks,
   syncFromArchiveOrg,
+  uploadBook,
   type OneDriveStatus, type BookSyncResult, type ArchiveSyncResult,
 } from "../api/adminBooksApi";
 import { createDesktopCommand, getDesktopCommand, isDesktopOnline } from "../api/desktopApi";
@@ -13,6 +14,7 @@ const OFFICE_CLIENT_ID = "4765445b-32c6-49b0-83e6-1d93765276ca";
 const ONEDRIVE_CALLBACK_PATH = "/api/admin/books/onedrive/callback";
 
 export function AdminBooksPanel() {
+  const uploadInputRef = useRef<HTMLInputElement>(null);
   const [status, setStatus] = useState<OneDriveStatus | null>(null);
   const [books, setBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(false);
@@ -36,6 +38,8 @@ export function AdminBooksPanel() {
   const [total, setTotal] = useState(0);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
+  const [uploadingBook, setUploadingBook] = useState(false);
+  const [uploadMessage, setUploadMessage] = useState<string | null>(null);
 
   useEffect(() => {
     loadStatusAndBooks(1);
@@ -113,6 +117,22 @@ export function AdminBooksPanel() {
       setError(err?.response?.data?.detail ?? "Sync failed.");
     } finally {
       setSyncing(false);
+    }
+  }
+
+  async function handleBookUpload(file: File) {
+    setUploadingBook(true);
+    setUploadMessage(null);
+    setError(null);
+    try {
+      const created = await uploadBook(file);
+      setUploadMessage(`Uploaded and published “${created.title}”.`);
+      await loadBooks(1);
+    } catch (err: any) {
+      setError(err?.response?.data?.detail ?? err?.message ?? "Book upload failed.");
+    } finally {
+      setUploadingBook(false);
+      if (uploadInputRef.current) uploadInputRef.current.value = "";
     }
   }
 
@@ -329,6 +349,26 @@ export function AdminBooksPanel() {
                   Scanned {syncResult.scanned} · {syncResult.created} new · {syncResult.updated} updated
                 </p>
               )}
+            </div>
+            <div className="flex items-center gap-3">
+              <input
+                ref={uploadInputRef}
+                type="file"
+                hidden
+                accept=".pdf,.epub,.pptx,.txt,.srt,.vtt,.mobi,.cbz,.cbr,.mp3,.m4a,.m4b,.aac,.wav,.ogg,.mp4,.webm,.mov,.m4v"
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (file) void handleBookUpload(file);
+                }}
+              />
+              <button
+                onClick={() => uploadInputRef.current?.click()}
+                disabled={uploadingBook}
+                className="px-3 py-1.5 text-xs rounded-lg border border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10 transition disabled:opacity-50"
+              >
+                {uploadingBook ? "Uploading to OneDrive…" : "Upload New Book"}
+              </button>
+              {uploadMessage && <p className="text-xs text-emerald-400">{uploadMessage}</p>}
             </div>
             <div className="flex items-center gap-3">
               <button

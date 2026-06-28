@@ -280,6 +280,7 @@ export async function putCachedEpubLocations(bookId: number, signature: string, 
 export interface BookPageResponse {
   items: Book[];
   total: number;
+  available_total?: number;
   page: number;
   page_size: number;
   pages: number;

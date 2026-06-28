@@ -222,6 +222,11 @@
     running - on your laptop, on a single VPS, or fully distributed across Azure Static Web Apps,
     Railway, and Supabase.
   </p>
+  <section>
+    <h2>Smart Source Workspace Deployment</h2>
+    <p>The Microsoft Graph application requires <code>Files.ReadWrite.All</code>, <code>User.Read</code>, and <code>offline_access</code>. Existing OneDrive connections created with read-only consent must be disconnected and reconnected once after deployment. The backend creates a <strong>MemoLink Sources</strong> folder for user-uploaded originals.</p>
+    <p>Apply <code>migrations/smart_source_workspace.sql</code> before deployment. Browser local cache uses IndexedDB and remains origin/device scoped; clearing browser site data removes only the local cache, not the OneDrive original or synchronized annotations.</p>
+  </section>
 </div>
 
 <div class="container">

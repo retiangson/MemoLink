@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import { finalizeLectureTranscript, transcribeAudio } from "../api/chatApi";
 import type { LectureFinalizeResponse, TranscribeAudioOptions } from "../api/chatApi";
 
@@ -14,15 +14,26 @@ export interface RecordingStartOptions {
   silenceThreshold?: number;
   silenceDurationMs?: number;
   onFinalizeLecture?: (result: LectureFinalizeResponse) => void;
+  onRecordingComplete?: (recording: { blob: Blob; durationSeconds: number }) => void | Promise<void>;
 }
 
 export function useRecording(onFinalText: (text: string) => void) {
   const [isRecording, setIsRecording] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
+  const [recordingDurationSeconds, setRecordingDurationSeconds] = useState(0);
+  const [recordingCaptureError, setRecordingCaptureError] = useState<string | null>(null);
   const [audioLevel, setAudioLevel] = useState(0);
   const streamRef = useRef<MediaStream | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
-  const sessionRef = useRef<Required<Omit<RecordingStartOptions, "onFinalizeLecture">> & { onFinalizeLecture?: (result: LectureFinalizeResponse) => void }>({
+  const archiveRecorderRef = useRef<MediaRecorder | null>(null);
+  const archiveChunksRef = useRef<Blob[]>([]);
+  const durationTimerRef = useRef<number | null>(null);
+  const durationRef = useRef(0);
+  const sessionRef = useRef<Required<Omit<RecordingStartOptions, "onFinalizeLecture" | "onRecordingComplete">> & {
+    onFinalizeLecture?: (result: LectureFinalizeResponse) => void;
+    onRecordingComplete?: (recording: { blob: Blob; durationSeconds: number }) => void | Promise<void>;
+  }>({
     language: "",
     mode: "default",
     backend: "auto",
@@ -31,6 +42,7 @@ export function useRecording(onFinalText: (text: string) => void) {
     silenceThreshold: 0.018,
     silenceDurationMs: 1800,
     onFinalizeLecture: undefined,
+    onRecordingComplete: undefined,
   });
   const transcriptTailRef = useRef<string>("");
   const lectureTranscriptRef = useRef<string[]>([]);
@@ -44,6 +56,26 @@ export function useRecording(onFinalText: (text: string) => void) {
   const stopRequestedRef = useRef(false);
   const onFinalTextRef = useRef(onFinalText);
   onFinalTextRef.current = onFinalText;
+
+  function supportedMimeType(): string {
+    return ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg"]
+      .find((type) => MediaRecorder.isTypeSupported(type)) ?? "";
+  }
+
+  function stopDurationTimer() {
+    if (durationTimerRef.current != null) {
+      window.clearInterval(durationTimerRef.current);
+      durationTimerRef.current = null;
+    }
+  }
+
+  function startDurationTimer() {
+    stopDurationTimer();
+    durationTimerRef.current = window.setInterval(() => {
+      durationRef.current += 1;
+      setRecordingDurationSeconds(durationRef.current);
+    }, 1000);
+  }
 
   function cleanupAudioMonitor() {
     if (monitorTimerRef.current != null) {
@@ -123,9 +155,7 @@ export function useRecording(onFinalText: (text: string) => void) {
   function recordChunk(stream: MediaStream) {
     if (!streamRef.current) return; // stopped
 
-    const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
-      ? "audio/webm;codecs=opus"
-      : MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" : "";
+    const mimeType = supportedMimeType();
 
     const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
     const chunks: Blob[] = [];
@@ -170,9 +200,33 @@ export function useRecording(onFinalText: (text: string) => void) {
     recorderRef.current = recorder;
 
     // cut this chunk after CHUNK_MS
-    setTimeout(() => {
+    const stopChunkWhenReady = () => {
       if (recorder.state === "recording") recorder.stop();
-    }, sessionRef.current.chunkMs || CHUNK_MS);
+      else if (recorder.state === "paused") window.setTimeout(stopChunkWhenReady, 500);
+    };
+    window.setTimeout(stopChunkWhenReady, sessionRef.current.chunkMs || CHUNK_MS);
+  }
+
+  function startArchiveRecorder(stream: MediaStream) {
+    archiveChunksRef.current = [];
+    const mimeType = supportedMimeType();
+    const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+    recorder.ondataavailable = (event) => {
+      if (event.data.size > 0) archiveChunksRef.current.push(event.data);
+    };
+    const onRecordingComplete = sessionRef.current.onRecordingComplete;
+    recorder.onstop = () => {
+      const blob = new Blob(archiveChunksRef.current, { type: recorder.mimeType || mimeType || "audio/webm" });
+      archiveChunksRef.current = [];
+      if (blob.size > 0) {
+        void onRecordingComplete?.({
+          blob,
+          durationSeconds: durationRef.current,
+        });
+      }
+    };
+    recorder.start(1000);
+    archiveRecorderRef.current = recorder;
   }
 
   async function startRecording(source: "mic" | "computer", config: string | RecordingStartOptions = "") {
@@ -186,11 +240,16 @@ export function useRecording(onFinalText: (text: string) => void) {
       silenceThreshold: normalized.silenceThreshold ?? 0.018,
       silenceDurationMs: normalized.silenceDurationMs ?? 1800,
       onFinalizeLecture: normalized.onFinalizeLecture,
+      onRecordingComplete: normalized.onRecordingComplete,
     };
     transcriptTailRef.current = "";
     lectureTranscriptRef.current = [];
     pendingLectureFinalizeRef.current = false;
     stopRequestedRef.current = false;
+    durationRef.current = 0;
+    setRecordingDurationSeconds(0);
+    setIsPaused(false);
+    setRecordingCaptureError(null);
     try {
       let stream: MediaStream;
 
@@ -212,10 +271,25 @@ export function useRecording(onFinalText: (text: string) => void) {
 
       streamRef.current = stream;
       setIsRecording(true);
+      try {
+        startArchiveRecorder(stream);
+      } catch {
+        // Some browsers do not allow two MediaRecorders on one stream. Keep the
+        // established lecture transcription working even if local archival is unavailable.
+        archiveRecorderRef.current = null;
+        setRecordingCaptureError("Local recording capture is unavailable in this browser; transcription is still active.");
+      }
+      startDurationTimer();
       if (source === "mic") startAudioMonitor(stream);
       recordChunk(stream);
     } catch (err: any) {
+      stopDurationTimer();
       cleanupAudioMonitor();
+      streamRef.current?.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+      archiveRecorderRef.current = null;
+      setIsRecording(false);
+      setIsPaused(false);
       if (err?.name === "NotAllowedError" || err?.name === "PermissionDeniedError") {
         alert("Permission denied. Please allow access and try again.");
       } else if (err?.name !== "AbortError") {
@@ -228,16 +302,70 @@ export function useRecording(onFinalText: (text: string) => void) {
     stopRequestedRef.current = true;
     const recorder = recorderRef.current;
     recorderRef.current = null;
+    const archiveRecorder = archiveRecorderRef.current;
+    archiveRecorderRef.current = null;
+    stopDurationTimer();
     cleanupAudioMonitor();
-    streamRef.current?.getTracks().forEach((t) => t.stop());
+    const stream = streamRef.current;
     streamRef.current = null; // null before onstop fires so recordChunk won't restart
     pendingLectureFinalizeRef.current = sessionRef.current.mode === "lecture";
-    if (recorder?.state === "recording") recorder.stop();
+    if (recorder && recorder.state !== "inactive") recorder.stop();
+    if (archiveRecorder && archiveRecorder.state !== "inactive") archiveRecorder.stop();
+    stream?.getTracks().forEach((track) => track.stop());
     setIsRecording(false);
-    if (!recorder || recorder.state !== "recording") {
+    setIsPaused(false);
+    if (!recorder || recorder.state === "inactive") {
       finalizeLectureIfNeeded();
     }
   }
 
-  return { isRecording, isTranscribing, audioLevel, startRecording, stopRecording };
+  function pauseResumeRecording() {
+    const recorder = recorderRef.current;
+    const archiveRecorder = archiveRecorderRef.current;
+    if (!recorder) return;
+    if (recorder.state === "recording") {
+      recorder.pause();
+      if (archiveRecorder?.state === "recording") archiveRecorder.pause();
+      stopDurationTimer();
+      setIsPaused(true);
+      return;
+    }
+    if (recorder.state === "paused") {
+      recorder.resume();
+      if (archiveRecorder?.state === "paused") archiveRecorder.resume();
+      startDurationTimer();
+      setIsPaused(false);
+    }
+  }
+
+  useEffect(() => () => {
+    stopDurationTimer();
+    cleanupAudioMonitor();
+    const recorder = recorderRef.current;
+    const archiveRecorder = archiveRecorderRef.current;
+    recorderRef.current = null;
+    archiveRecorderRef.current = null;
+    streamRef.current?.getTracks().forEach((track) => track.stop());
+    streamRef.current = null;
+    if (recorder) {
+      recorder.onstop = null;
+      if (recorder.state !== "inactive") recorder.stop();
+    }
+    if (archiveRecorder) {
+      archiveRecorder.onstop = null;
+      if (archiveRecorder.state !== "inactive") archiveRecorder.stop();
+    }
+  }, []);
+
+  return {
+    isRecording,
+    isPaused,
+    isTranscribing,
+    audioLevel,
+    recordingDurationSeconds,
+    recordingCaptureError,
+    startRecording,
+    stopRecording,
+    pauseResumeRecording,
+  };
 }

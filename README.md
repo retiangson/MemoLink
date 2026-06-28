@@ -367,6 +367,25 @@ Recent documentation updates also cover the Gmail connector cleanup: token refre
 | `POST` | `/api/admin/books/{id}/publish` / `/unpublish` | Publish or unpublish a book | Admin |
 | `POST` | `/api/admin/books/publish-all` / `/unpublish-all` | Bulk publish/unpublish all books | Admin |
 | `POST` | `/api/admin/books/publish-selected` / `/unpublish-selected` | Bulk publish/unpublish selected books | Admin |
+| `POST` | `/api/admin/books/upload` | Upload and publish a supported book original to OneDrive | Admin |
+
+---
+
+## Smart Source Workspace
+
+MemoLink notes now support an `Original | Editor | Source File | Timeline` workspace. Original uploaded files are stored in OneDrive, cached in browser storage per device, and linked to editable note content used for RAG. PDF and image originals support non-destructive pen/highlighter annotations whose editable stroke data is synced through the database.
+
+- Original file and book binaries are never stored in the database.
+- OneDrive books reuse their existing OneDrive item; they are not uploaded twice.
+- External books and note attachments are moved to OneDrive before linking.
+- Local recordings are saved through the File System Access API where available, or shared/downloaded as a browser fallback. Only filename, duration, and local-only metadata are stored.
+- Transcription uploads occur only after an explicit user action and remain request-scoped; only confirmed transcript text is added to the note and embedded.
+- All notes autosave after a short debounce; Save and Discard controls are no longer required. Pending changes are kept in device storage, retried when connectivity returns, and flushed when the browser tab is hidden, the MemoLink note tab changes, or the page exits. Source tabs still appear only when a real source is linked.
+- **Solve Equation** first flushes the current note, then asks the configured AI provider for a step-by-step solution and safely appends the equation, reasoning, answer, and verification to the note. The endpoint verifies note ownership and treats note text as untrusted input.
+- Note recording extends the existing Record Lecture hook. Its transcription behavior is reused while the complete recording is saved locally and only local-only metadata is synchronized.
+- Admins can upload supported books directly to OneDrive. Uploaded books are published into Browse Books, whose header reports both available and filtered counts.
+
+Smart Source and note APIs include `/api/source-files/upload-to-onedrive`, ownership-checked source retrieval, `/api/annotations`, `/api/notes/{id}/autosave`, `/api/notes/{id}/source-workspace`, `/api/notes/{id}/source-workspace/autosave`, `/api/notes/{id}/timeline`, `/api/notes/{id}/recordings`, and `/api/commands/solve-equation`. Books Library links are created internally so clients cannot attach arbitrary OneDrive item IDs.
 
 ---
 

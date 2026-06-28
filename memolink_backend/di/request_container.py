@@ -101,6 +101,12 @@ class RequestContainer:
     def book_cache(self):
         return self.services.get_book_cache_service()
 
+    def smart_sources(self):
+        return self.services.get_smart_source_service()
+
+    def book_upload(self):
+        return self.services.get_book_upload_service()
+
 
 def get_request_container(db: Session = Depends(get_db)) -> RequestContainer:
     return RequestContainer(db)

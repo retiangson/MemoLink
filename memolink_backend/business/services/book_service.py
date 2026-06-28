@@ -38,9 +38,17 @@ class BookService:
         page_size: int = 12,
     ) -> dict:
         total = self._books.count_published(search, category, tag, format)
+        available_total = self._books.count_published()
         items = [BookResponseDTO.model_validate(b) for b in self._books.list_published(search, category, tag, format, page, page_size)]
         pages = max(1, (total + page_size - 1) // page_size)
-        return {"items": items, "total": total, "page": page, "page_size": page_size, "pages": pages}
+        return {
+            "items": items,
+            "total": total,
+            "available_total": available_total,
+            "page": page,
+            "page_size": page_size,
+            "pages": pages,
+        }
 
     def get_published_book(self, book_id: int) -> BookResponseDTO:
         book = self._require_published(book_id)

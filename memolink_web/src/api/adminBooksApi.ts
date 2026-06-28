@@ -45,6 +45,12 @@ export async function syncBooks(): Promise<BookSyncResult> {
   return (await api.post("/admin/books/sync")).data;
 }
 
+export async function uploadBook(file: File): Promise<Book> {
+  const form = new FormData();
+  form.append("file", file);
+  return (await api.post("/admin/books/upload", form)).data;
+}
+
 export async function updateBookMetadata(
   bookId: number,
   body: { title?: string; author?: string; description?: string; category?: string; tags?: string; cover_image_url?: string }

@@ -31,6 +31,7 @@ class BookResponseDTO(BaseModel):
 class BookPageResponseDTO(BaseModel):
     items: List[BookResponseDTO]
     total: int
+    available_total: int
     page: int
     page_size: int
     pages: int

@@ -72,6 +72,7 @@ from memolink_backend.api.v1 import (
     public_agent_controller,
     admin_books_controller,
     books_controller,
+    smart_source_controller,
 )
 
 # Register all models so SQLAlchemy sees them
@@ -103,6 +104,7 @@ import memolink_backend.domain.models.book                  # noqa: F401
 import memolink_backend.domain.models.user_book              # noqa: F401
 import memolink_backend.domain.models.book_bookmark           # noqa: F401
 import memolink_backend.domain.models.book_note_source         # noqa: F401
+import memolink_backend.domain.models.smart_source              # noqa: F401
 
 if os.getenv("MEMOLINK_SKIP_DB_BOOTSTRAP") != "1":
     with engine.connect() as _conn:
@@ -758,6 +760,96 @@ if os.getenv("MEMOLINK_SKIP_DB_BOOTSTRAP") != "1":
             )
         """))
         _conn.execute(text("CREATE INDEX IF NOT EXISTS ix_book_highlights_book ON book_highlights(user_id, book_id)"))
+        # ── Smart Source Workspace (metadata and editable annotation data only) ──
+        _conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS source_files (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                workspace_id INTEGER REFERENCES workspaces(id) ON DELETE SET NULL,
+                note_id INTEGER NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
+                source_type VARCHAR(40) NOT NULL,
+                original_filename VARCHAR(500) NOT NULL,
+                mime_type VARCHAR(200),
+                file_size BIGINT,
+                onedrive_drive_id VARCHAR(255) NOT NULL,
+                onedrive_item_id VARCHAR(500) NOT NULL,
+                onedrive_web_url TEXT,
+                onedrive_etag VARCHAR(500),
+                extraction_status VARCHAR(30) NOT NULL DEFAULT 'pending',
+                cache_status VARCHAR(30) NOT NULL DEFAULT 'unknown',
+                last_synced_at TIMESTAMPTZ,
+                created_at TIMESTAMPTZ DEFAULT now(),
+                updated_at TIMESTAMPTZ DEFAULT now(),
+                deleted_at TIMESTAMPTZ,
+                CONSTRAINT uq_source_file_note_item UNIQUE(user_id, note_id, onedrive_drive_id, onedrive_item_id)
+            )
+        """))
+        _conn.execute(text("CREATE INDEX IF NOT EXISTS ix_source_files_note ON source_files(user_id, note_id)"))
+        _conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS book_note_links (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                workspace_id INTEGER REFERENCES workspaces(id) ON DELETE SET NULL,
+                book_id INTEGER NOT NULL REFERENCES books(id) ON DELETE CASCADE,
+                note_id INTEGER NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
+                source_file_id INTEGER NOT NULL REFERENCES source_files(id) ON DELETE CASCADE,
+                created_at TIMESTAMPTZ DEFAULT now(),
+                CONSTRAINT uq_book_note_link UNIQUE(user_id, book_id, note_id)
+            )
+        """))
+        _conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS file_annotations (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                workspace_id INTEGER REFERENCES workspaces(id) ON DELETE SET NULL,
+                note_id INTEGER NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
+                source_file_id INTEGER REFERENCES source_files(id) ON DELETE CASCADE,
+                book_id INTEGER REFERENCES books(id) ON DELETE SET NULL,
+                page_number INTEGER,
+                location_anchor JSONB,
+                annotation_type VARCHAR(40) NOT NULL,
+                strokes_json JSONB,
+                highlight_data JSONB,
+                comment_text TEXT,
+                color VARCHAR(40),
+                pen_size FLOAT,
+                tool_type VARCHAR(40),
+                created_at TIMESTAMPTZ DEFAULT now(),
+                updated_at TIMESTAMPTZ DEFAULT now(),
+                deleted_at TIMESTAMPTZ
+            )
+        """))
+        _conn.execute(text("CREATE INDEX IF NOT EXISTS ix_file_annotations_note ON file_annotations(user_id, note_id, source_file_id)"))
+        _conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS note_timeline_events (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                workspace_id INTEGER REFERENCES workspaces(id) ON DELETE SET NULL,
+                note_id INTEGER NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
+                source_file_id INTEGER REFERENCES source_files(id) ON DELETE CASCADE,
+                book_id INTEGER REFERENCES books(id) ON DELETE SET NULL,
+                event_type VARCHAR(50) NOT NULL,
+                event_summary VARCHAR(500) NOT NULL,
+                metadata_json JSONB,
+                created_at TIMESTAMPTZ DEFAULT now()
+            )
+        """))
+        _conn.execute(text("CREATE INDEX IF NOT EXISTS ix_note_timeline_events_note ON note_timeline_events(user_id, note_id, created_at DESC)"))
+        _conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS recording_metadata (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                workspace_id INTEGER REFERENCES workspaces(id) ON DELETE SET NULL,
+                note_id INTEGER NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
+                file_name VARCHAR(500) NOT NULL,
+                duration_seconds FLOAT NOT NULL,
+                local_only BOOLEAN NOT NULL DEFAULT TRUE,
+                transcript_status VARCHAR(30) NOT NULL DEFAULT 'not_requested',
+                transcript_note_id INTEGER REFERENCES notes(id) ON DELETE SET NULL,
+                created_at TIMESTAMPTZ DEFAULT now()
+            )
+        """))
+        _conn.execute(text("CREATE INDEX IF NOT EXISTS ix_recording_metadata_note ON recording_metadata(user_id, note_id)"))
         _conn.execute(text("INSERT INTO feature_flags (key, value) VALUES ('books_library_enabled', 'true') ON CONFLICT (key) DO NOTHING"))
         # Auto-promote first user as admin if none exists
         _conn.execute(text("""
@@ -931,6 +1023,7 @@ app.include_router(public_agent_controller.router, prefix="/api")
 app.include_router(public_agent_controller.public_router, prefix="/api")
 app.include_router(admin_books_controller.router, prefix="/api")
 app.include_router(books_controller.router, prefix="/api")
+app.include_router(smart_source_controller.router, prefix="/api")
 
 # AWS Lambda handler - only active when running inside Lambda
 if os.getenv("AWS_LAMBDA_FUNCTION_NAME"):

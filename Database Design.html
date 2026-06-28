@@ -187,6 +187,11 @@
   <div class="section-label">Documentation</div>
   <h1>Database Design</h1>
   <p>Entity-Relationship model, table schemas, column constraints, relationships, and indexes for MemoLink's PostgreSQL database with pgvector.</p>
+  <section>
+    <h2>Smart Source Workspace Tables</h2>
+    <p><code>source_files</code> stores OneDrive identifiers, file metadata, extraction state, and version metadata. <code>book_note_links</code> links a book, source, and editable note. <code>file_annotations</code> stores editable normalized stroke/highlight/comment JSON. <code>note_timeline_events</code> records source-workspace actions. <code>recording_metadata</code> stores local-only filename and duration metadata.</p>
+    <p>These tables intentionally contain no original file, book, recording, Blob, or base64 binary columns. Source binaries remain in OneDrive; recording binaries remain local.</p>
+  </section>
 </div>
 
 <div class="container">

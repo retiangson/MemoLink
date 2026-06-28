@@ -4,7 +4,6 @@ from typing import List, Optional
 from memolink_backend.di.request_container import RequestContainer, get_request_container
 from memolink_backend.core.security import get_current_user
 from memolink_backend.core.config import settings
-from memolink_backend.contracts.note_dtos import NoteCreateDTO
 from memolink_backend.utils.file_extractor import extract_formatted_html
 
 _WHISPER_LIMIT_BYTES = 25 * 1024 * 1024
@@ -44,13 +43,21 @@ async def bulk_upload(
                 c.logs().warning("bulk.upload", f"Transcription skipped for '{filename}' - file exceeds Whisper 25 MB limit", {"filename": filename, "size_mb": size_mb}, current_user_id)
 
             if not html_content.strip() or html_content.strip() == "<p></p>":
-                reason = "No text could be extracted (scanned or image-only file?)"
-                failed.append({"filename": filename, "reason": reason})
                 c.logs().warning("bulk.upload", f"No text extracted from '{filename}'", {"filename": filename, "size_mb": size_mb}, current_user_id)
-                continue
+                html_content = "<p></p>"
+                extraction_status = "unavailable"
+            else:
+                extraction_status = "ready"
 
-            dto = NoteCreateDTO(user_id=current_user_id, title=filename, content=html_content, source=filename, workspace_id=workspace_id)
-            note = c.notes().create_note(dto)
+            note = await c.smart_sources().create_imported_note(
+                user_id=current_user_id,
+                workspace_id=workspace_id,
+                file_name=filename,
+                mime_type=file.content_type,
+                content=content_bytes,
+                extracted_html=html_content,
+                extraction_status=extraction_status,
+            )
             created.append(note)
             c.logs().info("bulk.upload", f"Note created from '{filename}'", {"filename": filename, "size_mb": size_mb}, current_user_id)
         except Exception as exc:

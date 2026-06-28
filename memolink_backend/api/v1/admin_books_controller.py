@@ -5,7 +5,7 @@ import time
 from typing import Optional
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from fastapi.responses import RedirectResponse
 
 import logging
@@ -26,9 +26,11 @@ from memolink_backend.contracts.book_dtos import (
     ArchiveOrgSyncResultDTO,
 )
 from memolink_backend.business.services.archive_org_service import ArchiveOrgServiceError
+from memolink_backend.business.services.book_upload_service import BookUploadError
 
 router = APIRouter(prefix="/admin/books", tags=["admin-books"])
 logger = logging.getLogger(__name__)
+MAX_BOOK_UPLOAD_BYTES = 100 * 1024 * 1024
 
 
 def _frontend_redirect_url(params: dict[str, str]) -> str:
@@ -70,6 +72,29 @@ def list_books(
     c: RequestContainer = Depends(get_request_container),
 ):
     return c.books().list_all_for_admin(search, page, page_size)
+
+
+@router.post("/upload", response_model=BookResponseDTO)
+async def upload_book(
+    file: UploadFile = File(...),
+    admin_id: int = Depends(get_current_admin),
+    c: RequestContainer = Depends(get_request_container),
+):
+    file_name = (file.filename or "").strip()
+    content = await file.read(MAX_BOOK_UPLOAD_BYTES + 1)
+    if len(content) > MAX_BOOK_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail="Book uploads are limited to 100 MB")
+    try:
+        return await c.book_upload().upload(
+            admin_user_id=admin_id,
+            file_name=file_name,
+            content=content,
+            mime_type=file.content_type,
+        )
+    except BookUploadError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    except OneDriveServiceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
 
 # ── OneDrive connection ──────────────────────────────────────────────────────

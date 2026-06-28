@@ -8,7 +8,9 @@ import { useNoteEditor } from "../hooks/useNoteEditor";
 import { useConversations } from "../hooks/useConversations";
 import { useChat } from "../hooks/useChat";
 import { addMessageToNoteAPI, deleteMessage } from "../api/conversationApi";
-import { getNote, updateNote, setNotePublicAgentEnabled } from "../api/client";
+import { autosaveNote, autosaveNoteOnPageExit, createNoteOnPageExit, getNote, updateNote, setNotePublicAgentEnabled } from "../api/client";
+import { autosaveSourceNote } from "../api/smartSourceApi";
+import type { NoteSnapshot } from "../hooks/useNoteAutosave";
 import { Sidebar } from "../components/Sidebar";
 import { NoteEditorView } from "../components/NoteEditorView";
 import { RightPanel } from "../components/RightPanel";
@@ -354,7 +356,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
 
   const activeWorkspaceId = workspaceHook.activeWorkspace?.id ?? null;
 
-  const { notes, setNotes, addNote, saveNote, removeNote, reloadNotes } = useNotes(user.id, activeWorkspaceId);
+  const { notes, setNotes, addNote, removeNote, reloadNotes } = useNotes(user.id, activeWorkspaceId);
   const suggestions = useSuggestions(activeWorkspaceId);
   const calendar = useCalendar(activeWorkspaceId);
   const { permission: notifPermission, requestPermission: requestNotifPermission } = useReminderNotifications(suggestions.items);
@@ -696,21 +698,6 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
   }
 
   // ── Note CRUD ─────────────────────────────────────────────────────────────
-  async function handleSaveNote() {
-    if (!editor.noteTitleDraft.trim() && !editor.noteContentDraft.trim()) {
-      alert("Cannot save an empty note."); return;
-    }
-    if (editor.selectedNote?.id === null) {
-      const fresh = await addNote(editor.noteTitleDraft, editor.noteContentDraft);
-      editor.updateActiveNote(fresh);
-      suggestions.generateFromNote(editor.noteTitleDraft, editor.noteContentDraft);
-      return;
-    }
-    const fresh = await saveNote(editor.selectedNote!.id, editor.noteTitleDraft, editor.noteContentDraft);
-    editor.updateActiveNote(fresh);
-    suggestions.generateFromNote(editor.noteTitleDraft, editor.noteContentDraft);
-  }
-
   async function handleTogglePublicAgent() {
     const note = editor.selectedNote;
     if (!note || note.id === null) return;
@@ -937,6 +924,53 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
       if (needsNativeSettleDelay) disposeReaderAfterPaint(closeTab);
       else closeTab();
     });
+  }
+
+  const noteIdentityRef = useRef(new Map<string, number | null>());
+  const draftCreationRef = useRef(new Map<string, Promise<Note>>());
+  for (const tab of editor.openNotes) {
+    if (tab.note.id !== null || !noteIdentityRef.current.has(tab.clientKey)) {
+      noteIdentityRef.current.set(tab.clientKey, tab.note.id);
+    }
+  }
+
+  async function handleAutosaveNote(noteKey: string, snapshot: NoteSnapshot, sourceLinked: boolean) {
+    let noteId = noteIdentityRef.current.get(noteKey) ?? null;
+    if (noteId == null) {
+      let creation = draftCreationRef.current.get(noteKey);
+      if (!creation) {
+        creation = addNote(snapshot.title, snapshot.content);
+        draftCreationRef.current.set(noteKey, creation);
+      }
+      try {
+        const fresh = await creation;
+        noteId = fresh.id;
+        noteIdentityRef.current.set(noteKey, noteId);
+        editor.markDraftSaved(noteKey, fresh, snapshot.title, snapshot.content);
+        suggestions.generateFromNote(snapshot.title, snapshot.content);
+      } finally {
+        draftCreationRef.current.delete(noteKey);
+      }
+      return;
+    }
+
+    const fresh = sourceLinked
+      ? await autosaveSourceNote(noteId, snapshot.title, snapshot.content)
+      : await autosaveNote(noteId, snapshot.title, snapshot.content);
+    setNotes((previous) => previous.map((note) => note.id === noteId ? fresh : note));
+    editor.markDraftSaved(noteKey, fresh, snapshot.title, snapshot.content);
+  }
+
+  function handleAutosaveNoteOnPageExit(noteKey: string, snapshot: NoteSnapshot) {
+    if (draftCreationRef.current.has(noteKey)) return;
+    const noteId = noteIdentityRef.current.get(noteKey) ?? null;
+    if (noteId == null) createNoteOnPageExit(snapshot.title, snapshot.content, activeWorkspaceId);
+    else autosaveNoteOnPageExit(noteId, snapshot.title, snapshot.content);
+  }
+
+  function handleEquationSolved(noteId: number, fresh: Note) {
+    setNotes((previous) => previous.map((note) => note.id === noteId ? fresh : note));
+    editor.syncExternallyUpdatedNote(noteId, fresh);
   }
 
   function closeBookTabFromTabBar(index: number) {
@@ -1949,14 +1983,16 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
           ) : isNoteActive ? (
             <main className="flex-1 px-4 py-6 overflow-hidden flex flex-col">
               <NoteEditorView
-                noteKey={editor.active?.note.id ?? `new-${editor.activeIndex}`}
+                noteKey={editor.active?.clientKey ?? "no-note"}
                 noteTitleDraft={editor.noteTitleDraft}
                 setNoteTitleDraft={editor.setNoteTitleDraft}
                 noteContentDraft={editor.noteContentDraft}
                 setNoteContentDraft={editor.setNoteContentDraft}
                 isNoteDirty={editor.isNoteDirty}
-                onSave={handleSaveNote}
-                onDiscard={editor.discardChanges}
+                onAutosave={handleAutosaveNote}
+                onAutosavePageExit={handleAutosaveNoteOnPageExit}
+                onEquationSolved={handleEquationSolved}
+                aiModel={selectedModel}
                 onPlay={chat.tts.speak}
                 ttsPlaying={chat.tts.playing}
                 ttsPaused={chat.tts.paused}
@@ -2276,14 +2312,16 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                 {editor.openNotes.length > 0 ? (
                   <main className="flex-1 px-4 py-4 overflow-hidden flex flex-col min-h-0">
                     <NoteEditorView
-                      noteKey={editor.active?.note.id ?? `new-${editor.activeIndex}`}
+                      noteKey={editor.active?.clientKey ?? "no-note"}
                       noteTitleDraft={editor.noteTitleDraft}
                       setNoteTitleDraft={editor.setNoteTitleDraft}
                       noteContentDraft={editor.noteContentDraft}
                       setNoteContentDraft={editor.setNoteContentDraft}
                       isNoteDirty={editor.isNoteDirty}
-                      onSave={handleSaveNote}
-                      onDiscard={editor.discardChanges}
+                      onAutosave={handleAutosaveNote}
+                      onAutosavePageExit={handleAutosaveNoteOnPageExit}
+                      onEquationSolved={handleEquationSolved}
+                      aiModel={selectedModel}
                       onPlay={chat.tts.speak}
                       ttsPlaying={chat.tts.playing}
                       ttsPaused={chat.tts.paused}

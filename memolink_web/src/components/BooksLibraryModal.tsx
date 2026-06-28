@@ -155,6 +155,7 @@ export function BooksLibraryModal({ show, onClose, initialView = "browse", onMyB
   const [category, setCategory] = useState<BookCategory | "all">("all");
   const [page, setPage] = useState(1);
   const [browseTotal, setBrowseTotal] = useState(0);
+  const [availableTotal, setAvailableTotal] = useState(0);
   const [browsePages, setBrowsePages] = useState(1);
   const [loading, setLoading] = useState(false);
   const [borrowingId, setBorrowingId] = useState<number | null>(null);
@@ -170,11 +171,13 @@ export function BooksLibraryModal({ show, onClose, initialView = "browse", onMyB
       });
       setBooks(result.items);
       setBrowseTotal(result.total);
+      setAvailableTotal(result.available_total ?? result.total);
       setBrowsePages(result.pages);
       if (page > result.pages) setPage(result.pages);
     } catch {
       setBooks([]);
       setBrowseTotal(0);
+      setAvailableTotal(0);
       setBrowsePages(1);
     } finally {
       setLoading(false);
@@ -328,7 +331,7 @@ export function BooksLibraryModal({ show, onClose, initialView = "browse", onMyB
               onClick={() => setView("browse")}
               className={`px-3 py-1.5 text-xs rounded-md transition ${view === "browse" ? "bg-indigo-600 text-white" : "text-gray-400 hover:text-gray-200"}`}
             >
-              Browse Books
+              Browse Books ({availableTotal})
             </button>
             <button
               onClick={() => setView("my")}
@@ -376,6 +379,13 @@ export function BooksLibraryModal({ show, onClose, initialView = "browse", onMyB
             );
           })}
         </div>
+        {view === "browse" && !loading && (
+          <p className="max-w-4xl mx-auto mt-2 text-[11px] text-gray-500">
+            {search.trim() || category !== "all"
+              ? `Showing ${browseTotal} of ${availableTotal} books`
+              : `${availableTotal} books available`}
+          </p>
+        )}
       </div>
 
       <div className="flex-1 overflow-auto p-5">

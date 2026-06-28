@@ -4,6 +4,7 @@ import { getNote } from "../api/client";
 type NoteEditState = { id: number | null; title: string; content: string; source?: string; public_agent_enabled?: boolean };
 
 interface OpenTab {
+  clientKey: string;
   note: NoteEditState;
   titleDraft: string;
   contentDraft: string;
@@ -17,6 +18,14 @@ function defaultNoteTitle() {
     month: "short", day: "numeric", year: "numeric",
     hour: "numeric", minute: "2-digit",
   });
+}
+
+let nextDraftKey = 0;
+
+function createClientKey(noteId: number | null): string {
+  if (noteId !== null) return `note-${noteId}`;
+  nextDraftKey += 1;
+  return `draft-${Date.now()}-${nextDraftKey}`;
 }
 
 export function useNoteEditor() {
@@ -38,14 +47,14 @@ export function useNoteEditor() {
       if (existing !== -1) { setActiveIndex(existing); return; }
       const fresh = await getNote(note.id);
       setOpenNotes((prev) => {
-        const next = [...prev, { note: fresh, titleDraft: fresh.title ?? "", contentDraft: fresh.content ?? "", viewTab: "raw" as const }];
+        const next = [...prev, { clientKey: createClientKey(fresh.id), note: fresh, titleDraft: fresh.title ?? "", contentDraft: fresh.content ?? "", viewTab: "raw" as const }];
         setActiveIndex(next.length - 1);
         return next;
       });
     } else {
       const title = note.title || defaultNoteTitle();
       setOpenNotes((prev) => {
-        const next = [...prev, { note: { id: null, title, content: note.content }, titleDraft: title, contentDraft: note.content ?? "", viewTab: "raw" as const }];
+        const next = [...prev, { clientKey: createClientKey(null), note: { id: null, title, content: note.content }, titleDraft: title, contentDraft: note.content ?? "", viewTab: "raw" as const }];
         setActiveIndex(next.length - 1);
         return next;
       });
@@ -112,6 +121,34 @@ export function useNoteEditor() {
           ? { ...t, note: fresh, titleDraft: fresh.title ?? "", contentDraft: fresh.content ?? "" }
           : t
       )
+    );
+  }
+
+  function markActiveNoteSaved(fresh: NoteEditState, savedTitle: string, savedContent: string) {
+    setOpenNotes((prev) =>
+      prev.map((tab) => {
+        if (tab.note.id !== fresh.id) return tab;
+        return {
+          ...tab,
+          note: fresh,
+          titleDraft: tab.titleDraft === savedTitle ? (fresh.title ?? "") : tab.titleDraft,
+          contentDraft: tab.contentDraft === savedContent ? (fresh.content ?? "") : tab.contentDraft,
+        };
+      }),
+    );
+  }
+
+  function markDraftSaved(clientKey: string, fresh: NoteEditState, savedTitle: string, savedContent: string) {
+    setOpenNotes((prev) =>
+      prev.map((tab) => {
+        if (tab.clientKey !== clientKey) return tab;
+        return {
+          ...tab,
+          note: fresh,
+          titleDraft: tab.titleDraft === savedTitle ? (fresh.title ?? "") : tab.titleDraft,
+          contentDraft: tab.contentDraft === savedContent ? (fresh.content ?? "") : tab.contentDraft,
+        };
+      }),
     );
   }
 
@@ -215,7 +252,7 @@ export function useNoteEditor() {
     noteContentDraft, setNoteContentDraft,
     isNoteDirty,
     noteTab, setNoteTab,
-    openNote, closeNote, closeNoteById, closeAllNotes, reorderNotes, updateActiveNote, syncNoteById, syncExternallyUpdatedNote, syncNoteTitle, discardChanges, applyFormat,
+    openNote, closeNote, closeNoteById, closeAllNotes, reorderNotes, updateActiveNote, markActiveNoteSaved, markDraftSaved, syncNoteById, syncExternallyUpdatedNote, syncNoteTitle, discardChanges, applyFormat,
     selectedNote: active?.note ?? null,
   };
 }

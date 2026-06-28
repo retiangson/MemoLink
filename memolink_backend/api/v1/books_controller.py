@@ -464,7 +464,7 @@ def save_as_note_source(
 
     already_running = c.book_note_source().get_status(user_id, book_id)
     status = c.book_note_source().start(user_id, book_id)
-    if not already_running or already_running.status != "processing":
+    if status.status == "processing" and (not already_running or already_running.status != "processing"):
         background_tasks.add_task(run_book_note_source_job, user_id, book_id)
     return status
 

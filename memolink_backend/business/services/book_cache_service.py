@@ -124,6 +124,14 @@ class BookCacheService:
             drive_id=book.onedrive_drive_id, item_id=book.onedrive_item_id
         )
 
+    async def download_book_bytes(self, book: Book) -> bytes:
+        """Return source bytes for an explicit user action such as Save as Note.
+
+        The caller must keep these bytes request/job-scoped and must not persist them in
+        MemoLink's database.
+        """
+        return await self._download_book_bytes(book)
+
     # ── Public API ────────────────────────────────────────────────────────────
 
     async def get_read_url(
