@@ -384,6 +384,8 @@ MemoLink notes now support an `Original | Editor | Source File | Timeline` works
 - **Solve Equation** first flushes the current note, then asks the configured AI provider for a step-by-step solution and safely appends the equation, reasoning, answer, and verification to the note. The endpoint verifies note ownership and treats note text as untrusted input.
 - Note recording extends the existing Record Lecture hook. Its transcription behavior is reused while the complete recording is saved locally and only local-only metadata is synchronized.
 - Admins can upload supported books directly to OneDrive. Uploaded books are published into Browse Books, whose header reports both available and filtered counts.
+- Notes created by Save as Note actions across Chat, Study, Email, Teams, and Books update the shared Notes list automatically. Background book extraction continues to track completion after the reader closes.
+- Browse Books and My Books support a remembered per-device page size from 10 through 100 books in increments of 10.
 
 Smart Source and note APIs include `/api/source-files/upload-to-onedrive`, ownership-checked source retrieval, `/api/annotations`, `/api/notes/{id}/autosave`, `/api/notes/{id}/source-workspace`, `/api/notes/{id}/source-workspace/autosave`, `/api/notes/{id}/timeline`, `/api/notes/{id}/recordings`, and `/api/commands/solve-equation`. Books Library links are created internally so clients cannot attach arbitrary OneDrive item IDs.
 

@@ -1,5 +1,6 @@
 import axios from "axios";
 import { getToken, getUser, logout } from "../utils/auth";
+import { notifyNoteChanged } from "../utils/noteEvents";
 
 export const API_BASE = (import.meta.env.VITE_API_BASE_URL as string)?.replace(/\/$/, "") ?? "";
 
@@ -28,7 +29,9 @@ api.interceptors.response.use(
 
 // Notes
 export async function createNote(title: string | null, content: string, source: string | null = null, workspace_id?: number | null) {
-  return (await api.post("/notes", { title, content, source, workspace_id: workspace_id ?? null })).data;
+  const note = (await api.post("/notes", { title, content, source, workspace_id: workspace_id ?? null })).data;
+  notifyNoteChanged({ note, noteId: note.id });
+  return note;
 }
 export async function getNote(note_id: number) {
   return (await api.post("/notes/get", { note_id })).data;

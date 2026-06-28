@@ -1,4 +1,5 @@
 import { api } from "./client";
+import { notifyNoteChanged } from "../utils/noteEvents";
 
 export interface TeamsStatus {
   connected: boolean;
@@ -52,5 +53,6 @@ export async function sendTeamsMessage(chatId: string, text: string): Promise<vo
 
 export async function chatToNote(chatId: string, topic: string, workspaceId?: number | null): Promise<{ note_id: number; title: string }> {
   const r = await api.post(`/teams/chats/${chatId}/to-note`, { topic, workspace_id: workspaceId });
+  notifyNoteChanged({ noteId: r.data.note_id });
   return r.data;
 }
