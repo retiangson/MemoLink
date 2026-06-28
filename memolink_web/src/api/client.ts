@@ -67,11 +67,11 @@ export function createNoteOnPageExit(title: string, content: string, workspace_i
   keepaliveRequest("/notes", "POST", { title, content, source: "manual", workspace_id: workspace_id ?? null });
 }
 
-export async function solveNoteEquation(note_id: number, model?: string) {
-  return (await api.post("/commands/solve-equation", { note_id, model: model || null })).data;
+export async function solveNoteEquation(note_id: number, model?: string, drawing_image_data_url?: string | null, drawing_spacing_lines?: number) {
+  return (await api.post("/commands/solve-equation", { note_id, model: model || null, drawing_image_data_url: drawing_image_data_url || null, drawing_spacing_lines: drawing_spacing_lines || 0 })).data;
 }
-export async function completeNoteEquation(note_id: number, model?: string) {
-  return (await api.post("/commands/complete-equation", { note_id, model: model || null })).data;
+export async function completeNoteEquation(note_id: number, model?: string, drawing_image_data_url?: string | null, drawing_spacing_lines?: number) {
+  return (await api.post("/commands/complete-equation", { note_id, model: model || null, drawing_image_data_url: drawing_image_data_url || null, drawing_spacing_lines: drawing_spacing_lines || 0 })).data;
 }
 export async function deleteNote(note_id: number) {
   return (await api.post("/notes/delete", { note_id })).data;

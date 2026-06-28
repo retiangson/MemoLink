@@ -89,6 +89,7 @@ export function NoteEditorView({
   const [equationError, setEquationError] = useState<string | null>(null);
   const [persistedNoteId, setPersistedNoteId] = useState<number | null>(noteId);
   const editorRef = useRef<any>(null);
+  const inkSnapshotRef = useRef<(() => { dataUrl: string; spacingLines: number } | null) | null>(null);
   const speakStartDocPos = useRef(0);
   const speakDocText = useRef("");
   const speakDocTrimOffset = useRef(0);
@@ -269,6 +270,7 @@ export function NoteEditorView({
   const effectiveNoteId = noteId ?? persistedNoteId;
   const workspace = useSmartSourceWorkspace(effectiveNoteId);
   const hasSourceWorkspace = workspace.data.source_files.length > 0;
+  const hasNoteInk = workspace.data.annotations.some((annotation) => annotation.source_file_id == null && annotation.book_id == null && annotation.strokes_json?.points.length);
   const isLegacyNote = !workspace.loading && !hasSourceWorkspace;
   const autosave = useNoteAutosave({
     noteKey: String(noteKey),
@@ -300,14 +302,15 @@ export function NoteEditorView({
   }
 
   async function handleEquation(action: "solve" | "complete") {
-    if (!noteContentDraft.trim() || equationAction) return;
+    if ((!noteContentDraft.trim() && !hasNoteInk) || equationAction) return;
     setEquationAction(action);
     setEquationError(null);
     try {
       const id = await ensureNotePersisted();
+      const drawingSnapshot = inkSnapshotRef.current?.() ?? null;
       const fresh = action === "solve"
-        ? await solveNoteEquation(id, aiModel)
-        : await completeNoteEquation(id, aiModel);
+        ? await solveNoteEquation(id, aiModel, drawingSnapshot?.dataUrl, drawingSnapshot?.spacingLines)
+        : await completeNoteEquation(id, aiModel, drawingSnapshot?.dataUrl, drawingSnapshot?.spacingLines);
       onEquationSolved(id, fresh);
     } catch (caught: unknown) {
       const error = caught as { response?: { data?: { detail?: unknown } }; message?: unknown };
@@ -448,6 +451,7 @@ export function NoteEditorView({
                   annotations: workspace.data.annotations,
                   onAnnotationsChanged: () => void workspace.reload(),
                   onEnsurePersisted: ensureNotePersisted,
+                  inkSnapshotRef,
                 }}
               />
             </div>
@@ -471,6 +475,7 @@ export function NoteEditorView({
               annotations: workspace.data.annotations,
               onAnnotationsChanged: () => void workspace.reload(),
               onEnsurePersisted: ensureNotePersisted,
+              inkSnapshotRef,
             }}
           />
         </div>
@@ -675,20 +680,30 @@ export function NoteEditorView({
 
         <button
           onClick={() => void handleEquation("complete")}
-          disabled={!noteContentDraft.trim() || equationAction != null}
+          disabled={(!noteContentDraft.trim() && !hasNoteInk) || equationAction != null}
           title="Ask AI to complete the unfinished equation and write the result into this note"
-          className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs text-gray-500 hover:text-violet-400 hover:bg-violet-400/10 border border-transparent hover:border-violet-400/20 disabled:opacity-30 disabled:cursor-not-allowed transition shrink-0"
+          aria-label="Complete equation with AI"
+          className="flex h-7 w-8 items-center justify-center rounded-lg text-gray-500 hover:text-violet-400 hover:bg-violet-400/10 border border-transparent hover:border-violet-400/20 disabled:opacity-30 disabled:cursor-not-allowed transition shrink-0"
         >
-          {equationAction === "complete" ? "Completing…" : "Complete Equation"}
+          {equationAction === "complete" ? (
+            <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 12a9 9 0 1 1-3-6.7"/></svg>
+          ) : (
+            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 4h9l-5 8 5 8H5"/><path d="M17 8h4M19 6v4"/></svg>
+          )}
         </button>
 
         <button
           onClick={() => void handleEquation("solve")}
-          disabled={!noteContentDraft.trim() || equationAction != null}
+          disabled={(!noteContentDraft.trim() && !hasNoteInk) || equationAction != null}
           title="Ask AI to solve the equation in this note step by step"
-          className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs text-gray-500 hover:text-violet-400 hover:bg-violet-400/10 border border-transparent hover:border-violet-400/20 disabled:opacity-30 disabled:cursor-not-allowed transition shrink-0"
+          aria-label="Solve equation with AI"
+          className="flex h-7 w-8 items-center justify-center rounded-lg text-gray-500 hover:text-violet-400 hover:bg-violet-400/10 border border-transparent hover:border-violet-400/20 disabled:opacity-30 disabled:cursor-not-allowed transition shrink-0"
         >
-          {equationAction === "solve" ? "Solving…" : "Solve Equation"}
+          {equationAction === "solve" ? (
+            <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 12a9 9 0 1 1-3-6.7"/></svg>
+          ) : (
+            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 7h8M8 12h2m4 0h2M8 16h2m4 0h2"/></svg>
+          )}
         </button>
 
         {/* Public Portfolio Agent toggle */}

@@ -29,7 +29,7 @@ def solve_equation(
     c: RequestContainer = Depends(get_request_container),
 ):
     try:
-        return c.commands().solve_equation(user_id, dto.note_id, dto.model)
+        return c.commands().solve_equation(user_id, dto.note_id, dto.model, dto.drawing_image_data_url, dto.drawing_spacing_lines)
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ValueError as exc:
@@ -45,7 +45,7 @@ def complete_equation(
     c: RequestContainer = Depends(get_request_container),
 ):
     try:
-        return c.commands().complete_equation(user_id, dto.note_id, dto.model)
+        return c.commands().complete_equation(user_id, dto.note_id, dto.model, dto.drawing_image_data_url, dto.drawing_spacing_lines)
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ValueError as exc:
