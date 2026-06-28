@@ -460,10 +460,16 @@ export function RichNoteEditor({ value, onChange, noteKey, disabled, editorRef, 
               embedded
               tool={ink.tool}
               onToolChange={ink.setTool}
+              penType={ink.penType}
+              onPenTypeChange={ink.setPenType}
+              eraserMode={ink.eraserMode}
+              onEraserModeChange={ink.setEraserMode}
               color={ink.color}
               onColorChange={ink.setColor}
               penSize={ink.penSize}
               onPenSizeChange={ink.setPenSize}
+              opacity={ink.opacity}
+              onOpacityChange={ink.setOpacity}
               onUndo={() => void ink.undo()}
               onRedo={() => void ink.redo()}
               canUndo={ink.canUndo}
