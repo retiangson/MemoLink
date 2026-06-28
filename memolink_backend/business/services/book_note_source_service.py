@@ -3,6 +3,10 @@ from __future__ import annotations
 import io
 import logging
 import re
+import subprocess
+import tempfile
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Optional
 
 from memolink_backend.domain.repositories.book_repository import BookRepository
@@ -53,6 +57,29 @@ def _extract_pages_epub(content: bytes) -> list[str]:
         if text:
             pages_text.append(text)
     return pages_text
+
+
+def _extract_pages_mobi(content: bytes) -> list[str]:
+    parser_script = Path(__file__).resolve().parents[2] / "book_parser" / "extract_mobi.mjs"
+    if not parser_script.exists():
+        raise RuntimeError("MOBI extraction is not installed on the server")
+    with tempfile.TemporaryDirectory(prefix="memolink-mobi-") as temp_dir:
+        input_path = Path(temp_dir) / "book.mobi"
+        output_path = Path(temp_dir) / "book.html"
+        input_path.write_bytes(content)
+        result = subprocess.run(
+            ["node", str(parser_script), str(input_path), str(output_path)],
+            capture_output=True,
+            text=True,
+            timeout=180,
+            check=False,
+        )
+        if result.returncode != 0 or not output_path.exists():
+            raise ValueError("Could not extract MOBI text. The file may be encrypted or unsupported.")
+        from bs4 import BeautifulSoup
+        soup = BeautifulSoup(output_path.read_text(encoding="utf-8", errors="replace"), "html.parser")
+        text = soup.get_text(separator="\n").strip()
+        return _extract_pages_txt(text.encode("utf-8")) if text else []
 
 
 def _extract_pages_txt(content: bytes) -> list[str]:
@@ -122,6 +149,11 @@ class BookNoteSourceService:
         row = self._user_books.get_note_source(user_id, book_id)
         return BookNoteSourceResponseDTO.model_validate(row) if row else None
 
+    def mark_failed(self, user_id: int, book_id: int, message: str) -> None:
+        row = self._user_books.get_note_source(user_id, book_id)
+        if row:
+            self._user_books.set_note_source_status(row.id, "failed", message[:500])
+
     def start(self, user_id: int, book_id: int) -> BookNoteSourceResponseDTO:
         """Start extraction unless an existing live generated note is already ready.
 
@@ -130,20 +162,29 @@ class BookNoteSourceService:
         """
         existing = self._user_books.get_note_source(user_id, book_id)
         if existing and existing.status == "processing":
-            return BookNoteSourceResponseDTO.model_validate(existing)
+            updated_at = existing.updated_at or existing.created_at
+            if updated_at:
+                if updated_at.tzinfo is None:
+                    updated_at = updated_at.replace(tzinfo=timezone.utc)
+                # The deployed Lambda timeout is 300 seconds. Do not permit a retry
+                # while a legitimate extraction invocation can still be running.
+                if datetime.now(timezone.utc) - updated_at < timedelta(seconds=330):
+                    return BookNoteSourceResponseDTO.model_validate(existing)
         if existing and existing.status == "ready":
             for note_id in self._user_books.list_note_ids_for_source(existing.id):
                 note = self._notes.get_by_id(note_id)
                 if note and note.deleted_at is None:
                     return BookNoteSourceResponseDTO.model_validate(existing)
         row = self._user_books.get_or_create_note_source(user_id, book_id)
-        self._user_books.set_note_source_status(row.id, "processing")
+        self._user_books.set_note_source_status(row.id, "pending")
         return self.get_status(user_id, book_id)
 
     async def process(self, user_id: int, book_id: int) -> None:
-        """Runs as a FastAPI BackgroundTask. Must use repos bound to a session that
-        outlives the originating request (see run_book_note_source_job)."""
+        """Runs in a separately dispatched worker invocation and atomically claims
+        the pending job before touching the source or generated note."""
         source = self._user_books.get_or_create_note_source(user_id, book_id)
+        if not self._user_books.claim_pending_note_source(source.id):
+            return
         try:
             book = self._books.get_by_id(book_id)
             if not book:
@@ -156,9 +197,6 @@ class BookNoteSourceService:
                 raise ValueError("Note extraction is not supported for videos — there is no text to extract")
             if ext in NO_TEXT_EXTENSIONS:
                 raise ValueError("Note extraction is not supported for comic books — there is no text to extract")
-            if ext == ".mobi":
-                raise ValueError("Note extraction for MOBI books isn't supported yet")
-
             item_id = book.onedrive_item_id or ""
             reused_onedrive = getattr(book, "source", "onedrive") == "onedrive" and not item_id.startswith("archiveorg:")
             if not reused_onedrive:
@@ -180,6 +218,8 @@ class BookNoteSourceService:
 
             if ext == ".epub":
                 pages_text = _extract_pages_epub(content)
+            elif ext == ".mobi":
+                pages_text = _extract_pages_mobi(content)
             elif ext == ".pptx":
                 pages_text = _extract_pages_pptx(content)
             elif ext == ".txt":
@@ -235,8 +275,28 @@ class BookNoteSourceService:
 
             self._user_books.set_note_source_status(source.id, "ready", None)
         except Exception as exc:
-            logger.error("Book note-source processing failed for book %s user %s", book_id, user_id, exc_info=True)
-            self._user_books.set_note_source_status(source.id, "failed", str(exc)[:500])
+            logger.error(
+                "Book note-source processing failed for book %s user %s (%s)",
+                book_id,
+                user_id,
+                type(exc).__name__,
+            )
+            controlled_messages = (
+                "Book not found",
+                "Note extraction is not supported",
+                "No extractable text found",
+                "Could not extract MOBI text",
+                "MOBI extraction is not installed",
+                "Book is missing required OneDrive metadata",
+                "Book disappeared while linking",
+            )
+            detail = str(exc)
+            public_message = (
+                detail[:500]
+                if detail.startswith(controlled_messages)
+                else "Book text extraction failed. The source may be encrypted, corrupted, or temporarily unavailable."
+            )
+            self._user_books.set_note_source_status(source.id, "failed", public_message)
 
 
 async def run_book_note_source_job(user_id: int, book_id: int) -> None:

@@ -1,0 +1,9 @@
+{
+  "name": "memolink-book-parser",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@lingo-reader/mobi-parser": "0.4.6"
+  }
+}

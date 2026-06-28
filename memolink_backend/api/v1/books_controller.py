@@ -1,5 +1,7 @@
 import logging
 import mimetypes
+import json
+import os
 from typing import Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
@@ -34,6 +36,21 @@ from memolink_backend.contracts.book_dtos import (
 
 router = APIRouter(prefix="/books", tags=["books"])
 logger = logging.getLogger(__name__)
+
+
+def _dispatch_book_note_source_job(background_tasks: BackgroundTasks, user_id: int, book_id: int) -> None:
+    function_name = os.getenv("AWS_LAMBDA_FUNCTION_NAME")
+    if not function_name:
+        background_tasks.add_task(run_book_note_source_job, user_id, book_id)
+        return
+    import boto3
+    response = boto3.client("lambda").invoke(
+        FunctionName=function_name,
+        InvocationType="Event",
+        Payload=json.dumps({"memolink_job": "book_note_source", "user_id": user_id, "book_id": book_id}).encode("utf-8"),
+    )
+    if response.get("StatusCode") != 202:
+        raise RuntimeError("AWS Lambda did not accept the extraction job")
 
 
 class BookReaderErrorDTO(BaseModel):
@@ -462,10 +479,14 @@ def save_as_note_source(
     except BookAccessError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail)
 
-    already_running = c.book_note_source().get_status(user_id, book_id)
     status = c.book_note_source().start(user_id, book_id)
-    if status.status == "processing" and (not already_running or already_running.status != "processing"):
-        background_tasks.add_task(run_book_note_source_job, user_id, book_id)
+    if status.status == "pending":
+        try:
+            _dispatch_book_note_source_job(background_tasks, user_id, book_id)
+        except Exception as exc:
+            logger.exception("Could not dispatch book note-source job for user=%s book=%s", user_id, book_id)
+            c.book_note_source().mark_failed(user_id, book_id, "Could not start extraction. Please try again.")
+            raise HTTPException(status_code=503, detail="Could not start book extraction") from exc
     return status
 
 

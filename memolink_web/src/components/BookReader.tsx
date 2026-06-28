@@ -101,13 +101,13 @@ export function BookReader({ book, initialPage, onClose, onProgress, onAskAI, ju
   }, [noteStatus, book.id]);
 
   async function handleSaveAsNoteSource() {
-    if (savingNoteSource || noteStatus?.status === "processing") return;
+    if (savingNoteSource) return;
     setSavingNoteSource(true);
     try {
       const status = await saveAsNoteSource(book.id);
       setNoteStatus(status);
     } catch {
-      // ignore
+      getNoteSourceStatus(book.id).then(setNoteStatus).catch(() => {});
     } finally {
       setSavingNoteSource(false);
     }
@@ -115,7 +115,7 @@ export function BookReader({ book, initialPage, onClose, onProgress, onAskAI, ju
 
   const canExtractNotes =
     format === "pdf" || format === "epub" || format === "pptx" ||
-    format === "txt" || format === "srt" || format === "vtt";
+    format === "txt" || format === "srt" || format === "vtt" || format === "mobi";
 
   const noteSourceProps = canExtractNotes
     ? { noteStatus, noteStatusLoaded, savingNoteSource, onSaveAsNoteSource: handleSaveAsNoteSource }
@@ -202,7 +202,7 @@ export function BookReader({ book, initialPage, onClose, onProgress, onAskAI, ju
       {format === "txt" && <TxtReaderView book={book} initialPage={initialPage} colorMode={colorMode} fontSize={fontSize} onProgress={onProgress} jumpToHighlight={jumpToHighlight} onJumpToHighlightHandled={onJumpToHighlightHandled} onHighlightAdded={onHighlightAdded} isFullscreen={isFullscreen} {...noteSourceProps} />}
       {(format === "srt" || format === "vtt") && <CaptionReaderView book={book} initialPage={initialPage} colorMode={colorMode} fontSize={fontSize} onProgress={onProgress} jumpToHighlight={jumpToHighlight} onJumpToHighlightHandled={onJumpToHighlightHandled} onHighlightAdded={onHighlightAdded} isFullscreen={isFullscreen} {...noteSourceProps} />}
       {(format === "cbz" || format === "cbr") && <ComicReaderView book={book} initialPage={initialPage} colorMode={colorMode} fontSize={fontSize} onProgress={onProgress} isFullscreen={isFullscreen} />}
-      {format === "mobi" && <MobiReaderView book={book} initialPage={initialPage} colorMode={colorMode} fontSize={fontSize} onProgress={onProgress} jumpToHighlight={jumpToHighlight} onJumpToHighlightHandled={onJumpToHighlightHandled} onHighlightAdded={onHighlightAdded} isFullscreen={isFullscreen} />}
+      {format === "mobi" && <MobiReaderView book={book} initialPage={initialPage} colorMode={colorMode} fontSize={fontSize} onProgress={onProgress} jumpToHighlight={jumpToHighlight} onJumpToHighlightHandled={onJumpToHighlightHandled} onHighlightAdded={onHighlightAdded} isFullscreen={isFullscreen} {...noteSourceProps} />}
       {format === "unsupported" && (
         <div className="flex-1 flex items-center justify-center text-gray-500 text-sm">
           This file type ({book.file_extension || book.mime_type || "unknown"}) isn't supported by the reader yet.

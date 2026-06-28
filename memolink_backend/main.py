@@ -1027,5 +1027,13 @@ app.include_router(smart_source_controller.router, prefix="/api")
 
 # AWS Lambda handler - only active when running inside Lambda
 if os.getenv("AWS_LAMBDA_FUNCTION_NAME"):
+    import asyncio
     from mangum import Mangum
-    handler = Mangum(app, lifespan="off")
+    _http_handler = Mangum(app, lifespan="off")
+
+    def handler(event, context):
+        if isinstance(event, dict) and event.get("memolink_job") == "book_note_source":
+            from memolink_backend.business.services.book_note_source_service import run_book_note_source_job
+            asyncio.run(run_book_note_source_job(int(event["user_id"]), int(event["book_id"])))
+            return {"ok": True}
+        return _http_handler(event, context)

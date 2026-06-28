@@ -18,6 +18,7 @@ import { applySpeechHighlight, captureSelectionInContainer, applyPersistentMarks
 import { useSelectionChangeCapture } from "../../hooks/useSelectionChangeCapture";
 import { ZoomPanWrapper } from "./ZoomPanWrapper";
 import { disposeReaderAfterPaint, isNativeReaderPlatform } from "./nativeReaderLifecycle";
+import { NoteSourceButton } from "./NoteSourceButton";
 
 interface PendingSelection { x: number; y: number; start: number; end: number; }
 
@@ -165,12 +166,12 @@ function technicalMobiLoadDetail(error: unknown): string | null {
 // MOBI chapters are parsed entirely client-side via @lingo-reader/mobi-parser; each
 // chapter's own CSS is intentionally ignored (it can't be trusted to play well with the
 // app's dark/light/sepia modes) in favor of readerThemeColors — the same approach
-// EpubReaderView already uses for injected book content. Note extraction (RAG ingestion)
-// is deferred since it would need a new backend Python MOBI dependency; highlight-to-note
-// still works fully since it only needs this browser-side parse.
+// EpubReaderView already uses for injected book content. The backend reuses this same
+// MIT-licensed parser's Node build for Save as Note Source / RAG extraction.
 export function MobiReaderView({
   book, initialPage, colorMode, fontSize, onProgress,
   jumpToHighlight, onJumpToHighlightHandled, onHighlightAdded, isFullscreen,
+  noteStatus, noteStatusLoaded, savingNoteSource, onSaveAsNoteSource,
 }: ReaderViewProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -519,6 +520,12 @@ export function MobiReaderView({
               {tts.playing ? (tts.paused ? "Resume" : "Pause") : "Read Aloud"}
             </button>
             <HighlightColorPicker value={highlightColor} onChange={setHighlightColor} disabled={!pendingSelection} onApply={handleAddHighlight} />
+            <NoteSourceButton
+              noteStatus={noteStatus}
+              noteStatusLoaded={noteStatusLoaded}
+              savingNoteSource={savingNoteSource}
+              onSaveAsNoteSource={onSaveAsNoteSource}
+            />
           </div>
 
           <div className="flex items-center gap-2">

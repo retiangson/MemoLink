@@ -144,7 +144,7 @@
     <h2>Smart Source Workspace Requirements</h2>
     <p>Users can attach original files, reuse OneDrive-backed books as note sources, cache originals per device, edit extracted content, and add editable pointer/stylus annotations. Original uploaded files are stored in OneDrive; external books are uploaded before linking; existing OneDrive books are never re-uploaded. Local audio remains on the user's device unless explicitly submitted temporarily for transcription.</p>
     <p>All source metadata, annotations, recording metadata, and timeline events are user/workspace scoped. Raw binaries, base64 content, OAuth tokens, and local absolute paths must not enter the database or logs.</p>
-    <p>Source workspace tabs and debounced autosave apply only when a note has a real linked source. Legacy notes retain their existing editor and manual-save behavior. Note-linked recording reuses the existing Record Lecture workflow, and supported admin book uploads are stored in OneDrive before appearing in Browse Books.</p>
+    <p>Source workspace tabs appear only when a note has a real linked source, while debounced and lifecycle autosave applies to every note. Note-linked recording reuses the existing Record Lecture workflow, and supported admin book uploads are stored in OneDrive before appearing in Browse Books.</p>
   </section>
 </div>
 
@@ -1118,7 +1118,7 @@
       <div class="uc-card">
         <div class="uc-actor">Actor: Logged-in User</div>
         <div class="uc-title">UC-39 &middot; Save a Book as a Note Source</div>
-        <div class="uc-desc">User clicks "Save as Note Source" on a borrowed PDF, EPUB, PPTX, TXT, or SRT/VTT book. The system kicks off an async extraction job (pending &rarr; processing &rarr; ready/failed) that chunks and embeds the book's full text into notes. The user polls the status endpoint until the job is ready, after which the book's content is citable in AI Chat answers.</div>
+        <div class="uc-desc">User clicks "Save as Note Source" on a borrowed PDF, EPUB, MOBI, PPTX, TXT, or SRT/VTT book. The system dispatches a durable async extraction job (pending &rarr; processing &rarr; ready/failed) that chunks and embeds the book's full text into notes. A stale interrupted job can be retried, and the book becomes citable in AI Chat when ready.</div>
       </div>
     </div>
   </section>
@@ -1368,7 +1368,7 @@
       <div class="constraint">
         <div class="constraint-icon">&#x1F4C4;</div>
         <h4>Highlight &amp; Note-Source Format Scope</h4>
-        <p>Highlighting works only on formats with extractable text - PDF, EPUB, PPTX, TXT, captions (SRT/VTT), and MOBI - not audio or comics (CBZ/CBR). "Save as Note Source" further narrows to PDF, EPUB, PPTX, TXT, and SRT/VTT.</p>
+        <p>Highlighting and "Save as Note Source" work on formats with extractable text - PDF, EPUB, MOBI, PPTX, TXT, and captions (SRT/VTT) - not audio/video or comics (CBZ/CBR), which require transcription or OCR.</p>
       </div>
     </div>
   </section>
