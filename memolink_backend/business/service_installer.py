@@ -234,6 +234,8 @@ class ServiceInstaller:
             note_repo=self._domain.get_note_repository(),
             embedding_service=self._domain.get_embedding_service(),
             onedrive_service=self.get_onedrive_service(),
+            book_cache_service=self.get_book_cache_service(),
+            smart_source_repo=self._domain.get_smart_source_repository(),
         )
 
     def get_book_highlight_service(self):
@@ -261,4 +263,13 @@ class ServiceInstaller:
         return BookCacheService(
             onedrive_service=self.get_onedrive_service(),
             archive_service=self.get_archive_org_service(),
+        )
+
+    def get_smart_source_service(self):
+        from memolink_backend.business.services.smart_source_service import SmartSourceService
+        return SmartSourceService(
+            repository=self._domain.get_smart_source_repository(),
+            note_repository=self._domain.get_note_repository(),
+            onedrive=self.get_onedrive_service(),
+            embeddings=self._domain.get_embedding_service(),
         )

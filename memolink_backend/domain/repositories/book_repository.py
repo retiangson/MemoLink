@@ -172,6 +172,20 @@ class BookRepository:
         self.db.refresh(book)
         return book
 
+    def move_source_to_onedrive(self, book_id: int, uploaded: dict) -> Optional[Book]:
+        book = self.get_by_id(book_id)
+        if not book:
+            return None
+        book.source = "onedrive"
+        book.onedrive_drive_id = uploaded["drive_id"]
+        book.onedrive_item_id = uploaded["item_id"]
+        book.onedrive_web_url = uploaded.get("web_url")
+        book.file_size = uploaded.get("size") or book.file_size
+        book.mime_type = uploaded.get("mime_type") or book.mime_type
+        self.db.commit()
+        self.db.refresh(book)
+        return book
+
     def set_published(self, book_id: int, is_published: bool) -> Optional[Book]:
         book = self.get_by_id(book_id)
         if not book:

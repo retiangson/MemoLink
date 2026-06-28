@@ -12,6 +12,9 @@ from memolink_backend.domain.repositories.onedrive_account_repository import One
 from memolink_backend.business.services.embedding_service import EmbeddingService
 from memolink_backend.business.services.onedrive_service import OneDriveService
 from memolink_backend.contracts.book_dtos import BookNoteSourceResponseDTO
+from memolink_backend.business.services.book_cache_service import BookCacheService
+from memolink_backend.business.services.archive_org_service import ArchiveOrgService
+from memolink_backend.domain.repositories.smart_source_repository import SmartSourceRepository
 
 logger = logging.getLogger(__name__)
 
@@ -104,25 +107,35 @@ class BookNoteSourceService:
         note_repo: NoteRepository,
         embedding_service: EmbeddingService,
         onedrive_service: OneDriveService,
+        book_cache_service: BookCacheService,
+        smart_source_repo: SmartSourceRepository,
     ):
         self._books = book_repo
         self._user_books = user_book_repo
         self._notes = note_repo
         self._embeddings = embedding_service
         self._onedrive = onedrive_service
+        self._book_cache = book_cache_service
+        self._smart_sources = smart_source_repo
 
     def get_status(self, user_id: int, book_id: int) -> Optional[BookNoteSourceResponseDTO]:
         row = self._user_books.get_note_source(user_id, book_id)
         return BookNoteSourceResponseDTO.model_validate(row) if row else None
 
     def start(self, user_id: int, book_id: int) -> BookNoteSourceResponseDTO:
-        """Starts (or restarts) the note-extraction job. Re-running when status is
-        already "ready" is allowed on purpose — it lets the user regenerate the Note
-        if they deleted it from the Notes list, since the source row would otherwise
-        be stuck pointing at notes that no longer exist."""
+        """Start extraction unless an existing live generated note is already ready.
+
+        Rebuilding a live source note would delete its source link and annotations,
+        so regeneration is limited to missing/soft-deleted generated notes.
+        """
         existing = self._user_books.get_note_source(user_id, book_id)
         if existing and existing.status == "processing":
             return BookNoteSourceResponseDTO.model_validate(existing)
+        if existing and existing.status == "ready":
+            for note_id in self._user_books.list_note_ids_for_source(existing.id):
+                note = self._notes.get_by_id(note_id)
+                if note and note.deleted_at is None:
+                    return BookNoteSourceResponseDTO.model_validate(existing)
         row = self._user_books.get_or_create_note_source(user_id, book_id)
         self._user_books.set_note_source_status(row.id, "processing")
         return self.get_status(user_id, book_id)
@@ -146,9 +159,24 @@ class BookNoteSourceService:
             if ext == ".mobi":
                 raise ValueError("Note extraction for MOBI books isn't supported yet")
 
-            content = await self._onedrive.download_file_bytes(
-                drive_id=book.onedrive_drive_id, item_id=book.onedrive_item_id
-            )
+            item_id = book.onedrive_item_id or ""
+            reused_onedrive = getattr(book, "source", "onedrive") == "onedrive" and not item_id.startswith("archiveorg:")
+            if not reused_onedrive:
+                content = await self._book_cache.download_book_bytes(book)
+                uploaded = await self._onedrive.upload_source_bytes(
+                    file_name=book.file_name,
+                    content=content,
+                    mime_type=book.mime_type,
+                )
+                book = self._books.move_source_to_onedrive(book.id, uploaded)
+                if not book:
+                    raise ValueError("Book disappeared while linking its OneDrive source")
+            else:
+                if not book.onedrive_drive_id or not book.onedrive_item_id:
+                    raise ValueError("Book is missing required OneDrive metadata")
+                content = await self._onedrive.download_file_bytes(
+                    drive_id=book.onedrive_drive_id, item_id=book.onedrive_item_id
+                )
 
             if ext == ".epub":
                 pages_text = _extract_pages_epub(content)
@@ -182,6 +210,29 @@ class BookNoteSourceService:
                 logger.warning("Embedding failed for book %s", book_id, exc_info=True)
             self._user_books.add_note_chunk(source.id, note.id, book_id, None)
 
+            linked_source = self._smart_sources.create_source(user_id, {
+                "workspace_id": note.workspace_id,
+                "note_id": note.id,
+                "source_type": "book",
+                "original_filename": book.file_name,
+                "mime_type": book.mime_type,
+                "file_size": book.file_size,
+                "onedrive_drive_id": book.onedrive_drive_id,
+                "onedrive_item_id": book.onedrive_item_id,
+                "onedrive_web_url": book.onedrive_web_url,
+                "onedrive_etag": book.last_modified.isoformat() if book.last_modified else None,
+                "extraction_status": "ready",
+                "cache_status": "unknown",
+            })
+            self._smart_sources.create_book_link(user_id, note.workspace_id, book.id, note.id, linked_source.id)
+            self._smart_sources.create_timeline_event(user_id, note.workspace_id, note.id, {
+                "source_file_id": linked_source.id,
+                "book_id": book.id,
+                "event_type": "book_linked",
+                "event_summary": f"Linked book {book.title} to note",
+                "metadata_json": {"onedrive_reused": reused_onedrive},
+            })
+
             self._user_books.set_note_source_status(source.id, "ready", None)
         except Exception as exc:
             logger.error("Book note-source processing failed for book %s user %s", book_id, user_id, exc_info=True)
@@ -201,6 +252,11 @@ async def run_book_note_source_job(user_id: int, book_id: int) -> None:
             note_repo=NoteRepository(db),
             embedding_service=EmbeddingService(),
             onedrive_service=OneDriveService(OneDriveAccountRepository(db)),
+            book_cache_service=BookCacheService(
+                onedrive_service=OneDriveService(OneDriveAccountRepository(db)),
+                archive_service=ArchiveOrgService(),
+            ),
+            smart_source_repo=SmartSourceRepository(db),
         )
         await service.process(user_id, book_id)
     finally:

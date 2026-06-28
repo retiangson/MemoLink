@@ -164,6 +164,16 @@
   <div class="section-label">Documentation</div>
   <h1>API Endpoint Design</h1>
   <p>All REST endpoints for MemoLink's FastAPI backend - base URL <code>/api/v1</code>. Docs auto-generated at <code>/api/docs</code>.</p>
+  <section>
+    <h2>Smart Source Workspace API</h2>
+    <ul>
+      <li><code>POST /api/source-files/upload-to-onedrive</code> uploads an original and links safe metadata.</li>
+      <li><code>GET /api/source-files/{id}</code> and <code>GET /api/source-files/{id}/content</code> serve ownership-checked metadata/content without exposing tokens. Trusted Books Library linking is performed internally rather than accepting arbitrary OneDrive item IDs.</li>
+      <li><code>POST /api/source-files/{id}/extract</code> extracts text and updates note embeddings; audio/video require explicit transcription.</li>
+      <li><code>GET/POST/PUT/DELETE /api/annotations</code> synchronize editable annotation data.</li>
+      <li><code>GET /api/notes/{id}/source-workspace</code>, <code>POST /api/notes/{id}/timeline</code>, and <code>POST /api/notes/{id}/recordings</code> expose the workspace aggregate.</li>
+    </ul>
+  </section>
 </div>
 
 <div class="container">

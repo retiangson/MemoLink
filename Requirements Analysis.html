@@ -140,6 +140,11 @@
   <div class="section-label">Documentation</div>
   <h1>Requirements Analysis</h1>
   <p>Functional and non-functional requirements, use cases, and user stories for MemoLink.</p>
+  <section>
+    <h2>Smart Source Workspace Requirements</h2>
+    <p>Users can attach original files, reuse OneDrive-backed books as note sources, cache originals per device, edit extracted content, and add editable pointer/stylus annotations. Original uploaded files are stored in OneDrive; external books are uploaded before linking; existing OneDrive books are never re-uploaded. Local audio remains on the user's device unless explicitly submitted temporarily for transcription.</p>
+    <p>All source metadata, annotations, recording metadata, and timeline events are user/workspace scoped. Raw binaries, base64 content, OAuth tokens, and local absolute paths must not enter the database or logs.</p>
+  </section>
 </div>
 
 <div class="container">

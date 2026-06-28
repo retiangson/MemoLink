@@ -370,6 +370,20 @@ Recent documentation updates also cover the Gmail connector cleanup: token refre
 
 ---
 
+## Smart Source Workspace
+
+MemoLink notes now support an `Original | Editor | Source File | Timeline` workspace. Original uploaded files are stored in OneDrive, cached in browser storage per device, and linked to editable note content used for RAG. PDF and image originals support non-destructive pen/highlighter annotations whose editable stroke data is synced through the database.
+
+- Original file and book binaries are never stored in the database.
+- OneDrive books reuse their existing OneDrive item; they are not uploaded twice.
+- External books and note attachments are moved to OneDrive before linking.
+- Local recordings are saved through the File System Access API where available, or shared/downloaded as a browser fallback. Only filename, duration, and local-only metadata are stored.
+- Transcription uploads occur only after an explicit user action and remain request-scoped; only confirmed transcript text is added to the note and embedded.
+
+Smart Source APIs include `/api/source-files/upload-to-onedrive`, ownership-checked source retrieval, `/api/annotations`, `/api/notes/{id}/source-workspace`, `/api/notes/{id}/timeline`, and `/api/notes/{id}/recordings`. Books Library links are created internally so clients cannot attach arbitrary OneDrive item IDs.
+
+---
+
 ## Security Notes
 
 - Never commit `.env` files

@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import time
+import uuid
 from datetime import datetime, timezone
 from typing import Optional
 from urllib.parse import quote
@@ -22,7 +23,7 @@ DEFAULT_TENANT = "common"
 OFFICE_CLIENT_ID = "4765445b-32c6-49b0-83e6-1d93765276ca"
 MEMOLINK_CALLBACK_PATH = "/api/admin/books/onedrive/callback"
 
-ONEDRIVE_SCOPES = "Files.Read.All User.Read offline_access"
+ONEDRIVE_SCOPES = "Files.ReadWrite.All User.Read offline_access"
 
 SUPPORTED_EXTENSIONS = {
     ".pdf", ".epub", ".pptx",
@@ -356,3 +357,67 @@ class OneDriveService:
         if resp.status_code != 200:
             raise OneDriveServiceError(resp.status_code, f"Failed to download file from OneDrive: {resp.status_code}")
         return resp.content
+
+    async def delete_file(self, *, drive_id: str, item_id: str) -> None:
+        """Delete a specific OneDrive item after an incomplete MemoLink upload flow."""
+        token = await self._get_valid_access_token()
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            resp = await client.delete(
+                f"{GRAPH_BASE}/drives/{drive_id}/items/{item_id}",
+                headers={"Authorization": f"Bearer {token}"},
+            )
+        if resp.status_code != 204:
+            raise OneDriveServiceError(resp.status_code, "Could not clean up the incomplete OneDrive upload")
+
+    async def upload_source_bytes(self, *, file_name: str, content: bytes, mime_type: Optional[str]) -> dict:
+        """Upload an original source to MemoLink's OneDrive area.
+
+        Bytes are request-scoped and never persisted by MemoLink. A unique OneDrive name
+        prevents accidental replacement of an existing original.
+        """
+        token = await self._get_valid_access_token()
+        safe_name = "".join(ch if ch.isalnum() or ch in " ._-()" else "_" for ch in file_name).strip() or "source"
+        stored_name = f"{uuid.uuid4().hex[:12]}_{safe_name}"
+        folder_name = "MemoLink Sources"
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            folder_resp = await client.get(
+                f"{GRAPH_BASE}/me/drive/root:/{quote(folder_name)}",
+                headers={"Authorization": f"Bearer {token}"},
+            )
+            if folder_resp.status_code == 404:
+                folder_resp = await client.post(
+                    f"{GRAPH_BASE}/me/drive/root/children",
+                    headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+                    json={"name": folder_name, "folder": {}, "@microsoft.graph.conflictBehavior": "fail"},
+                )
+                if folder_resp.status_code == 409:
+                    # Another concurrent upload may have created the folder between
+                    # the GET and POST. Resolve the folder again instead of failing.
+                    folder_resp = await client.get(
+                        f"{GRAPH_BASE}/me/drive/root:/{quote(folder_name)}",
+                        headers={"Authorization": f"Bearer {token}"},
+                    )
+            if folder_resp.status_code not in (200, 201):
+                raise OneDriveServiceError(folder_resp.status_code, "Could not prepare the OneDrive source folder")
+
+            upload_resp = await client.put(
+                f"{GRAPH_BASE}/me/drive/root:/{quote(folder_name)}/{quote(stored_name)}:/content",
+                headers={"Authorization": f"Bearer {token}", "Content-Type": mime_type or "application/octet-stream"},
+                content=content,
+            )
+        if upload_resp.status_code not in (200, 201):
+            raise OneDriveServiceError(upload_resp.status_code, f"OneDrive upload failed: {upload_resp.text[:300]}")
+        item = upload_resp.json()
+        drive_id = (item.get("parentReference") or {}).get("driveId", "")
+        item_id = item.get("id", "")
+        if not drive_id or not item_id:
+            raise OneDriveServiceError(502, "OneDrive upload returned incomplete source metadata")
+        return {
+            "drive_id": drive_id,
+            "item_id": item_id,
+            "web_url": item.get("webUrl"),
+            "etag": item.get("eTag"),
+            "name": item.get("name", stored_name),
+            "size": item.get("size", len(content)),
+            "mime_type": (item.get("file") or {}).get("mimeType") or mime_type,
+        }

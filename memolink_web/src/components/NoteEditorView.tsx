@@ -13,6 +13,9 @@ import { FontSizePicker } from "./FontSizePicker";
 import { useReaderColorMode } from "../hooks/useReaderColorMode";
 import { useReaderFontSize } from "../hooks/useReaderFontSize";
 import { richContentFilter, readerFontScale } from "./book-readers/format";
+import { SmartSourceWorkspace, type WorkspaceTab } from "./smart-source/SmartSourceWorkspace";
+import { AudioRecordingToolbar } from "./smart-source/AudioRecordingToolbar";
+import { getNote } from "../api/client";
 
 interface NoteEditorViewProps {
   noteKey: string | number;
@@ -213,14 +216,14 @@ export function NoteEditorView({
     editor.view.dispatch(editor.view.state.tr.setMeta(ttsHighlightKey, { from, to }));
   }, [ttsSentenceIdx, ttsSentences, ttsWord]);
   const [exporting, setExporting] = useState<ExportFormat | null>(null);
-  const [activeTab, setActiveTab] = useState<"editor" | "source" | "timeline">("editor");
   const [rawContent, setRawContent] = useState(noteContentDraft);
+  const [workspaceTab, setWorkspaceTab] = useState<WorkspaceTab>("editor");
 
   // Capture the raw DB content (Markdown) when the note changes,
   // before TipTap converts it to HTML via onChange
   React.useEffect(() => {
     setRawContent(noteContentDraft);
-    setActiveTab("editor");
+    setWorkspaceTab("editor");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [noteKey]);
 
@@ -228,8 +231,7 @@ export function NoteEditorView({
     if (!phrase) return;
     const editor = editorRef.current;
     if (!editor) return;
-    // Switch to editor tab first so the ProseMirror view is visible
-    setActiveTab("editor");
+    setWorkspaceTab("editor");
     const search = phrase.slice(0, 40).toLowerCase();
     const doc = editor.state.doc;
     let found = false;
@@ -277,85 +279,37 @@ export function NoteEditorView({
         </div>
       )}
 
-      {/* Tabs */}
-      <div className="flex items-center justify-between gap-1 mb-2 shrink-0">
-        <div className="flex items-center gap-1">
-          <button
-            onClick={() => setActiveTab("editor")}
-            className={`px-3 py-1 rounded-lg text-xs font-medium transition ${activeTab === "editor" ? "bg-indigo-600 text-white" : "text-gray-500 hover:text-gray-300"}`}
-          >
-            Editor
-          </button>
-          <button
-            onClick={() => setActiveTab("source")}
-            className={`px-3 py-1 rounded-lg text-xs font-medium transition ${activeTab === "source" ? "bg-indigo-600 text-white" : "text-gray-500 hover:text-gray-300"}`}
-          >
-            Source
-          </button>
-          {timelineEnabled && noteId && (
-            <button
-              onClick={() => setActiveTab("timeline")}
-              className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium transition ${activeTab === "timeline" ? "bg-indigo-600 text-white" : "text-gray-500 hover:text-gray-300"}`}
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" fill="currentColor" viewBox="0 0 16 16">
-                <path d="M8 3.5a.5.5 0 0 0-1 0V9a.5.5 0 0 0 .252.434l3.5 2a.5.5 0 0 0 .496-.868L8 8.71z"/>
-                <path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16m7-8A7 7 0 1 1 1 8a7 7 0 0 1 14 0"/>
-              </svg>
-              Timeline
-            </button>
-          )}
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <FontSizePicker value={fontSize} onChange={setFontSize} />
-          <ColorModePicker value={colorMode} onChange={setColorMode} />
-        </div>
+      <div className="mb-2 flex items-center justify-end gap-2 shrink-0">
+        <FontSizePicker value={fontSize} onChange={setFontSize} />
+        <ColorModePicker value={colorMode} onChange={setColorMode} />
       </div>
 
-      {/* Rich editor */}
-      <div
-        data-rc-mode={colorMode}
-        style={{ filter: richContentFilter(colorMode), ...noteFontSizeVar }}
-        className={`flex-1 overflow-hidden flex flex-col border border-[var(--ml-bg-panel)] rounded-xl bg-[var(--ml-bg-bar)] transition-[filter] ${activeTab !== "editor" ? "hidden" : ""}`}
-      >
-        <RichNoteEditor
-          key={String(noteKey)}
-          noteKey={noteKey}
-          value={noteContentDraft}
-          onChange={(html) => setNoteContentDraft(html)}
-          editorRef={editorRef}
-          onOpenHighlight={onOpenHighlight}
-        />
-      </div>
-
-      {/* Source view */}
-      {activeTab === "source" && (
-        <div
-          data-rc-mode={colorMode}
-          style={{ filter: richContentFilter(colorMode) }}
-          className="flex-1 overflow-hidden border border-[var(--ml-bg-panel)] rounded-xl bg-[var(--ml-bg-bar)]"
-        >
-          <textarea
-            readOnly
-            value={rawContent}
-            style={{ fontSize: `${Math.round(12 * readerFontScale(fontSize))}px` }}
-            className="w-full h-full bg-transparent text-gray-400 font-mono p-4 resize-none focus:outline-none"
-          />
-        </div>
-      )}
-
-      {/* Timeline tab */}
-      {activeTab === "timeline" && noteId && (
-        <div
-          data-rc-mode={colorMode}
-          style={{ filter: richContentFilter(colorMode) }}
-          className="flex-1 min-h-0 overflow-y-auto border border-[var(--ml-bg-panel)] rounded-xl bg-[var(--ml-bg-bar)] p-4"
-        >
-          <TimelinePanel noteId={noteId} onJump={jumpToText} />
-        </div>
-      )}
+      <SmartSourceWorkspace
+        noteId={noteId}
+        noteKey={noteKey}
+        rawContent={rawContent}
+        activeTab={workspaceTab}
+        onTabChange={setWorkspaceTab}
+        onSourceChanged={() => {
+          if (!noteId) return;
+          void getNote(noteId).then((fresh) => {
+            setNoteContentDraft(fresh.content || "");
+            setRawContent(fresh.content || "");
+          });
+        }}
+        sourceUploadDisabled={isNoteDirty}
+        timelineSupplement={timelineEnabled && noteId ? <div className="border-t border-[var(--ml-bg-hover)] p-4"><TimelinePanel noteId={noteId} onJump={jumpToText} /></div> : null}
+        editor={(
+          <div data-rc-mode={colorMode} style={{ filter: richContentFilter(colorMode), ...noteFontSizeVar }} className="flex h-full flex-col overflow-hidden bg-[var(--ml-bg-bar)] transition-[filter]">
+            <RichNoteEditor key={String(noteKey)} noteKey={noteKey} value={noteContentDraft} onChange={(html) => setNoteContentDraft(html)} editorRef={editorRef} onOpenHighlight={onOpenHighlight} />
+          </div>
+        )}
+      />
 
       {/* Bottom bar */}
-      <div className="mt-3 flex items-center gap-2 shrink-0">
+      <div className="mt-3 flex flex-wrap items-center gap-2 shrink-0">
+
+        <AudioRecordingToolbar noteId={noteId} noteTitle={noteTitleDraft} onTranscriptConfirmed={(text) => setNoteContentDraft((prev) => appendCapturedParagraph(prev, text))} />
 
         {/* Record */}
         {recording.isRecording ? (

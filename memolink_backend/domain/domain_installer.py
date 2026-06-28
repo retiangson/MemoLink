@@ -85,3 +85,7 @@ class DomainInstaller:
     def get_onedrive_account_repository(self):
         from memolink_backend.domain.repositories.onedrive_account_repository import OneDriveAccountRepository
         return OneDriveAccountRepository(self._db)
+
+    def get_smart_source_repository(self):
+        from memolink_backend.domain.repositories.smart_source_repository import SmartSourceRepository
+        return SmartSourceRepository(self._db)
