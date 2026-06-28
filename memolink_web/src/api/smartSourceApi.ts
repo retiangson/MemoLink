@@ -60,6 +60,8 @@ export interface StrokePoint {
 export interface StrokePayload {
   version: 1;
   pointerType: string;
+  penType?: string;
+  opacity?: number;
   points: StrokePoint[];
 }
 
