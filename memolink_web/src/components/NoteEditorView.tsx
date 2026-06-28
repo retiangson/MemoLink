@@ -14,12 +14,13 @@ import { useReaderColorMode } from "../hooks/useReaderColorMode";
 import { useReaderFontSize } from "../hooks/useReaderFontSize";
 import { richContentFilter, readerFontScale } from "./book-readers/format";
 import { SmartSourceWorkspace, type WorkspaceTab } from "./smart-source/SmartSourceWorkspace";
-import { getNote } from "../api/client";
+import { getNote, solveNoteEquation } from "../api/client";
 import { useSmartSourceWorkspace } from "../hooks/useSmartSourceWorkspace";
-import { useSourceNoteAutosave } from "../hooks/useSourceNoteAutosave";
+import { useNoteAutosave, type NoteSnapshot } from "../hooks/useNoteAutosave";
 import { useLocalRecordingStorage } from "../hooks/useLocalRecordingStorage";
 import { saveRecordingMetadata } from "../api/smartSourceApi";
 import { SourceUploadButton } from "./smart-source/SourceUploadButton";
+import type { Note } from "../types";
 
 interface NoteEditorViewProps {
   noteKey: string | number;
@@ -28,9 +29,10 @@ interface NoteEditorViewProps {
   noteContentDraft: string;
   setNoteContentDraft: (v: string | ((prev: string) => string)) => void;
   isNoteDirty: boolean;
-  onSave: () => void;
-  onAutosave: (title: string, content: string) => Promise<void>;
-  onDiscard: () => void;
+  onAutosave: (noteKey: string, snapshot: NoteSnapshot, sourceLinked: boolean) => Promise<void>;
+  onAutosavePageExit: (noteKey: string, snapshot: NoteSnapshot) => void;
+  onEquationSolved: (noteId: number, freshNote: Note) => void;
+  aiModel?: string;
   onPlay?: (text: string) => void;
   ttsPlaying?: boolean;
   ttsPaused?: boolean;
@@ -60,7 +62,7 @@ export function NoteEditorView({
   noteKey,
   noteTitleDraft, setNoteTitleDraft,
   noteContentDraft, setNoteContentDraft,
-  isNoteDirty, onSave, onAutosave, onDiscard,
+  isNoteDirty, onAutosave, onAutosavePageExit, onEquationSolved, aiModel,
   onPlay, ttsPlaying, ttsPaused, onTtsStop, onTtsPauseResume,
   onTtsBack, onTtsForward, ttsRate = 1.0, ttsVoices = [], ttsSelectedVoice = null,
   onTtsRateChange, onTtsVoiceChange,
@@ -82,6 +84,8 @@ export function NoteEditorView({
   const [autoStopOnSilence, setAutoStopOnSilence] = useState(false);
   const recordingStorage = useLocalRecordingStorage();
   const [recordingFileStatus, setRecordingFileStatus] = useState<string | null>(null);
+  const [solvingEquation, setSolvingEquation] = useState(false);
+  const [equationError, setEquationError] = useState<string | null>(null);
   const editorRef = useRef<any>(null);
   const speakStartDocPos = useRef(0);
   const speakDocText = useRef("");
@@ -263,18 +267,41 @@ export function NoteEditorView({
   const workspace = useSmartSourceWorkspace(noteId);
   const hasSourceWorkspace = workspace.data.source_files.length > 0;
   const isLegacyNote = !workspace.loading && !hasSourceWorkspace;
-  const autosave = useSourceNoteAutosave({
-    enabled: hasSourceWorkspace,
-    noteId,
+  const autosave = useNoteAutosave({
+    noteKey: String(noteKey),
     title: noteTitleDraft,
     content: noteContentDraft,
     dirty: isNoteDirty,
-    save: onAutosave,
+    save: (key, snapshot) => onAutosave(key, snapshot, hasSourceWorkspace),
+    saveOnPageExit: onAutosavePageExit,
     restore: (title, content) => {
       setNoteTitleDraft(title);
       setNoteContentDraft(content);
     },
   });
+
+  async function handleSolveEquation() {
+    if (noteId == null || solvingEquation) return;
+    setSolvingEquation(true);
+    setEquationError(null);
+    try {
+      await autosave.flush();
+      const fresh = await solveNoteEquation(noteId, aiModel);
+      onEquationSolved(noteId, fresh);
+    } catch (caught: unknown) {
+      const error = caught as { response?: { data?: { detail?: unknown } }; message?: unknown };
+      const detail = error.response?.data?.detail;
+      setEquationError(
+        typeof detail === "string"
+          ? detail
+          : typeof error.message === "string"
+            ? error.message
+            : "Could not solve the equation",
+      );
+    } finally {
+      setSolvingEquation(false);
+    }
+  }
 
   // Capture the raw DB content (Markdown) when the note changes,
   // before TipTap converts it to HTML via onChange
@@ -599,6 +626,15 @@ export function NoteEditorView({
           Video
         </button>}
 
+        <button
+          onClick={() => void handleSolveEquation()}
+          disabled={noteId == null || !noteContentDraft.trim() || solvingEquation}
+          title={noteId == null ? "Waiting for the new note to autosave" : "Ask AI to solve the equation in this note step by step"}
+          className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs text-gray-500 hover:text-violet-400 hover:bg-violet-400/10 border border-transparent hover:border-violet-400/20 disabled:opacity-30 disabled:cursor-not-allowed transition shrink-0"
+        >
+          {solvingEquation ? "Solving…" : "Solve Equation"}
+        </button>
+
         {/* Public Portfolio Agent toggle */}
         {publicAgentFeatureEnabled && noteId && (
           <button
@@ -658,28 +694,17 @@ export function NoteEditorView({
           {recording.recordingCaptureError
             ? <span className="text-amber-400">{recording.recordingCaptureError}</span>
             : null}
+          {!recording.isRecording && equationError
+            ? <span className="text-amber-400" title={equationError}>{equationError}</span>
+            : null}
         </span>
 
-        {hasSourceWorkspace ? (
-          <span
-            className={`text-xs shrink-0 ${autosave.status === "error" || autosave.status === "offline" ? "text-amber-400" : autosave.status === "saving" ? "text-indigo-400" : "text-gray-500"}`}
-            title={autosave.error ?? undefined}
-          >
-            {autosave.status === "saving" ? "Saving…" : autosave.status === "offline" ? "Offline / pending sync" : autosave.status === "error" ? "Error saving — retrying" : "Saved"}
-          </span>
-        ) : workspace.loading ? (
-          <span className="text-xs text-gray-500">Loading note…</span>
-        ) : (
-          <>
-            <span className="text-xs text-gray-600 shrink-0">{isNoteDirty ? "Unsaved" : "Saved"}</span>
-            <button onClick={onDiscard} disabled={!isNoteDirty} className="px-3 py-1 rounded-full text-xs border border-[var(--ml-bg-hover)] text-gray-400 disabled:opacity-30 shrink-0">
-              Discard
-            </button>
-            <button onClick={onSave} disabled={!isNoteDirty} className="px-4 py-1 rounded-full text-xs bg-indigo-600 hover:bg-indigo-500 text-white disabled:opacity-30 disabled:cursor-not-allowed shrink-0">
-              Save
-            </button>
-          </>
-        )}
+        <span
+          className={`text-xs shrink-0 ${autosave.status === "error" || autosave.status === "offline" ? "text-amber-400" : autosave.status === "saving" ? "text-indigo-400" : "text-gray-500"}`}
+          title={autosave.error ?? undefined}
+        >
+          {autosave.status === "saving" ? "Saving…" : autosave.status === "offline" ? "Offline / pending sync" : autosave.status === "error" ? "Error saving — retrying" : "Saved"}
+        </span>
       </div>
 
       {showVideoImport && (

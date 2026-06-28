@@ -66,6 +66,12 @@ class NoteService(INoteService):
             self.db.refresh(note)
         return NoteResponseDTO.model_validate(note)
 
+    def autosave_note(self, user_id: int, note_id: int, title: str, content: str) -> NoteResponseDTO | None:
+        existing = self.repo.get_by_id(note_id)
+        if not existing or existing.user_id != user_id or getattr(existing, "deleted_at", None) is not None:
+            return None
+        return self.update_note(NoteUpdateDTO(note_id=note_id, title=title, content=content))
+
     def delete_note(self, note_id: int) -> bool:
         return self.repo.delete_note(note_id)
 

@@ -39,6 +39,34 @@ export async function listNotes(workspace_id?: number | null) {
 export async function updateNote(note_id: number, title?: string | null, content?: string | null) {
   return (await api.post("/notes/update", { note_id, title: title ?? null, content: content ?? null })).data;
 }
+export async function autosaveNote(note_id: number, title: string, content: string) {
+  return (await api.put(`/notes/${note_id}/autosave`, { title, content })).data;
+}
+
+function keepaliveRequest(path: string, method: "POST" | "PUT", body: unknown): void {
+  const token = getToken();
+  void fetch(`${API_BASE}${path}`, {
+    method,
+    keepalive: true,
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify(body),
+  }).catch(() => { /* the pending local snapshot remains available for retry */ });
+}
+
+export function autosaveNoteOnPageExit(note_id: number, title: string, content: string): void {
+  keepaliveRequest(`/notes/${note_id}/autosave`, "PUT", { title, content });
+}
+
+export function createNoteOnPageExit(title: string, content: string, workspace_id?: number | null): void {
+  keepaliveRequest("/notes", "POST", { title, content, source: "manual", workspace_id: workspace_id ?? null });
+}
+
+export async function solveNoteEquation(note_id: number, model?: string) {
+  return (await api.post("/commands/solve-equation", { note_id, model: model || null })).data;
+}
 export async function deleteNote(note_id: number) {
   return (await api.post("/notes/delete", { note_id })).data;
 }

@@ -97,6 +97,51 @@ def _build_service(note_repo):
     )
 
 
+def test_solve_equation_appends_escaped_step_by_step_solution(monkeypatch):
+    repo = FakeNoteRepository()
+    note = repo.create_note(7, "Algebra", "<p>Solve x + 2 = 5</p>", "manual")
+    service = _build_service(repo)
+    monkeypatch.setattr(
+        service,
+        "_ai",
+        lambda *args, **kwargs: '{"equation":"x + 2 = 5","steps":["Subtract <script>alert(1)</script> 2 from both sides","x = 3"],"answer":"x = 3","verification":"3 + 2 = 5"}',
+    )
+
+    updated = service.solve_equation(7, note.id, "gpt-5")
+
+    assert "Equation Solution" in updated.content
+    assert "&lt;script&gt;alert(1)&lt;/script&gt;" in updated.content
+    assert "<script>" not in updated.content
+    assert "<strong>Answer:</strong> x = 3" in updated.content
+
+
+def test_solve_equation_rejects_note_owned_by_another_user():
+    repo = FakeNoteRepository()
+    note = repo.create_note(8, "Private", "x = 1", "manual")
+    service = _build_service(repo)
+
+    try:
+        service.solve_equation(7, note.id)
+    except LookupError as exc:
+        assert str(exc) == "Note not found"
+    else:
+        raise AssertionError("Expected ownership check to reject the note")
+
+
+def test_solve_equation_rejects_invalid_ai_response(monkeypatch):
+    repo = FakeNoteRepository()
+    note = repo.create_note(7, "Algebra", "x + 2 = 5", "manual")
+    service = _build_service(repo)
+    monkeypatch.setattr(service, "_ai", lambda *args, **kwargs: "not json")
+
+    try:
+        service.solve_equation(7, note.id)
+    except RuntimeError as exc:
+        assert "invalid" in str(exc)
+    else:
+        raise AssertionError("Expected malformed AI output to be rejected")
+
+
 def test_parse_discussion_bare_question_keeps_question_text():
     parsed = _parse("/Discussion how should I approach AI integration?")
     assert parsed is not None

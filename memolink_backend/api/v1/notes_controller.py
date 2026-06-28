@@ -6,7 +6,7 @@ from memolink_backend.core.security import get_current_user
 from fastapi import HTTPException
 from memolink_backend.contracts.note_dtos import (
     NoteCreateDTO, NoteGetDTO, NoteListDTO, NoteUpdateDTO,
-    NoteDeleteDTO, NoteSearchDTO, NoteResponseDTO, NotePublicAgentToggleDTO,
+    NoteDeleteDTO, NoteSearchDTO, NoteResponseDTO, NotePublicAgentToggleDTO, NoteAutosaveDTO,
 )
 
 
@@ -53,6 +53,19 @@ def update_note(
     c: RequestContainer = Depends(get_request_container),
 ):
     return c.notes().update_note(dto)
+
+
+@router.put("/{note_id}/autosave", response_model=NoteResponseDTO)
+def autosave_note(
+    note_id: int,
+    dto: NoteAutosaveDTO,
+    current_user_id: int = Depends(get_current_user),
+    c: RequestContainer = Depends(get_request_container),
+):
+    note = c.notes().autosave_note(current_user_id, note_id, dto.title, dto.content)
+    if not note:
+        raise HTTPException(status_code=404, detail="Note not found")
+    return note
 
 
 @router.post("/delete")

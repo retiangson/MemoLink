@@ -380,11 +380,12 @@ MemoLink notes now support an `Original | Editor | Source File | Timeline` works
 - External books and note attachments are moved to OneDrive before linking.
 - Local recordings are saved through the File System Access API where available, or shared/downloaded as a browser fallback. Only filename, duration, and local-only metadata are stored.
 - Transcription uploads occur only after an explicit user action and remain request-scoped; only confirmed transcript text is added to the note and embedded.
-- Source-linked note text autosaves after an 800 ms debounce, keeps failed changes in device storage, and retries when connectivity returns. Legacy notes retain their existing manual-save UI and do not gain source tabs unless a real source is linked.
+- All notes autosave after a short debounce; Save and Discard controls are no longer required. Pending changes are kept in device storage, retried when connectivity returns, and flushed when the browser tab is hidden, the MemoLink note tab changes, or the page exits. Source tabs still appear only when a real source is linked.
+- **Solve Equation** first flushes the current note, then asks the configured AI provider for a step-by-step solution and safely appends the equation, reasoning, answer, and verification to the note. The endpoint verifies note ownership and treats note text as untrusted input.
 - Note recording extends the existing Record Lecture hook. Its transcription behavior is reused while the complete recording is saved locally and only local-only metadata is synchronized.
 - Admins can upload supported books directly to OneDrive. Uploaded books are published into Browse Books, whose header reports both available and filtered counts.
 
-Smart Source APIs include `/api/source-files/upload-to-onedrive`, ownership-checked source retrieval, `/api/annotations`, `/api/notes/{id}/source-workspace`, `/api/notes/{id}/source-workspace/autosave`, `/api/notes/{id}/timeline`, and `/api/notes/{id}/recordings`. Books Library links are created internally so clients cannot attach arbitrary OneDrive item IDs.
+Smart Source and note APIs include `/api/source-files/upload-to-onedrive`, ownership-checked source retrieval, `/api/annotations`, `/api/notes/{id}/autosave`, `/api/notes/{id}/source-workspace`, `/api/notes/{id}/source-workspace/autosave`, `/api/notes/{id}/timeline`, `/api/notes/{id}/recordings`, and `/api/commands/solve-equation`. Books Library links are created internally so clients cannot attach arbitrary OneDrive item IDs.
 
 ---
 

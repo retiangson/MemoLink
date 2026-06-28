@@ -37,6 +37,11 @@ class NoteUpdateDTO(BaseModel):
     content: Optional[str] = None
 
 
+class NoteAutosaveDTO(BaseModel):
+    title: str
+    content: str
+
+
 class NoteDeleteDTO(BaseModel):
     note_id: int
 

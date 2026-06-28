@@ -7,3 +7,8 @@ class SlashCommandRequestDTO(BaseModel):
     conversation_id: Optional[int] = None
     workspace_id: Optional[int] = None
     model: Optional[str] = None
+
+
+class EquationSolveRequestDTO(BaseModel):
+    note_id: int
+    model: Optional[str] = None

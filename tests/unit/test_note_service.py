@@ -34,3 +34,27 @@ def test_update_note_returns_updated_response(fake):
 
     assert updated is not None
     assert updated.content == new_content
+
+
+def test_autosave_updates_only_owned_active_note():
+    repo = FakeNoteRepository()
+    service = NoteService(note_repo=repo)
+    owned = service.create_note(NoteCreateDTO(user_id=7, title="Old", content="Draft"))
+    other = service.create_note(NoteCreateDTO(user_id=8, title="Other", content="Private"))
+
+    updated = service.autosave_note(7, owned.id, "New", "Saved")
+
+    assert updated is not None
+    assert updated.title == "New"
+    assert updated.content == "Saved"
+    assert service.autosave_note(7, other.id, "Stolen", "Changed") is None
+    assert repo.get_by_id(other.id).content == "Private"
+
+
+def test_autosave_rejects_deleted_note():
+    repo = FakeNoteRepository()
+    service = NoteService(note_repo=repo)
+    note = service.create_note(NoteCreateDTO(user_id=7, title="Old", content="Draft"))
+    repo.delete_note(note.id)
+
+    assert service.autosave_note(7, note.id, "New", "Saved") is None
