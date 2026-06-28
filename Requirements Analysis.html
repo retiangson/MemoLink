@@ -144,6 +144,7 @@
     <h2>Smart Source Workspace Requirements</h2>
     <p>Users can attach original files, reuse OneDrive-backed books as note sources, cache originals per device, edit extracted content, and add editable pointer/stylus annotations. Original uploaded files are stored in OneDrive; external books are uploaded before linking; existing OneDrive books are never re-uploaded. Local audio remains on the user's device unless explicitly submitted temporarily for transcription.</p>
     <p>All source metadata, annotations, recording metadata, and timeline events are user/workspace scoped. Raw binaries, base64 content, OAuth tokens, and local absolute paths must not enter the database or logs.</p>
+    <p>Source workspace tabs and debounced autosave apply only when a note has a real linked source. Legacy notes retain their existing editor and manual-save behavior. Note-linked recording reuses the existing Record Lecture workflow, and supported admin book uploads are stored in OneDrive before appearing in Browse Books.</p>
   </section>
 </div>
 

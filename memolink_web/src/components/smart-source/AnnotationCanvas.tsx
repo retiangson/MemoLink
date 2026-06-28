@@ -42,6 +42,12 @@ export function AnnotationCanvas({ noteId, sourceFileId, pageNumber = 1, annotat
           canUndo={canvas.canUndo} canRedo={canvas.canRedo} saving={canvas.saving}
         />
       </div>
+      {canvas.error && (
+        <div className="absolute bottom-2 left-2 right-2 z-10 flex items-center justify-between gap-2 rounded bg-red-950/90 px-2 py-1 text-[11px] text-red-300">
+          <span>{canvas.error}</span>
+          {canvas.draft && <button type="button" onClick={() => void canvas.finishStroke()} className="font-semibold underline">Retry</button>}
+        </div>
+      )}
       <svg
         ref={surfaceRef}
         viewBox="0 0 1000 1000"

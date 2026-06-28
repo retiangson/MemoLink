@@ -9,6 +9,7 @@ import { useConversations } from "../hooks/useConversations";
 import { useChat } from "../hooks/useChat";
 import { addMessageToNoteAPI, deleteMessage } from "../api/conversationApi";
 import { getNote, updateNote, setNotePublicAgentEnabled } from "../api/client";
+import { autosaveSourceNote } from "../api/smartSourceApi";
 import { Sidebar } from "../components/Sidebar";
 import { NoteEditorView } from "../components/NoteEditorView";
 import { RightPanel } from "../components/RightPanel";
@@ -937,6 +938,14 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
       if (needsNativeSettleDelay) disposeReaderAfterPaint(closeTab);
       else closeTab();
     });
+  }
+
+  async function handleAutosaveNote(title: string, content: string) {
+    const noteId = editor.selectedNote?.id;
+    if (noteId == null) throw new Error("Create the note before enabling source autosave");
+    const fresh = await autosaveSourceNote(noteId, title, content);
+    setNotes((previous) => previous.map((note) => note.id === noteId ? fresh : note));
+    editor.markActiveNoteSaved(fresh, title, content);
   }
 
   function closeBookTabFromTabBar(index: number) {
@@ -1956,6 +1965,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                 setNoteContentDraft={editor.setNoteContentDraft}
                 isNoteDirty={editor.isNoteDirty}
                 onSave={handleSaveNote}
+                onAutosave={handleAutosaveNote}
                 onDiscard={editor.discardChanges}
                 onPlay={chat.tts.speak}
                 ttsPlaying={chat.tts.playing}
@@ -2283,6 +2293,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                       setNoteContentDraft={editor.setNoteContentDraft}
                       isNoteDirty={editor.isNoteDirty}
                       onSave={handleSaveNote}
+                      onAutosave={handleAutosaveNote}
                       onDiscard={editor.discardChanges}
                       onPlay={chat.tts.speak}
                       ttsPlaying={chat.tts.playing}

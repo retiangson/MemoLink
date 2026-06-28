@@ -115,6 +115,20 @@ export function useNoteEditor() {
     );
   }
 
+  function markActiveNoteSaved(fresh: NoteEditState, savedTitle: string, savedContent: string) {
+    setOpenNotes((prev) =>
+      prev.map((tab) => {
+        if (tab.note.id !== fresh.id) return tab;
+        return {
+          ...tab,
+          note: fresh,
+          titleDraft: tab.titleDraft === savedTitle ? (fresh.title ?? "") : tab.titleDraft,
+          contentDraft: tab.contentDraft === savedContent ? (fresh.content ?? "") : tab.contentDraft,
+        };
+      }),
+    );
+  }
+
   // Refresh a note changed by another feature (for example, a book highlight) without
   // discarding unsaved editor work. When the server update only appended content, merge
   // that suffix into a dirty draft so the new highlight appears immediately.
@@ -215,7 +229,7 @@ export function useNoteEditor() {
     noteContentDraft, setNoteContentDraft,
     isNoteDirty,
     noteTab, setNoteTab,
-    openNote, closeNote, closeNoteById, closeAllNotes, reorderNotes, updateActiveNote, syncNoteById, syncExternallyUpdatedNote, syncNoteTitle, discardChanges, applyFormat,
+    openNote, closeNote, closeNoteById, closeAllNotes, reorderNotes, updateActiveNote, markActiveNoteSaved, syncNoteById, syncExternallyUpdatedNote, syncNoteTitle, discardChanges, applyFormat,
     selectedNote: active?.note ?? null,
   };
 }

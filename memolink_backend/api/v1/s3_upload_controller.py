@@ -1,4 +1,5 @@
 import logging
+import asyncio
 import uuid
 import boto3
 from botocore.config import Config
@@ -11,7 +12,6 @@ from pydantic import BaseModel
 from memolink_backend.di.request_container import RequestContainer, get_request_container
 from memolink_backend.core.security import get_current_user
 from memolink_backend.core.config import settings
-from memolink_backend.contracts.note_dtos import NoteCreateDTO
 from memolink_backend.utils.file_extractor import extract_formatted_html
 
 router = APIRouter(prefix="/upload", tags=["upload"])
@@ -201,8 +201,6 @@ def process_from_s3(
 
             # 5. Nothing extracted
             if not html_content.strip() or html_content.strip() == "<p></p>":
-                reason = "No text could be extracted (scanned or image-only file?)"
-                failed.append({"filename": filename, "reason": reason})
                 try:
                     c.logs().warning(
                         "s3.process",
@@ -212,17 +210,21 @@ def process_from_s3(
                     )
                 except Exception as log_exc:
                     logger.debug("Non-critical cleanup/logging step failed: %s", log_exc)
-                continue
+                html_content = "<p></p>"
+                extraction_status = "unavailable"
+            else:
+                extraction_status = "ready"
 
             # 6. Create note
-            dto = NoteCreateDTO(
+            note = asyncio.run(c.smart_sources().create_imported_note(
                 user_id=current_user_id,
-                title=filename,
-                content=html_content,
-                source=filename,
                 workspace_id=body.workspace_id,
-            )
-            note = c.notes().create_note(dto)
+                file_name=filename,
+                mime_type=None,
+                content=content_bytes,
+                extracted_html=html_content,
+                extraction_status=extraction_status,
+            ))
             created.append(note)
 
             try:

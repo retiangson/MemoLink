@@ -96,6 +96,10 @@ export async function getSmartSourceWorkspace(noteId: number): Promise<SmartSour
   return (await api.get(`/notes/${noteId}/source-workspace`)).data;
 }
 
+export async function autosaveSourceNote(noteId: number, title: string, content: string) {
+  return (await api.put(`/notes/${noteId}/source-workspace/autosave`, { title, content })).data;
+}
+
 export async function createSourceAnnotation(payload: Omit<SourceAnnotation, "id" | "created_at" | "updated_at">): Promise<SourceAnnotation> {
   return (await api.post("/annotations", payload)).data;
 }

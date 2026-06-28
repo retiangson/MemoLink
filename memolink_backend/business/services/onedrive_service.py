@@ -370,7 +370,32 @@ class OneDriveService:
             raise OneDriveServiceError(resp.status_code, "Could not clean up the incomplete OneDrive upload")
 
     async def upload_source_bytes(self, *, file_name: str, content: bytes, mime_type: Optional[str]) -> dict:
-        """Upload an original source to MemoLink's OneDrive area.
+        """Upload an original note source to MemoLink's OneDrive area."""
+        return await self._upload_original_bytes(
+            folder_name="MemoLink Sources",
+            file_name=file_name,
+            content=content,
+            mime_type=mime_type,
+        )
+
+    async def upload_book_bytes(self, *, file_name: str, content: bytes, mime_type: Optional[str]) -> dict:
+        """Upload an admin-selected book once and return safe OneDrive metadata."""
+        return await self._upload_original_bytes(
+            folder_name="MemoLink Books Uploads",
+            file_name=file_name,
+            content=content,
+            mime_type=mime_type,
+        )
+
+    async def _upload_original_bytes(
+        self,
+        *,
+        folder_name: str,
+        file_name: str,
+        content: bytes,
+        mime_type: Optional[str],
+    ) -> dict:
+        """Upload request-scoped bytes without persisting them inside MemoLink.
 
         Bytes are request-scoped and never persisted by MemoLink. A unique OneDrive name
         prevents accidental replacement of an existing original.
@@ -378,7 +403,6 @@ class OneDriveService:
         token = await self._get_valid_access_token()
         safe_name = "".join(ch if ch.isalnum() or ch in " ._-()" else "_" for ch in file_name).strip() or "source"
         stored_name = f"{uuid.uuid4().hex[:12]}_{safe_name}"
-        folder_name = "MemoLink Sources"
         async with httpx.AsyncClient(timeout=120.0) as client:
             folder_resp = await client.get(
                 f"{GRAPH_BASE}/me/drive/root:/{quote(folder_name)}",
@@ -420,4 +444,5 @@ class OneDriveService:
             "name": item.get("name", stored_name),
             "size": item.get("size", len(content)),
             "mime_type": (item.get("file") or {}).get("mimeType") or mime_type,
+            "last_modified": item.get("lastModifiedDateTime"),
         }

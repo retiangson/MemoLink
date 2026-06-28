@@ -14,8 +14,12 @@ import { useReaderColorMode } from "../hooks/useReaderColorMode";
 import { useReaderFontSize } from "../hooks/useReaderFontSize";
 import { richContentFilter, readerFontScale } from "./book-readers/format";
 import { SmartSourceWorkspace, type WorkspaceTab } from "./smart-source/SmartSourceWorkspace";
-import { AudioRecordingToolbar } from "./smart-source/AudioRecordingToolbar";
 import { getNote } from "../api/client";
+import { useSmartSourceWorkspace } from "../hooks/useSmartSourceWorkspace";
+import { useSourceNoteAutosave } from "../hooks/useSourceNoteAutosave";
+import { useLocalRecordingStorage } from "../hooks/useLocalRecordingStorage";
+import { saveRecordingMetadata } from "../api/smartSourceApi";
+import { SourceUploadButton } from "./smart-source/SourceUploadButton";
 
 interface NoteEditorViewProps {
   noteKey: string | number;
@@ -25,6 +29,7 @@ interface NoteEditorViewProps {
   setNoteContentDraft: (v: string | ((prev: string) => string)) => void;
   isNoteDirty: boolean;
   onSave: () => void;
+  onAutosave: (title: string, content: string) => Promise<void>;
   onDiscard: () => void;
   onPlay?: (text: string) => void;
   ttsPlaying?: boolean;
@@ -55,7 +60,7 @@ export function NoteEditorView({
   noteKey,
   noteTitleDraft, setNoteTitleDraft,
   noteContentDraft, setNoteContentDraft,
-  isNoteDirty, onSave, onDiscard,
+  isNoteDirty, onSave, onAutosave, onDiscard,
   onPlay, ttsPlaying, ttsPaused, onTtsStop, onTtsPauseResume,
   onTtsBack, onTtsForward, ttsRate = 1.0, ttsVoices = [], ttsSelectedVoice = null,
   onTtsRateChange, onTtsVoiceChange,
@@ -75,6 +80,8 @@ export function NoteEditorView({
   const [recordMode, setRecordMode] = useState<"default" | "lecture">("lecture");
   const [recordBackend, setRecordBackend] = useState<"auto" | "whisper" | "deepgram">("auto");
   const [autoStopOnSilence, setAutoStopOnSilence] = useState(false);
+  const recordingStorage = useLocalRecordingStorage();
+  const [recordingFileStatus, setRecordingFileStatus] = useState<string | null>(null);
   const editorRef = useRef<any>(null);
   const speakStartDocPos = useRef(0);
   const speakDocText = useRef("");
@@ -101,6 +108,38 @@ export function NoteEditorView({
     });
   });
 
+  function recordingFileName(blob: Blob): string {
+    const cleanedTitle = noteTitleDraft.trim().replace(/[<>:"/\\|?*\x00-\x1F]/g, "_").replace(/\s+/g, "_").slice(0, 80) || "Untitled";
+    const now = new Date();
+    const pad = (value: number) => String(value).padStart(2, "0");
+    const stamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+    const extension = blob.type.includes("mp4") ? "mp4" : blob.type.includes("ogg") ? "ogg" : "webm";
+    return `MemoLink_Recording_${cleanedTitle}_${stamp}.${extension}`;
+  }
+
+  async function saveCompletedRecording(recordingResult: { blob: Blob; durationSeconds: number }) {
+    const fileName = recordingFileName(recordingResult.blob);
+    setRecordingFileStatus("Saving recording…");
+    try {
+      await recordingStorage.saveRecording(recordingResult.blob, fileName);
+      if (noteId) {
+        try {
+          await saveRecordingMetadata(noteId, {
+            file_name: fileName,
+            duration_seconds: recordingResult.durationSeconds,
+            local_only: true,
+          });
+        } catch {
+          setRecordingFileStatus("Saved locally; timeline sync pending");
+          return;
+        }
+      }
+      setRecordingFileStatus("Recording saved locally");
+    } catch (caught) {
+      setRecordingFileStatus(caught instanceof Error ? caught.message : "Recording save failed");
+    }
+  }
+
   function readableTextBetween(doc: any, from: number, to: number): string {
     return doc.textBetween(from, to, " ", (node: any) => {
       if (node.type?.name !== "bookHighlightBlock") return "";
@@ -114,14 +153,17 @@ export function NoteEditorView({
     recording.stopRecording();
   }
 
-  function startRecording(source: "mic" | "computer") {
+  async function startRecording(source: "mic" | "computer") {
     setShowPicker(false);
-    recording.startRecording(source, {
+    setRecordingFileStatus(null);
+    if (!await recordingStorage.prepareDirectory()) return;
+    await recording.startRecording(source, {
       language,
       mode: recordMode,
       backend: recordBackend,
       autoStopOnSilence: recordMode === "lecture" ? false : autoStopOnSilence,
       silenceDurationMs: recordMode === "lecture" ? 2600 : 1500,
+      onRecordingComplete: saveCompletedRecording,
     });
   }
 
@@ -218,6 +260,21 @@ export function NoteEditorView({
   const [exporting, setExporting] = useState<ExportFormat | null>(null);
   const [rawContent, setRawContent] = useState(noteContentDraft);
   const [workspaceTab, setWorkspaceTab] = useState<WorkspaceTab>("editor");
+  const workspace = useSmartSourceWorkspace(noteId);
+  const hasSourceWorkspace = workspace.data.source_files.length > 0;
+  const isLegacyNote = !workspace.loading && !hasSourceWorkspace;
+  const autosave = useSourceNoteAutosave({
+    enabled: hasSourceWorkspace,
+    noteId,
+    title: noteTitleDraft,
+    content: noteContentDraft,
+    dirty: isNoteDirty,
+    save: onAutosave,
+    restore: (title, content) => {
+      setNoteTitleDraft(title);
+      setNoteContentDraft(content);
+    },
+  });
 
   // Capture the raw DB content (Markdown) when the note changes,
   // before TipTap converts it to HTML via onChange
@@ -279,37 +336,82 @@ export function NoteEditorView({
         </div>
       )}
 
-      <div className="mb-2 flex items-center justify-end gap-2 shrink-0">
-        <FontSizePicker value={fontSize} onChange={setFontSize} />
-        <ColorModePicker value={colorMode} onChange={setColorMode} />
+      <div className="mb-2 flex items-center justify-between gap-2 shrink-0">
+        <div className="flex items-center gap-1">
+          {isLegacyNote && (["editor", "source", "timeline"] as const).map((tab) => (
+            (tab !== "timeline" || (timelineEnabled && noteId)) && (
+              <button
+                key={tab}
+                onClick={() => setWorkspaceTab(tab)}
+                className={`rounded-lg px-3 py-1 text-xs font-medium capitalize transition ${workspaceTab === tab ? "bg-indigo-600 text-white" : "text-gray-500 hover:text-gray-300"}`}
+              >
+                {tab}
+              </button>
+            )
+          ))}
+        </div>
+        <div className="flex items-center gap-2">
+          {isLegacyNote && noteId && (
+            <SourceUploadButton
+              noteId={noteId}
+              disabled={isNoteDirty}
+              onComplete={() => {
+                void workspace.reload();
+                void getNote(noteId).then((fresh) => {
+                  setNoteContentDraft(fresh.content || "");
+                  setRawContent(fresh.content || "");
+                });
+              }}
+            />
+          )}
+          <FontSizePicker value={fontSize} onChange={setFontSize} />
+          <ColorModePicker value={colorMode} onChange={setColorMode} />
+        </div>
       </div>
 
-      <SmartSourceWorkspace
-        noteId={noteId}
-        noteKey={noteKey}
-        rawContent={rawContent}
-        activeTab={workspaceTab}
-        onTabChange={setWorkspaceTab}
-        onSourceChanged={() => {
-          if (!noteId) return;
-          void getNote(noteId).then((fresh) => {
-            setNoteContentDraft(fresh.content || "");
-            setRawContent(fresh.content || "");
-          });
-        }}
-        sourceUploadDisabled={isNoteDirty}
-        timelineSupplement={timelineEnabled && noteId ? <div className="border-t border-[var(--ml-bg-hover)] p-4"><TimelinePanel noteId={noteId} onJump={jumpToText} /></div> : null}
-        editor={(
-          <div data-rc-mode={colorMode} style={{ filter: richContentFilter(colorMode), ...noteFontSizeVar }} className="flex h-full flex-col overflow-hidden bg-[var(--ml-bg-bar)] transition-[filter]">
-            <RichNoteEditor key={String(noteKey)} noteKey={noteKey} value={noteContentDraft} onChange={(html) => setNoteContentDraft(html)} editorRef={editorRef} onOpenHighlight={onOpenHighlight} />
-          </div>
-        )}
-      />
+      {hasSourceWorkspace ? (
+        <SmartSourceWorkspace
+          workspace={workspace}
+          noteId={noteId}
+          noteKey={noteKey}
+          rawContent={rawContent}
+          activeTab={workspaceTab}
+          onTabChange={setWorkspaceTab}
+          onSourceChanged={() => {
+            if (!noteId) return;
+            void getNote(noteId).then((fresh) => {
+              setNoteContentDraft(fresh.content || "");
+              setRawContent(fresh.content || "");
+            });
+          }}
+          sourceUploadDisabled={isNoteDirty}
+          timelineSupplement={timelineEnabled && noteId ? <div className="border-t border-[var(--ml-bg-hover)] p-4"><TimelinePanel noteId={noteId} onJump={jumpToText} /></div> : null}
+          editor={(
+            <div data-rc-mode={colorMode} style={{ filter: richContentFilter(colorMode), ...noteFontSizeVar }} className="flex h-full flex-col overflow-hidden bg-[var(--ml-bg-bar)] transition-[filter]">
+              <RichNoteEditor key={String(noteKey)} noteKey={noteKey} value={noteContentDraft} onChange={(html) => setNoteContentDraft(html)} editorRef={editorRef} onOpenHighlight={onOpenHighlight} />
+            </div>
+          )}
+        />
+      ) : workspaceTab === "editor" ? (
+        <div
+          data-rc-mode={colorMode}
+          style={{ filter: richContentFilter(colorMode), ...noteFontSizeVar }}
+          className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-[var(--ml-bg-panel)] bg-[var(--ml-bg-bar)] transition-[filter]"
+        >
+          <RichNoteEditor key={String(noteKey)} noteKey={noteKey} value={noteContentDraft} onChange={(html) => setNoteContentDraft(html)} editorRef={editorRef} onOpenHighlight={onOpenHighlight} />
+        </div>
+      ) : workspaceTab === "source" ? (
+        <div data-rc-mode={colorMode} style={{ filter: richContentFilter(colorMode) }} className="min-h-0 flex-1 overflow-hidden rounded-xl border border-[var(--ml-bg-panel)] bg-[var(--ml-bg-bar)]">
+          <textarea readOnly value={rawContent} style={{ fontSize: `${Math.round(12 * readerFontScale(fontSize))}px` }} className="h-full w-full resize-none bg-transparent p-4 font-mono text-gray-400 focus:outline-none" />
+        </div>
+      ) : (
+        <div data-rc-mode={colorMode} style={{ filter: richContentFilter(colorMode) }} className="min-h-0 flex-1 overflow-y-auto rounded-xl border border-[var(--ml-bg-panel)] bg-[var(--ml-bg-bar)] p-4">
+          {noteId && <TimelinePanel noteId={noteId} onJump={jumpToText} />}
+        </div>
+      )}
 
       {/* Bottom bar */}
       <div className="mt-3 flex flex-wrap items-center gap-2 shrink-0">
-
-        <AudioRecordingToolbar noteId={noteId} noteTitle={noteTitleDraft} onTranscriptConfirmed={(text) => setNoteContentDraft((prev) => appendCapturedParagraph(prev, text))} />
 
         {/* Record */}
         {recording.isRecording ? (
@@ -319,8 +421,17 @@ export function NoteEditorView({
               className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs text-red-400 bg-red-400/10 border border-red-400/30 animate-pulse"
             >
               <span className="w-2 h-2 rounded-full bg-red-500 inline-block" />
-              Stop
+              Stop &amp; Save
             </button>
+            <button
+              onClick={recording.pauseResumeRecording}
+              className="px-2 py-1 rounded-lg text-xs text-gray-300 border border-[var(--ml-bg-hover)]"
+            >
+              {recording.isPaused ? "Resume" : "Pause"}
+            </button>
+            <span className="text-[11px] tabular-nums text-gray-500">
+              {Math.floor(recording.recordingDurationSeconds / 60)}:{String(recording.recordingDurationSeconds % 60).padStart(2, "0")}
+            </span>
             <span className="w-10 h-1.5 rounded-full bg-[#2b2b38] overflow-hidden" aria-hidden="true">
               <span
                 className="block h-full bg-red-400 transition-[width] duration-150"
@@ -335,13 +446,13 @@ export function NoteEditorView({
                 <div className="fixed inset-0 z-[9]" onClick={() => setShowPicker(false)} />
                 <div className="absolute bottom-full left-0 mb-1 z-10 bg-[var(--ml-bg-panel)] border border-[var(--ml-bg-hover)] rounded-xl shadow-xl overflow-hidden min-w-[160px]">
                   <button
-                    onClick={() => startRecording("mic")}
+                    onClick={() => void startRecording("mic")}
                     className="w-full text-left px-4 py-2.5 text-xs text-gray-300 hover:bg-[var(--ml-bg-hover)] flex items-center gap-2 transition"
                   >
                     🎤 Microphone
                   </button>
                   <button
-                    onClick={() => startRecording("computer")}
+                    onClick={() => void startRecording("computer")}
                     className="w-full text-left px-4 py-2.5 text-xs text-gray-300 hover:bg-[var(--ml-bg-hover)] flex items-center gap-2 transition"
                   >
                     🖥️ Computer Audio
@@ -541,15 +652,34 @@ export function NoteEditorView({
             : recording.isRecording
               ? <span className="text-red-400/80">● Recording…</span>
               : null}
+          {!recording.isRecording && !recording.isTranscribing && recordingFileStatus
+            ? <span className="text-gray-500">{recordingFileStatus}</span>
+            : null}
+          {recording.recordingCaptureError
+            ? <span className="text-amber-400">{recording.recordingCaptureError}</span>
+            : null}
         </span>
 
-        <span className="text-xs text-gray-600 shrink-0">{isNoteDirty ? "Unsaved" : "Saved"}</span>
-        <button onClick={onDiscard} disabled={!isNoteDirty} className="px-3 py-1 rounded-full text-xs border border-[var(--ml-bg-hover)] text-gray-400 disabled:opacity-30 shrink-0">
-          Discard
-        </button>
-        <button onClick={onSave} disabled={!isNoteDirty} className="px-4 py-1 rounded-full text-xs bg-indigo-600 hover:bg-indigo-500 text-white disabled:opacity-30 disabled:cursor-not-allowed shrink-0">
-          Save
-        </button>
+        {hasSourceWorkspace ? (
+          <span
+            className={`text-xs shrink-0 ${autosave.status === "error" || autosave.status === "offline" ? "text-amber-400" : autosave.status === "saving" ? "text-indigo-400" : "text-gray-500"}`}
+            title={autosave.error ?? undefined}
+          >
+            {autosave.status === "saving" ? "Saving…" : autosave.status === "offline" ? "Offline / pending sync" : autosave.status === "error" ? "Error saving — retrying" : "Saved"}
+          </span>
+        ) : workspace.loading ? (
+          <span className="text-xs text-gray-500">Loading note…</span>
+        ) : (
+          <>
+            <span className="text-xs text-gray-600 shrink-0">{isNoteDirty ? "Unsaved" : "Saved"}</span>
+            <button onClick={onDiscard} disabled={!isNoteDirty} className="px-3 py-1 rounded-full text-xs border border-[var(--ml-bg-hover)] text-gray-400 disabled:opacity-30 shrink-0">
+              Discard
+            </button>
+            <button onClick={onSave} disabled={!isNoteDirty} className="px-4 py-1 rounded-full text-xs bg-indigo-600 hover:bg-indigo-500 text-white disabled:opacity-30 disabled:cursor-not-allowed shrink-0">
+              Save
+            </button>
+          </>
+        )}
       </div>
 
       {showVideoImport && (

@@ -95,6 +95,13 @@ class SmartSourceRepository:
             NoteTimelineEvent.note_id == note_id,
         ).order_by(NoteTimelineEvent.created_at.desc()).all()
 
+    def latest_timeline_event(self, user_id: int, note_id: int, event_type: str) -> Optional[NoteTimelineEvent]:
+        return self.db.query(NoteTimelineEvent).filter(
+            NoteTimelineEvent.user_id == user_id,
+            NoteTimelineEvent.note_id == note_id,
+            NoteTimelineEvent.event_type == event_type,
+        ).order_by(NoteTimelineEvent.created_at.desc()).first()
+
     def create_timeline_event(
         self,
         user_id: int,

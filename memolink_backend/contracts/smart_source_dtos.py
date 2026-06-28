@@ -8,7 +8,8 @@ ANNOTATION_TYPES = {"pen", "handwriting", "highlighter", "text", "comment", "sha
 TIMELINE_EVENT_TYPES = {
     "uploaded", "linked", "cached", "extracted", "edited", "annotation_added",
     "annotation_updated", "annotation_deleted", "transcribed", "rag_used",
-    "reminder_generated", "exported", "recording_saved", "book_linked",
+    "drawing_added", "highlighted", "comment_added", "reminder_generated",
+    "exported", "recording_saved", "book_linked",
 }
 
 
@@ -196,3 +197,8 @@ class SourceWorkspaceResponseDTO(BaseModel):
     annotations: list[AnnotationResponseDTO]
     timeline: list[TimelineEventResponseDTO]
     recordings: list[RecordingMetadataResponseDTO]
+
+
+class SourceNoteAutosaveDTO(BaseModel):
+    title: str = Field(max_length=255)
+    content: str

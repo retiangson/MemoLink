@@ -170,9 +170,9 @@ export function UploadNotes({ setNotes, workspaceId, onUploaded }: Props) {
         onDrop={(e) => { e.preventDefault(); processFiles(Array.from(e.dataTransfer.files)); }}
       >
         <p className="text-gray-300 text-sm font-medium">Upload Notes</p>
-        <p className="text-gray-500 text-xs mt-0.5">txt, md, pdf, docx, pptx, html, mp3, mp4, wav…</p>
+        <p className="text-gray-500 text-xs mt-0.5">txt, md, pdf, docx, pptx, images, audio, video…</p>
       </div>
-      <input type="file" multiple hidden accept=".txt,.md,.html,.htm,.pdf,.docx,.pptx,.zip,.mp3,.mp4,.m4a,.mp4a,.wav,.webm,.ogg,.flac,.avi,.mpeg" ref={fileInputRef} onChange={(e) => { if (e.target.files) processFiles(Array.from(e.target.files)); }} />
+      <input type="file" multiple hidden accept=".txt,.md,.html,.htm,.pdf,.docx,.pptx,.zip,.png,.jpg,.jpeg,.gif,.webp,.bmp,.tiff,.mp3,.mp4,.m4a,.mp4a,.wav,.webm,.ogg,.flac,.avi,.mpeg,.mov" ref={fileInputRef} onChange={(e) => { if (e.target.files) processFiles(Array.from(e.target.files)); }} />
       {loading && (
         <div className="flex items-center gap-2 text-xs text-indigo-400">
           <svg className="w-3.5 h-3.5 animate-spin shrink-0" fill="none" viewBox="0 0 24 24">

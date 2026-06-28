@@ -23,6 +23,7 @@ class FakeSmartSources:
     def __init__(self):
         self.recording_values = None
         self.timeline_values = None
+        self.db = SimpleNamespace(commit=lambda: None, rollback=lambda: None, refresh=lambda row: None)
 
     def create_recording(self, user_id, workspace_id, note_id, values):
         self.recording_values = values
@@ -35,6 +36,35 @@ class FakeSmartSources:
     def create_timeline_event(self, user_id, workspace_id, note_id, values):
         self.timeline_values = values
         return SimpleNamespace(id=1, note_id=note_id, created_at=None, **values)
+
+    def list_sources(self, user_id, note_id):
+        return []
+
+
+class FakeAutosaveNotes(FakeNotes):
+    def update_note(self, note_id, title, content):
+        self.note.title = title
+        self.note.content = content
+        return self.note
+
+    def save_embedding(self, note_id, vector):
+        return None
+
+
+class FakeEmbeddings:
+    def embed_text(self, content):
+        return [0.1]
+
+
+class FakeSourceWorkspace(FakeSmartSources):
+    def list_sources(self, user_id, note_id):
+        return [SimpleNamespace(id=1)]
+
+    def list_annotations(self, user_id, note_id, source_file_id=None):
+        return []
+
+    def latest_timeline_event(self, user_id, note_id, event_type):
+        return None
 
 
 def service_for(note):
@@ -107,3 +137,28 @@ def test_timeline_metadata_rejects_binary_payload():
             event_summary="Exported note",
             metadata_json={"file": "data:application/pdf;base64,AAAA"},
         )
+
+
+def test_autosave_rejects_normal_note_without_source_workspace():
+    note = SimpleNamespace(id=7, user_id=4, workspace_id=2, deleted_at=None, title="Old", content="Body")
+    repository = FakeSmartSources()
+    service = SmartSourceService(repository, FakeAutosaveNotes(note), onedrive=None, embeddings=FakeEmbeddings())
+
+    from memolink_backend.contracts.smart_source_dtos import SourceNoteAutosaveDTO
+    with pytest.raises(SmartSourceError, match="only enabled"):
+        service.autosave_note(4, 7, SourceNoteAutosaveDTO(title="Old", content="Changed"))
+
+
+def test_autosave_updates_only_source_linked_note_and_records_timeline():
+    note = SimpleNamespace(
+        id=7, user_id=4, workspace_id=2, deleted_at=None,
+        title="Source", content="Body", source="upload.pdf", public_agent_enabled=False,
+    )
+    repository = FakeSourceWorkspace()
+    service = SmartSourceService(repository, FakeAutosaveNotes(note), onedrive=None, embeddings=FakeEmbeddings())
+
+    from memolink_backend.contracts.smart_source_dtos import SourceNoteAutosaveDTO
+    result = service.autosave_note(4, 7, SourceNoteAutosaveDTO(title="Source", content="Changed"))
+
+    assert result.content == "Changed"
+    assert repository.timeline_values["event_type"] == "edited"

@@ -367,6 +367,7 @@ Recent documentation updates also cover the Gmail connector cleanup: token refre
 | `POST` | `/api/admin/books/{id}/publish` / `/unpublish` | Publish or unpublish a book | Admin |
 | `POST` | `/api/admin/books/publish-all` / `/unpublish-all` | Bulk publish/unpublish all books | Admin |
 | `POST` | `/api/admin/books/publish-selected` / `/unpublish-selected` | Bulk publish/unpublish selected books | Admin |
+| `POST` | `/api/admin/books/upload` | Upload and publish a supported book original to OneDrive | Admin |
 
 ---
 
@@ -379,8 +380,11 @@ MemoLink notes now support an `Original | Editor | Source File | Timeline` works
 - External books and note attachments are moved to OneDrive before linking.
 - Local recordings are saved through the File System Access API where available, or shared/downloaded as a browser fallback. Only filename, duration, and local-only metadata are stored.
 - Transcription uploads occur only after an explicit user action and remain request-scoped; only confirmed transcript text is added to the note and embedded.
+- Source-linked note text autosaves after an 800 ms debounce, keeps failed changes in device storage, and retries when connectivity returns. Legacy notes retain their existing manual-save UI and do not gain source tabs unless a real source is linked.
+- Note recording extends the existing Record Lecture hook. Its transcription behavior is reused while the complete recording is saved locally and only local-only metadata is synchronized.
+- Admins can upload supported books directly to OneDrive. Uploaded books are published into Browse Books, whose header reports both available and filtered counts.
 
-Smart Source APIs include `/api/source-files/upload-to-onedrive`, ownership-checked source retrieval, `/api/annotations`, `/api/notes/{id}/source-workspace`, `/api/notes/{id}/timeline`, and `/api/notes/{id}/recordings`. Books Library links are created internally so clients cannot attach arbitrary OneDrive item IDs.
+Smart Source APIs include `/api/source-files/upload-to-onedrive`, ownership-checked source retrieval, `/api/annotations`, `/api/notes/{id}/source-workspace`, `/api/notes/{id}/source-workspace/autosave`, `/api/notes/{id}/timeline`, and `/api/notes/{id}/recordings`. Books Library links are created internally so clients cannot attach arbitrary OneDrive item IDs.
 
 ---
 

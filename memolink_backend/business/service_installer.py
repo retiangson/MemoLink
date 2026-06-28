@@ -273,3 +273,10 @@ class ServiceInstaller:
             onedrive=self.get_onedrive_service(),
             embeddings=self._domain.get_embedding_service(),
         )
+
+    def get_book_upload_service(self):
+        from memolink_backend.business.services.book_upload_service import BookUploadService
+        return BookUploadService(
+            books=self._domain.get_book_repository(),
+            onedrive=self.get_onedrive_service(),
+        )

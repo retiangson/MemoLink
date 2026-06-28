@@ -15,6 +15,7 @@ from memolink_backend.contracts.smart_source_dtos import (
     SourceFileCreateDTO,
     SourceFileResponseDTO,
     SourceWorkspaceResponseDTO,
+    SourceNoteAutosaveDTO,
     TimelineEventCreateDTO,
     TimelineEventResponseDTO,
 )
@@ -50,6 +51,16 @@ def get_source_workspace(
     c: RequestContainer = Depends(get_request_container),
 ):
     return _handle(lambda: c.smart_sources().get_workspace(user_id, note_id))
+
+
+@router.put("/notes/{note_id}/source-workspace/autosave")
+def autosave_source_note(
+    note_id: int,
+    dto: SourceNoteAutosaveDTO,
+    user_id: int = Depends(get_current_user),
+    c: RequestContainer = Depends(get_request_container),
+):
+    return _handle(lambda: c.smart_sources().autosave_note(user_id, note_id, dto))
 
 
 @router.post("/source-files/upload-to-onedrive", response_model=SourceFileResponseDTO)

@@ -172,6 +172,8 @@
       <li><code>POST /api/source-files/{id}/extract</code> extracts text and updates note embeddings; audio/video require explicit transcription.</li>
       <li><code>GET/POST/PUT/DELETE /api/annotations</code> synchronize editable annotation data.</li>
       <li><code>GET /api/notes/{id}/source-workspace</code>, <code>POST /api/notes/{id}/timeline</code>, and <code>POST /api/notes/{id}/recordings</code> expose the workspace aggregate.</li>
+      <li><code>PUT /api/notes/{id}/source-workspace/autosave</code> saves only ownership-checked, source-linked notes and throttles edit timeline events.</li>
+      <li><code>POST /api/admin/books/upload</code> uploads a supported book to OneDrive before creating published Books Library metadata.</li>
     </ul>
   </section>
 </div>

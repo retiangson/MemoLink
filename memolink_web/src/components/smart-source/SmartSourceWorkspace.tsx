@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useState } from "react";
-import { useSmartSourceWorkspace } from "../../hooks/useSmartSourceWorkspace";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import type { SmartSourceWorkspaceState } from "../../hooks/useSmartSourceWorkspace";
 import { NoteTimelineTab } from "./NoteTimelineTab";
 import { SourceFileViewer } from "./SourceFileViewer";
 import { SourceMetadataTab } from "./SourceMetadataTab";
@@ -17,10 +17,10 @@ interface Props {
   onTabChange?: (tab: WorkspaceTab) => void;
   onSourceChanged?: () => void;
   sourceUploadDisabled?: boolean;
+  workspace: SmartSourceWorkspaceState;
 }
 
-export function SmartSourceWorkspace({ noteId, noteKey, editor, rawContent, timelineSupplement, activeTab: controlledTab, onTabChange, onSourceChanged, sourceUploadDisabled }: Props) {
-  const workspace = useSmartSourceWorkspace(noteId);
+export function SmartSourceWorkspace({ noteId, noteKey, editor, rawContent, timelineSupplement, activeTab: controlledTab, onTabChange, onSourceChanged, sourceUploadDisabled, workspace }: Props) {
   const [internalTab, setInternalTab] = useState<WorkspaceTab>("editor");
   const activeTab = controlledTab ?? internalTab;
   const setActiveTab = useCallback((tab: WorkspaceTab) => {
@@ -28,9 +28,20 @@ export function SmartSourceWorkspace({ noteId, noteKey, editor, rawContent, time
     onTabChange?.(tab);
   }, [onTabChange]);
   const [localCacheStatus, setLocalCacheStatus] = useState("not checked");
+  const annotationReloadTimerRef = useRef<number | null>(null);
   const source = workspace.data.source_files.at(-1) ?? null;
   useEffect(() => { setActiveTab("editor"); }, [noteKey, setActiveTab]);
   const handleCacheStatus = useCallback((status: string) => setLocalCacheStatus(status), []);
+  const scheduleAnnotationReload = useCallback(() => {
+    if (annotationReloadTimerRef.current != null) window.clearTimeout(annotationReloadTimerRef.current);
+    annotationReloadTimerRef.current = window.setTimeout(() => {
+      annotationReloadTimerRef.current = null;
+      void workspace.reload();
+    }, 1000);
+  }, [workspace.reload]);
+  useEffect(() => () => {
+    if (annotationReloadTimerRef.current != null) window.clearTimeout(annotationReloadTimerRef.current);
+  }, []);
   const tabs: { id: WorkspaceTab; label: string }[] = [
     { id: "original", label: "Original" }, { id: "editor", label: "Editor" },
     { id: "source", label: "Source File" }, { id: "timeline", label: "Timeline" },
@@ -46,7 +57,7 @@ export function SmartSourceWorkspace({ noteId, noteKey, editor, rawContent, time
       </div>
       <div className="relative min-h-0 flex-1 overflow-hidden rounded-xl border border-[var(--ml-bg-panel)] bg-[var(--ml-bg-bar)]">
         {activeTab === "editor" && editor}
-        {activeTab === "original" && noteId && <SourceFileViewer noteId={noteId} source={source} annotations={workspace.data.annotations} onAnnotationsChanged={() => void workspace.reload()} onCacheStatus={handleCacheStatus} />}
+        {activeTab === "original" && noteId && <SourceFileViewer noteId={noteId} source={source} annotations={workspace.data.annotations} onAnnotationsChanged={scheduleAnnotationReload} onCacheStatus={handleCacheStatus} />}
         {activeTab === "source" && <SourceMetadataTab source={source} localCacheStatus={localCacheStatus} rawContent={rawContent} />}
         {activeTab === "timeline" && <div className="h-full overflow-y-auto"><NoteTimelineTab events={workspace.data.timeline} />{timelineSupplement}</div>}
         {workspace.error && activeTab !== "editor" && <div className="absolute bottom-4 left-4 right-4 rounded-lg bg-red-500/10 p-2 text-xs text-red-400">{workspace.error}</div>}

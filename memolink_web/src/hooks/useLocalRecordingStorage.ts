@@ -97,8 +97,14 @@ export function useLocalRecordingStorage() {
 
       const file = new File([blob], fileName, { type: blob.type });
       if (navigator.share && navigator.canShare?.({ files: [file] })) {
-        await navigator.share({ files: [file], title: "MemoLink recording" });
-        return "share";
+        try {
+          await navigator.share({ files: [file], title: "MemoLink recording" });
+          return "share";
+        } catch (caught) {
+          if (caught instanceof DOMException && caught.name === "AbortError") throw caught;
+          // Android WebViews may expose Web Share but reject calls made after
+          // MediaRecorder's asynchronous stop event. Fall through to download.
+        }
       }
 
       const url = URL.createObjectURL(blob);
@@ -108,7 +114,7 @@ export function useLocalRecordingStorage() {
         anchor.download = fileName;
         anchor.click();
       } finally {
-        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        setTimeout(() => URL.revokeObjectURL(url), 30000);
       }
       return "download";
     } finally {

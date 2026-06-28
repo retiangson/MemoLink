@@ -28,6 +28,7 @@ export function useAnnotationCanvas(
   const [localAnnotations, setLocalAnnotations] = useState<SourceAnnotation[]>(initialAnnotations);
   const [redoStack, setRedoStack] = useState<SourceAnnotation[]>([]);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const annotations = useMemo(
     () => localAnnotations.filter((annotation) =>
       annotation.source_file_id === sourceFileId && (annotation.page_number ?? 1) === pageNumber
@@ -52,6 +53,7 @@ export function useAnnotationCanvas(
     if (!completed || completed.points.length < 2) return;
     const strokes: StrokePayload = { version: 1, pointerType: completed.pointerType, points: completed.points };
     setSaving(true);
+    setError(null);
     try {
       const created = await createSourceAnnotation({
         note_id: noteId,
@@ -70,20 +72,30 @@ export function useAnnotationCanvas(
       setLocalAnnotations((current) => [...current, created]);
       setRedoStack([]);
       onPersisted();
+    } catch (caught) {
+      setDraft(completed);
+      setError(caught instanceof Error ? caught.message : "Annotation save failed — stroke kept for retry");
     } finally {
       setSaving(false);
     }
   }
 
   async function eraseAnnotation(id: number) {
-    await deleteSourceAnnotation(id);
-    setLocalAnnotations((current) => current.filter((annotation) => annotation.id !== id));
-    onPersisted();
+    setError(null);
+    try {
+      await deleteSourceAnnotation(id);
+      setLocalAnnotations((current) => current.filter((annotation) => annotation.id !== id));
+      onPersisted();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not erase annotation");
+    }
   }
 
   async function addTextAnnotation(point: StrokePoint, annotationType: "text" | "comment", text: string) {
     if (!text.trim()) return;
-    const created = await createSourceAnnotation({
+    setError(null);
+    try {
+      const created = await createSourceAnnotation({
       note_id: noteId,
       source_file_id: sourceFileId,
       book_id: null,
@@ -97,24 +109,34 @@ export function useAnnotationCanvas(
       pen_size: penSize,
       tool_type: annotationType,
     });
-    setLocalAnnotations((current) => [...current, created]);
-    setRedoStack([]);
-    onPersisted();
+      setLocalAnnotations((current) => [...current, created]);
+      setRedoStack([]);
+      onPersisted();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not save annotation text");
+    }
   }
 
   async function undo() {
     const latest = annotations[annotations.length - 1];
     if (!latest) return;
-    await deleteSourceAnnotation(latest.id);
-    setLocalAnnotations((current) => current.filter((annotation) => annotation.id !== latest.id));
-    setRedoStack((current) => [...current, latest]);
-    onPersisted();
+    setError(null);
+    try {
+      await deleteSourceAnnotation(latest.id);
+      setLocalAnnotations((current) => current.filter((annotation) => annotation.id !== latest.id));
+      setRedoStack((current) => [...current, latest]);
+      onPersisted();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not undo annotation");
+    }
   }
 
   async function redo() {
     const latest = redoStack[redoStack.length - 1];
     if (!latest) return;
-    const recreated = await createSourceAnnotation({
+    setError(null);
+    try {
+      const recreated = await createSourceAnnotation({
       note_id: noteId,
       source_file_id: sourceFileId,
       book_id: latest.book_id,
@@ -128,14 +150,17 @@ export function useAnnotationCanvas(
       pen_size: latest.pen_size,
       tool_type: latest.tool_type,
     });
-    setLocalAnnotations((current) => [...current, recreated]);
-    setRedoStack((current) => current.slice(0, -1));
-    onPersisted();
+      setLocalAnnotations((current) => [...current, recreated]);
+      setRedoStack((current) => current.slice(0, -1));
+      onPersisted();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not redo annotation");
+    }
   }
 
   return {
     tool, setTool, color, setColor, penSize, setPenSize,
-    draft, annotations, saving, canUndo: annotations.length > 0, canRedo: redoStack.length > 0,
+    draft, annotations, saving, error, canUndo: annotations.length > 0, canRedo: redoStack.length > 0,
     beginStroke, appendPoint, finishStroke, eraseAnnotation, addTextAnnotation, undo, redo,
   };
 }
