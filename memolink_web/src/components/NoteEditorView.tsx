@@ -21,7 +21,6 @@ import { useLocalRecordingStorage } from "../hooks/useLocalRecordingStorage";
 import { saveRecordingMetadata } from "../api/smartSourceApi";
 import { SourceUploadButton } from "./smart-source/SourceUploadButton";
 import type { Note } from "../types";
-import { NoteDrawingPanel } from "./NoteDrawingPanel";
 
 interface NoteEditorViewProps {
   noteKey: string | number;
@@ -89,8 +88,6 @@ export function NoteEditorView({
   const [equationAction, setEquationAction] = useState<"solve" | "complete" | null>(null);
   const [equationError, setEquationError] = useState<string | null>(null);
   const [persistedNoteId, setPersistedNoteId] = useState<number | null>(noteId);
-  const [openingDrawing, setOpeningDrawing] = useState(false);
-  const [showDrawing, setShowDrawing] = useState(false);
   const editorRef = useRef<any>(null);
   const speakStartDocPos = useRef(0);
   const speakDocText = useRef("");
@@ -288,7 +285,6 @@ export function NoteEditorView({
 
   useEffect(() => {
     setPersistedNoteId(noteId);
-    setShowDrawing(false);
   }, [noteId, noteKey]);
 
   async function ensureNotePersisted(): Promise<number> {
@@ -325,20 +321,6 @@ export function NoteEditorView({
       );
     } finally {
       setEquationAction(null);
-    }
-  }
-
-  async function handleOpenDrawing() {
-    if (openingDrawing) return;
-    setOpeningDrawing(true);
-    setEquationError(null);
-    try {
-      await ensureNotePersisted();
-      setShowDrawing(true);
-    } catch (caught) {
-      setEquationError(caught instanceof Error ? caught.message : "Could not prepare the drawing canvas");
-    } finally {
-      setOpeningDrawing(false);
     }
   }
 
@@ -454,7 +436,20 @@ export function NoteEditorView({
           timelineSupplement={timelineEnabled && effectiveNoteId ? <div className="border-t border-[var(--ml-bg-hover)] p-4"><TimelinePanel noteId={effectiveNoteId} onJump={jumpToText} /></div> : null}
           editor={(
             <div data-rc-mode={colorMode} style={{ filter: richContentFilter(colorMode), ...noteFontSizeVar }} className="flex h-full flex-col overflow-hidden bg-[var(--ml-bg-bar)] transition-[filter]">
-              <RichNoteEditor key={String(noteKey)} noteKey={noteKey} value={noteContentDraft} onChange={(html) => setNoteContentDraft(html)} editorRef={editorRef} onOpenHighlight={onOpenHighlight} />
+              <RichNoteEditor
+                key={String(noteKey)}
+                noteKey={noteKey}
+                value={noteContentDraft}
+                onChange={(html) => setNoteContentDraft(html)}
+                editorRef={editorRef}
+                onOpenHighlight={onOpenHighlight}
+                drawing={{
+                  noteId: effectiveNoteId,
+                  annotations: workspace.data.annotations,
+                  onAnnotationsChanged: () => void workspace.reload(),
+                  onEnsurePersisted: ensureNotePersisted,
+                }}
+              />
             </div>
           )}
         />
@@ -464,7 +459,20 @@ export function NoteEditorView({
           style={{ filter: richContentFilter(colorMode), ...noteFontSizeVar }}
           className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-[var(--ml-bg-panel)] bg-[var(--ml-bg-bar)] transition-[filter]"
         >
-          <RichNoteEditor key={String(noteKey)} noteKey={noteKey} value={noteContentDraft} onChange={(html) => setNoteContentDraft(html)} editorRef={editorRef} onOpenHighlight={onOpenHighlight} />
+          <RichNoteEditor
+            key={String(noteKey)}
+            noteKey={noteKey}
+            value={noteContentDraft}
+            onChange={(html) => setNoteContentDraft(html)}
+            editorRef={editorRef}
+            onOpenHighlight={onOpenHighlight}
+            drawing={{
+              noteId: effectiveNoteId,
+              annotations: workspace.data.annotations,
+              onAnnotationsChanged: () => void workspace.reload(),
+              onEnsurePersisted: ensureNotePersisted,
+            }}
+          />
         </div>
       ) : workspaceTab === "source" ? (
         <div data-rc-mode={colorMode} style={{ filter: richContentFilter(colorMode) }} className="min-h-0 flex-1 overflow-hidden rounded-xl border border-[var(--ml-bg-panel)] bg-[var(--ml-bg-bar)]">
@@ -666,15 +674,6 @@ export function NoteEditorView({
         </button>}
 
         <button
-          onClick={() => void handleOpenDrawing()}
-          disabled={openingDrawing}
-          title="Draw or handwrite on this note"
-          className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs text-gray-500 hover:text-cyan-400 hover:bg-cyan-400/10 border border-transparent hover:border-cyan-400/20 disabled:opacity-30 disabled:cursor-not-allowed transition shrink-0"
-        >
-          {openingDrawing ? "Opening…" : "Draw"}
-        </button>
-
-        <button
           onClick={() => void handleEquation("complete")}
           disabled={!noteContentDraft.trim() || equationAction != null}
           title="Ask AI to complete the unfinished equation and write the result into this note"
@@ -771,14 +770,6 @@ export function NoteEditorView({
             if (!noteTitleDraft.trim()) setNoteTitleDraft(title);
             setNoteContentDraft(content);
           }}
-        />
-      )}
-      {showDrawing && effectiveNoteId && (
-        <NoteDrawingPanel
-          noteId={effectiveNoteId}
-          annotations={workspace.data.annotations}
-          onAnnotationsChanged={() => void workspace.reload()}
-          onClose={() => setShowDrawing(false)}
         />
       )}
     </div>

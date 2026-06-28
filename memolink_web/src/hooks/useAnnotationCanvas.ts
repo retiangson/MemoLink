@@ -31,7 +31,9 @@ export function useAnnotationCanvas(
   const [error, setError] = useState<string | null>(null);
   const annotations = useMemo(
     () => localAnnotations.filter((annotation) =>
-      (annotation.source_file_id ?? null) === sourceFileId && (annotation.page_number ?? 1) === pageNumber
+      (annotation.source_file_id ?? null) === sourceFileId
+      && (sourceFileId !== null || annotation.book_id == null)
+      && (annotation.page_number ?? 1) === pageNumber
     ),
     [localAnnotations, pageNumber, sourceFileId],
   );

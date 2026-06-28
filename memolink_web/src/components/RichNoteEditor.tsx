@@ -17,6 +17,8 @@ import { Extension } from "@tiptap/core";
 import { Plugin, PluginKey } from "prosemirror-state";
 import { Decoration, DecorationSet } from "prosemirror-view";
 import { marked } from "marked";
+import type { SourceAnnotation } from "../api/smartSourceApi";
+import { InlineNoteDrawing, InlineNoteDrawingContext } from "./InlineNoteDrawing";
 import "../styles/editor.css";
 
 interface RichNoteEditorProps {
@@ -26,6 +28,12 @@ interface RichNoteEditorProps {
   disabled?: boolean;
   editorRef?: React.MutableRefObject<any>;
   onOpenHighlight?: (highlightId: number) => void;
+  drawing?: {
+    noteId: number | null;
+    annotations: SourceAnnotation[];
+    onAnnotationsChanged: () => void;
+    onEnsurePersisted: () => Promise<number>;
+  };
 }
 
 // Book highlights are appended to their "{Title} - Highlights" note as
@@ -99,7 +107,7 @@ function unwrapMarkdownFence(s: string) {
 }
 
 function hasRichHtmlStructure(s: string) {
-  return /<(h[1-6]|ul|ol|li|strong|em|blockquote|pre|code|table|thead|tbody|tr|th|td|img)\b/i.test(s);
+  return /data-note-drawing-page/i.test(s) || /<(h[1-6]|ul|ol|li|strong|em|blockquote|pre|code|table|thead|tbody|tr|th|td|img)\b/i.test(s);
 }
 
 async function toHtml(content: string): Promise<string> {
@@ -168,14 +176,18 @@ const ttsHighlightPlugin = new Plugin({
   },
 });
 
-export function RichNoteEditor({ value, onChange, noteKey, disabled, editorRef, onOpenHighlight }: RichNoteEditorProps) {
+export function RichNoteEditor({ value, onChange, noteKey, disabled, editorRef, onOpenHighlight, drawing }: RichNoteEditorProps) {
   const lastSent = useRef<string>("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [toolbarMode, setToolbarMode] = React.useState<"text" | "pen">("text");
+  const [addingDrawing, setAddingDrawing] = React.useState(false);
+  const [drawingError, setDrawingError] = React.useState<string | null>(null);
 
   const editor = useEditor({
     extensions: [
       StarterKit.configure({ heading: { levels: [1, 2, 3, 4] } }),
       BookHighlightBlock,
+      InlineNoteDrawing,
       Underline,
       Highlight.configure({ multicolor: false }),
       TextAlign.configure({ types: ["heading", "paragraph"] }),
@@ -288,6 +300,33 @@ export function RichNoteEditor({ value, onChange, noteKey, disabled, editorRef, 
     editor?.chain().focus().setLink({ href: url }).run();
   }
 
+  async function insertDrawingBlock() {
+    if (!editor || !drawing || disabled || addingDrawing) return;
+    setAddingDrawing(true);
+    setDrawingError(null);
+    try {
+      await drawing.onEnsurePersisted();
+      const usedPages = new Set<number>();
+      editor.state.doc.descendants((node) => {
+        if (node.type.name === "noteDrawing") usedPages.add(Math.max(1, Number(node.attrs.pageNumber) || 1));
+      });
+      const storedPages = drawing.annotations
+        .filter((annotation) => annotation.source_file_id == null && annotation.book_id == null && annotation.page_number != null)
+        .map((annotation) => Math.max(1, Number(annotation.page_number)))
+        .sort((left, right) => left - right);
+      const recoverablePage = storedPages.find((page) => !usedPages.has(page));
+      const pageNumber = recoverablePage ?? Math.max(0, ...usedPages, ...storedPages) + 1;
+      editor.chain().focus().insertContent([
+        { type: "noteDrawing", attrs: { pageNumber } },
+        { type: "paragraph" },
+      ]).run();
+    } catch (caught) {
+      setDrawingError(caught instanceof Error ? caught.message : "Could not create the drawing area");
+    } finally {
+      setAddingDrawing(false);
+    }
+  }
+
   if (!editor) return null;
 
   const e = editor;
@@ -297,6 +336,30 @@ export function RichNoteEditor({ value, onChange, noteKey, disabled, editorRef, 
       {/* ── Toolbar — single swipeable strip ────────────────────────── */}
       <div className="relative border-b border-[var(--ml-bg-panel)] shrink-0 bg-[#0d0d12]">
         <div className="flex items-center gap-0.5 px-1 py-1.5 overflow-x-auto scrollbar-none">
+          {drawing && (
+            <div className="sticky left-0 z-20 flex shrink-0 items-center rounded-lg border border-[#303043] bg-[#0d0d12] p-0.5 shadow-lg" aria-label="Note input mode">
+              <button
+                type="button"
+                onMouseDown={(event) => { event.preventDefault(); setToolbarMode("text"); }}
+                title="Type and format text"
+                aria-label="Text tools"
+                aria-pressed={toolbarMode === "text"}
+                className={`flex h-6 w-7 items-center justify-center rounded text-xs font-semibold ${toolbarMode === "text" ? "bg-indigo-600 text-white" : "text-gray-500 hover:text-gray-200"}`}
+              >T</button>
+              <button
+                type="button"
+                onMouseDown={(event) => { event.preventDefault(); setToolbarMode("pen"); }}
+                title="Pen and drawing tools"
+                aria-label="Pen tools"
+                aria-pressed={toolbarMode === "pen"}
+                className={`flex h-6 w-7 items-center justify-center rounded ${toolbarMode === "pen" ? "bg-indigo-600 text-white" : "text-gray-500 hover:text-gray-200"}`}
+              >
+                <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2"><path d="m4 20 4.5-1 10-10a2.1 2.1 0 0 0-3-3l-10 10L4 20Z"/><path d="m13.5 8 3 3"/></svg>
+              </button>
+            </div>
+          )}
+          {drawing && <Divider />}
+          {toolbarMode === "text" ? <div className="contents">
           {/* Most used -------------------------------------------------- */}
           <Btn title="Undo" onClick={() => e.chain().focus().undo().run()} disabled={!e.can().undo()}>
             <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" fill="currentColor" viewBox="0 0 16 16"><path d="M8 3a5 5 0 1 1-4.546 2.914.5.5 0 0 0-.908-.417A6 6 0 1 0 8 2z"/><path d="M8 4.466V.534a.25.25 0 0 0-.41-.192L5.23 2.308a.25.25 0 0 0 0 .384l2.36 1.966A.25.25 0 0 0 8 4.466"/></svg>
@@ -366,6 +429,23 @@ export function RichNoteEditor({ value, onChange, noteKey, disabled, editorRef, 
           <Btn title="Clear formatting" onClick={() => e.chain().focus().unsetAllMarks().clearNodes().run()}>
             <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" fill="currentColor" viewBox="0 0 16 16"><path d="M8.086 2.207a2 2 0 0 1 2.828 0l3.879 3.879a2 2 0 0 1 0 2.828l-5.5 5.5A2 2 0 0 1 7.879 15H5.12a2 2 0 0 1-1.414-.586l-2.5-2.5a2 2 0 0 1 0-2.828zm.66 11.34L3.453 8.254 1.914 9.793a1 1 0 0 0 0 1.414l2.5 2.5a1 1 0 0 0 .707.293H7.88a1 1 0 0 0 .707-.293z"/></svg>
           </Btn>
+          </div> : (
+            <>
+              <button
+                type="button"
+                onMouseDown={(event) => { event.preventDefault(); void insertDrawingBlock(); }}
+                disabled={addingDrawing}
+                className="flex shrink-0 items-center gap-1.5 rounded-lg bg-indigo-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-indigo-500 disabled:opacity-50"
+                title="Insert an editable drawing area at the cursor"
+              >
+                <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2"><path d="m4 20 4.5-1 10-10a2.1 2.1 0 0 0-3-3l-10 10L4 20Z"/><path d="m13.5 8 3 3"/></svg>
+                {addingDrawing ? "Preparing…" : "Insert drawing area"}
+              </button>
+              <span className={`whitespace-nowrap px-2 text-[11px] ${drawingError ? "text-amber-400" : "text-gray-500"}`} title={drawingError ?? undefined}>
+                {drawingError ?? "Pen, highlighter, eraser, color, and size appear in each drawing area."}
+              </span>
+            </>
+          )}
         </div>
         {/* Fade hint — shows more content is available by scrolling */}
         <div className="pointer-events-none absolute right-0 top-0 h-full w-8 bg-gradient-to-l from-[#0d0d12] to-transparent" />
@@ -387,8 +467,20 @@ export function RichNoteEditor({ value, onChange, noteKey, disabled, editorRef, 
       </div>
 
       {/* ── Editor area ─────────────────────────────────────────────── */}
-      <div className="flex-1 overflow-y-auto py-3 cursor-text" onClick={() => e.commands.focus()}>
-        <EditorContent editor={editor} />
+      <div
+        className="flex-1 overflow-y-auto py-3 cursor-text"
+        onClick={(event) => {
+          if ((event.target as HTMLElement).closest("[data-note-drawing-page]")) return;
+          e.commands.focus();
+        }}
+      >
+        <InlineNoteDrawingContext.Provider value={{
+          noteId: drawing?.noteId ?? null,
+          annotations: drawing?.annotations ?? [],
+          onAnnotationsChanged: drawing?.onAnnotationsChanged ?? (() => undefined),
+        }}>
+          <EditorContent editor={editor} />
+        </InlineNoteDrawingContext.Provider>
       </div>
     </div>
   );
