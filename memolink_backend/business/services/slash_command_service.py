@@ -161,8 +161,18 @@ class SlashCommandService:
         return parsed
 
     @staticmethod
-    def _equation_user_content(prompt: str, drawing_image_data_url: str | None):
-        if not drawing_image_data_url:
+    def _supports_equation_image(model: str) -> bool:
+        model = _canonical_model(model or "")
+        return (
+            model.startswith("gpt-4o")
+            or model.startswith("gpt-4.1")
+            or model.startswith("gpt-5")
+            or model in {"gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.5-pro"}
+        )
+
+    @classmethod
+    def _equation_user_content(cls, prompt: str, drawing_image_data_url: str | None, model: str | None = None):
+        if not drawing_image_data_url or not model or not cls._supports_equation_image(model):
             return prompt
         return [
             {"type": "text", "text": prompt + "\nThe attached image is a temporary rendering of handwritten ink from this note. Use it only to identify the mathematical expression."},
@@ -188,7 +198,7 @@ class SlashCommandService:
             model or settings.openai_chat_model,
             [
                 {"role": "system", "content": "Solve only the mathematical content supplied by the application and return strict JSON."},
-                {"role": "user", "content": self._equation_user_content(prompt, drawing_image_data_url)},
+                {"role": "user", "content": self._equation_user_content(prompt, drawing_image_data_url, model or settings.openai_chat_model)},
             ],
             user_id,
         ).strip()
@@ -244,7 +254,7 @@ class SlashCommandService:
             model or settings.openai_chat_model,
             [
                 {"role": "system", "content": "Complete only the mathematical content supplied by the application and return strict JSON."},
-                {"role": "user", "content": self._equation_user_content(prompt, drawing_image_data_url)},
+                {"role": "user", "content": self._equation_user_content(prompt, drawing_image_data_url, model or settings.openai_chat_model)},
             ],
             user_id,
         ).strip()

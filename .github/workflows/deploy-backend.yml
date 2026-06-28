@@ -178,7 +178,8 @@ jobs:
         shell: bash
         run: |
           FUNCTION_NAME="${{ secrets.LAMBDA_FUNCTION_NAME }}"
-          ROLE_ARN=$(aws lambda get-function-configuration --function-name "$FUNCTION_NAME" --query Role --output text)
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          FUNCTION_ARN=$(aws lambda get-function --function-name "$FUNCTION_NAME" --query Configuration.FunctionArn --output text)
           aws lambda remove-permission \
             --function-name "$FUNCTION_NAME" \
             --statement-id memolink-self-invoke 2>/dev/null || true
@@ -186,7 +187,8 @@ jobs:
             --function-name "$FUNCTION_NAME" \
             --statement-id memolink-self-invoke \
             --action lambda:InvokeFunction \
-            --principal "$ROLE_ARN"
+            --principal "$ACCOUNT_ID" \
+            --source-arn "$FUNCTION_ARN"
 
       - name: Print deployed image
         run: echo "Deployed ${{ steps.build.outputs.image_uri }} to Lambda"

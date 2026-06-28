@@ -438,15 +438,12 @@ export async function listBookHighlights(bookId: number): Promise<BookHighlight[
 
 export async function saveAsNoteSource(bookId: number): Promise<BookNoteSourceStatus> {
   const status: BookNoteSourceStatus = (await api.post(`/books/${bookId}/save-as-note-source`)).data;
-  watchBookNoteSourceCompletion(bookId, status);
+  startWatchingBookNoteSourceCompletion(bookId, status);
   return status;
 }
 
 export async function getNoteSourceStatus(bookId: number): Promise<BookNoteSourceStatus | null> {
-  const status: BookNoteSourceStatus | null = (await api.get(`/books/${bookId}/note-source-status`)).data;
-  if (status && (status.status === "pending" || status.status === "processing")) {
-    watchBookNoteSourceCompletion(bookId, status);
-  }
+  const status = await fetchNoteSourceStatus(bookId);
   return status;
 }
 
@@ -460,7 +457,11 @@ function waitForNoteSourcePoll(delayMs: number): Promise<void> {
   return new Promise((resolve) => window.setTimeout(resolve, delayMs));
 }
 
-function watchBookNoteSourceCompletion(bookId: number, initialStatus: BookNoteSourceStatus): void {
+async function fetchNoteSourceStatus(bookId: number): Promise<BookNoteSourceStatus | null> {
+  return (await api.get(`/books/${bookId}/note-source-status`)).data;
+}
+
+function startWatchingBookNoteSourceCompletion(bookId: number, initialStatus: BookNoteSourceStatus): void {
   if (typeof window === "undefined") return;
   if (initialStatus.status === "ready") {
     notifyNoteChanged();
@@ -472,7 +473,7 @@ function watchBookNoteSourceCompletion(bookId: number, initialStatus: BookNoteSo
     for (let attempt = 0; attempt < NOTE_SOURCE_MAX_POLLS; attempt += 1) {
       await waitForNoteSourcePoll(attempt < NOTE_SOURCE_FAST_POLLS ? NOTE_SOURCE_FAST_POLL_MS : NOTE_SOURCE_SLOW_POLL_MS);
       try {
-        const status = await getNoteSourceStatus(bookId);
+        const status = await fetchNoteSourceStatus(bookId);
         if (status?.status === "ready") {
           notifyNoteChanged();
           return;

@@ -196,6 +196,28 @@ def test_solve_equation_accepts_temporary_handwriting_image_for_empty_note(monke
     assert captured["content"][1]["image_url"]["url"] == image
 
 
+def test_solve_equation_rejects_empty_note_without_image():
+    repo = FakeNoteRepository()
+    note = repo.create_note(7, "Handwritten", "", "manual")
+    service = _build_service(repo)
+
+    try:
+        service.solve_equation(7, note.id, "gpt-5")
+    except ValueError as exc:
+        assert str(exc) == "Add an equation to the note before solving it"
+    else:
+        raise AssertionError("Expected empty note without image to be rejected")
+
+
+def test_equation_prompt_omits_image_for_text_only_model():
+    prompt = "Solve x + 2 = 5"
+    image = "data:image/png;base64,AAAA"
+
+    content = SlashCommandService._equation_user_content(prompt, image, "gpt-3.5-turbo")
+
+    assert content == prompt
+
+
 def test_equation_request_rejects_non_image_data_url():
     try:
         EquationSolveRequestDTO(note_id=1, drawing_image_data_url="data:text/plain;base64,AAAA")
