@@ -6,6 +6,18 @@ import { describeRecurrence } from "../utils/recurrence";
 
 const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 const WEEKDAY_HEADERS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const EVENTS_PER_DAY_STORAGE_KEY = "memolink-calendar-events-per-day";
+const DEFAULT_EVENTS_PER_DAY = 3;
+
+function readEventsPerDay(): number {
+  if (typeof window === "undefined") return DEFAULT_EVENTS_PER_DAY;
+  try {
+    const value = Number(window.localStorage.getItem(EVENTS_PER_DAY_STORAGE_KEY));
+    return Number.isInteger(value) && value >= 1 && value <= 12 ? value : DEFAULT_EVENTS_PER_DAY;
+  } catch {
+    return DEFAULT_EVENTS_PER_DAY;
+  }
+}
 
 function toISO(d: Date): string {
   return [d.getFullYear(), String(d.getMonth() + 1).padStart(2, "0"), String(d.getDate()).padStart(2, "0")].join("-");
@@ -27,6 +39,13 @@ export function CalendarTabContent({ calendar }: CalendarTabContentProps) {
   const [view, setView] = useState<"month" | "agenda">("month");
   const [modalState, setModalState] = useState<{ event: CalendarOccurrence | null; defaultDate: string | null } | null>(null);
   const [expandedDate, setExpandedDate] = useState<string | null>(null);
+  const [eventsPerDay, setEventsPerDay] = useState(readEventsPerDay);
+
+  function changeEventsPerDay(value: number) {
+    const safeValue = Math.min(12, Math.max(1, Math.trunc(value)));
+    setEventsPerDay(safeValue);
+    try { window.localStorage.setItem(EVENTS_PER_DAY_STORAGE_KEY, String(safeValue)); } catch { /* local preferences are best effort */ }
+  }
 
   const monthAnchor = range.start;
   const today = useMemo(() => new Date(), []);
@@ -139,6 +158,19 @@ export function CalendarTabContent({ calendar }: CalendarTabContentProps) {
         </div>
 
         <div className="flex items-center gap-2">
+          {view === "month" && (
+            <label className="flex items-center gap-1.5 text-[11px] text-gray-500">
+              <span className="hidden sm:inline">Events/day</span>
+              <select
+                aria-label="Events displayed per calendar day"
+                value={eventsPerDay}
+                onChange={(event) => changeEventsPerDay(Number(event.target.value))}
+                className="rounded-md border border-[var(--ml-bg-hover)] bg-[var(--ml-bg-base)] px-1.5 py-1 text-[11px] text-gray-300 focus:border-indigo-500 focus:outline-none"
+              >
+                {Array.from({ length: 12 }, (_, index) => index + 1).map((count) => <option key={count} value={count}>{count}</option>)}
+              </select>
+            </label>
+          )}
           <div className="flex items-center rounded-lg border border-[var(--ml-bg-hover)] overflow-hidden">
             <button
               onClick={() => setView("month")}
@@ -172,19 +204,22 @@ export function CalendarTabContent({ calendar }: CalendarTabContentProps) {
       )}
 
       {view === "month" ? (
-        <div className="flex-1 flex flex-col p-3 min-h-0">
+        <div className="flex-1 flex flex-col overflow-auto p-3 min-h-0">
           <div className="grid grid-cols-7 shrink-0">
             {WEEKDAY_HEADERS.map((d) => (
               <div key={d} className="text-center text-[10px] font-semibold text-gray-600 uppercase tracking-wider py-1.5">{d}</div>
             ))}
           </div>
-          <div className="grid grid-cols-7 grid-rows-6 flex-1 gap-1 min-h-0">
+          <div
+            className="grid grid-cols-7 gap-1"
+            style={{ gridAutoRows: `${Math.max(90, 48 + eventsPerDay * 22)}px` }}
+          >
             {gridDays.map((day) => {
               const iso = toISO(day);
               const inMonth = day.getMonth() === monthAnchor.getMonth();
               const isToday = iso === todayISO;
               const dayEvents = eventsByDate.get(iso) ?? [];
-              const visible = dayEvents.slice(0, 3);
+              const visible = dayEvents.slice(0, eventsPerDay);
               const overflow = dayEvents.length - visible.length;
               return (
                 <div

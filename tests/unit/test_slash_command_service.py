@@ -142,6 +142,38 @@ def test_solve_equation_rejects_invalid_ai_response(monkeypatch):
         raise AssertionError("Expected malformed AI output to be rejected")
 
 
+def test_complete_equation_appends_escaped_completion(monkeypatch):
+    repo = FakeNoteRepository()
+    note = repo.create_note(7, "Sequence", "<p>1 + 2 + 3 + ...</p>", "manual")
+    service = _build_service(repo)
+    monkeypatch.setattr(
+        service,
+        "_ai",
+        lambda *args, **kwargs: '{"original":"1 + 2 + 3 + ...","completed":"1 + 2 + 3 + ... + n = n(n+1)/2","steps":["Pair first and last terms","There are n/2 pairs"],"explanation":"Works for positive integer <script>n</script>."}',
+    )
+
+    updated = service.complete_equation(7, note.id, "gpt-5")
+
+    assert "Equation Completion" in updated.content
+    assert "n(n+1)/2" in updated.content
+    assert "&lt;script&gt;n&lt;/script&gt;" in updated.content
+    assert "<script>" not in updated.content
+
+
+def test_complete_equation_rejects_ambiguous_ai_response(monkeypatch):
+    repo = FakeNoteRepository()
+    note = repo.create_note(7, "Incomplete", "x +", "manual")
+    service = _build_service(repo)
+    monkeypatch.setattr(service, "_ai", lambda *args, **kwargs: '{"original":"x +","completed":"","steps":[]}')
+
+    try:
+        service.complete_equation(7, note.id)
+    except RuntimeError as exc:
+        assert "incomplete" in str(exc)
+    else:
+        raise AssertionError("Expected incomplete AI output to be rejected")
+
+
 def test_parse_discussion_bare_question_keeps_question_text():
     parsed = _parse("/Discussion how should I approach AI integration?")
     assert parsed is not None

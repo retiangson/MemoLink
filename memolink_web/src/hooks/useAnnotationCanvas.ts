@@ -16,7 +16,7 @@ interface DraftStroke {
 
 export function useAnnotationCanvas(
   noteId: number,
-  sourceFileId: number,
+  sourceFileId: number | null,
   pageNumber: number,
   initialAnnotations: SourceAnnotation[],
   onPersisted: () => void,
@@ -31,7 +31,7 @@ export function useAnnotationCanvas(
   const [error, setError] = useState<string | null>(null);
   const annotations = useMemo(
     () => localAnnotations.filter((annotation) =>
-      annotation.source_file_id === sourceFileId && (annotation.page_number ?? 1) === pageNumber
+      (annotation.source_file_id ?? null) === sourceFileId && (annotation.page_number ?? 1) === pageNumber
     ),
     [localAnnotations, pageNumber, sourceFileId],
   );

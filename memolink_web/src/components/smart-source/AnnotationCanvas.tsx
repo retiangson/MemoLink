@@ -5,7 +5,7 @@ import { AnnotationToolbar } from "./AnnotationToolbar";
 
 interface Props {
   noteId: number;
-  sourceFileId: number;
+  sourceFileId: number | null;
   pageNumber?: number;
   annotations: SourceAnnotation[];
   onPersisted: () => void;
