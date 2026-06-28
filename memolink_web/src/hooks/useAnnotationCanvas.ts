@@ -22,8 +22,7 @@ interface PersistenceJob {
 }
 
 const SAVE_DEBOUNCE_MS = 220;
-const ERASER_RADIUS = 0.018;
-let nextTemporaryId = -1;
+export const ERASER_RADIUS = 0.018;
 
 const PEN_DEFAULTS: Record<PenType, { size: number; opacity: number }> = {
   pen: { size: 3, opacity: 1 },
@@ -36,7 +35,16 @@ const PEN_DEFAULTS: Record<PenType, { size: number; opacity: number }> = {
 };
 
 function sameStroke(left: SourceAnnotation, right: SourceAnnotation): boolean {
-  return JSON.stringify(left.strokes_json) === JSON.stringify(right.strokes_json);
+  const a = left.strokes_json;
+  const b = right.strokes_json;
+  if (a === b) return true;
+  if (!a || !b || a.version !== b.version || a.pointerType !== b.pointerType
+    || a.penType !== b.penType || a.opacity !== b.opacity || a.points.length !== b.points.length) return false;
+  return a.points.every((point, index) => {
+    const other = b.points[index];
+    return point.x === other.x && point.y === other.y && point.time === other.time
+      && point.pressure === other.pressure && point.tiltX === other.tiltX && point.tiltY === other.tiltY;
+  });
 }
 
 function splitStrokeAtPoint(points: StrokePoint[], point: StrokePoint, radius = ERASER_RADIUS): StrokePoint[][] {
@@ -82,9 +90,14 @@ export function useAnnotationCanvas(
   const queueTimerRef = useRef<number | null>(null);
   const processingRef = useRef(false);
   const mountedRef = useRef(true);
+  const nextTemporaryIdRef = useRef(-1);
   const deletedIdsRef = useRef(new Set<number>());
   const scopeRef = useRef(`${noteId}:${sourceFileId ?? "note"}:${pageNumber ?? "all"}`);
   const eraseBeforeRef = useRef<SourceAnnotation[] | null>(null);
+
+  function allocateTemporaryId(): number {
+    return nextTemporaryIdRef.current--;
+  }
 
   const replaceAnnotations = useCallback((update: (current: SourceAnnotation[]) => SourceAnnotation[]) => {
     setLocalAnnotations((current) => {
@@ -242,7 +255,7 @@ export function useAnnotationCanvas(
     if (!completed || completed.points.length < 2) return;
     const savedPageNumber = pageNumber ?? 1;
     const temporary: SourceAnnotation = {
-      id: nextTemporaryId--,
+      id: allocateTemporaryId(),
       note_id: noteId,
       source_file_id: sourceFileId,
       book_id: null,
@@ -278,7 +291,7 @@ export function useAnnotationCanvas(
       if (eraserMode === "stroke") return [];
       return segments.map((segment, index) => ({
         ...annotation,
-        id: index === 0 ? annotation.id : nextTemporaryId--,
+        id: index === 0 ? annotation.id : allocateTemporaryId(),
         strokes_json: { ...annotation.strokes_json!, points: segment },
         updated_at: new Date().toISOString(),
       }));
@@ -324,7 +337,7 @@ export function useAnnotationCanvas(
   function addTextAnnotation(point: StrokePoint, annotationType: "text" | "comment", text: string) {
     if (!text.trim()) return;
     const temporary: SourceAnnotation = {
-      id: nextTemporaryId--, note_id: noteId, source_file_id: sourceFileId, book_id: null,
+      id: allocateTemporaryId(), note_id: noteId, source_file_id: sourceFileId, book_id: null,
       page_number: pageNumber ?? 1,
       location_anchor: { coordinateSpace: "normalized", page: pageNumber ?? 1, x: point.x, y: point.y },
       annotation_type: annotationType, strokes_json: null, highlight_data: null, comment_text: text.trim(),
@@ -349,7 +362,7 @@ export function useAnnotationCanvas(
   function redo() {
     const latest = redoStack[redoStack.length - 1];
     if (!latest) return;
-    const recreated = { ...latest, id: nextTemporaryId--, created_at: new Date().toISOString(), updated_at: null };
+    const recreated = { ...latest, id: allocateTemporaryId(), created_at: new Date().toISOString(), updated_at: null };
     replaceAnnotations((current) => [...current, recreated]);
     setRedoStack((current) => current.slice(0, -1));
     queueCreate(recreated);

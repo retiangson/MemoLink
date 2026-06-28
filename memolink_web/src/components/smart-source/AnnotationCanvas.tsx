@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import type { SourceAnnotation, StrokePoint } from "../../api/smartSourceApi";
-import { useAnnotationCanvas } from "../../hooks/useAnnotationCanvas";
+import { ERASER_RADIUS, useAnnotationCanvas } from "../../hooks/useAnnotationCanvas";
 import { AnnotationToolbar } from "./AnnotationToolbar";
 
 interface Props {
@@ -105,6 +105,7 @@ export function AnnotationSurface({
 }) {
   const surfaceRef = useRef<SVGSVGElement>(null);
   const draftPathRef = useRef<SVGPathElement>(null);
+  const eraserPreviewRef = useRef<SVGEllipseElement>(null);
   const draftFrameRef = useRef<number | null>(null);
   const activePenPointersRef = useRef(new Set<number>());
   const activeTouchPointersRef = useRef(new Set<number>());
@@ -153,6 +154,15 @@ export function AnnotationSurface({
     };
   }
 
+  function updateEraserPreview(clientX: number, clientY: number) {
+    const preview = eraserPreviewRef.current;
+    if (!preview || canvas.tool !== "eraser") return;
+    const point = pointFromClient(clientX, clientY, 0, 0, 0, 0);
+    preview.setAttribute("cx", String(point.x * 1000));
+    preview.setAttribute("cy", String(point.y * viewHeight));
+    preview.style.visibility = "visible";
+  }
+
   function rejectsAsPalm(event: React.PointerEvent<SVGSVGElement>): boolean {
     if (event.pointerType !== "touch") return false;
     return stylusDetectedRef.current || activePenPointersRef.current.size > 0 || performance.now() - lastPenInputAtRef.current < 900;
@@ -172,8 +182,11 @@ export function AnnotationSurface({
         viewBox={`0 0 1000 ${viewHeight}`}
         preserveAspectRatio="none"
         className={`absolute inset-0 h-full w-full ${screenLocked ? "touch-none" : "touch-pan-y"} ${!active || canvas.tool === "view" ? "pointer-events-none" : ""}`}
+        onPointerEnter={(event) => updateEraserPreview(event.clientX, event.clientY)}
+        onPointerLeave={() => { if (eraserPreviewRef.current) eraserPreviewRef.current.style.visibility = "hidden"; }}
         onPointerDown={(event) => {
           if (rejectsAsPalm(event) || (!screenLocked && event.pointerType === "touch")) return;
+          updateEraserPreview(event.clientX, event.clientY);
           if (event.pointerType === "pen") {
             stylusDetectedRef.current = true;
             for (const pointerId of activeTouchPointersRef.current) {
@@ -203,6 +216,7 @@ export function AnnotationSurface({
           renderDraftOnNextFrame();
         }}
         onPointerMove={(event) => {
+          updateEraserPreview(event.clientX, event.clientY);
           if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
           if (rejectsAsPalm(event)) return;
           if (event.pointerType === "pen") lastPenInputAtRef.current = performance.now();
@@ -243,7 +257,12 @@ export function AnnotationSurface({
             const anchor = annotation.location_anchor as { x?: number; y?: number } | null;
             if (!annotation.comment_text || anchor?.x == null || anchor?.y == null) return null;
             return (
-              <g key={annotation.id} transform={`translate(${anchor.x * 1000} ${anchor.y * annotationHeight})`}>
+              <g key={annotation.id} transform={`translate(${anchor.x * 1000} ${anchor.y * annotationHeight})`} onPointerDown={(event) => {
+                if (canvas.tool !== "eraser") return;
+                event.preventDefault();
+                event.stopPropagation();
+                canvas.eraseAnnotation(annotation.id);
+              }}>
                 <rect width="220" height="80" rx="8" fill={annotation.annotation_type === "comment" ? "#facc15" : "#111827"} fillOpacity="0.9" />
                 <text x="10" y="25" fill={annotation.annotation_type === "comment" ? "#111827" : (annotation.color || "#ffffff")} fontSize="18">{annotation.comment_text.slice(0, 24)}</text>
               </g>
@@ -258,6 +277,20 @@ export function AnnotationSurface({
           const draftAppearance = strokeAppearance({ annotation_type: canvas.tool === "highlighter" ? "highlighter" : "pen", tool_type: canvas.penType, pen_size: canvas.penSize, strokes_json: { version: 1, pointerType: canvas.draft.pointerType, penType: canvas.penType, opacity: canvas.opacity, points: canvas.draft.points } });
           return <path ref={draftPathRef} d={pointsPath(canvas.draft.points, viewHeight)} fill="none" stroke={canvas.color} strokeWidth={draftAppearance.width} strokeOpacity={draftAppearance.opacity} strokeDasharray={draftAppearance.dash} strokeLinecap="round" strokeLinejoin="round" />;
         })()}
+        {canvas.tool === "eraser" && (
+          <ellipse
+            ref={eraserPreviewRef}
+            rx={ERASER_RADIUS * 1000}
+            ry={ERASER_RADIUS * viewHeight}
+            fill="rgb(248 113 113)"
+            fillOpacity="0.14"
+            stroke="rgb(248 113 113)"
+            strokeWidth="1.5"
+            vectorEffect="non-scaling-stroke"
+            pointerEvents="none"
+            style={{ visibility: "hidden" }}
+          />
+        )}
       </svg>
     </>
   );
