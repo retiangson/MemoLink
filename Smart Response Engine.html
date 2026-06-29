@@ -237,6 +237,14 @@
 <div class="container">
 
   <section>
+    <div class="section-label">Smart Source Integration</div>
+    <h2>How Source Notes Enter AI Workflows</h2>
+    <p>RAG consumes extracted source text, editor content, confirmed transcripts, saved highlights, annotation comments, and equation results—not raw OneDrive files, local recordings, or drawing binaries. Book Save as Note Source jobs extract supported PDF, EPUB, MOBI, PPTX, TXT, SRT, and VTT content asynchronously and generate searchable note chunks with source/page context.</p>
+    <p>Solve Equation and Complete Equation flush the autosaved note first. A handwritten equation may be supplied as a temporary request-scoped image only to a vision-capable model; text-only models receive text context instead. The engine validates structured output, escapes it, formats the steps for readability, and appends the durable result to the note.</p>
+    <div class="highlight-box"><p>Privacy boundary: source and audio binaries are never embedded or retained by the note database. OneDrive holds originals, each device owns its local cache, and MemoLink synchronizes metadata, extracted text, note content, editable annotation JSON, and timeline events.</p></div>
+  </section>
+
+  <section>
     <div class="section-label">Purpose</div>
     <h2>Why This Layer Exists</h2>
     <p>

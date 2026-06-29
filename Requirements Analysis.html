@@ -145,6 +145,8 @@
     <p>Users can attach original files, reuse OneDrive-backed books as note sources, cache originals per device, edit extracted content, and add editable pointer/stylus annotations. Original uploaded files are stored in OneDrive; external books are uploaded before linking; existing OneDrive books are never re-uploaded. Local audio remains on the user's device unless explicitly submitted temporarily for transcription.</p>
     <p>All source metadata, annotations, recording metadata, and timeline events are user/workspace scoped. Raw binaries, base64 content, OAuth tokens, and local absolute paths must not enter the database or logs.</p>
     <p>Source workspace tabs appear only when a note has a real linked source, while debounced and lifecycle autosave applies to every note. Note-linked recording reuses the existing Record Lecture workflow, and supported admin book uploads are stored in OneDrive before appearing in Browse Books.</p>
+    <p>Ink input must render immediately without waiting for persistence. Completed strokes, partial erases, and whole-stroke deletes update optimistically, use per-canvas temporary identifiers, save through a debounced retryable queue, and must not be replaced by stale workspace responses. Pen tools provide type, colour, opacity, thickness, and available pointer pressure; eraser size controls both its preview and hit area. Palm rejection and screen locking support touch, stylus, and Apple Pencil workflows.</p>
+    <p>Users can select 10–100 Books Library results per page and 1–12 simultaneous calendar months. Equation actions append readable, step-by-step results to the same autosaved note and persist those results as normal note content.</p>
   </section>
 </div>
 

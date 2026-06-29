@@ -82,9 +82,9 @@ export function AnnotationToolbar(props: Props) {
         <span className="sr-only">Ink color</span>
         <input type="color" value={props.color} onChange={(event) => props.onColorChange(event.target.value)} aria-label="Ink color" className="absolute inset-0 cursor-pointer opacity-0" />
       </label>
-      <label className="flex items-center gap-1.5 px-1 text-[11px] text-gray-500" title="Pen size">
+      <label className="flex items-center gap-1.5 px-1 text-[11px] text-gray-500" title={props.tool === "eraser" ? "Eraser size" : "Pen size"}>
         <span className="h-2 w-2 rounded-full bg-current" />
-        <input type="range" min="1" max="20" value={props.penSize} onChange={(event) => props.onPenSizeChange(Number(event.target.value))} className="w-20 accent-indigo-500" aria-label="Pen size" />
+        <input type="range" min="1" max="20" value={props.penSize} onChange={(event) => props.onPenSizeChange(Number(event.target.value))} className="w-20 accent-indigo-500" aria-label={props.tool === "eraser" ? "Eraser size" : "Pen size"} />
       </label>
       {penActive && <label className="flex items-center gap-1 px-1 text-[10px] text-gray-500" title="Ink opacity"><span>Opacity</span><input type="range" min="10" max="100" value={Math.round(props.opacity * 100)} onChange={(event) => props.onOpacityChange(Number(event.target.value) / 100)} className="w-14 accent-indigo-500" aria-label="Ink opacity" /></label>}
       <button type="button" onClick={props.onUndo} disabled={!props.canUndo} title="Undo ink" aria-label="Undo ink" className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 hover:bg-[var(--ml-bg-hover)] disabled:opacity-30"><span aria-hidden="true">↶</span></button>

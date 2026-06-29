@@ -16,6 +16,7 @@ const NAV: Section[] = [
   { id: "workspaces", label: "Workspaces",        icon: <path d="M1 3.5A1.5 1.5 0 0 1 2.5 2h2.764c.958 0 1.76.56 2.311 1.184C7.985 3.648 8.48 4 9 4h4.5A1.5 1.5 0 0 1 15 5.5v7a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 1 12.5z"/> },
   { id: "chat",       label: "AI Chat",           icon: <path d="M14 1a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H4.414A2 2 0 0 0 3 11.586l-2 2V2a1 1 0 0 1 1-1zM2 0a2 2 0 0 0-2 2v12.793a.5.5 0 0 0 .854.353l2.853-2.853A1 1 0 0 1 4.414 12H14a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2z"/> },
   { id: "notes",      label: "Notes",             icon: <path d="M2.5 1A1.5 1.5 0 0 0 1 2.5v11A1.5 1.5 0 0 0 2.5 15h6.086a1.5 1.5 0 0 0 1.06-.44l4.915-4.914A1.5 1.5 0 0 0 15 8.586V2.5A1.5 1.5 0 0 0 13.5 1zm6 8.5a1 1 0 0 1 1-1h4.396l-5.396 5.397z"/> },
+  { id: "sources",    label: "Source & Drawing",  icon: <><path d="M2 2h8l4 4v8H2z"/><path d="M10 2v4h4M4 12l6-6 2 2-6 6H4z"/></> },
   { id: "import",     label: "File & Video",      icon: <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5M7.646 1.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 2.707V11.5a.5.5 0 0 1-1 0V2.707L5.354 4.854a.5.5 0 1 1-.708-.708z"/> },
   { id: "books",      label: "Books Library",     icon: <path d="M1 2.828c.885-.37 2.154-.769 3.388-.893 1.33-.134 2.458.063 3.112.752v9.746c-.935-.53-2.12-.603-3.213-.493-1.18.12-2.37.461-3.287.811zm7.5-.141c.654-.689 1.782-.886 3.112-.752 1.234.124 2.503.523 3.388.893v9.923c-.918-.35-2.107-.692-3.287-.81-1.094-.111-2.278-.039-3.213.492zM8 1.783C7.015.936 5.587.81 4.287.94c-1.514.153-3.042.672-3.994 1.105A.5.5 0 0 0 0 2.5v11a.5.5 0 0 0 .707.455c.882-.4 2.303-.881 3.68-1.02 1.409-.142 2.59.087 3.223.877a.5.5 0 0 0 .78 0c.633-.79 1.814-1.019 3.223-.877 1.377.139 2.798.62 3.68 1.02A.5.5 0 0 0 16 13.5v-11a.5.5 0 0 0-.293-.455c-.952-.433-2.48-.952-3.994-1.105C10.413.809 8.985.936 8 1.783"/> },
   { id: "aitools",    label: "AI Tools",          icon: <><path d="M6 12.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 0 1h-3a.5.5 0 0 1-.5-.5M3 8.062C3 6.76 4.235 5.765 5.53 5.886a26.6 26.6 0 0 0 4.94 0C11.765 5.765 13 6.76 13 8.062v1.157a.93.93 0 0 1-.765.935c-.845.147-2.34.346-4.235.346s-3.39-.2-4.235-.346A.93.93 0 0 1 3 9.219zm4.542-.827a.25.25 0 0 0-.217.068l-.92.9a25 25 0 0 1-1.871-.183.25.25 0 0 0-.068.495c.55.076 1.232.149 2.02.193a.25.25 0 0 0 .189-.071l.754-.736.847 1.71a.25.25 0 0 0 .404.062l.932-.97a25 25 0 0 0 1.922-.188.25.25 0 0 0-.068-.495c-.538.074-1.207.145-1.98.189a.25.25 0 0 0-.166.076l-.754.785-.842-1.7a.25.25 0 0 0-.182-.134"/><path d="M8.5 1.866a1 1 0 1 0-1 0V3h-2A4.5 4.5 0 0 0 1 7.5V8a1 1 0 0 0-1 1v2a1 1 0 0 0 1 1v1a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-1a1 1 0 0 0 1-1V9a1 1 0 0 0-1-1v-.5A4.5 4.5 0 0 0 10.5 3h-2zM14 7.5V13a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V7.5A3.5 3.5 0 0 1 5.5 4h5A3.5 3.5 0 0 1 14 7.5"/></> },
@@ -45,7 +46,8 @@ const CONTENT: Record<string, React.ReactNode> = {
         {[
           { label: "Workspaces", desc: "Separate contexts for different subjects or projects" },
           { label: "AI Chat", desc: "Grounded answers routed through MemoLink's Smart Response Engine" },
-          { label: "Smart Notes", desc: "Rich editor with voice, images, and formatting" },
+          { label: "Smart Notes", desc: "Autosaved rich text mixed with handwriting, drawing, equations, and local recording" },
+          { label: "Smart Sources", desc: "OneDrive originals, per-device cache, editable annotations, source metadata, and history" },
           { label: "File & Video", desc: "Import PDFs, DOCX, PPTX, YouTube, and recordings" },
           { label: "Books Library", desc: "Read PDF, EPUB, PPTX, audio, TXT, captions, comics, and MOBI books with highlights, bookmarks, and TTS" },
           { label: "AI Tools", desc: "Web search, smart actions, research, image generation, and long academic drafting" },
@@ -123,6 +125,37 @@ const CONTENT: Record<string, React.ReactNode> = {
           <li key={i} className="flex gap-2"><span className="text-indigo-500 shrink-0 mt-0.5">•</span><span>{item}</span></li>
         ))}
       </ul>
+    </div>
+  ),
+
+  sources: (
+    <div className="space-y-4 text-sm text-gray-400 leading-relaxed">
+      <p>Smart Source Workspace connects an editable note to its preserved original without changing the original file. Source-linked notes use <span className="text-gray-200">Original, Editor, Source File, and Timeline</span> tabs.</p>
+      <div>
+        <p className="text-xs font-semibold text-indigo-300 mb-2 uppercase tracking-wider">Drawing and handwriting</p>
+        <ul className="space-y-2">
+          {[
+            "Switch between text and pen mode from the note toolbar. The entire note surface remains available for ink, signatures, underlining, and mixed text/handwriting.",
+            "Choose Ballpoint, Pencil, Marker, Highlighter, Brush, Calligraphy, or Dashed pen from the pen icon dropdown. Color, opacity, thickness, pressure, and stylus tilt are retained where available.",
+            "The eraser icon offers Partial Eraser and Stroke Eraser. The size slider changes both the visible eraser footprint and the actual affected area.",
+            "Screen Lock prevents page movement while drawing. Palm rejection prioritises an active stylus/Apple Pencil over touch input.",
+            "Ink appears immediately and saves through a background queue. A failed save leaves the stroke visible and offers Retry; undo and redo remain available.",
+          ].map((item, i) => <li key={i} className="flex gap-2"><span className="text-indigo-500 shrink-0 mt-0.5">•</span><span>{item}</span></li>)}
+        </ul>
+      </div>
+      <div>
+        <p className="text-xs font-semibold text-indigo-300 mb-2 uppercase tracking-wider">Sources, books, and privacy</p>
+        <ul className="space-y-2">
+          {[
+            "Uploaded originals are stored in OneDrive and cached only on the current device for faster viewing. The database stores metadata, extracted text, and editable annotation JSON—not file binaries.",
+            "Save as Note Source reuses an existing OneDrive book instead of uploading it again. Supported text extraction includes PDF, EPUB, MOBI, PPTX, TXT, SRT, and VTT.",
+            "Extracted text, editor content, transcripts, highlight comments, and saved equation solutions can be used by search and RAG. Raw source and audio binaries are not embedded.",
+            "Local recordings request microphone access only when recording starts. The recording remains local unless you explicitly request transcription.",
+            "Solve Equation or Complete Equation can read typed content and a temporary ink snapshot, then append a formatted step-by-step explanation to the autosaved note.",
+          ].map((item, i) => <li key={i} className="flex gap-2"><span className="text-indigo-500 shrink-0 mt-0.5">•</span><span>{item}</span></li>)}
+        </ul>
+      </div>
+      <p className="rounded-lg border border-indigo-500/20 bg-indigo-500/5 p-3 text-xs text-gray-500">Original source files remain unchanged unless you explicitly export an annotated copy. Annotation data synchronises through MemoLink; each device maintains its own local source cache.</p>
     </div>
   ),
 
