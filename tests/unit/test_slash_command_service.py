@@ -163,6 +163,23 @@ def test_complete_equation_appends_escaped_completion(monkeypatch):
     assert "<script>" not in updated.content
 
 
+def test_equation_steps_render_intermediate_formulas(monkeypatch):
+    repo = FakeNoteRepository()
+    note = repo.create_note(7, "Algebra", "<p>2x + 4 = 10</p>", "manual")
+    service = _build_service(repo)
+    monkeypatch.setattr(
+        service,
+        "_ai",
+        lambda *args, **kwargs: '{"equation":"2x + 4 = 10","equation_latex":"2x+4=10","steps":[{"explanation":"Subtract 4","latex":"2x=6","result":"2x = 6"},{"explanation":"Divide by 2","latex":"x=3","result":"x = 3"}],"answer":"x = 3","answer_latex":"x=3","verification":"6 + 4 = 10"}',
+    )
+
+    updated = service.solve_equation(7, note.id, "gpt-5")
+
+    assert 'data-equation-label="Step 1 formula"' in updated.content
+    assert 'data-memolink-equation-latex="2x=6"' in updated.content
+    assert 'data-equation-label="Step 2 formula"' in updated.content
+
+
 def test_complete_equation_rejects_ambiguous_ai_response(monkeypatch):
     repo = FakeNoteRepository()
     note = repo.create_note(7, "Incomplete", "x +", "manual")

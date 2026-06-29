@@ -95,7 +95,7 @@ export function AnnotationSurface({
   active = true,
   documentCoordinates = false,
   surfaceHeightRef,
-  screenLocked = true,
+  screenLocked = false,
 }: {
   canvas: AnnotationCanvasController;
   active?: boolean;
@@ -298,12 +298,13 @@ export function AnnotationSurface({
 
 export function AnnotationCanvas({ noteId, sourceFileId, pageNumber = 1, annotations, onPersisted }: Props) {
   const canvas = useAnnotationCanvas(noteId, sourceFileId, pageNumber, annotations, onPersisted);
+  const [screenLocked, setScreenLocked] = useState(false);
   return (
     <div className="absolute inset-0">
       <div className="absolute left-0 right-0 top-0 z-10">
-        <AnnotationToolbar tool={canvas.tool} onToolChange={canvas.setTool} penType={canvas.penType} onPenTypeChange={canvas.setPenType} eraserMode={canvas.eraserMode} onEraserModeChange={canvas.setEraserMode} color={canvas.color} onColorChange={canvas.setColor} penSize={canvas.penSize} onPenSizeChange={canvas.setPenSize} opacity={canvas.opacity} onOpacityChange={canvas.setOpacity} onUndo={() => void canvas.undo()} onRedo={() => void canvas.redo()} canUndo={canvas.canUndo} canRedo={canvas.canRedo} saving={canvas.saving} />
+        <AnnotationToolbar tool={canvas.tool} onToolChange={canvas.setTool} penType={canvas.penType} onPenTypeChange={canvas.setPenType} eraserMode={canvas.eraserMode} onEraserModeChange={canvas.setEraserMode} color={canvas.color} onColorChange={canvas.setColor} penSize={canvas.penSize} onPenSizeChange={canvas.setPenSize} opacity={canvas.opacity} onOpacityChange={canvas.setOpacity} onUndo={() => void canvas.undo()} onRedo={() => void canvas.redo()} canUndo={canvas.canUndo} canRedo={canvas.canRedo} saving={canvas.saving} screenLocked={screenLocked} onScreenLockedChange={setScreenLocked} />
       </div>
-      <AnnotationSurface canvas={canvas} />
+      <AnnotationSurface canvas={canvas} screenLocked={screenLocked} />
     </div>
   );
 }

@@ -25,6 +25,7 @@ interface Props {
 }
 
 export function AnnotationToolbar(props: Props) {
+  const inkColors = ["#111827", "#ffffff", "#ef4444", "#f97316", "#eab308", "#22c55e", "#06b6d4", "#3b82f6", "#6366f1", "#a855f7"];
   const penIcons: Record<PenType, React.ReactNode> = {
     pen: <><path d="m4 20 4.5-1 10-10a2.1 2.1 0 0 0-3-3l-10 10L4 20Z" /><path d="m13.5 8 3 3" /></>,
     pencil: <><path d="m4 20 4-1 11-11-3-3L5 16l-1 4Z" /><path d="m14 7 3 3" /></>,
@@ -78,10 +79,13 @@ export function AnnotationToolbar(props: Props) {
           <option value="partial">◌ Partial eraser</option><option value="stroke">✕ Stroke eraser</option>
         </select>
       </label>
-      <label className="relative ml-1 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border border-white/20" title="Ink color" style={{ backgroundColor: props.color }}>
-        <span className="sr-only">Ink color</span>
-        <input type="color" value={props.color} onChange={(event) => props.onColorChange(event.target.value)} aria-label="Ink color" className="absolute inset-0 cursor-pointer opacity-0" />
-      </label>
+      {penActive && <div className="ml-1 flex items-center gap-1 rounded-lg border border-white/10 bg-black/10 p-1" role="group" aria-label="Ink color presets">
+        {inkColors.map((inkColor) => <button key={inkColor} type="button" onClick={() => props.onColorChange(inkColor)} title={inkColor} aria-label={`Use ink color ${inkColor}`} aria-pressed={props.color.toLowerCase() === inkColor} className={`h-5 w-5 rounded-full border transition-transform hover:scale-110 ${props.color.toLowerCase() === inkColor ? "border-white ring-1 ring-indigo-400" : "border-white/20"}`} style={{ backgroundColor: inkColor }} />)}
+        <label className="relative flex h-5 w-5 cursor-pointer items-center justify-center rounded-full border border-white/30 bg-[conic-gradient(red,yellow,lime,aqua,blue,magenta,red)]" title="Custom ink color">
+          <span className="sr-only">Custom ink color</span>
+          <input type="color" value={props.color} onChange={(event) => props.onColorChange(event.target.value)} aria-label="Custom ink color" className="absolute inset-0 cursor-pointer opacity-0" />
+        </label>
+      </div>}
       <label className="flex items-center gap-1.5 px-1 text-[11px] text-gray-500" title={props.tool === "eraser" ? "Eraser size" : "Pen size"}>
         <span className="h-2 w-2 rounded-full bg-current" />
         <input type="range" min="1" max="20" value={props.penSize} onChange={(event) => props.onPenSizeChange(Number(event.target.value))} className="w-20 accent-indigo-500" aria-label={props.tool === "eraser" ? "Eraser size" : "Pen size"} />
@@ -89,19 +93,19 @@ export function AnnotationToolbar(props: Props) {
       {penActive && <label className="flex items-center gap-1 px-1 text-[10px] text-gray-500" title="Ink opacity"><span>Opacity</span><input type="range" min="10" max="100" value={Math.round(props.opacity * 100)} onChange={(event) => props.onOpacityChange(Number(event.target.value) / 100)} className="w-14 accent-indigo-500" aria-label="Ink opacity" /></label>}
       <button type="button" onClick={props.onUndo} disabled={!props.canUndo} title="Undo ink" aria-label="Undo ink" className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 hover:bg-[var(--ml-bg-hover)] disabled:opacity-30"><span aria-hidden="true">↶</span></button>
       <button type="button" onClick={props.onRedo} disabled={!props.canRedo} title="Redo ink" aria-label="Redo ink" className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 hover:bg-[var(--ml-bg-hover)] disabled:opacity-30"><span aria-hidden="true">↷</span></button>
-      {props.embedded && props.onScreenLockedChange && (
+      {props.onScreenLockedChange && (
         <button
           type="button"
           onClick={() => props.onScreenLockedChange?.(!props.screenLocked)}
-          title={props.screenLocked ? "Screen locked while drawing — tap to allow scrolling" : "Screen unlocked — tap to freeze while drawing"}
-          aria-label={props.screenLocked ? "Unlock drawing screen" : "Lock drawing screen"}
+          title={props.screenLocked ? "Touch drawing locked — tap for automatic finger scrolling" : "Auto mode: finger scrolls, stylus draws — tap to draw by touch"}
+          aria-label={props.screenLocked ? "Enable automatic finger scrolling" : "Lock screen for touch drawing"}
           aria-pressed={props.screenLocked}
           className={`flex h-8 w-8 items-center justify-center rounded-lg ${props.screenLocked ? "bg-emerald-600/20 text-emerald-300" : "text-gray-400 hover:bg-[var(--ml-bg-hover)]"}`}
         >
           <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2"><rect x="5" y="10" width="14" height="11" rx="2"/><path d={props.screenLocked ? "M8 10V7a4 4 0 0 1 8 0v3" : "M8 10V7a4 4 0 0 1 7.5-2"}/></svg>
         </button>
       )}
-      <span className="ml-auto whitespace-nowrap text-[10px] text-gray-500">{props.saving ? "Saving in background…" : props.embedded ? `Palm rejection • ${props.screenLocked ? "Locked" : "Scroll on"}` : "Synced"}</span>
+      <span className="ml-auto whitespace-nowrap text-[10px] text-gray-500">{props.saving ? "Saving in background…" : props.onScreenLockedChange ? `Palm rejection • ${props.screenLocked ? "Touch draw" : "Auto scroll"}` : "Synced"}</span>
     </div>
   );
 }

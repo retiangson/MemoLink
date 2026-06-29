@@ -187,7 +187,9 @@ export function RichNoteEditor({ value, onChange, noteKey, disabled, editorRef, 
   const [preparedDrawingNoteId, setPreparedDrawingNoteId] = React.useState<number | null>(null);
   const [preparingDrawing, setPreparingDrawing] = React.useState(false);
   const [drawingError, setDrawingError] = React.useState<string | null>(null);
-  const [screenLocked, setScreenLocked] = React.useState(true);
+  // Auto mode defaults to finger scrolling while stylus/mouse input draws.
+  // Users can still lock the surface when they intentionally draw by touch.
+  const [screenLocked, setScreenLocked] = React.useState(false);
   const inkSurfaceHeightRef = useRef(1000);
   const ink = useAnnotationCanvas(
     drawing?.noteId ?? preparedDrawingNoteId ?? 0,

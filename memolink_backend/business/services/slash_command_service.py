@@ -161,6 +161,25 @@ class SlashCommandService:
         return parsed
 
     @staticmethod
+    def _equation_steps(raw_steps) -> list[dict[str, str]]:
+        """Normalize the current structured step contract and legacy string steps."""
+        if not isinstance(raw_steps, list):
+            return []
+        steps: list[dict[str, str]] = []
+        for raw_step in raw_steps[:30]:
+            if isinstance(raw_step, dict):
+                explanation = str(raw_step.get("explanation") or raw_step.get("description") or "").strip()
+                latex = str(raw_step.get("latex") or raw_step.get("formula_latex") or "").strip()
+                result = str(raw_step.get("result") or raw_step.get("formula") or latex).strip()
+            else:
+                explanation = str(raw_step or "").strip()
+                latex = ""
+                result = ""
+            if explanation or latex or result:
+                steps.append({"explanation": explanation, "latex": latex, "result": result})
+        return steps
+
+    @staticmethod
     def _supports_equation_image(model: str) -> bool:
         model = _canonical_model(model or "")
         return (
@@ -190,8 +209,8 @@ class SlashCommandService:
             "intended for solving, solve it step by step, state assumptions, and verify the final result. If values "
             "or constraints are missing, do not invent them; solve symbolically or explain what is missing. "
             "Return ONLY valid JSON with this exact shape: "
-            '{"equation":"...","equation_latex":"...","steps":["..."],"answer":"...","answer_latex":"...","verification":"..."}. '
-            "Put valid KaTeX-compatible LaTeX without dollar delimiters in the *_latex fields. Make each step a clear, separate tutoring step.\n\n"
+            '{"equation":"...","equation_latex":"...","steps":[{"explanation":"...","latex":"...","result":"..."}],"answer":"...","answer_latex":"...","verification":"..."}. '
+            "For every step, explanation describes the operation, latex contains the complete equation after that operation in valid KaTeX-compatible LaTeX without dollar delimiters, and result is a readable plain-text fallback of that same equation. Do not skip intermediate formulas.\n\n"
             f"--- NOTE START ---\n{plain_text[:12000]}\n--- NOTE END ---"
         )
         response = self._ai(
@@ -212,16 +231,20 @@ class SlashCommandService:
         answer = str(parsed.get("answer") or "").strip()
         answer_latex = str(parsed.get("answer_latex") or answer).strip()
         verification = str(parsed.get("verification") or "").strip()
-        raw_steps = parsed.get("steps")
-        steps = [str(step).strip() for step in raw_steps] if isinstance(raw_steps, list) else []
-        steps = [step for step in steps if step][:30]
+        steps = self._equation_steps(parsed.get("steps"))
         if not equation or not equation_latex or not steps or not answer or not answer_latex:
             raise RuntimeError("The AI service returned an incomplete equation solution")
 
         def escaped(value: str) -> str:
             return html.escape(value[:4000], quote=True)
 
-        step_html = "".join(f"<li><h3>Step {index}</h3><p>{escaped(step)}</p></li>" for index, step in enumerate(steps, start=1))
+        step_html = "".join(
+            f"<li><h3>Step {index}</h3>"
+            + (f"<p>{escaped(step['explanation'])}</p>" if step["explanation"] else "")
+            + (f'<div data-memolink-equation-latex="{escaped(step["latex"])}" data-equation-label="Step {index} formula">{escaped(step["result"] or step["latex"])}</div>' if step["latex"] else "")
+            + "</li>"
+            for index, step in enumerate(steps, start=1)
+        )
         solution_html = (
             '<hr><section data-memolink-equation-solution="true">'
             "<h2>Equation Solution</h2>"
@@ -246,8 +269,8 @@ class SlashCommandService:
             "most likely wants completed. Complete only mathematically justified missing terms or steps. Never invent "
             "values, constraints, or an intended problem. If completion is ambiguous, preserve variables and clearly "
             "state the assumption or missing information. Return ONLY valid JSON with this exact shape: "
-            '{"original":"...","original_latex":"...","completed":"...","completed_latex":"...","steps":["..."],"explanation":"..."}. '
-            "Put valid KaTeX-compatible LaTeX without dollar delimiters in the *_latex fields. Make each step clear and separate.\n\n"
+            '{"original":"...","original_latex":"...","completed":"...","completed_latex":"...","steps":[{"explanation":"...","latex":"...","result":"..."}],"explanation":"..."}. '
+            "For every step, explanation describes what was completed, latex contains the complete expression after that step in valid KaTeX-compatible LaTeX without dollar delimiters, and result is its readable plain-text fallback. Include each meaningful intermediate formula.\n\n"
             f"--- NOTE START ---\n{plain_text[:12000]}\n--- NOTE END ---"
         )
         response = self._ai(
@@ -267,22 +290,26 @@ class SlashCommandService:
         completed = str(parsed.get("completed") or "").strip()
         completed_latex = str(parsed.get("completed_latex") or completed).strip()
         explanation = str(parsed.get("explanation") or "").strip()
-        raw_steps = parsed.get("steps")
-        steps = [str(step).strip() for step in raw_steps] if isinstance(raw_steps, list) else []
-        steps = [step for step in steps if step][:30]
+        steps = self._equation_steps(parsed.get("steps"))
         if not original or not original_latex or not completed or not completed_latex or not steps:
             raise RuntimeError("The AI service returned an incomplete equation completion")
 
         def escaped(value: str) -> str:
             return html.escape(value[:4000], quote=True)
 
-        step_html = "".join(f"<li><h3>Step {index}</h3><p>{escaped(step)}</p></li>" for index, step in enumerate(steps, start=1))
+        step_html = "".join(
+            f"<li><h3>Step {index}</h3>"
+            + (f"<p>{escaped(step['explanation'])}</p>" if step["explanation"] else "")
+            + (f'<div data-memolink-equation-latex="{escaped(step["latex"])}" data-equation-label="Step {index} formula">{escaped(step["result"] or step["latex"])}</div>' if step["latex"] else "")
+            + "</li>"
+            for index, step in enumerate(steps, start=1)
+        )
         completion_html = (
             '<hr><section data-memolink-equation-completion="true">'
             "<h2>Equation Completion</h2>"
             f'<div data-memolink-equation-latex="{escaped(original_latex)}" data-equation-label="Original">{escaped(original)}</div>'
-            f'<div data-memolink-equation-latex="{escaped(completed_latex)}" data-equation-label="Completed">{escaped(completed)}</div>'
             f'<ol class="equation-steps">{step_html}</ol>'
+            f'<div data-memolink-equation-latex="{escaped(completed_latex)}" data-equation-label="Completed equation">{escaped(completed)}</div>'
             + (f"<p><strong>Explanation:</strong> {escaped(explanation)}</p>" if explanation else "")
             + "</section>"
         )
