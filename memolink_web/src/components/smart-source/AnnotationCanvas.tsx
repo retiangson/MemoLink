@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import type { SourceAnnotation, StrokePoint } from "../../api/smartSourceApi";
-import { ERASER_RADIUS, useAnnotationCanvas } from "../../hooks/useAnnotationCanvas";
+import { useAnnotationCanvas } from "../../hooks/useAnnotationCanvas";
 import { AnnotationToolbar } from "./AnnotationToolbar";
 
 interface Props {
@@ -280,8 +280,8 @@ export function AnnotationSurface({
         {canvas.tool === "eraser" && (
           <ellipse
             ref={eraserPreviewRef}
-            rx={ERASER_RADIUS * 1000}
-            ry={ERASER_RADIUS * viewHeight}
+            rx={canvas.eraserRadius * 1000}
+            ry={canvas.eraserRadius * viewHeight}
             fill="rgb(248 113 113)"
             fillOpacity="0.14"
             stroke="rgb(248 113 113)"

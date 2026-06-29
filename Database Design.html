@@ -189,8 +189,9 @@
   <p>Entity-Relationship model, table schemas, column constraints, relationships, and indexes for MemoLink's PostgreSQL database with pgvector.</p>
   <section>
     <h2>Smart Source Workspace Tables</h2>
-    <p><code>source_files</code> stores OneDrive identifiers, file metadata, extraction state, and version metadata. <code>book_note_links</code> links a book, source, and editable note. <code>file_annotations</code> stores editable normalized stroke/highlight/comment JSON. <code>note_timeline_events</code> records source-workspace actions. <code>recording_metadata</code> stores local-only filename and duration metadata.</p>
+    <p><code>source_files</code> stores OneDrive identifiers, file metadata, extraction state, and version metadata. <code>book_note_links</code> links a book, source, and editable note. <code>file_annotations</code> stores editable normalized stroke/highlight/comment JSON. Stroke payloads retain pointer type, pen type, opacity, normalized points, timestamps, pressure, and available tilt; colour, pen size, tool type, page, and location anchor remain queryable columns. <code>note_timeline_events</code> records source-workspace actions. <code>recording_metadata</code> stores local-only filename and duration metadata.</p>
     <p>These tables intentionally contain no original file, book, recording, Blob, or base64 binary columns. Source binaries remain in OneDrive; recording binaries remain local.</p>
+    <p>Negative temporary annotation IDs and save queues exist only in frontend memory. The database assigns canonical positive IDs. Partial erasing updates/splits stroke JSON; whole-stroke erasing uses the existing soft-delete lifecycle so synchronized clients retain an auditable model without altering the original source.</p>
   </section>
 </div>
 

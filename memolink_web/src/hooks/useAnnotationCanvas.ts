@@ -22,7 +22,9 @@ interface PersistenceJob {
 }
 
 const SAVE_DEBOUNCE_MS = 220;
-export const ERASER_RADIUS = 0.018;
+export function eraserRadiusForSize(size: number): number {
+  return Math.min(0.04, 0.008 + Math.max(1, size) * 0.0016);
+}
 
 const PEN_DEFAULTS: Record<PenType, { size: number; opacity: number }> = {
   pen: { size: 3, opacity: 1 },
@@ -47,7 +49,7 @@ function sameStroke(left: SourceAnnotation, right: SourceAnnotation): boolean {
   });
 }
 
-function splitStrokeAtPoint(points: StrokePoint[], point: StrokePoint, radius = ERASER_RADIUS): StrokePoint[][] {
+function splitStrokeAtPoint(points: StrokePoint[], point: StrokePoint, radius: number): StrokePoint[][] {
   const radiusSquared = radius * radius;
   const segments: StrokePoint[][] = [];
   let current: StrokePoint[] = [];
@@ -286,7 +288,7 @@ export function useAnnotationCanvas(
     replaceAnnotations((current) => current.flatMap((annotation) => {
       const points = annotation.strokes_json?.points;
       if (!points?.length) return annotation;
-      const segments = splitStrokeAtPoint(points, point);
+      const segments = splitStrokeAtPoint(points, point, eraserRadiusForSize(penSize));
       if (segments.length === 1 && segments[0].length === points.length) return annotation;
       if (eraserMode === "stroke") return [];
       return segments.map((segment, index) => ({
@@ -369,7 +371,7 @@ export function useAnnotationCanvas(
   }
 
   return {
-    tool, setTool, penType, setPenType, eraserMode, setEraserMode,
+    tool, setTool, penType, setPenType, eraserMode, setEraserMode, eraserRadius: eraserRadiusForSize(penSize),
     color, setColor, penSize, setPenSize, opacity, setOpacity,
     draft, getDraft, annotations, saving: pendingCount > 0, pendingCount, error, retryFailed,
     canUndo: annotations.length > 0, canRedo: redoStack.length > 0,

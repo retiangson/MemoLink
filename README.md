@@ -373,7 +373,7 @@ Recent documentation updates also cover the Gmail connector cleanup: token refre
 
 ## Smart Source Workspace
 
-MemoLink notes now support an `Original | Editor | Source File | Timeline` workspace. Original uploaded files are stored in OneDrive, cached in browser storage per device, and linked to editable note content used for RAG. PDF and image originals support non-destructive pen/highlighter annotations whose editable stroke data is synced through the database.
+MemoLink notes now support an `Original | Editor | Source File | Timeline` workspace. Original uploaded files are stored in OneDrive, cached in browser storage per device, and linked to editable note content used for RAG. Notes and supported originals share a non-destructive annotation layer whose editable stroke data is synchronized through the database.
 
 - Original file and book binaries are never stored in the database.
 - OneDrive books reuse their existing OneDrive item; they are not uploaded twice.
@@ -387,6 +387,10 @@ MemoLink notes now support an `Original | Editor | Source File | Timeline` works
 - Notes created by Save as Note actions across Chat, Study, Email, Teams, and Books update the shared Notes list automatically. Background book extraction continues to track completion after the reader closes.
 - Book note extraction is dispatched as a durable asynchronous Lambda invocation (with stale-job retry) instead of an in-request background task. PDF, EPUB, MOBI, PPTX, TXT, SRT, and VTT sources are supported.
 - Browse Books and My Books support a remembered per-device page size from 10 through 100 books in increments of 10.
+- Mixed text and ink use the full note surface. Pen choices include ballpoint, pencil, marker, highlighter, brush, calligraphy, and dashed ink, with color, opacity, thickness, pointer pressure, palm rejection, and a screen lock for touch/stylus work.
+- Annotation rendering is optimistic: an active stroke is drawn through `requestAnimationFrame`, committed locally on pointer-up, and persisted through a debounced background queue. Temporary client IDs are replaced in place by database IDs so autosave cannot blink or clear ink.
+- Partial erasing splits editable point sequences; stroke erasing removes the complete annotation. The size slider controls the same radius used by the visible eraser preview and hit testing. Failed creates, updates, or deletes remain queued for explicit retry.
+- Calendar view supports a user-selected 1–12 month layout, while Browse Books supports 10–100 results per page.
 
 Smart Source and note APIs include `/api/source-files/upload-to-onedrive`, ownership-checked source retrieval, `/api/annotations`, `/api/notes/{id}/autosave`, `/api/notes/{id}/source-workspace`, `/api/notes/{id}/source-workspace/autosave`, `/api/notes/{id}/timeline`, `/api/notes/{id}/recordings`, and `/api/commands/solve-equation`. Books Library links are created internally so clients cannot attach arbitrary OneDrive item IDs.
 
