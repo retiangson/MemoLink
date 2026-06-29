@@ -151,7 +151,7 @@ const CONTENT: Record<string, React.ReactNode> = {
             "Save as Note Source reuses an existing OneDrive book instead of uploading it again. Supported text extraction includes PDF, EPUB, MOBI, PPTX, TXT, SRT, and VTT.",
             "Extracted text, editor content, transcripts, highlight comments, and saved equation solutions can be used by search and RAG. Raw source and audio binaries are not embedded.",
             "Local recordings request microphone access only when recording starts. The recording remains local unless you explicitly request transcription.",
-            "Solve Equation or Complete Equation can read typed content and a temporary ink snapshot, then append every explanation with its next rendered formula plus the formatted final answer to the autosaved note.",
+            "Solve Equation or Complete Equation can read typed content, a temporary ink snapshot, and embedded PNG/JPEG images pasted into the note when the selected model supports vision. It appends every explanation with its next rendered formula plus the formatted final answer.",
           ].map((item, i) => <li key={i} className="flex gap-2"><span className="text-indigo-500 shrink-0 mt-0.5">•</span><span>{item}</span></li>)}
         </ul>
       </div>

@@ -235,6 +235,37 @@ def test_equation_prompt_omits_image_for_text_only_model():
     assert content == prompt
 
 
+def test_solve_equation_includes_embedded_note_image_for_vision_model(monkeypatch):
+    repo = FakeNoteRepository()
+    image = "data:image/png;base64,AAAA"
+    note = repo.create_note(7, "Pasted equation", f'<p>Solve the pasted equation</p><img src="{image}">', "manual")
+    service = _build_service(repo)
+    captured = {}
+
+    def fake_ai(model, messages, user_id):
+        captured["content"] = messages[-1]["content"]
+        return '{"equation":"x=1","steps":["Read image"],"answer":"x=1"}'
+
+    monkeypatch.setattr(service, "_ai", fake_ai)
+    service.solve_equation(7, note.id, "gpt-5")
+
+    assert captured["content"][1]["image_url"]["url"] == image
+
+
+def test_embedded_equation_images_reject_remote_and_invalid_sources():
+    html_content = '<img src="https://example.com/equation.png"><img src="data:text/plain;base64,AAAA"><img src="data:image/png;base64,not-valid!">'
+
+    assert SlashCommandService._embedded_equation_images(html_content) == []
+
+
+def test_embedded_note_image_is_omitted_for_text_only_model():
+    image = "data:image/jpeg;base64,AAAA"
+
+    content = SlashCommandService._equation_user_content("Solve it", None, "gpt-3.5-turbo", [image])
+
+    assert content == "Solve it"
+
+
 def test_equation_request_rejects_non_image_data_url():
     try:
         EquationSolveRequestDTO(note_id=1, drawing_image_data_url="data:text/plain;base64,AAAA")
