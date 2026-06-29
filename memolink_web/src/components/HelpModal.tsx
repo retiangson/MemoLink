@@ -138,7 +138,7 @@ const CONTENT: Record<string, React.ReactNode> = {
             "Switch between text and pen mode from the note toolbar. The entire note surface remains available for ink, signatures, underlining, and mixed text/handwriting.",
             "Choose Ballpoint, Pencil, Marker, Highlighter, Brush, Calligraphy, or Dashed pen from the pen icon dropdown. Color, opacity, thickness, pressure, and stylus tilt are retained where available.",
             "The eraser icon offers Partial Eraser and Stroke Eraser. The size slider changes both the visible eraser footprint and the actual affected area.",
-            "Screen Lock prevents page movement while drawing. Palm rejection prioritises an active stylus/Apple Pencil over touch input.",
+            "Auto mode lets a finger scroll while a stylus/Apple Pencil draws without moving the page. Turn on Touch Draw lock only when you intentionally want to draw with a finger; palm rejection prioritises the active stylus.",
             "Ink appears immediately and saves through a background queue. A failed save leaves the stroke visible and offers Retry; undo and redo remain available.",
           ].map((item, i) => <li key={i} className="flex gap-2"><span className="text-indigo-500 shrink-0 mt-0.5">•</span><span>{item}</span></li>)}
         </ul>
@@ -151,7 +151,7 @@ const CONTENT: Record<string, React.ReactNode> = {
             "Save as Note Source reuses an existing OneDrive book instead of uploading it again. Supported text extraction includes PDF, EPUB, MOBI, PPTX, TXT, SRT, and VTT.",
             "Extracted text, editor content, transcripts, highlight comments, and saved equation solutions can be used by search and RAG. Raw source and audio binaries are not embedded.",
             "Local recordings request microphone access only when recording starts. The recording remains local unless you explicitly request transcription.",
-            "Solve Equation or Complete Equation can read typed content and a temporary ink snapshot, then append a formatted step-by-step explanation to the autosaved note.",
+            "Solve Equation or Complete Equation can read typed content and a temporary ink snapshot, then append every explanation with its next rendered formula plus the formatted final answer to the autosaved note.",
           ].map((item, i) => <li key={i} className="flex gap-2"><span className="text-indigo-500 shrink-0 mt-0.5">•</span><span>{item}</span></li>)}
         </ul>
       </div>
