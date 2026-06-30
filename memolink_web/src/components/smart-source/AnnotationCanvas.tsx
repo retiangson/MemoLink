@@ -10,6 +10,8 @@ interface Props {
   pageNumber?: number;
   annotations: SourceAnnotation[];
   onPersisted: () => void;
+  isMaximized?: boolean;
+  onToggleMaximized?: () => void;
 }
 
 export type AnnotationCanvasController = ReturnType<typeof useAnnotationCanvas>;
@@ -297,13 +299,13 @@ export function AnnotationSurface({
   );
 }
 
-export function AnnotationCanvas({ noteId, sourceFileId, bookId = null, pageNumber = 1, annotations, onPersisted }: Props) {
+export function AnnotationCanvas({ noteId, sourceFileId, bookId = null, pageNumber = 1, annotations, onPersisted, isMaximized, onToggleMaximized }: Props) {
   const canvas = useAnnotationCanvas(noteId, sourceFileId, pageNumber, annotations, onPersisted, bookId);
   const [screenLocked, setScreenLocked] = useState(false);
   return (
     <div className="absolute inset-0">
       <div className="absolute left-0 right-0 top-0 z-10">
-        <AnnotationToolbar tool={canvas.tool} onToolChange={canvas.setTool} penType={canvas.penType} onPenTypeChange={canvas.setPenType} eraserMode={canvas.eraserMode} onEraserModeChange={canvas.setEraserMode} color={canvas.color} onColorChange={canvas.setColor} penSize={canvas.penSize} onPenSizeChange={canvas.setPenSize} opacity={canvas.opacity} onOpacityChange={canvas.setOpacity} onUndo={() => void canvas.undo()} onRedo={() => void canvas.redo()} canUndo={canvas.canUndo} canRedo={canvas.canRedo} saving={canvas.saving} screenLocked={screenLocked} onScreenLockedChange={setScreenLocked} />
+        <AnnotationToolbar tool={canvas.tool} onToolChange={canvas.setTool} penType={canvas.penType} onPenTypeChange={canvas.setPenType} eraserMode={canvas.eraserMode} onEraserModeChange={canvas.setEraserMode} color={canvas.color} onColorChange={canvas.setColor} penSize={canvas.penSize} onPenSizeChange={canvas.setPenSize} opacity={canvas.opacity} onOpacityChange={canvas.setOpacity} onUndo={() => void canvas.undo()} onRedo={() => void canvas.redo()} canUndo={canvas.canUndo} canRedo={canvas.canRedo} saving={canvas.saving} screenLocked={screenLocked} onScreenLockedChange={setScreenLocked} isMaximized={isMaximized} onToggleMaximized={onToggleMaximized} />
       </div>
       <AnnotationSurface canvas={canvas} screenLocked={screenLocked} />
     </div>

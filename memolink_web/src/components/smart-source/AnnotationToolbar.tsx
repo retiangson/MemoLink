@@ -22,6 +22,8 @@ interface Props {
   embedded?: boolean;
   screenLocked?: boolean;
   onScreenLockedChange?: (locked: boolean) => void;
+  isMaximized?: boolean;
+  onToggleMaximized?: () => void;
 }
 
 export function AnnotationToolbar(props: Props) {
@@ -106,6 +108,22 @@ export function AnnotationToolbar(props: Props) {
         </button>
       )}
       <span className="ml-auto whitespace-nowrap text-[10px] text-gray-500">{props.saving ? "Saving in background…" : props.onScreenLockedChange ? `Palm rejection • ${props.screenLocked ? "Touch draw" : "Auto scroll"}` : "Synced"}</span>
+      {props.onToggleMaximized && (
+        <button
+          type="button"
+          onClick={props.onToggleMaximized}
+          title={props.isMaximized ? "Restore note view (Esc)" : "Maximize document"}
+          aria-label={props.isMaximized ? "Restore document view" : "Maximize document"}
+          aria-pressed={props.isMaximized}
+          className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-400 transition hover:bg-[var(--ml-bg-hover)] hover:text-white"
+        >
+          {props.isMaximized ? (
+            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2"><path d="M8 3v5H3M16 3v5h5M8 21v-5H3M16 21v-5h5" /></svg>
+          ) : (
+            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2"><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5" /></svg>
+          )}
+        </button>
+      )}
     </div>
   );
 }

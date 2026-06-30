@@ -18,6 +18,7 @@ interface Props {
 
 export function PdfSourceViewer({ noteId, sourceFileId, bookId, objectUrl, annotations, onAnnotationsChanged }: Props) {
   const hostRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const documentRef = useRef<pdfjsLib.PDFDocumentProxy | null>(null);
   const loadingTaskRef = useRef<pdfjsLib.PDFDocumentLoadingTask | null>(null);
@@ -26,6 +27,7 @@ export function PdfSourceViewer({ noteId, sourceFileId, bookId, objectUrl, annot
   const [pageCount, setPageCount] = useState(0);
   const [hostSize, setHostSize] = useState({ width: 800, height: 900 });
   const [isMaximized, setIsMaximized] = useState(false);
+  const [autoScroll, setAutoScroll] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -85,6 +87,10 @@ export function PdfSourceViewer({ noteId, sourceFileId, bookId, objectUrl, annot
   }, [objectUrl]);
 
   useEffect(() => {
+    scrollRef.current?.scrollTo({ top: 0 });
+  }, [pageNumber]);
+
+  useEffect(() => {
     const document = documentRef.current;
     const canvas = canvasRef.current;
     if (!document || !canvas || hostSize.width <= 0 || hostSize.height <= 0) return;
@@ -125,33 +131,25 @@ export function PdfSourceViewer({ noteId, sourceFileId, bookId, objectUrl, annot
 
   const viewer = (
     <div ref={hostRef} className={`flex min-h-0 flex-col bg-[#171720] ${isMaximized ? "fixed inset-0 z-[100] h-dvh w-screen" : "h-full"}`}>
-      <div className="relative flex h-10 shrink-0 items-center justify-center gap-3 bg-black/35 px-12 text-xs text-gray-200">
-        <button type="button" disabled={pageNumber <= 1} onClick={() => setPageNumber((page) => page - 1)} className="rounded px-2 py-1 disabled:opacity-35">Previous</button>
-        <span>Page {pageNumber} of {pageCount || "…"}</span>
-        <button type="button" disabled={!pageCount || pageNumber >= pageCount} onClick={() => setPageNumber((page) => page + 1)} className="rounded px-2 py-1 disabled:opacity-35">Next</button>
-        <button
-          type="button"
-          onClick={() => setIsMaximized((current) => !current)}
-          title={isMaximized ? "Restore note view (Esc)" : "Maximize document"}
-          aria-label={isMaximized ? "Restore document view" : "Maximize document"}
-          aria-pressed={isMaximized}
-          className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-gray-400 transition hover:bg-white/10 hover:text-white"
-        >
-          {isMaximized ? (
-            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2"><path d="M8 3v5H3M16 3v5h5M8 21v-5H3M16 21v-5h5" /></svg>
-          ) : (
-            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2"><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5" /></svg>
-          )}
-        </button>
-      </div>
-      {error ? <div className="grid flex-1 place-items-center text-sm text-red-400">{error}</div> : (
-        <div className="flex min-h-0 flex-1 items-start justify-center overflow-auto p-4">
+      {error ? (
+        <div className="grid flex-1 place-items-center text-sm text-red-400">{error}</div>
+      ) : (
+        <div ref={scrollRef} className="flex min-h-0 flex-1 items-start justify-center overflow-auto p-4">
           <div className="relative shrink-0 bg-white shadow-xl">
             <canvas ref={canvasRef} className="block" />
-            <AnnotationCanvas noteId={noteId} sourceFileId={sourceFileId} bookId={bookId} pageNumber={pageNumber} annotations={annotations} onPersisted={onAnnotationsChanged} />
+            <AnnotationCanvas noteId={noteId} sourceFileId={sourceFileId} bookId={bookId} pageNumber={pageNumber} annotations={annotations} onPersisted={onAnnotationsChanged} isMaximized={isMaximized} onToggleMaximized={() => setIsMaximized((v) => !v)} />
           </div>
         </div>
       )}
+      <div className="flex h-10 shrink-0 items-center justify-center gap-2 bg-black/35 px-4 text-xs text-gray-200">
+        <button type="button" disabled={pageNumber <= 1} onClick={() => setPageNumber((p) => p - 1)} title="Previous page" className="flex h-7 w-7 items-center justify-center rounded-lg disabled:opacity-35 hover:bg-white/10 transition">
+          <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M15 18l-6-6 6-6" /></svg>
+        </button>
+        <span className="min-w-[90px] text-center">Page {pageNumber} of {pageCount || "…"}</span>
+        <button type="button" disabled={!pageCount || pageNumber >= pageCount} onClick={() => setPageNumber((p) => p + 1)} title="Next page" className="flex h-7 w-7 items-center justify-center rounded-lg disabled:opacity-35 hover:bg-white/10 transition">
+          <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M9 18l6-6-6-6" /></svg>
+        </button>
+      </div>
     </div>
   );
   return isMaximized ? createPortal(viewer, document.body) : viewer;
