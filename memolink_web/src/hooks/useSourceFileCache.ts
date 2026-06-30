@@ -84,7 +84,7 @@ export function useSourceFileCache(source: SourceFileMetadata | null) {
         setStatus("stale");
         return;
       }
-      const response = await api.get(`/source-files/${source.id}/content`, { responseType: "blob" });
+      const response = await api.get(`/source-files/${source.id}/content`, { responseType: "blob", timeout: 300_000 });
       const blob = response.data as Blob;
       await writeCachedSource({
         id: source.id,
