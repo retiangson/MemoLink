@@ -2,6 +2,7 @@ from typing import Optional
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Response, UploadFile
+from fastapi.responses import RedirectResponse
 from urllib.parse import quote
 from pydantic import BaseModel
 
@@ -136,19 +137,15 @@ async def download_source_file(
 ):
     source = _handle(lambda: c.smart_sources().get_source(user_id, source_file_id))
     try:
-        content = await c.onedrive().download_file_bytes(
+        url = await c.onedrive().get_file_download_url(
             drive_id=source.onedrive_drive_id,
             item_id=source.onedrive_item_id,
         )
     except Exception as exc:
         status_code = getattr(exc, "status_code", 502)
-        detail = getattr(exc, "detail", "Could not download the source file")
+        detail = getattr(exc, "detail", "Could not get download URL for the source file")
         raise HTTPException(status_code=status_code, detail=detail) from exc
-    return Response(
-        content=content,
-        media_type=source.mime_type or "application/octet-stream",
-        headers={"Content-Disposition": f"inline; filename*=UTF-8''{quote(source.original_filename)}"},
-    )
+    return RedirectResponse(url=url, status_code=302)
 
 
 @router.put("/source-files/{source_file_id}/cache-status", response_model=SourceFileResponseDTO)
