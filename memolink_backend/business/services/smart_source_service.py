@@ -7,6 +7,7 @@ from memolink_backend.contracts.smart_source_dtos import (
     AnnotationCreateDTO,
     AnnotationResponseDTO,
     AnnotationUpdateDTO,
+    BookNoteLinkResponseDTO,
     RecordingMetadataCreateDTO,
     RecordingMetadataResponseDTO,
     SourceFileCreateDTO,
@@ -81,6 +82,7 @@ class SmartSourceService:
         self._owned_note(user_id, note_id)
         return SourceWorkspaceResponseDTO(
             source_files=[SourceFileResponseDTO.model_validate(row) for row in self._repo.list_sources(user_id, note_id)],
+            book_links=[BookNoteLinkResponseDTO.model_validate(row) for row in self._repo.list_book_links(user_id, note_id)],
             annotations=[AnnotationResponseDTO.model_validate(row) for row in self._repo.list_annotations(user_id, note_id)],
             timeline=[TimelineEventResponseDTO.model_validate(row) for row in self._repo.list_timeline(user_id, note_id)],
             recordings=[RecordingMetadataResponseDTO.model_validate(row) for row in self._repo.list_recordings(user_id, note_id)],

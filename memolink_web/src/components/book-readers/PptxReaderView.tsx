@@ -167,7 +167,7 @@ export function PptxReaderView({
           <div
             ref={slideRef}
             onAnimationEnd={() => setSlideAnim(null)}
-            className={`pptx-slide relative shadow-lg rounded-xl max-w-2xl w-full h-fit p-10 ${slideAnim === "next" ? "ml-page-anim-next" : slideAnim === "prev" ? "ml-page-anim-prev" : ""}`}
+            className={`pptx-slide relative shadow-lg rounded-xl w-full h-fit p-10 ${slideAnim === "next" ? "ml-page-anim-next" : slideAnim === "prev" ? "ml-page-anim-prev" : ""}`}
             style={{ backgroundColor: colors.background, color: colors.foreground }}
             dangerouslySetInnerHTML={{ __html: slides[currentSlide - 1] || "" }}
           />

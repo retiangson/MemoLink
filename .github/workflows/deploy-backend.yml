@@ -174,21 +174,28 @@ jobs:
             --timeout 300 \
             --memory-size 512
 
-      - name: Allow Lambda to dispatch durable background jobs to itself
+      - name: Allow Lambda execution role to dispatch durable jobs to itself
         shell: bash
         run: |
           FUNCTION_NAME="${{ secrets.LAMBDA_FUNCTION_NAME }}"
-          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
           FUNCTION_ARN=$(aws lambda get-function --function-name "$FUNCTION_NAME" --query Configuration.FunctionArn --output text)
+          ROLE_ARN=$(aws lambda get-function --function-name "$FUNCTION_NAME" --query Configuration.Role --output text)
+          ROLE_NAME="${ROLE_ARN##*/}"
+
+          # Same-account Lambda invocation requires an identity policy on the
+          # caller role. A function resource policy alone does not grant the
+          # execution role permission to call lambda:InvokeFunction.
+          aws iam put-role-policy \
+            --role-name "$ROLE_NAME" \
+            --policy-name memolink-self-invoke \
+            --policy-document "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Action\":\"lambda:InvokeFunction\",\"Resource\":\"$FUNCTION_ARN\"}]}"
+
+          # Remove the obsolete resource-policy statement from earlier
+          # deployments. The execution-role policy above is sufficient and is
+          # scoped to this function ARN only.
           aws lambda remove-permission \
             --function-name "$FUNCTION_NAME" \
             --statement-id memolink-self-invoke 2>/dev/null || true
-          aws lambda add-permission \
-            --function-name "$FUNCTION_NAME" \
-            --statement-id memolink-self-invoke \
-            --action lambda:InvokeFunction \
-            --principal "$ACCOUNT_ID" \
-            --source-arn "$FUNCTION_ARN"
 
       - name: Print deployed image
         run: echo "Deployed ${{ steps.build.outputs.image_uri }} to Lambda"

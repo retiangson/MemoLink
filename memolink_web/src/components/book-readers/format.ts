@@ -1,5 +1,6 @@
 import type { Book } from "../../api/booksApi";
 import type { BookNoteSourceStatus } from "../../api/booksApi";
+import type { SourceAnnotation } from "../../api/smartSourceApi";
 
 export type BookFormat =
   | "pdf"
@@ -37,6 +38,13 @@ export interface ReaderViewProps {
   onJumpToHighlightHandled?: () => void;
   onHighlightAdded?: (noteId: number) => Promise<void> | void;
   isFullscreen?: boolean;
+  bookInk?: {
+    enabled: boolean;
+    noteId: number;
+    sourceFileId: number;
+    bookId: number;
+    annotations: SourceAnnotation[];
+  };
   /** True only when this reader is the currently visible tab. PdfReaderView uses this to
    *  re-render the canvas when becoming visible after a display:none hide cycle, since
    *  Chromium frees the canvas GPU texture while the element is not displayed. */

@@ -6,6 +6,7 @@ import { AnnotationToolbar } from "./AnnotationToolbar";
 interface Props {
   noteId: number;
   sourceFileId: number | null;
+  bookId?: number | null;
   pageNumber?: number;
   annotations: SourceAnnotation[];
   onPersisted: () => void;
@@ -296,8 +297,8 @@ export function AnnotationSurface({
   );
 }
 
-export function AnnotationCanvas({ noteId, sourceFileId, pageNumber = 1, annotations, onPersisted }: Props) {
-  const canvas = useAnnotationCanvas(noteId, sourceFileId, pageNumber, annotations, onPersisted);
+export function AnnotationCanvas({ noteId, sourceFileId, bookId = null, pageNumber = 1, annotations, onPersisted }: Props) {
+  const canvas = useAnnotationCanvas(noteId, sourceFileId, pageNumber, annotations, onPersisted, bookId);
   const [screenLocked, setScreenLocked] = useState(false);
   return (
     <div className="absolute inset-0">

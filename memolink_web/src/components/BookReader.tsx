@@ -15,6 +15,8 @@ import { ColorModePicker } from "./ColorModePicker";
 import { FontSizePicker } from "./FontSizePicker";
 import { useReaderColorMode } from "../hooks/useReaderColorMode";
 import { useReaderFontSize } from "../hooks/useReaderFontSize";
+import { listSourceAnnotations, type SourceAnnotation } from "../api/smartSourceApi";
+import { AnnotationCanvas } from "./smart-source/AnnotationCanvas";
 
 interface Props {
   book: Book;
@@ -40,6 +42,10 @@ export function BookReader({ book, initialPage, onClose, onProgress, onAskAI, ju
   const [colorMode, setColorMode] = useReaderColorMode();
   const [fontSize, setFontSize] = useReaderFontSize();
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [currentPage, setCurrentPage] = useState(Math.max(1, initialPage));
+  const [bookAnnotations, setBookAnnotations] = useState<SourceAnnotation[]>([]);
+  const [inkEnabled, setInkEnabled] = useState(false);
+  const [inkMessage, setInkMessage] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const format = getBookFormat(book);
   const canFullscreen = format !== "audio" && format !== "video" && format !== "unsupported";
@@ -100,6 +106,21 @@ export function BookReader({ book, initialPage, onClose, onProgress, onAskAI, ju
     return () => clearInterval(t);
   }, [noteStatus, book.id]);
 
+  useEffect(() => {
+    const noteId = noteStatus?.status === "ready" ? noteStatus.note_id : null;
+    const sourceFileId = noteStatus?.status === "ready" ? noteStatus.source_file_id : null;
+    if (!noteId || !sourceFileId || !isFullscreen) return;
+    let cancelled = false;
+    listSourceAnnotations(noteId, sourceFileId)
+      .then((rows) => { if (!cancelled) setBookAnnotations(rows); })
+      .catch(() => { if (!cancelled) setInkMessage("Could not load saved book drawings."); });
+    return () => { cancelled = true; };
+  }, [book.id, isFullscreen, noteStatus?.note_id, noteStatus?.source_file_id, noteStatus?.status]);
+
+  useEffect(() => {
+    if (!isFullscreen) setInkEnabled(false);
+  }, [isFullscreen]);
+
   async function handleSaveAsNoteSource() {
     if (savingNoteSource) return;
     setSavingNoteSource(true);
@@ -113,6 +134,33 @@ export function BookReader({ book, initialPage, onClose, onProgress, onAskAI, ju
     }
   }
 
+  async function toggleBookInk() {
+    setInkMessage(null);
+    if (inkEnabled) {
+      setInkEnabled(false);
+      return;
+    }
+    if (noteStatus?.status === "ready" && noteStatus.note_id && noteStatus.source_file_id) {
+      setInkEnabled(true);
+      return;
+    }
+    if (noteStatus?.status === "ready") {
+      setInkMessage("The book source link is incomplete. Reopen the book after the source workspace is refreshed.");
+      return;
+    }
+    if (noteStatus?.status === "pending" || noteStatus?.status === "processing") {
+      setInkMessage("Preparing the book note source. Drawing will be available when extraction finishes.");
+      return;
+    }
+    await handleSaveAsNoteSource();
+    setInkMessage("Preparing the book note source. Drawing will be available when extraction finishes.");
+  }
+
+  function handleReaderProgress(page: number, totalPages: number) {
+    setCurrentPage(Math.max(1, page));
+    onProgress?.(page, totalPages);
+  }
+
   const canExtractNotes =
     format === "pdf" || format === "epub" || format === "pptx" ||
     format === "txt" || format === "srt" || format === "vtt" || format === "mobi";
@@ -120,6 +168,15 @@ export function BookReader({ book, initialPage, onClose, onProgress, onAskAI, ju
   const noteSourceProps = canExtractNotes
     ? { noteStatus, noteStatusLoaded, savingNoteSource, onSaveAsNoteSource: handleSaveAsNoteSource }
     : {};
+  const bookInk = inkEnabled && noteStatus?.note_id && noteStatus.source_file_id
+    ? {
+        enabled: true,
+        noteId: noteStatus.note_id,
+        sourceFileId: noteStatus.source_file_id,
+        bookId: book.id,
+        annotations: bookAnnotations,
+      }
+    : undefined;
 
   return (
     <div
@@ -133,6 +190,8 @@ export function BookReader({ book, initialPage, onClose, onProgress, onAskAI, ju
             <p className="text-xs text-gray-400 truncate max-w-[200px]">{book.title}</p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
+            {onAskAI && <button onClick={() => { exitFullscreen(); onAskAI(book); }} title="Ask AI from this book" className="rounded-lg px-2 py-1 text-[11px] text-indigo-300 hover:bg-indigo-600/20">Ask AI</button>}
+            {canExtractNotes && <button onClick={() => void toggleBookInk()} title="Draw, write, or highlight on this book" aria-pressed={inkEnabled} className={`flex h-8 w-8 items-center justify-center rounded-lg ${inkEnabled ? "bg-indigo-600 text-white" : "text-gray-400 hover:bg-[var(--ml-bg-hover)]"}`}><svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2"><path d="m4 20 4.5-1 10-10a2.1 2.1 0 0 0-3-3l-10 10L4 20Z"/><path d="m13.5 8 3 3"/></svg></button>}
             <FontSizePicker value={fontSize} onChange={setFontSize} />
             <ColorModePicker value={colorMode} onChange={setColorMode} />
             <button
@@ -194,20 +253,30 @@ export function BookReader({ book, initialPage, onClose, onProgress, onAskAI, ju
         </div>
       )}
 
-      {format === "pdf" && <PdfReaderView book={book} initialPage={initialPage} colorMode={colorMode} fontSize={fontSize} onProgress={onProgress} jumpToHighlight={jumpToHighlight} onJumpToHighlightHandled={onJumpToHighlightHandled} onHighlightAdded={onHighlightAdded} isFullscreen={isFullscreen} isActive={isActive} {...noteSourceProps} />}
-      {format === "epub" && <EpubReaderView book={book} initialPage={initialPage} colorMode={colorMode} fontSize={fontSize} onProgress={onProgress} jumpToHighlight={jumpToHighlight} onJumpToHighlightHandled={onJumpToHighlightHandled} onHighlightAdded={onHighlightAdded} isFullscreen={isFullscreen} {...noteSourceProps} />}
-      {format === "pptx" && <PptxReaderView book={book} initialPage={initialPage} colorMode={colorMode} fontSize={fontSize} onProgress={onProgress} jumpToHighlight={jumpToHighlight} onJumpToHighlightHandled={onJumpToHighlightHandled} onHighlightAdded={onHighlightAdded} isFullscreen={isFullscreen} {...noteSourceProps} />}
-      {format === "audio" && <AudioReaderView book={book} initialPage={initialPage} colorMode={colorMode} fontSize={fontSize} onProgress={onProgress} />}
-      {format === "video" && <VideoReaderView book={book} initialPage={initialPage} colorMode={colorMode} fontSize={fontSize} onProgress={onProgress} />}
-      {format === "txt" && <TxtReaderView book={book} initialPage={initialPage} colorMode={colorMode} fontSize={fontSize} onProgress={onProgress} jumpToHighlight={jumpToHighlight} onJumpToHighlightHandled={onJumpToHighlightHandled} onHighlightAdded={onHighlightAdded} isFullscreen={isFullscreen} {...noteSourceProps} />}
-      {(format === "srt" || format === "vtt") && <CaptionReaderView book={book} initialPage={initialPage} colorMode={colorMode} fontSize={fontSize} onProgress={onProgress} jumpToHighlight={jumpToHighlight} onJumpToHighlightHandled={onJumpToHighlightHandled} onHighlightAdded={onHighlightAdded} isFullscreen={isFullscreen} {...noteSourceProps} />}
-      {(format === "cbz" || format === "cbr") && <ComicReaderView book={book} initialPage={initialPage} colorMode={colorMode} fontSize={fontSize} onProgress={onProgress} isFullscreen={isFullscreen} />}
-      {format === "mobi" && <MobiReaderView book={book} initialPage={initialPage} colorMode={colorMode} fontSize={fontSize} onProgress={onProgress} jumpToHighlight={jumpToHighlight} onJumpToHighlightHandled={onJumpToHighlightHandled} onHighlightAdded={onHighlightAdded} isFullscreen={isFullscreen} {...noteSourceProps} />}
+      {inkMessage && <div className="shrink-0 bg-indigo-500/10 px-4 py-1.5 text-[11px] text-indigo-300">{inkMessage}</div>}
+
+      <div className="relative flex min-h-0 flex-1 flex-col">
+
+      {format === "pdf" && <PdfReaderView book={book} initialPage={initialPage} colorMode={colorMode} fontSize={fontSize} onProgress={handleReaderProgress} jumpToHighlight={jumpToHighlight} onJumpToHighlightHandled={onJumpToHighlightHandled} onHighlightAdded={onHighlightAdded} isFullscreen={isFullscreen} isActive={isActive} bookInk={bookInk} {...noteSourceProps} />}
+      {format === "epub" && <EpubReaderView book={book} initialPage={initialPage} colorMode={colorMode} fontSize={fontSize} onProgress={handleReaderProgress} jumpToHighlight={jumpToHighlight} onJumpToHighlightHandled={onJumpToHighlightHandled} onHighlightAdded={onHighlightAdded} isFullscreen={isFullscreen} {...noteSourceProps} />}
+      {format === "pptx" && <PptxReaderView book={book} initialPage={initialPage} colorMode={colorMode} fontSize={fontSize} onProgress={handleReaderProgress} jumpToHighlight={jumpToHighlight} onJumpToHighlightHandled={onJumpToHighlightHandled} onHighlightAdded={onHighlightAdded} isFullscreen={isFullscreen} {...noteSourceProps} />}
+      {format === "audio" && <AudioReaderView book={book} initialPage={initialPage} colorMode={colorMode} fontSize={fontSize} onProgress={handleReaderProgress} />}
+      {format === "video" && <VideoReaderView book={book} initialPage={initialPage} colorMode={colorMode} fontSize={fontSize} onProgress={handleReaderProgress} />}
+      {format === "txt" && <TxtReaderView book={book} initialPage={initialPage} colorMode={colorMode} fontSize={fontSize} onProgress={handleReaderProgress} jumpToHighlight={jumpToHighlight} onJumpToHighlightHandled={onJumpToHighlightHandled} onHighlightAdded={onHighlightAdded} isFullscreen={isFullscreen} {...noteSourceProps} />}
+      {(format === "srt" || format === "vtt") && <CaptionReaderView book={book} initialPage={initialPage} colorMode={colorMode} fontSize={fontSize} onProgress={handleReaderProgress} jumpToHighlight={jumpToHighlight} onJumpToHighlightHandled={onJumpToHighlightHandled} onHighlightAdded={onHighlightAdded} isFullscreen={isFullscreen} {...noteSourceProps} />}
+      {(format === "cbz" || format === "cbr") && <ComicReaderView book={book} initialPage={initialPage} colorMode={colorMode} fontSize={fontSize} onProgress={handleReaderProgress} isFullscreen={isFullscreen} />}
+      {format === "mobi" && <MobiReaderView book={book} initialPage={initialPage} colorMode={colorMode} fontSize={fontSize} onProgress={handleReaderProgress} jumpToHighlight={jumpToHighlight} onJumpToHighlightHandled={onJumpToHighlightHandled} onHighlightAdded={onHighlightAdded} isFullscreen={isFullscreen} {...noteSourceProps} />}
       {format === "unsupported" && (
         <div className="flex-1 flex items-center justify-center text-gray-500 text-sm">
           This file type ({book.file_extension || book.mime_type || "unknown"}) isn't supported by the reader yet.
         </div>
       )}
+      {format !== "pdf" && isFullscreen && bookInk && (
+        <div className="absolute inset-0 z-30 bg-transparent">
+          <AnnotationCanvas noteId={bookInk.noteId} sourceFileId={bookInk.sourceFileId} bookId={bookInk.bookId} pageNumber={currentPage} annotations={bookInk.annotations} onPersisted={() => undefined} />
+        </div>
+      )}
+      </div>
     </div>
   );
 }

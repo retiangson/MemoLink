@@ -225,9 +225,9 @@ export function useZoomPan(active: boolean, options: UseZoomPanOptions = {}) {
         }
       } else if (e.touches.length === 1) {
         const isZoomedIn = transformRef.current.zoom > 1.01;
-        // Pan with single touch only in fullscreen mode or when already zoomed in.
-        // At normal zoom (zoom≈1) outside fullscreen, let the browser handle scrolling.
-        if (!active && !isZoomedIn) return;
+        // At normal zoom, let the browser handle vertical scrolling in both
+        // normal and fullscreen reading modes. Pan only after pinch zoom.
+        if (!isZoomedIn) return;
         e.preventDefault();
         const t    = e.touches[0];
         const prev = touchStateRef.current.get(t.identifier);

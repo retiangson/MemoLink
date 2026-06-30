@@ -167,3 +167,9 @@ class SmartSourceRepository:
             BookNoteLink.note_id == note_id,
             BookNoteLink.book_id == book_id,
         ).first()
+
+    def list_book_links(self, user_id: int, note_id: int) -> list[BookNoteLink]:
+        return self.db.query(BookNoteLink).filter(
+            BookNoteLink.user_id == user_id,
+            BookNoteLink.note_id == note_id,
+        ).order_by(BookNoteLink.created_at.asc()).all()

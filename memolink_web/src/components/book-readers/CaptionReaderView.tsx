@@ -309,7 +309,7 @@ export function CaptionReaderView({
           <div
             ref={containerRef}
             onAnimationEnd={() => setPageAnim(null)}
-            className={`relative shadow-lg rounded-xl max-w-2xl w-full h-fit p-8 ${pageAnim === "next" ? "ml-page-anim-next" : pageAnim === "prev" ? "ml-page-anim-prev" : ""}`}
+            className={`relative shadow-lg rounded-xl w-full h-fit p-8 ${pageAnim === "next" ? "ml-page-anim-next" : pageAnim === "prev" ? "ml-page-anim-prev" : ""}`}
             style={{ backgroundColor: colors.background, color: colors.foreground }}
           >
             {pageCues.map((cue) => (

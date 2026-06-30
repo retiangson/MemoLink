@@ -87,8 +87,19 @@ export interface RecordingMetadata {
   created_at: string | null;
 }
 
+export interface BookNoteLinkMetadata {
+  id: number;
+  user_id: number;
+  workspace_id: number | null;
+  book_id: number;
+  note_id: number;
+  source_file_id: number;
+  created_at: string | null;
+}
+
 export interface SmartSourceWorkspaceData {
   source_files: SourceFileMetadata[];
+  book_links: BookNoteLinkMetadata[];
   annotations: SourceAnnotation[];
   timeline: SourceTimelineEvent[];
   recordings: RecordingMetadata[];
@@ -104,6 +115,10 @@ export async function autosaveSourceNote(noteId: number, title: string, content:
 
 export async function createSourceAnnotation(payload: Omit<SourceAnnotation, "id" | "created_at" | "updated_at">): Promise<SourceAnnotation> {
   return (await api.post("/annotations", payload)).data;
+}
+
+export async function listSourceAnnotations(noteId: number, sourceFileId?: number | null): Promise<SourceAnnotation[]> {
+  return (await api.get("/annotations", { params: { note_id: noteId, ...(sourceFileId ? { source_file_id: sourceFileId } : {}) } })).data;
 }
 
 export async function updateSourceAnnotation(id: number, payload: Partial<SourceAnnotation>): Promise<SourceAnnotation> {

@@ -67,6 +67,8 @@ export interface BookNoteSourceStatus {
   user_id: number;
   book_id: number;
   status: "pending" | "processing" | "ready" | "failed";
+  note_id?: number | null;
+  source_file_id?: number | null;
   error_message?: string | null;
   created_at?: string | null;
   updated_at?: string | null;

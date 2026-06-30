@@ -683,6 +683,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
 
   // ── Note tab actions ──────────────────────────────────────────────────────
   async function handleOpenNote(note: Note | { id: null; title: string; content: string }) {
+    setBookReaderFullscreen(false);
     await editor.openNote(note);
     setActiveTabType("note");
   }
@@ -881,7 +882,14 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
     openBookTab(ub.book, ub.current_page || 1);
   }
 
+  function askAIFromBook(book: Book) {
+    setBookReaderFullscreen(false);
+    setActiveTabType("chat");
+    chat.setInput(`Ask a question about \"${book.title}\": `);
+  }
+
   function openStudyTool(tool: StudyTab) {
+    setBookReaderFullscreen(false);
     studyTabs.openStudyTab(tool);
     setActiveTabType("study");
   }
@@ -1874,12 +1882,56 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
                   jumpToHighlight={tab.pendingHighlight}
                   onJumpToHighlightHandled={() => bookTabs.clearPendingHighlight(tab.book.id)}
                   onHighlightAdded={handleBookHighlightAdded}
+                  onAskAI={askAIFromBook}
                   onFullscreenChange={i === bookTabs.activeIndex ? setBookReaderFullscreen : undefined}
                   isActive={isBookReaderActive && i === bookTabs.activeIndex}
                 />
               </div>
             ))}
           </div>
+        )}
+        {/* Note editor: always-mounted in stacked mode (like the book reader) so switching
+            book↔note doesn't unmount/remount the editor — avoids a black flash on Android
+            WebView when the canvas is hidden and the editor needs to paint from scratch. */}
+        {activeLayoutMode === "stacked" && editor.openNotes.length > 0 && (
+          <main {...readerTabProps("flex-1 px-4 py-6 overflow-hidden flex flex-col", isNoteActive)}>
+            <NoteEditorView
+              noteKey={editor.active?.clientKey ?? "no-note"}
+              noteTitleDraft={editor.noteTitleDraft}
+              setNoteTitleDraft={editor.setNoteTitleDraft}
+              noteContentDraft={editor.noteContentDraft}
+              setNoteContentDraft={editor.setNoteContentDraft}
+              isNoteDirty={editor.isNoteDirty}
+              onAutosave={handleAutosaveNote}
+              onEnsurePersisted={persistNoteSnapshot}
+              onAutosavePageExit={handleAutosaveNoteOnPageExit}
+              onEquationSolved={handleEquationSolved}
+              aiModel={selectedModel}
+              onPlay={chat.tts.speak}
+              ttsPlaying={chat.tts.playing}
+              ttsPaused={chat.tts.paused}
+              onTtsStop={chat.tts.stop}
+              onTtsPauseResume={chat.tts.paused ? chat.tts.resume : chat.tts.pause}
+              onTtsBack={chat.tts.back}
+              onTtsForward={chat.tts.forward}
+              ttsRate={chat.tts.rate}
+              ttsVoices={chat.tts.voices}
+              ttsSelectedVoice={chat.tts.selectedVoice}
+              onTtsRateChange={chat.tts.setRate}
+              onTtsVoiceChange={chat.tts.setSelectedVoice}
+              ttsSentenceIdx={chat.tts.currentSentenceIdx}
+              ttsSentences={chat.tts.sentencesList}
+              ttsWord={chat.tts.currentWord}
+              ttsEnabled={flags.tts_enabled}
+              videoImportEnabled={flags.video_import_enabled}
+              timelineEnabled={flags.timeline_enabled}
+              noteId={editor.active?.note.id ?? null}
+              publicAgentFeatureEnabled={flags.public_portfolio_agent_enabled}
+              publicAgentEnabled={editor.active?.note.public_agent_enabled ?? false}
+              onTogglePublicAgent={handleTogglePublicAgent}
+              onOpenHighlight={openBookHighlight}
+            />
+          </main>
         )}
         {/* ── Content area ─────────────────────────────────────────────── */}
         {activeLayoutMode === "stacked" ? (
@@ -1986,44 +2038,7 @@ export function ChatPage({ user, workspaceHook }: { user: User; workspaceHook: W
               )}
             </main>
           ) : isNoteActive ? (
-            <main className="flex-1 px-4 py-6 overflow-hidden flex flex-col">
-              <NoteEditorView
-                noteKey={editor.active?.clientKey ?? "no-note"}
-                noteTitleDraft={editor.noteTitleDraft}
-                setNoteTitleDraft={editor.setNoteTitleDraft}
-                noteContentDraft={editor.noteContentDraft}
-                setNoteContentDraft={editor.setNoteContentDraft}
-                isNoteDirty={editor.isNoteDirty}
-                onAutosave={handleAutosaveNote}
-                onEnsurePersisted={persistNoteSnapshot}
-                onAutosavePageExit={handleAutosaveNoteOnPageExit}
-                onEquationSolved={handleEquationSolved}
-                aiModel={selectedModel}
-                onPlay={chat.tts.speak}
-                ttsPlaying={chat.tts.playing}
-                ttsPaused={chat.tts.paused}
-                onTtsStop={chat.tts.stop}
-                onTtsPauseResume={chat.tts.paused ? chat.tts.resume : chat.tts.pause}
-                onTtsBack={chat.tts.back}
-                onTtsForward={chat.tts.forward}
-                ttsRate={chat.tts.rate}
-                ttsVoices={chat.tts.voices}
-                ttsSelectedVoice={chat.tts.selectedVoice}
-                onTtsRateChange={chat.tts.setRate}
-                onTtsVoiceChange={chat.tts.setSelectedVoice}
-                ttsSentenceIdx={chat.tts.currentSentenceIdx}
-                ttsSentences={chat.tts.sentencesList}
-                ttsWord={chat.tts.currentWord}
-                ttsEnabled={flags.tts_enabled}
-                videoImportEnabled={flags.video_import_enabled}
-                timelineEnabled={flags.timeline_enabled}
-                noteId={editor.active?.note.id ?? null}
-                publicAgentFeatureEnabled={flags.public_portfolio_agent_enabled}
-                publicAgentEnabled={editor.active?.note.public_agent_enabled ?? false}
-                onTogglePublicAgent={handleTogglePublicAgent}
-                onOpenHighlight={openBookHighlight}
-              />
-            </main>
+            null
           ) : (
             <>
               <main className="flex-1 px-4 py-6 overflow-hidden">
