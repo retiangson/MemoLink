@@ -387,38 +387,40 @@ export function NoteEditorView({
         </div>
       )}
 
-      <div className="mb-2 flex items-center justify-between gap-2 shrink-0">
-        <div className="flex items-center gap-1">
-          {isLegacyNote && (["editor", "source", "timeline"] as const).map((tab) => (
-            (tab !== "timeline" || (timelineEnabled && noteId)) && (
-              <button
-                key={tab}
-                onClick={() => setWorkspaceTab(tab)}
-                className={`rounded-lg px-3 py-1 text-xs font-medium capitalize transition ${workspaceTab === tab ? "bg-indigo-600 text-white" : "text-gray-500 hover:text-gray-300"}`}
-              >
-                {tab}
-              </button>
-            )
-          ))}
+      {isLegacyNote && (
+        <div className="mb-2 flex items-center justify-between gap-2 shrink-0">
+          <div className="flex items-center gap-1">
+            {(["editor", "source", "timeline"] as const).map((tab) => (
+              (tab !== "timeline" || (timelineEnabled && noteId)) && (
+                <button
+                  key={tab}
+                  onClick={() => setWorkspaceTab(tab)}
+                  className={`rounded-lg px-3 py-1 text-xs font-medium capitalize transition ${workspaceTab === tab ? "bg-indigo-600 text-white" : "text-gray-500 hover:text-gray-300"}`}
+                >
+                  {tab}
+                </button>
+              )
+            ))}
+          </div>
+          <div className="flex items-center gap-2">
+            {effectiveNoteId && (
+              <SourceUploadButton
+                noteId={effectiveNoteId}
+                disabled={isNoteDirty}
+                onComplete={() => {
+                  void workspace.reload();
+                  void getNote(effectiveNoteId).then((fresh) => {
+                    setNoteContentDraft(fresh.content || "");
+                    setRawContent(fresh.content || "");
+                  });
+                }}
+              />
+            )}
+            <FontSizePicker value={fontSize} onChange={setFontSize} />
+            <ColorModePicker value={colorMode} onChange={setColorMode} />
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          {isLegacyNote && effectiveNoteId && (
-            <SourceUploadButton
-              noteId={effectiveNoteId}
-              disabled={isNoteDirty}
-              onComplete={() => {
-                void workspace.reload();
-                void getNote(effectiveNoteId).then((fresh) => {
-                  setNoteContentDraft(fresh.content || "");
-                  setRawContent(fresh.content || "");
-                });
-              }}
-            />
-          )}
-          <FontSizePicker value={fontSize} onChange={setFontSize} />
-          <ColorModePicker value={colorMode} onChange={setColorMode} />
-        </div>
-      </div>
+      )}
 
       {hasSourceWorkspace ? (
         <SmartSourceWorkspace
@@ -436,6 +438,7 @@ export function NoteEditorView({
             });
           }}
           sourceUploadDisabled={isNoteDirty}
+          controls={<><FontSizePicker value={fontSize} onChange={setFontSize} /><ColorModePicker value={colorMode} onChange={setColorMode} /></>}
           timelineSupplement={timelineEnabled && effectiveNoteId ? <div className="border-t border-[var(--ml-bg-hover)] p-4"><TimelinePanel noteId={effectiveNoteId} onJump={jumpToText} /></div> : null}
           editor={(
             <div data-rc-mode={colorMode} style={{ filter: richContentFilter(colorMode), ...noteFontSizeVar }} className="flex h-full flex-col overflow-hidden bg-[var(--ml-bg-bar)] transition-[filter]">

@@ -17,6 +17,7 @@ interface Props {
   onSourceChanged?: () => void;
   sourceUploadDisabled?: boolean;
   workspace: SmartSourceWorkspaceState;
+  controls?: React.ReactNode;
 }
 
 const TabIcons: Record<WorkspaceTab, React.ReactNode> = {
@@ -54,7 +55,7 @@ const TAB_LABELS: Record<WorkspaceTab, string> = {
 
 const TAB_ORDER: WorkspaceTab[] = ["original", "editor", "source", "timeline"];
 
-export function SmartSourceWorkspace({ noteId, noteKey, editor, rawContent, timelineSupplement, activeTab: controlledTab, onTabChange, onSourceChanged, sourceUploadDisabled, workspace }: Props) {
+export function SmartSourceWorkspace({ noteId, noteKey, editor, rawContent, timelineSupplement, activeTab: controlledTab, onTabChange, onSourceChanged, sourceUploadDisabled, workspace, controls }: Props) {
   const [internalTab, setInternalTab] = useState<WorkspaceTab>("editor");
   const activeTab = controlledTab ?? internalTab;
   const setActiveTab = useCallback((tab: WorkspaceTab) => {
@@ -100,6 +101,7 @@ export function SmartSourceWorkspace({ noteId, noteKey, editor, rawContent, time
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
           </svg>
         )}
+        {controls && <div className="ml-auto flex items-center gap-2">{controls}</div>}
       </div>
       <div className="relative min-h-0 flex-1 overflow-hidden rounded-xl border border-[var(--ml-bg-panel)] bg-[var(--ml-bg-bar)]">
         {/* Keep TipTap mounted while browsing source tabs. Recreating the editor on
