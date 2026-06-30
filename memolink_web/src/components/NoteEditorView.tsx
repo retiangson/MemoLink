@@ -604,23 +604,12 @@ export function NoteEditorView({
             )}
             <button
               onClick={() => setShowPicker((v) => !v)}
-              title="Record and transcribe"
-              className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs text-gray-500 hover:text-red-400 hover:bg-red-400/10 border border-transparent hover:border-red-400/20 transition"
+              title={`Record and transcribe${recordMode === "lecture" ? " — Lecture mode" : ""}${language ? ` (${language})` : ""}`}
+              className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-500 hover:text-red-400 hover:bg-red-400/10 border border-transparent hover:border-red-400/20 transition shrink-0"
             >
               <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 fill-current" xmlns="http://www.w3.org/2000/svg">
                 <path d="M12 1a4 4 0 0 1 4 4v6a4 4 0 0 1-8 0V5a4 4 0 0 1 4-4zm-6 10a6 6 0 0 0 12 0h2a8 8 0 0 1-7 7.93V21h2v2H9v-2h2v-2.07A8 8 0 0 1 4 11h2z" />
               </svg>
-              Record
-              {recordMode === "lecture" && (
-                <span className="ml-0.5 px-1 py-0.5 rounded bg-emerald-600/30 text-emerald-300 text-[10px] uppercase">
-                  Lecture
-                </span>
-              )}
-              {language && (
-                <span className="ml-0.5 px-1 py-0.5 rounded bg-indigo-600/30 text-indigo-300 text-[10px] uppercase">
-                  {language}
-                </span>
-              )}
             </button>
           </div>
         )}
@@ -651,7 +640,7 @@ export function NoteEditorView({
             onClick={() => setShowExport((v) => !v)}
             disabled={!noteContentDraft.trim()}
             title="Export note"
-            className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs text-gray-500 hover:text-emerald-400 hover:bg-emerald-400/10 border border-transparent hover:border-emerald-400/20 disabled:opacity-30 transition"
+            className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-500 hover:text-emerald-400 hover:bg-emerald-400/10 border border-transparent hover:border-emerald-400/20 disabled:opacity-30 transition shrink-0"
           >
             {exporting ? (
               <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -664,7 +653,6 @@ export function NoteEditorView({
                 <path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708z"/>
               </svg>
             )}
-            Export
           </button>
         </div>
 
@@ -672,13 +660,12 @@ export function NoteEditorView({
         {videoImportEnabled && <button
           onClick={() => setShowVideoImport(true)}
           title="Import from video URL"
-          className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs text-gray-500 hover:text-red-400 hover:bg-red-400/10 border border-transparent hover:border-red-400/20 transition shrink-0"
+          className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-500 hover:text-red-400 hover:bg-red-400/10 border border-transparent hover:border-red-400/20 transition shrink-0"
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" viewBox="0 0 16 16" fill="currentColor">
             <path d="M6.79 5.093A.5.5 0 0 0 6 5.5v5a.5.5 0 0 0 .79.407l3.5-2.5a.5.5 0 0 0 0-.814z"/>
             <path d="M0 4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2zm2-1a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V4a1 1 0 0 0-1-1z"/>
           </svg>
-          Video
         </button>}
 
         <button
@@ -714,9 +701,9 @@ export function NoteEditorView({
           <button
             onClick={onTogglePublicAgent}
             title={publicAgentEnabled
-              ? "This note can be retrieved by your public portfolio agent(s). Click to make it private again."
-              : "Make this note visible to your public portfolio agent(s). It stays private until you do this."}
-            className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs border transition shrink-0 ${
+              ? "Public — visible to portfolio agent. Click to make private."
+              : "Private — hidden from portfolio agent. Click to make public."}
+            className={`flex h-7 w-7 items-center justify-center rounded-lg border transition shrink-0 ${
               publicAgentEnabled
                 ? "text-emerald-400 bg-emerald-400/10 border-emerald-400/20 hover:bg-emerald-400/20"
                 : "text-gray-500 border-transparent hover:text-emerald-400 hover:bg-emerald-400/10 hover:border-emerald-400/20"
@@ -725,7 +712,6 @@ export function NoteEditorView({
             <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 16 16">
               <path d="M8 1a2 2 0 0 1 2 2v1h2.5A1.5 1.5 0 0 1 14 5.5V13a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5.5A1.5 1.5 0 0 1 3.5 4H6V3a2 2 0 0 1 2-2zm0 1a1 1 0 0 0-1 1v1h2V3a1 1 0 0 0-1-1zM3.5 5a.5.5 0 0 0-.5.5V13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V5.5a.5.5 0 0 0-.5-.5zM6 8a1 1 0 1 1 2 0 1 1 0 0 1-2 0m4 0a1 1 0 1 1 2 0 1 1 0 0 1-2 0"/>
             </svg>
-            {publicAgentEnabled ? "Public" : "Private"}
           </button>
         )}
 
@@ -746,12 +732,11 @@ export function NoteEditorView({
               onClick={handlePlay}
               disabled={!noteContentDraft.trim()}
               title="Read note aloud from cursor position"
-              className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs text-gray-500 hover:text-indigo-400 hover:bg-indigo-400/10 border border-transparent hover:border-indigo-400/20 disabled:opacity-30 transition shrink-0"
+              className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-500 hover:text-indigo-400 hover:bg-indigo-400/10 border border-transparent hover:border-indigo-400/20 disabled:opacity-30 transition shrink-0"
             >
               <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M8 5v14l11-7z"/>
               </svg>
-              Read
             </button>
           )
         )}
