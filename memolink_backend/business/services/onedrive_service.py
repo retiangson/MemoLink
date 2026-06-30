@@ -344,9 +344,28 @@ class OneDriveService:
             return f"/me/drive/root:/{quote(path)}:/children"
         return "/me/drive/root/children"
 
+    async def get_file_download_url(self, *, drive_id: str, item_id: str) -> str:
+        """Return a pre-authenticated short-lived CDN URL for direct client download.
+        Avoids proxying file bytes through the backend (critical on Lambda where the
+        response payload is capped at 6 MB)."""
+        token = await self._get_valid_access_token()
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            resp = await client.get(
+                f"{GRAPH_BASE}/drives/{drive_id}/items/{item_id}",
+                headers={"Authorization": f"Bearer {token}"},
+                params={"$select": "@microsoft.graph.downloadUrl"},
+            )
+        if resp.status_code != 200:
+            raise OneDriveServiceError(resp.status_code, f"Failed to get download URL from OneDrive: {resp.status_code}")
+        url = resp.json().get("@microsoft.graph.downloadUrl")
+        if not url:
+            raise OneDriveServiceError(502, "OneDrive did not return a download URL for this file")
+        return url
+
     async def download_file_bytes(self, *, drive_id: str, item_id: str) -> bytes:
-        """Stream a file's content from OneDrive. Used only when a user opens the reader
-        or clicks Save as Note Source — never during routine metadata sync."""
+        """Download a file's full content from OneDrive into memory.
+        Only safe for small files or non-Lambda deployments — Lambda caps responses
+        at 6 MB. Prefer get_file_download_url() for user-facing file delivery."""
         token = await self._get_valid_access_token()
         async with httpx.AsyncClient(timeout=60.0) as client:
             resp = await client.get(
