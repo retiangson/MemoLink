@@ -27,6 +27,7 @@ export function PdfSourceViewer({ noteId, sourceFileId, bookId, objectUrl, annot
   const [pageCount, setPageCount] = useState(0);
   const [hostSize, setHostSize] = useState({ width: 800, height: 900 });
   const [isMaximized, setIsMaximized] = useState(false);
+  const [autoScroll, setAutoScroll] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -136,7 +137,7 @@ export function PdfSourceViewer({ noteId, sourceFileId, bookId, objectUrl, annot
         <div ref={scrollRef} className="flex min-h-0 flex-1 items-start justify-center overflow-auto p-4">
           <div className="relative shrink-0 bg-white shadow-xl">
             <canvas ref={canvasRef} className="block" />
-            <AnnotationCanvas noteId={noteId} sourceFileId={sourceFileId} bookId={bookId} pageNumber={pageNumber} annotations={annotations} onPersisted={onAnnotationsChanged} />
+            <AnnotationCanvas noteId={noteId} sourceFileId={sourceFileId} bookId={bookId} pageNumber={pageNumber} annotations={annotations} onPersisted={onAnnotationsChanged} isMaximized={isMaximized} onToggleMaximized={() => setIsMaximized((v) => !v)} />
           </div>
         </div>
       )}
@@ -147,20 +148,6 @@ export function PdfSourceViewer({ noteId, sourceFileId, bookId, objectUrl, annot
         <span className="min-w-[90px] text-center">Page {pageNumber} of {pageCount || "…"}</span>
         <button type="button" disabled={!pageCount || pageNumber >= pageCount} onClick={() => setPageNumber((p) => p + 1)} title="Next page" className="flex h-7 w-7 items-center justify-center rounded-lg disabled:opacity-35 hover:bg-white/10 transition">
           <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M9 18l6-6-6-6" /></svg>
-        </button>
-        <button
-          type="button"
-          onClick={() => setIsMaximized((current) => !current)}
-          title={isMaximized ? "Restore note view (Esc)" : "Maximize document"}
-          aria-label={isMaximized ? "Restore document view" : "Maximize document"}
-          aria-pressed={isMaximized}
-          className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-400 transition hover:bg-white/10 hover:text-white"
-        >
-          {isMaximized ? (
-            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2"><path d="M8 3v5H3M16 3v5h5M8 21v-5H3M16 21v-5h5" /></svg>
-          ) : (
-            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2"><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5" /></svg>
-          )}
         </button>
       </div>
     </div>
