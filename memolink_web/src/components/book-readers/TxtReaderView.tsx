@@ -246,7 +246,7 @@ export function TxtReaderView({
             onAnimationEnd={() => setPageAnim(null)}
             onDoubleClick={handleDoubleClick}
             title="Double-click a sentence to start reading from there"
-            className={`relative shadow-lg rounded-xl max-w-2xl w-full h-fit p-10 whitespace-pre-wrap leading-relaxed cursor-text ${pageAnim === "next" ? "ml-page-anim-next" : pageAnim === "prev" ? "ml-page-anim-prev" : ""}`}
+            className={`relative shadow-lg rounded-xl w-full h-fit p-10 whitespace-pre-wrap leading-relaxed cursor-text ${pageAnim === "next" ? "ml-page-anim-next" : pageAnim === "prev" ? "ml-page-anim-prev" : ""}`}
             style={{ backgroundColor: colors.background, color: colors.foreground, fontSize: `${readerFontSizePx(fontSize, 15)}px` }}
           >
             {pages[currentPage - 1] || ""}

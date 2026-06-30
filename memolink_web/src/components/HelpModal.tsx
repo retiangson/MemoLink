@@ -217,7 +217,9 @@ const CONTENT: Record<string, React.ReactNode> = {
             "Select text in PDF, EPUB, PPTX, TXT, captions, or MOBI books, then click Highlight - pick a color to tag it.",
             "Every highlight is appended to an auto-generated \"{Book Title} - Highlights\" note, and the Notes list updates instantly.",
             "Click a highlight inside that note to jump the reader straight back to the exact passage - the highlighted text itself can't be edited.",
-            "\"Save as Note Source\" extracts a book's full text (PDF, EPUB, PPTX, TXT, SRT/VTT) into searchable notes so it becomes part of AI Chat's grounded answers.",
+            "\"Save as Note Source\" extracts a book's full text (PDF, EPUB, MOBI, PPTX, TXT, SRT/VTT) into searchable notes so it becomes part of AI Chat's grounded answers.",
+            "In fullscreen, tap the pen icon to open the same drawing toolbar used by Notes. Ink is shared with that book's supported Original preview, saved per source page in the database, and never written into the original book file.",
+            "Fullscreen also keeps Ask AI available. Select passages for source highlights, or ask questions against the prepared book note source.",
             "Deleting the highlights note permanently (from the Recycle Bin) also permanently deletes all highlights saved for that book.",
           ].map((item, i) => (
             <li key={i} className="flex gap-2"><span className="text-indigo-500 shrink-0 mt-0.5">•</span><span>{item}</span></li>

@@ -147,7 +147,14 @@ class BookNoteSourceService:
 
     def get_status(self, user_id: int, book_id: int) -> Optional[BookNoteSourceResponseDTO]:
         row = self._user_books.get_note_source(user_id, book_id)
-        return BookNoteSourceResponseDTO.model_validate(row) if row else None
+        if not row:
+            return None
+        note_id = next(iter(self._user_books.list_note_ids_for_source(row.id)), None) if row.status == "ready" else None
+        link = self._smart_sources.get_book_link(user_id, note_id, book_id) if note_id is not None and self._smart_sources else None
+        return BookNoteSourceResponseDTO.model_validate(row).model_copy(update={
+            "note_id": note_id,
+            "source_file_id": link.source_file_id if link else None,
+        })
 
     def mark_failed(self, user_id: int, book_id: int, message: str) -> None:
         row = self._user_books.get_note_source(user_id, book_id)
@@ -174,7 +181,7 @@ class BookNoteSourceService:
             for note_id in self._user_books.list_note_ids_for_source(existing.id):
                 note = self._notes.get_by_id(note_id)
                 if note and note.deleted_at is None:
-                    return BookNoteSourceResponseDTO.model_validate(existing)
+                    return self.get_status(user_id, book_id)
         row = self._user_books.get_or_create_note_source(user_id, book_id)
         self._user_books.set_note_source_status(row.id, "pending")
         return self.get_status(user_id, book_id)

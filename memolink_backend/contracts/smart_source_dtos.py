@@ -70,6 +70,8 @@ class StrokePointDTO(BaseModel):
 class StrokePayloadDTO(BaseModel):
     version: int = Field(default=1, ge=1, le=1)
     pointerType: str = Field(max_length=20)
+    penType: Optional[str] = Field(default=None, max_length=40)
+    opacity: Optional[float] = Field(default=None, ge=0, le=1)
     points: list[StrokePointDTO] = Field(min_length=2, max_length=20000)
 
 
@@ -192,8 +194,21 @@ class RecordingMetadataResponseDTO(BaseModel):
     created_at: Optional[datetime]
 
 
+class BookNoteLinkResponseDTO(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    user_id: int
+    workspace_id: Optional[int]
+    book_id: int
+    note_id: int
+    source_file_id: int
+    created_at: Optional[datetime]
+
+
 class SourceWorkspaceResponseDTO(BaseModel):
     source_files: list[SourceFileResponseDTO]
+    book_links: list[BookNoteLinkResponseDTO] = Field(default_factory=list)
     annotations: list[AnnotationResponseDTO]
     timeline: list[TimelineEventResponseDTO]
     recordings: list[RecordingMetadataResponseDTO]

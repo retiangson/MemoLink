@@ -115,6 +115,8 @@ class BookNoteSourceResponseDTO(BaseModel):
     user_id: int
     book_id: int
     status: str
+    note_id: Optional[int] = None
+    source_file_id: Optional[int] = None
     error_message: Optional[str] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None

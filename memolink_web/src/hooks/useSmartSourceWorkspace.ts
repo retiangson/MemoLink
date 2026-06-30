@@ -3,6 +3,7 @@ import { getSmartSourceWorkspace, smartSourceErrorMessage, type SmartSourceWorks
 
 const EMPTY_WORKSPACE: SmartSourceWorkspaceData = {
   source_files: [],
+  book_links: [],
   annotations: [],
   timeline: [],
   recordings: [],

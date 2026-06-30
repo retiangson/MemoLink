@@ -73,6 +73,7 @@ export function useAnnotationCanvas(
   pageNumber: number | null,
   initialAnnotations: SourceAnnotation[],
   _onPersisted: () => void,
+  bookId: number | null = null,
 ) {
   const [tool, setToolState] = useState<AnnotationTool>("view");
   const [penType, setPenTypeState] = useState<PenType>("pen");
@@ -94,7 +95,7 @@ export function useAnnotationCanvas(
   const mountedRef = useRef(true);
   const nextTemporaryIdRef = useRef(-1);
   const deletedIdsRef = useRef(new Set<number>());
-  const scopeRef = useRef(`${noteId}:${sourceFileId ?? "note"}:${pageNumber ?? "all"}`);
+  const scopeRef = useRef(`${noteId}:${sourceFileId ?? "note"}:${bookId ?? "no-book"}`);
   const eraseBeforeRef = useRef<SourceAnnotation[] | null>(null);
 
   function allocateTemporaryId(): number {
@@ -112,10 +113,10 @@ export function useAnnotationCanvas(
   const annotations = useMemo(
     () => localAnnotations.filter((annotation) =>
       (annotation.source_file_id ?? null) === sourceFileId
-      && (sourceFileId !== null || annotation.book_id == null)
+      && (annotation.book_id ?? null) === bookId
       && (pageNumber === null || (annotation.page_number ?? 1) === pageNumber)
     ),
-    [localAnnotations, pageNumber, sourceFileId],
+    [bookId, localAnnotations, pageNumber, sourceFileId],
   );
 
   const processQueue = useCallback(async () => {
@@ -162,7 +163,7 @@ export function useAnnotationCanvas(
   }, []);
 
   useEffect(() => {
-    const scope = `${noteId}:${sourceFileId ?? "note"}:${pageNumber ?? "all"}`;
+    const scope = `${noteId}:${sourceFileId ?? "note"}:${bookId ?? "no-book"}`;
     if (scopeRef.current !== scope) {
       scopeRef.current = scope;
       localAnnotationsRef.current = initialAnnotations;
@@ -180,7 +181,7 @@ export function useAnnotationCanvas(
       const serverRows = initialAnnotations.filter((annotation) => !deletedIdsRef.current.has(annotation.id));
       return [...serverRows, ...localPersisted, ...pending];
     });
-  }, [initialAnnotations, noteId, pageNumber, replaceAnnotations, sourceFileId]);
+  }, [bookId, initialAnnotations, noteId, pageNumber, replaceAnnotations, sourceFileId]);
 
   useEffect(() => () => {
     if (queueTimerRef.current != null) window.clearTimeout(queueTimerRef.current);
@@ -260,7 +261,7 @@ export function useAnnotationCanvas(
       id: allocateTemporaryId(),
       note_id: noteId,
       source_file_id: sourceFileId,
-      book_id: null,
+      book_id: bookId,
       page_number: savedPageNumber,
       location_anchor: { coordinateSpace: "normalized", page: savedPageNumber, ...anchorMetadata },
       annotation_type: tool === "highlighter" ? "highlighter" : completed.pointerType === "pen" ? "handwriting" : "pen",
@@ -339,7 +340,7 @@ export function useAnnotationCanvas(
   function addTextAnnotation(point: StrokePoint, annotationType: "text" | "comment", text: string) {
     if (!text.trim()) return;
     const temporary: SourceAnnotation = {
-      id: allocateTemporaryId(), note_id: noteId, source_file_id: sourceFileId, book_id: null,
+      id: allocateTemporaryId(), note_id: noteId, source_file_id: sourceFileId, book_id: bookId,
       page_number: pageNumber ?? 1,
       location_anchor: { coordinateSpace: "normalized", page: pageNumber ?? 1, x: point.x, y: point.y },
       annotation_type: annotationType, strokes_json: null, highlight_data: null, comment_text: text.trim(),

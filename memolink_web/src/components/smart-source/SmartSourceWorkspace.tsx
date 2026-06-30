@@ -30,6 +30,9 @@ export function SmartSourceWorkspace({ noteId, noteKey, editor, rawContent, time
   const [localCacheStatus, setLocalCacheStatus] = useState("not checked");
   const annotationReloadTimerRef = useRef<number | null>(null);
   const source = workspace.data.source_files.at(-1) ?? null;
+  const bookLink = source
+    ? (workspace.data.book_links ?? []).find((link) => link.source_file_id === source.id) ?? null
+    : null;
   useEffect(() => { setActiveTab("editor"); }, [noteKey, setActiveTab]);
   const handleCacheStatus = useCallback((status: string) => setLocalCacheStatus(status), []);
   const scheduleAnnotationReload = useCallback(() => {
@@ -56,8 +59,14 @@ export function SmartSourceWorkspace({ noteId, noteKey, editor, rawContent, time
         {noteId && <SourceUploadButton noteId={noteId} disabled={sourceUploadDisabled} onComplete={() => { void workspace.reload(); onSourceChanged?.(); }} />}
       </div>
       <div className="relative min-h-0 flex-1 overflow-hidden rounded-xl border border-[var(--ml-bg-panel)] bg-[var(--ml-bg-bar)]">
-        {activeTab === "editor" && editor}
-        {activeTab === "original" && noteId && <SourceFileViewer noteId={noteId} source={source} annotations={workspace.data.annotations} onAnnotationsChanged={scheduleAnnotationReload} onCacheStatus={handleCacheStatus} />}
+        {/* Keep TipTap mounted while browsing source tabs. Recreating the editor on
+            every Original -> Editor switch loses transient editor state and leaves
+            a blank panel while its async editor instance is initialized, which is
+            especially visible as a black screen in Android WebView. */}
+        <div className={activeTab === "editor" ? "h-full" : "hidden"} aria-hidden={activeTab !== "editor"}>
+          {editor}
+        </div>
+        {activeTab === "original" && noteId && <SourceFileViewer noteId={noteId} source={source} bookId={bookLink?.book_id ?? null} annotations={workspace.data.annotations} onAnnotationsChanged={scheduleAnnotationReload} onCacheStatus={handleCacheStatus} />}
         {activeTab === "source" && <SourceMetadataTab source={source} localCacheStatus={localCacheStatus} rawContent={rawContent} />}
         {activeTab === "timeline" && <div className="h-full overflow-y-auto"><NoteTimelineTab events={workspace.data.timeline} />{timelineSupplement}</div>}
         {workspace.error && activeTab !== "editor" && <div className="absolute bottom-4 left-4 right-4 rounded-lg bg-red-500/10 p-2 text-xs text-red-400">{workspace.error}</div>}

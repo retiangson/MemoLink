@@ -20,6 +20,7 @@ import { highlightColorMark } from "./highlightColors";
 import { ZoomPanWrapper } from "./ZoomPanWrapper";
 import { disposeReaderAfterPaint, isNativeReaderPlatform } from "./nativeReaderLifecycle";
 import { useSelectionChangeCapture } from "../../hooks/useSelectionChangeCapture";
+import { AnnotationCanvas } from "../smart-source/AnnotationCanvas";
 
 interface PendingSelection { start: number; end: number; }
 
@@ -29,8 +30,10 @@ export function PdfReaderView({
   book, initialPage, colorMode, fontSize, onProgress,
   noteStatus, noteStatusLoaded, savingNoteSource, onSaveAsNoteSource,
   jumpToHighlight, onJumpToHighlightHandled, onHighlightAdded, isFullscreen, isActive,
+  bookInk,
 }: ReaderViewProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const readerSurfaceRef = useRef<HTMLDivElement | null>(null);
   const textLayerRef = useRef<HTMLDivElement | null>(null);
   const pdfDocRef = useRef<pdfjsLib.PDFDocumentProxy | null>(null);
   const renderTaskRef = useRef<{ cancel: () => void } | null>(null);
@@ -47,6 +50,7 @@ export function PdfReaderView({
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
   const [showBookmarks, setShowBookmarks] = useState(false);
   const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
+  const [readerWidth, setReaderWidth] = useState(0);
   const [pageAnim, setPageAnim] = useState<"next" | "prev" | null>(null);
   const [pendingSelection, setPendingSelection] = useState<PendingSelection | null>(null);
   const [highlights, setHighlights] = useState<BookHighlight[]>([]);
@@ -55,6 +59,17 @@ export function PdfReaderView({
 
   const tts = useTTS();
   const [highlightColor, setHighlightColor] = useHighlightColor();
+
+  useEffect(() => {
+    const surface = readerSurfaceRef.current;
+    if (!surface) return;
+    const updateWidth = () => setReaderWidth(Math.max(0, surface.clientWidth - 32));
+    updateWidth();
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(updateWidth);
+    observer.observe(surface);
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -140,7 +155,10 @@ export function PdfReaderView({
     if (!doc || !canvas) return;
     renderTaskRef.current?.cancel();
     const page = await doc.getPage(pageNum);
-    const viewport = page.getViewport({ scale: 1.4 * readerFontScale(fontSize) });
+    const unscaled = page.getViewport({ scale: 1 });
+    const fitScale = readerWidth > 0 ? readerWidth / unscaled.width : 1.4;
+    const scale = Math.min(3, Math.max(0.5, fitScale * readerFontScale(fontSize)));
+    const viewport = page.getViewport({ scale });
     canvas.width = viewport.width;
     canvas.height = viewport.height;
     setViewportSize({ width: viewport.width, height: viewport.height });
@@ -182,7 +200,7 @@ export function PdfReaderView({
       await textLayer.render();
       textDivsRef.current = textLayer.textDivs as HTMLElement[];
     }
-  }, [fontSize]);
+  }, [fontSize, readerWidth]);
 
   useEffect(() => {
     if (loading || !pdfDocRef.current) return;
@@ -388,6 +406,7 @@ export function PdfReaderView({
         overlay={!loading && !error ? <PageNavArrows onPrev={() => goToPage(currentPage - 1)} onNext={() => goToPage(currentPage + 1)} canPrev={currentPage > 1} canNext={currentPage < numPages} /> : undefined}
       >
       <div
+        ref={readerSurfaceRef}
         className={`flex-1 ${isFullscreen ? "overflow-visible" : "overflow-auto"} flex justify-center py-6 px-4 relative transition-colors ${readerSurfaceClass(colorMode)}`}
         {...(!isFullscreen ? swipeHandlers : {})}
       >
@@ -431,6 +450,16 @@ export function PdfReaderView({
                 handleSentenceClick(range.start);
               }}
             />
+            {bookInk?.enabled && (
+              <AnnotationCanvas
+                noteId={bookInk.noteId}
+                sourceFileId={bookInk.sourceFileId}
+                bookId={bookInk.bookId}
+                pageNumber={currentPage}
+                annotations={bookInk.annotations}
+                onPersisted={() => undefined}
+              />
+            )}
           </div>
         )}
       </div>

@@ -19,7 +19,7 @@ export function ZoomPanWrapper({ active, children, overlay, surfaceClass = "", o
   // Once pinched in (zoom > 1) or in fullscreen, intercept all touch so
   // panning works correctly and the browser doesn't fight us.
   const isZoomedIn = zoom > 1.01;
-  const touchAction = (active || isZoomedIn) ? "none" : "pan-x pan-y";
+  const touchAction = isZoomedIn ? "none" : "pan-x pan-y";
 
   // Always render the SAME two-level DOM structure regardless of active state.
   // Changing the wrapper structure causes React to re-mount children, which blanks
@@ -27,12 +27,12 @@ export function ZoomPanWrapper({ active, children, overlay, surfaceClass = "", o
   return (
     <div
       ref={containerRef}
-      className={`flex-1 relative min-h-0 flex flex-col overflow-hidden ${active ? surfaceClass : ""}`}
+      className={`flex-1 relative min-h-0 flex flex-col ${isZoomedIn ? "overflow-hidden" : "overflow-auto"} ${active ? surfaceClass : ""}`}
       style={{
-        cursor: active ? (isDragging ? "grabbing" : "grab") : undefined,
+        cursor: active && isZoomedIn ? (isDragging ? "grabbing" : "grab") : undefined,
         touchAction,
       }}
-      onMouseDown={active ? handlers.onMouseDown : undefined}
+      onMouseDown={active && isZoomedIn ? handlers.onMouseDown : undefined}
     >
       {/* Stable child-wrapper: transform always applied (no-op at zoom=1/pan=0),
           so pinch-to-zoom works outside fullscreen without changing DOM structure. */}

@@ -47,7 +47,7 @@ class FakeNotes:
         return None
 
 
-def build_service(user_books):
+def build_service(user_books, smart_sources=None):
     return BookNoteSourceService(
         book_repo=None,
         user_book_repo=user_books,
@@ -55,7 +55,7 @@ def build_service(user_books):
         embedding_service=None,
         onedrive_service=None,
         book_cache_service=None,
-        smart_source_repo=None,
+        smart_source_repo=smart_sources,
     )
 
 
@@ -87,6 +87,40 @@ def test_stale_processing_job_is_reset_to_pending_for_retry():
 
     assert status.status == "pending"
     assert repo.set_calls[-1][1] == "pending"
+
+
+def test_ready_status_exposes_generated_note_id():
+    ready = SimpleNamespace(
+        id=4, user_id=7, book_id=9, status="ready", error_message=None,
+        created_at=datetime.now(timezone.utc), updated_at=datetime.now(timezone.utc),
+    )
+    repo = FakeUserBooks(ready)
+    repo.list_note_ids_for_source = lambda source_id: [321]
+
+    smart_sources = SimpleNamespace(
+        get_book_link=lambda user_id, note_id, book_id: SimpleNamespace(source_file_id=654),
+    )
+    status = build_service(repo, smart_sources).get_status(7, 9)
+
+    assert status is not None
+    assert status.note_id == 321
+    assert status.source_file_id == 654
+
+
+def test_starting_existing_ready_source_keeps_generated_note_id():
+    ready = SimpleNamespace(
+        id=4, user_id=7, book_id=9, status="ready", error_message=None,
+        created_at=datetime.now(timezone.utc), updated_at=datetime.now(timezone.utc),
+    )
+    repo = FakeUserBooks(ready)
+    repo.list_note_ids_for_source = lambda source_id: [321]
+    service = build_service(repo)
+    service._notes = SimpleNamespace(get_by_id=lambda note_id: SimpleNamespace(id=note_id, deleted_at=None))
+
+    status = service.start(7, 9)
+
+    assert status.note_id == 321
+    assert repo.set_calls == []
 
 
 def test_lambda_dispatch_uses_async_invocation(monkeypatch):

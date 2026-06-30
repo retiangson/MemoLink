@@ -40,6 +40,9 @@ class FakeSmartSources:
     def list_sources(self, user_id, note_id):
         return []
 
+    def list_book_links(self, user_id, note_id):
+        return []
+
 
 class FakeAutosaveNotes(FakeNotes):
     def update_note(self, note_id, title, content):
