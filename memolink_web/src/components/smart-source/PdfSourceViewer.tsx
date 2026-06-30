@@ -18,6 +18,7 @@ interface Props {
 
 export function PdfSourceViewer({ noteId, sourceFileId, bookId, objectUrl, annotations, onAnnotationsChanged }: Props) {
   const hostRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const documentRef = useRef<pdfjsLib.PDFDocumentProxy | null>(null);
   const loadingTaskRef = useRef<pdfjsLib.PDFDocumentLoadingTask | null>(null);
@@ -85,6 +86,10 @@ export function PdfSourceViewer({ noteId, sourceFileId, bookId, objectUrl, annot
   }, [objectUrl]);
 
   useEffect(() => {
+    scrollRef.current?.scrollTo({ top: 0 });
+  }, [pageNumber]);
+
+  useEffect(() => {
     const document = documentRef.current;
     const canvas = canvasRef.current;
     if (!document || !canvas || hostSize.width <= 0 || hostSize.height <= 0) return;
@@ -125,10 +130,20 @@ export function PdfSourceViewer({ noteId, sourceFileId, bookId, objectUrl, annot
 
   const viewer = (
     <div ref={hostRef} className={`flex min-h-0 flex-col bg-[#171720] ${isMaximized ? "fixed inset-0 z-[100] h-dvh w-screen" : "h-full"}`}>
+      {error ? (
+        <div className="grid flex-1 place-items-center text-sm text-red-400">{error}</div>
+      ) : (
+        <div ref={scrollRef} className="flex min-h-0 flex-1 items-start justify-center overflow-auto p-4">
+          <div className="relative shrink-0 bg-white shadow-xl">
+            <canvas ref={canvasRef} className="block" />
+            <AnnotationCanvas noteId={noteId} sourceFileId={sourceFileId} bookId={bookId} pageNumber={pageNumber} annotations={annotations} onPersisted={onAnnotationsChanged} />
+          </div>
+        </div>
+      )}
       <div className="relative flex h-10 shrink-0 items-center justify-center gap-3 bg-black/35 px-12 text-xs text-gray-200">
-        <button type="button" disabled={pageNumber <= 1} onClick={() => setPageNumber((page) => page - 1)} className="rounded px-2 py-1 disabled:opacity-35">Previous</button>
+        <button type="button" disabled={pageNumber <= 1} onClick={() => setPageNumber((p) => p - 1)} className="rounded px-2 py-1 disabled:opacity-35">Previous</button>
         <span>Page {pageNumber} of {pageCount || "…"}</span>
-        <button type="button" disabled={!pageCount || pageNumber >= pageCount} onClick={() => setPageNumber((page) => page + 1)} className="rounded px-2 py-1 disabled:opacity-35">Next</button>
+        <button type="button" disabled={!pageCount || pageNumber >= pageCount} onClick={() => setPageNumber((p) => p + 1)} className="rounded px-2 py-1 disabled:opacity-35">Next</button>
         <button
           type="button"
           onClick={() => setIsMaximized((current) => !current)}
@@ -144,14 +159,6 @@ export function PdfSourceViewer({ noteId, sourceFileId, bookId, objectUrl, annot
           )}
         </button>
       </div>
-      {error ? <div className="grid flex-1 place-items-center text-sm text-red-400">{error}</div> : (
-        <div className="flex min-h-0 flex-1 items-start justify-center overflow-auto p-4">
-          <div className="relative shrink-0 bg-white shadow-xl">
-            <canvas ref={canvasRef} className="block" />
-            <AnnotationCanvas noteId={noteId} sourceFileId={sourceFileId} bookId={bookId} pageNumber={pageNumber} annotations={annotations} onPersisted={onAnnotationsChanged} />
-          </div>
-        </div>
-      )}
     </div>
   );
   return isMaximized ? createPortal(viewer, document.body) : viewer;
