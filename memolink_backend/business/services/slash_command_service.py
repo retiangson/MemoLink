@@ -206,17 +206,51 @@ class SlashCommandService:
         except (TypeError, json.JSONDecodeError):
             pass
         # Fallback: thinking models (Gemini 2.5, DeepSeek reasoner) and models that
-        # add preamble/postamble text may embed the JSON inside prose. Extract the
-        # first {...} block and try again before giving up.
-        match = re.search(r"\{.*\}", response, re.DOTALL)
-        if match:
+        # add preamble/postamble text may embed the JSON inside prose. Use brace
+        # counting anchored on '{"' to skip non-JSON brace pairs and correctly
+        # capture the full nested object without greedy/non-greedy regex pitfalls.
+        candidate = SlashCommandService._extract_first_json_object(response)
+        if candidate:
             try:
-                parsed = json.loads(match.group(0))
+                parsed = json.loads(candidate)
                 if isinstance(parsed, dict):
                     return parsed
             except (TypeError, json.JSONDecodeError):
                 pass
         raise RuntimeError(invalid_message)
+
+    @staticmethod
+    def _extract_first_json_object(text: str) -> str | None:
+        """Return the first JSON object embedded in text using brace counting.
+        Anchors on '{\"' to ignore non-JSON brace pairs, then tracks nesting
+        depth and string/escape state to find the matching closing brace."""
+        anchor = re.search(r'\{\s*"', text)
+        if not anchor:
+            return None
+        start = anchor.start()
+        depth = 0
+        in_string = False
+        escape = False
+        for i in range(start, len(text)):
+            ch = text[i]
+            if escape:
+                escape = False
+                continue
+            if ch == "\\" and in_string:
+                escape = True
+                continue
+            if ch == '"':
+                in_string = not in_string
+                continue
+            if in_string:
+                continue
+            if ch == "{":
+                depth += 1
+            elif ch == "}":
+                depth -= 1
+                if depth == 0:
+                    return text[start : i + 1]
+        return None
 
     @staticmethod
     def _equation_steps(raw_steps) -> list[dict[str, str]]:
