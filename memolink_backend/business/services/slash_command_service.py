@@ -195,15 +195,28 @@ class SlashCommandService:
     @staticmethod
     def _strict_json_object(response: str, invalid_message: str) -> dict:
         response = response.strip()
+        # Strip markdown code fences that some models emit.
         if response.startswith("```"):
             response = re.sub(r"^```(?:json)?\s*|\s*```$", "", response, flags=re.IGNORECASE).strip()
+        # Fast path: clean response parses directly.
         try:
             parsed = json.loads(response)
-        except (TypeError, json.JSONDecodeError) as exc:
-            raise RuntimeError(invalid_message) from exc
-        if not isinstance(parsed, dict):
-            raise RuntimeError(invalid_message)
-        return parsed
+            if isinstance(parsed, dict):
+                return parsed
+        except (TypeError, json.JSONDecodeError):
+            pass
+        # Fallback: thinking models (Gemini 2.5, DeepSeek reasoner) and models that
+        # add preamble/postamble text may embed the JSON inside prose. Extract the
+        # first {...} block and try again before giving up.
+        match = re.search(r"\{.*\}", response, re.DOTALL)
+        if match:
+            try:
+                parsed = json.loads(match.group(0))
+                if isinstance(parsed, dict):
+                    return parsed
+            except (TypeError, json.JSONDecodeError):
+                pass
+        raise RuntimeError(invalid_message)
 
     @staticmethod
     def _equation_steps(raw_steps) -> list[dict[str, str]]:
