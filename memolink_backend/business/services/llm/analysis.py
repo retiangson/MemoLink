@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+from collections import deque
 
 from .prompts import ANALYSER_PROMPT, MODES
 
@@ -39,12 +40,21 @@ def analyse_request(user_text: str, client, model: str, history: list[dict] | No
     try:
         # Include up to the last 6 user/assistant turns (trimmed) so the analyser
         # has enough context to understand pronouns and follow-up references.
+        # Exclude the final user turn — it's the same text as user_text and would
+        # be duplicated. Use a deque to avoid materialising the full history list.
         context_turns: list[dict] = []
         if history:
-            eligible = [m for m in history if m.get("role") in ("user", "assistant")][-6:]
-            for m in eligible:
+            bucket: deque[dict] = deque(maxlen=6)
+            for m in history:
+                role = m.get("role")
+                if role not in ("user", "assistant"):
+                    continue
+                # Skip the last user message to avoid duplicating user_text below.
+                if role == "user" and (m.get("content") or "").strip() == user_text.strip():
+                    continue
+                bucket.append(m)
+            for m in bucket:
                 raw_content = (m.get("content") or "")
-                # Trim long messages to avoid inflating the analyser's token budget.
                 content = raw_content[:300] + ("…" if len(raw_content) > 300 else "")
                 context_turns.append({"role": m["role"], "content": content})
 
