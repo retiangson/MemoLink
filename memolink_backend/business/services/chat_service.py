@@ -968,7 +968,7 @@ class ChatService(IChatService):
         if getattr(dto, "smart_mode", True):
             try:
                 analyser_client = _get_client(model, user_keys)
-                plan.smart_analysis = smart_engine.analyse_request(user_text, analyser_client, model)
+                plan.smart_analysis = smart_engine.analyse_request(user_text, analyser_client, model, history=messages)
                 plan.smart_mode_name = plan.smart_analysis.get("mode", "general_chat")
                 # Skip clarification for affirmative/follow-up messages.  Two-tier check:
                 # 1. Full regex match — pure affirmatives with optional filler ("uh, yes").

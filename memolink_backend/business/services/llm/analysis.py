@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+from collections import deque
 
 from .prompts import ANALYSER_PROMPT, MODES
 
@@ -29,13 +30,39 @@ def default_analysis() -> dict:
     }
 
 
-def analyse_request(user_text: str, client, model: str) -> dict:
-    """Run the lightweight intent/mode analyser with a safe fallback."""
+def analyse_request(user_text: str, client, model: str, history: list[dict] | None = None) -> dict:
+    """Run the lightweight intent/mode analyser with a safe fallback.
+
+    Pass recent conversation turns via `history` so the analyser can resolve
+    referential messages ("how about X?", "what best between them?") without
+    incorrectly triggering needs_clarification.
+    """
     try:
+        # Include up to the last 6 user/assistant turns (trimmed) so the analyser
+        # has enough context to understand pronouns and follow-up references.
+        # Exclude the final user turn — it's the same text as user_text and would
+        # be duplicated. Use a deque to avoid materialising the full history list.
+        context_turns: list[dict] = []
+        if history:
+            bucket: deque[dict] = deque(maxlen=6)
+            for m in history:
+                role = m.get("role")
+                if role not in ("user", "assistant"):
+                    continue
+                # Skip the last user message to avoid duplicating user_text below.
+                if role == "user" and (m.get("content") or "").strip() == user_text.strip():
+                    continue
+                bucket.append(m)
+            for m in bucket:
+                raw_content = (m.get("content") or "")
+                content = raw_content[:300] + ("…" if len(raw_content) > 300 else "")
+                context_turns.append({"role": m["role"], "content": content})
+
         resp = client.chat.completions.create(
             model=model,
             messages=[
                 {"role": "system", "content": ANALYSER_PROMPT},
+                *context_turns,
                 {"role": "user", "content": user_text},
             ],
             temperature=0,
