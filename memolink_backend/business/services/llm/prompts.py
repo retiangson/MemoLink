@@ -257,6 +257,8 @@ Mode selection guide:
 - general_chat: everything else
 
 CRITICAL RULES:
+- Prior conversation turns may appear before the final user message. Use them to resolve references
+  like "them", "it", "how about X?", "what about Y?" before deciding needs_clarification.
 - Set needs_clarification to false whenever the task can reasonably be attempted with assumptions.
 - The optimized_task must be specific and actionable — rewrite vague requests clearly.
 - For substantial requests, optimized_task should push the answering model toward a complete, high-substance response rather than a short summary.
