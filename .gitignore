@@ -22,6 +22,7 @@ test_deps/
 memolink_web/node_modules/
 memolink_web/dist/
 memolink_web/.vite/
+memolink_backend/book_parser/node_modules/
 
 # Editor / IDE state
 .vscode/
