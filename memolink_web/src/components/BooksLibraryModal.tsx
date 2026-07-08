@@ -1,12 +1,14 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import {
-  listBooks, listMyBooks, borrowBook, removeFromMyBooks, uploadOwnBook,
+  listBooks, listMyBooks, borrowBook, removeFromMyBooks, uploadOwnBook, getUploadSupportedExtensions,
   type Book, type UserBook,
 } from "../api/booksApi";
-
-const UPLOAD_ACCEPT = ".pdf,.epub,.pptx,.mp3,.m4a,.m4b,.aac,.wav,.ogg,.txt,.srt,.vtt,.cbz,.cbr,.mobi,.mp4,.webm,.mov,.m4v";
 import { getBookFormat, getBookCategory, BOOK_CATEGORY_LABELS, type BookCategory, type BookFormat } from "./book-readers/format";
 import { BookFormatIcon, getFormatStyle } from "./BookFormatIcon";
+
+// Fallback only, used until /books/upload/supported-extensions resolves — the
+// backend's SUPPORTED_EXTENSIONS in onedrive_service.py is the source of truth.
+const FALLBACK_UPLOAD_ACCEPT = ".pdf,.epub,.pptx,.mp3,.m4a,.m4b,.aac,.wav,.ogg,.txt,.srt,.vtt,.cbz,.cbr,.mobi,.mp4,.webm,.mov,.m4v";
 
 const CATEGORY_OPTIONS: BookCategory[] = ["ebook", "pdf", "audiobook", "video", "comic", "presentation", "text"];
 
@@ -174,6 +176,7 @@ export function BooksLibraryModal({ show, onClose, initialView = "browse", onMyB
   const [borrowingId, setBorrowingId] = useState<number | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploadAccept, setUploadAccept] = useState(FALLBACK_UPLOAD_ACCEPT);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const loadBrowse = useCallback(async () => {
@@ -219,6 +222,9 @@ export function BooksLibraryModal({ show, onClose, initialView = "browse", onMyB
     setPage(1);
     loadMyBooks();
     if (initialView === "browse") loadBrowse();
+    getUploadSupportedExtensions()
+      .then((extensions) => setUploadAccept(extensions.join(",")))
+      .catch(() => {});
   }, [show, initialView]);
 
   useEffect(() => {
@@ -394,7 +400,7 @@ export function BooksLibraryModal({ show, onClose, initialView = "browse", onMyB
               <input
                 ref={fileInputRef}
                 type="file"
-                accept={UPLOAD_ACCEPT}
+                accept={uploadAccept}
                 className="hidden"
                 onChange={handleFileSelected}
               />

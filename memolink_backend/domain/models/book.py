@@ -34,6 +34,9 @@ class Book(Base):
     sync_status = Column(String(30), nullable=False, default="synced", server_default="synced")
     sync_error = Column(Text, nullable=True)
 
-    created_by_admin_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    # The admin who synced/uploaded a shared library book, OR the user who privately
+    # uploaded their own (unpublished) book — see BookService._require_borrowed_or_admin.
+    # SQL: ALTER TABLE books RENAME COLUMN created_by_admin_id TO created_by_user_id;
+    created_by_user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

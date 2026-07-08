@@ -14,7 +14,7 @@ from memolink_backend.core.security import get_current_user_info, UserInfo, leve
 from memolink_backend.core.db import get_db
 from memolink_backend.di.request_container import RequestContainer, get_request_container
 from memolink_backend.business.services.book_service import BookAccessError
-from memolink_backend.business.services.onedrive_service import OneDriveServiceError
+from memolink_backend.business.services.onedrive_service import OneDriveServiceError, SUPPORTED_EXTENSIONS
 from memolink_backend.business.services.archive_org_service import ArchiveOrgServiceError
 from memolink_backend.business.services.book_cache_service import BookCacheServiceError
 from memolink_backend.business.services.book_note_source_service import run_book_note_source_job
@@ -150,6 +150,15 @@ def list_my_books(
     c: RequestContainer = Depends(get_request_container),
 ):
     return c.books().list_my_books(user_id)
+
+
+@router.get("/upload/supported-extensions", response_model=list[str])
+def list_upload_supported_extensions(
+    user_id: int = Depends(require_books_access),
+):
+    """Single source of truth for which file extensions BookUploadService.validate_file
+    accepts, so the frontend's upload file-picker filter can't drift from it."""
+    return sorted(SUPPORTED_EXTENSIONS)
 
 
 @router.post("/upload", response_model=UserBookResponseDTO)

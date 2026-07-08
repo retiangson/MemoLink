@@ -96,7 +96,7 @@ class BookRepository:
         file_size: Optional[int],
         onedrive_web_url: Optional[str],
         last_modified: Optional[datetime],
-        created_by_admin_id: int,
+        created_by_user_id: int,
         default_title: str,
         source: str = "onedrive",
         source_location: Optional[str] = None,
@@ -131,7 +131,7 @@ class BookRepository:
                 last_modified=last_modified,
                 source=source,
                 source_location=source_location,
-                created_by_admin_id=created_by_admin_id,
+                created_by_user_id=created_by_user_id,
                 sync_status="synced",
                 is_published=is_published,
             )

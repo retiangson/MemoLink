@@ -328,6 +328,10 @@ export async function uploadOwnBook(file: File): Promise<UserBook> {
   return (await api.post("/books/upload", form)).data;
 }
 
+export async function getUploadSupportedExtensions(): Promise<string[]> {
+  return (await api.get("/books/upload/supported-extensions")).data;
+}
+
 export async function borrowBook(bookId: number): Promise<UserBook> {
   return (await api.post(`/books/${bookId}/borrow`)).data;
 }

@@ -66,7 +66,9 @@ class BookService:
             raise BookAccessError(404, "Book not found")
         if is_admin:
             return book
-        if book.created_by_admin_id == user_id:
+        # Private, unpublished books uploaded by this same user remain accessible
+        # to their owner regardless of publish state.
+        if book.created_by_user_id == user_id:
             return book
         if not book.is_published:
             raise BookAccessError(404, "Book not found")

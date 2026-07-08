@@ -61,7 +61,7 @@ class BookUploadService:
                 file_size=uploaded.get("size") or len(content),
                 onedrive_web_url=uploaded.get("web_url"),
                 last_modified=last_modified,
-                created_by_admin_id=uploaded_by_user_id,
+                created_by_user_id=uploaded_by_user_id,
                 default_title=Path(file_name).stem,
                 source="onedrive",
                 is_published=is_published,

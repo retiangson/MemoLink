@@ -315,7 +315,7 @@
         <div class="erd-table">
           <div class="erd-th">books</div>
           <div class="erd-col"><span class="erd-pk erd-col-name">&#x1F511; id</span><span class="erd-col-type">INTEGER</span></div>
-          <div class="erd-col"><span class="erd-fk erd-col-name">&rarr; created_by_admin_id</span><span class="erd-col-type">INTEGER</span></div>
+          <div class="erd-col"><span class="erd-fk erd-col-name">&rarr; created_by_user_id</span><span class="erd-col-type">INTEGER</span></div>
           <div class="erd-col"><span class="erd-col-name">title</span><span class="erd-col-type">VARCHAR</span></div>
           <div class="erd-col"><span class="erd-col-name">onedrive_item_id</span><span class="erd-col-type">VARCHAR</span></div>
           <div class="erd-col"><span class="erd-col-name">is_published</span><span class="erd-col-type">BOOLEAN</span></div>
@@ -1120,7 +1120,7 @@
           <tr><td class="col-name">is_published</td><td class="col-type">BOOLEAN</td><td>default: false</td><td class="col-notes">Whether the book is visible to regular users; toggled via admin publish/unpublish endpoints</td></tr>
           <tr><td class="col-name">sync_status</td><td class="col-type">VARCHAR</td><td>default: <code>"synced"</code></td><td class="col-notes">Sync state of this book's metadata/content relative to OneDrive</td></tr>
           <tr><td class="col-name">sync_error</td><td class="col-type">TEXT</td><td>nullable</td><td class="col-notes">Last sync error message, shown to admins per book</td></tr>
-          <tr><td class="col-name">created_by_admin_id</td><td class="col-type">INTEGER</td><td><span class="badge-fk">FK &rarr; users.id</span> nullable</td><td class="col-notes">Admin who triggered the sync that created this book; ON DELETE SET NULL so the book survives admin account removal</td></tr>
+          <tr><td class="col-name">created_by_user_id</td><td class="col-type">INTEGER</td><td><span class="badge-fk">FK &rarr; users.id</span> nullable</td><td class="col-notes">Admin who triggered the sync, or the regular user who privately uploaded the book; ON DELETE SET NULL so the book survives account removal</td></tr>
           <tr><td class="col-name">created_at</td><td class="col-type">TIMESTAMPTZ</td><td>server default: now()</td><td class="col-notes">When the book row was first created</td></tr>
           <tr><td class="col-name">updated_at</td><td class="col-type">TIMESTAMPTZ</td><td>server default: now()</td><td class="col-notes">When the book row was last updated (metadata edit or re-sync)</td></tr>
         </tbody>
