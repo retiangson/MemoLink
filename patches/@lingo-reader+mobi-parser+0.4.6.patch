@@ -1,8 +1,36 @@
 diff --git a/node_modules/@lingo-reader/mobi-parser/dist/index.browser.js b/node_modules/@lingo-reader/mobi-parser/dist/index.browser.js
-index 98779ed..3f49ceb 100644
+index 98779ed..673b550 100644
 --- a/node_modules/@lingo-reader/mobi-parser/dist/index.browser.js
 +++ b/node_modules/@lingo-reader/mobi-parser/dist/index.browser.js
-@@ -1228,15 +1228,18 @@ class Mobi {
+@@ -1081,18 +1081,23 @@ class Kf8 {
+   }
+   replace(str) {
+     const cssUrls = [];
+-    const head = str.match(/<head[^>]*>([\s\S]*)<\/head>/i)[1];
++    const headMatch = str.match(/<head[^>]*>([\s\S]*)<\/head>/i);
++    const head = headMatch ? headMatch[1] : "";
+     const links = head.match(/<link[^>]*>/gi) ?? [];
+     for (const link of links) {
+-      const linkHref = link.match(/href="([^"]*)"/i)[1];
+-      const id = link.match(kindleResourceRegex)[2];
++      const linkHrefMatch = link.match(/href="([^"]*)"/i);
++      const idMatch = link.match(kindleResourceRegex);
++      if (!linkHrefMatch || !idMatch) continue;
++      const linkHref = linkHrefMatch[1];
++      const id = idMatch[2];
+       const href = this.replaceResources(linkHref);
+       cssUrls.push({
+         id,
+         href
+       });
+     }
+-    const body = str.match(/<body[^>]*>([\s\S]*)<\/body>/i)[1];
++    const bodyMatch = str.match(/<body[^>]*>([\s\S]*)<\/body>/i);
++    const body = bodyMatch ? bodyMatch[1] : str;
+     const bodyReplaced = this.replaceResources(body);
+     return {
+       html: bodyReplaced,
+@@ -1228,15 +1233,18 @@ class Mobi {
      const referenceStr = firstChapterText.slice(0, bodyOpenTagIndex);
      const tocChapterStr = this.findTocChapter(referenceStr);
      if (tocChapterStr) {
@@ -31,10 +59,38 @@ index 98779ed..3f49ceb 100644
    }
    findTocChapter(referenceStr) {
 diff --git a/node_modules/@lingo-reader/mobi-parser/dist/index.browser.mjs b/node_modules/@lingo-reader/mobi-parser/dist/index.browser.mjs
-index 3839370..7a53dcb 100644
+index 3839370..62ddfd4 100644
 --- a/node_modules/@lingo-reader/mobi-parser/dist/index.browser.mjs
 +++ b/node_modules/@lingo-reader/mobi-parser/dist/index.browser.mjs
-@@ -1226,15 +1226,18 @@ class Mobi {
+@@ -1079,18 +1079,23 @@ class Kf8 {
+   }
+   replace(str) {
+     const cssUrls = [];
+-    const head = str.match(/<head[^>]*>([\s\S]*)<\/head>/i)[1];
++    const headMatch = str.match(/<head[^>]*>([\s\S]*)<\/head>/i);
++    const head = headMatch ? headMatch[1] : "";
+     const links = head.match(/<link[^>]*>/gi) ?? [];
+     for (const link of links) {
+-      const linkHref = link.match(/href="([^"]*)"/i)[1];
+-      const id = link.match(kindleResourceRegex)[2];
++      const linkHrefMatch = link.match(/href="([^"]*)"/i);
++      const idMatch = link.match(kindleResourceRegex);
++      if (!linkHrefMatch || !idMatch) continue;
++      const linkHref = linkHrefMatch[1];
++      const id = idMatch[2];
+       const href = this.replaceResources(linkHref);
+       cssUrls.push({
+         id,
+         href
+       });
+     }
+-    const body = str.match(/<body[^>]*>([\s\S]*)<\/body>/i)[1];
++    const bodyMatch = str.match(/<body[^>]*>([\s\S]*)<\/body>/i);
++    const body = bodyMatch ? bodyMatch[1] : str;
+     const bodyReplaced = this.replaceResources(body);
+     return {
+       html: bodyReplaced,
+@@ -1226,15 +1231,18 @@ class Mobi {
      const referenceStr = firstChapterText.slice(0, bodyOpenTagIndex);
      const tocChapterStr = this.findTocChapter(referenceStr);
      if (tocChapterStr) {
@@ -63,10 +119,38 @@ index 3839370..7a53dcb 100644
    }
    findTocChapter(referenceStr) {
 diff --git a/node_modules/@lingo-reader/mobi-parser/dist/index.node.js b/node_modules/@lingo-reader/mobi-parser/dist/index.node.js
-index 9d9bb0f..9e4420d 100644
+index 9d9bb0f..1efddce 100644
 --- a/node_modules/@lingo-reader/mobi-parser/dist/index.node.js
 +++ b/node_modules/@lingo-reader/mobi-parser/dist/index.node.js
-@@ -1274,15 +1274,18 @@ class Mobi {
+@@ -1121,18 +1121,23 @@ class Kf8 {
+   }
+   replace(str) {
+     const cssUrls = [];
+-    const head = str.match(/<head[^>]*>([\s\S]*)<\/head>/i)[1];
++    const headMatch = str.match(/<head[^>]*>([\s\S]*)<\/head>/i);
++    const head = headMatch ? headMatch[1] : "";
+     const links = head.match(/<link[^>]*>/gi) ?? [];
+     for (const link of links) {
+-      const linkHref = link.match(/href="([^"]*)"/i)[1];
+-      const id = link.match(kindleResourceRegex)[2];
++      const linkHrefMatch = link.match(/href="([^"]*)"/i);
++      const idMatch = link.match(kindleResourceRegex);
++      if (!linkHrefMatch || !idMatch) continue;
++      const linkHref = linkHrefMatch[1];
++      const id = idMatch[2];
+       const href = this.replaceResources(linkHref);
+       cssUrls.push({
+         id,
+         href
+       });
+     }
+-    const body = str.match(/<body[^>]*>([\s\S]*)<\/body>/i)[1];
++    const bodyMatch = str.match(/<body[^>]*>([\s\S]*)<\/body>/i);
++    const body = bodyMatch ? bodyMatch[1] : str;
+     const bodyReplaced = this.replaceResources(body);
+     return {
+       html: bodyReplaced,
+@@ -1274,15 +1279,18 @@ class Mobi {
      const referenceStr = firstChapterText.slice(0, bodyOpenTagIndex);
      const tocChapterStr = this.findTocChapter(referenceStr);
      if (tocChapterStr) {
@@ -95,10 +179,38 @@ index 9d9bb0f..9e4420d 100644
    }
    findTocChapter(referenceStr) {
 diff --git a/node_modules/@lingo-reader/mobi-parser/dist/index.node.mjs b/node_modules/@lingo-reader/mobi-parser/dist/index.node.mjs
-index ea2a772..22b1dd6 100644
+index ea2a772..028c799 100644
 --- a/node_modules/@lingo-reader/mobi-parser/dist/index.node.mjs
 +++ b/node_modules/@lingo-reader/mobi-parser/dist/index.node.mjs
-@@ -1272,15 +1272,18 @@ class Mobi {
+@@ -1119,18 +1119,23 @@ class Kf8 {
+   }
+   replace(str) {
+     const cssUrls = [];
+-    const head = str.match(/<head[^>]*>([\s\S]*)<\/head>/i)[1];
++    const headMatch = str.match(/<head[^>]*>([\s\S]*)<\/head>/i);
++    const head = headMatch ? headMatch[1] : "";
+     const links = head.match(/<link[^>]*>/gi) ?? [];
+     for (const link of links) {
+-      const linkHref = link.match(/href="([^"]*)"/i)[1];
+-      const id = link.match(kindleResourceRegex)[2];
++      const linkHrefMatch = link.match(/href="([^"]*)"/i);
++      const idMatch = link.match(kindleResourceRegex);
++      if (!linkHrefMatch || !idMatch) continue;
++      const linkHref = linkHrefMatch[1];
++      const id = idMatch[2];
+       const href = this.replaceResources(linkHref);
+       cssUrls.push({
+         id,
+         href
+       });
+     }
+-    const body = str.match(/<body[^>]*>([\s\S]*)<\/body>/i)[1];
++    const bodyMatch = str.match(/<body[^>]*>([\s\S]*)<\/body>/i);
++    const body = bodyMatch ? bodyMatch[1] : str;
+     const bodyReplaced = this.replaceResources(body);
+     return {
+       html: bodyReplaced,
+@@ -1272,15 +1277,18 @@ class Mobi {
      const referenceStr = firstChapterText.slice(0, bodyOpenTagIndex);
      const tocChapterStr = this.findTocChapter(referenceStr);
      if (tocChapterStr) {
