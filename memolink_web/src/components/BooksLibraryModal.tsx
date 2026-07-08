@@ -1,10 +1,14 @@
-import React, { useEffect, useState, useCallback, useMemo } from "react";
+import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import {
-  listBooks, listMyBooks, borrowBook, removeFromMyBooks,
+  listBooks, listMyBooks, borrowBook, removeFromMyBooks, uploadOwnBook, getUploadSupportedExtensions,
   type Book, type UserBook,
 } from "../api/booksApi";
 import { getBookFormat, getBookCategory, BOOK_CATEGORY_LABELS, type BookCategory, type BookFormat } from "./book-readers/format";
 import { BookFormatIcon, getFormatStyle } from "./BookFormatIcon";
+
+// Fallback only, used until /books/upload/supported-extensions resolves — the
+// backend's SUPPORTED_EXTENSIONS in onedrive_service.py is the source of truth.
+const FALLBACK_UPLOAD_ACCEPT = ".pdf,.epub,.pptx,.mp3,.m4a,.m4b,.aac,.wav,.ogg,.txt,.srt,.vtt,.cbz,.cbr,.mobi,.mp4,.webm,.mov,.m4v";
 
 const CATEGORY_OPTIONS: BookCategory[] = ["ebook", "pdf", "audiobook", "video", "comic", "presentation", "text"];
 
@@ -170,6 +174,10 @@ export function BooksLibraryModal({ show, onClose, initialView = "browse", onMyB
   const [browsePages, setBrowsePages] = useState(1);
   const [loading, setLoading] = useState(false);
   const [borrowingId, setBorrowingId] = useState<number | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploadAccept, setUploadAccept] = useState(FALLBACK_UPLOAD_ACCEPT);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const loadBrowse = useCallback(async () => {
     setLoading(true);
@@ -214,6 +222,9 @@ export function BooksLibraryModal({ show, onClose, initialView = "browse", onMyB
     setPage(1);
     loadMyBooks();
     if (initialView === "browse") loadBrowse();
+    getUploadSupportedExtensions()
+      .then((extensions) => setUploadAccept(extensions.join(",")))
+      .catch(() => {});
   }, [show, initialView]);
 
   useEffect(() => {
@@ -255,6 +266,28 @@ export function BooksLibraryModal({ show, onClose, initialView = "browse", onMyB
 
   function openReader(book: Book, page: number) {
     onOpenBook(book, page || 1);
+  }
+
+  function handleUploadClick() {
+    setUploadError(null);
+    fileInputRef.current?.click();
+  }
+
+  async function handleFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setUploading(true);
+    setUploadError(null);
+    try {
+      const userBook = await uploadOwnBook(file);
+      await loadMyBooks();
+      if (userBook.book) openReader(userBook.book, 1);
+    } catch (error: any) {
+      setUploadError(error?.response?.data?.detail || "Failed to upload this book.");
+    } finally {
+      setUploading(false);
+    }
   }
 
   function isBorrowed(bookId: number): boolean {
@@ -362,6 +395,24 @@ export function BooksLibraryModal({ show, onClose, initialView = "browse", onMyB
             placeholder={view === "browse" ? "Search browse books…" : "Search my books…"}
             className="min-w-0 flex-1 bg-[var(--ml-bg-surface)] border border-[var(--ml-bg-hover)] rounded-lg px-3 py-2 text-sm text-gray-200"
           />
+          {view === "my" && (
+            <>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept={uploadAccept}
+                className="hidden"
+                onChange={handleFileSelected}
+              />
+              <button
+                onClick={handleUploadClick}
+                disabled={uploading}
+                className="shrink-0 px-3 py-2 text-xs rounded-lg bg-indigo-600 text-white hover:bg-indigo-500 disabled:opacity-50 transition"
+              >
+                {uploading ? "Uploading…" : "Upload a book"}
+              </button>
+            </>
+          )}
         </div>
         <div className="max-w-4xl mx-auto flex items-center gap-1.5 flex-wrap mt-2.5">
           <button
@@ -455,13 +506,16 @@ export function BooksLibraryModal({ show, onClose, initialView = "browse", onMyB
 
         {view === "my" && (
           <div className="max-w-4xl mx-auto">
+            {uploadError && (
+              <p className="mb-3 text-xs text-red-400">{uploadError}</p>
+            )}
             {loading ? (
               <p className="text-sm text-gray-500">Loading…</p>
             ) : filteredMyBooks.length === 0 ? (
               <p className="text-sm text-gray-500">
                 {search.trim() || category !== "all"
                   ? "No books in My Books match your search or filter."
-                  : "You haven't added any books yet. Browse the library to get started."}
+                  : "You haven't added any books yet. Browse the library or upload a book you own to get started."}
               </p>
             ) : (
               <>

@@ -96,12 +96,13 @@ class BookRepository:
         file_size: Optional[int],
         onedrive_web_url: Optional[str],
         last_modified: Optional[datetime],
-        created_by_admin_id: int,
+        created_by_user_id: int,
         default_title: str,
         source: str = "onedrive",
         source_location: Optional[str] = None,
         existing: Optional[Book] = None,
         commit: bool = True,
+        is_published: bool = True,
     ) -> Book:
         book = existing if existing is not None else self.get_by_onedrive_item_id(onedrive_item_id)
         if book:
@@ -130,9 +131,9 @@ class BookRepository:
                 last_modified=last_modified,
                 source=source,
                 source_location=source_location,
-                created_by_admin_id=created_by_admin_id,
+                created_by_user_id=created_by_user_id,
                 sync_status="synced",
-                is_published=True,
+                is_published=is_published,
             )
             self.db.add(book)
         if commit:

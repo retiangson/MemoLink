@@ -26,11 +26,10 @@ from memolink_backend.contracts.book_dtos import (
     ArchiveOrgSyncResultDTO,
 )
 from memolink_backend.business.services.archive_org_service import ArchiveOrgServiceError
-from memolink_backend.business.services.book_upload_service import BookUploadError
+from memolink_backend.business.services.book_upload_service import BookUploadError, MAX_BOOK_UPLOAD_BYTES
 
 router = APIRouter(prefix="/admin/books", tags=["admin-books"])
 logger = logging.getLogger(__name__)
-MAX_BOOK_UPLOAD_BYTES = 100 * 1024 * 1024
 
 
 def _frontend_redirect_url(params: dict[str, str]) -> str:
@@ -86,7 +85,7 @@ async def upload_book(
         raise HTTPException(status_code=413, detail="Book uploads are limited to 100 MB")
     try:
         return await c.book_upload().upload(
-            admin_user_id=admin_id,
+            uploaded_by_user_id=admin_id,
             file_name=file_name,
             content=content,
             mime_type=file.content_type,

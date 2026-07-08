@@ -1,5 +1,5 @@
 diff --git a/node_modules/@lingo-reader/mobi-parser/dist/index.browser.js b/node_modules/@lingo-reader/mobi-parser/dist/index.browser.js
-index 98779ed..673b550 100644
+index 98779ed..8492bdd 100644
 --- a/node_modules/@lingo-reader/mobi-parser/dist/index.browser.js
 +++ b/node_modules/@lingo-reader/mobi-parser/dist/index.browser.js
 @@ -1081,18 +1081,23 @@ class Kf8 {
@@ -58,8 +58,36 @@ index 98779ed..673b550 100644
      }
    }
    findTocChapter(referenceStr) {
+@@ -1295,17 +1303,22 @@ class Mobi {
+     html = html.replace(
+       /<img[^>]*>/g,
+       (matched) => {
+-        const recindex = matched.match(this.recindexReg)[1];
+-        const url = this.loadResource(Number.parseInt(recindex));
++        const recindexMatch = matched.match(this.recindexReg);
++        if (!recindexMatch) {
++          return matched;
++        }
++        const url = this.loadResource(Number.parseInt(recindexMatch[1]));
+         return matched.replace(this.recindexReg, `src="${url}"`);
+       }
+     );
+     html = html.replace(
+       /<(video|audio)[^>]*>/g,
+       (matched) => {
+-        const mediarecindex = matched.match(this.recindexReg)[1];
+-        const mediaUrl = this.loadResource(Number.parseInt(mediarecindex));
+-        matched = matched.replace(this.mediarecindexReg, `src="${mediaUrl}"`);
++        const mediarecindexMatch = matched.match(this.recindexReg);
++        if (mediarecindexMatch) {
++          const mediaUrl = this.loadResource(Number.parseInt(mediarecindexMatch[1]));
++          matched = matched.replace(this.mediarecindexReg, `src="${mediaUrl}"`);
++        }
+         const recindex = matched.match(this.recindexReg)?.[1];
+         if (recindex) {
+           const posterUrl = this.loadResource(Number.parseInt(recindex));
 diff --git a/node_modules/@lingo-reader/mobi-parser/dist/index.browser.mjs b/node_modules/@lingo-reader/mobi-parser/dist/index.browser.mjs
-index 3839370..62ddfd4 100644
+index 3839370..0881e62 100644
 --- a/node_modules/@lingo-reader/mobi-parser/dist/index.browser.mjs
 +++ b/node_modules/@lingo-reader/mobi-parser/dist/index.browser.mjs
 @@ -1079,18 +1079,23 @@ class Kf8 {
@@ -118,8 +146,36 @@ index 3839370..62ddfd4 100644
      }
    }
    findTocChapter(referenceStr) {
+@@ -1293,17 +1301,22 @@ class Mobi {
+     html = html.replace(
+       /<img[^>]*>/g,
+       (matched) => {
+-        const recindex = matched.match(this.recindexReg)[1];
+-        const url = this.loadResource(Number.parseInt(recindex));
++        const recindexMatch = matched.match(this.recindexReg);
++        if (!recindexMatch) {
++          return matched;
++        }
++        const url = this.loadResource(Number.parseInt(recindexMatch[1]));
+         return matched.replace(this.recindexReg, `src="${url}"`);
+       }
+     );
+     html = html.replace(
+       /<(video|audio)[^>]*>/g,
+       (matched) => {
+-        const mediarecindex = matched.match(this.recindexReg)[1];
+-        const mediaUrl = this.loadResource(Number.parseInt(mediarecindex));
+-        matched = matched.replace(this.mediarecindexReg, `src="${mediaUrl}"`);
++        const mediarecindexMatch = matched.match(this.recindexReg);
++        if (mediarecindexMatch) {
++          const mediaUrl = this.loadResource(Number.parseInt(mediarecindexMatch[1]));
++          matched = matched.replace(this.mediarecindexReg, `src="${mediaUrl}"`);
++        }
+         const recindex = matched.match(this.recindexReg)?.[1];
+         if (recindex) {
+           const posterUrl = this.loadResource(Number.parseInt(recindex));
 diff --git a/node_modules/@lingo-reader/mobi-parser/dist/index.node.js b/node_modules/@lingo-reader/mobi-parser/dist/index.node.js
-index 9d9bb0f..1efddce 100644
+index 9d9bb0f..e4ab438 100644
 --- a/node_modules/@lingo-reader/mobi-parser/dist/index.node.js
 +++ b/node_modules/@lingo-reader/mobi-parser/dist/index.node.js
 @@ -1121,18 +1121,23 @@ class Kf8 {
@@ -178,8 +234,36 @@ index 9d9bb0f..1efddce 100644
      }
    }
    findTocChapter(referenceStr) {
+@@ -1341,17 +1349,22 @@ class Mobi {
+     html = html.replace(
+       /<img[^>]*>/g,
+       (matched) => {
+-        const recindex = matched.match(this.recindexReg)[1];
+-        const url = this.loadResource(Number.parseInt(recindex));
++        const recindexMatch = matched.match(this.recindexReg);
++        if (!recindexMatch) {
++          return matched;
++        }
++        const url = this.loadResource(Number.parseInt(recindexMatch[1]));
+         return matched.replace(this.recindexReg, `src="${url}"`);
+       }
+     );
+     html = html.replace(
+       /<(video|audio)[^>]*>/g,
+       (matched) => {
+-        const mediarecindex = matched.match(this.recindexReg)[1];
+-        const mediaUrl = this.loadResource(Number.parseInt(mediarecindex));
+-        matched = matched.replace(this.mediarecindexReg, `src="${mediaUrl}"`);
++        const mediarecindexMatch = matched.match(this.recindexReg);
++        if (mediarecindexMatch) {
++          const mediaUrl = this.loadResource(Number.parseInt(mediarecindexMatch[1]));
++          matched = matched.replace(this.mediarecindexReg, `src="${mediaUrl}"`);
++        }
+         const recindex = matched.match(this.recindexReg)?.[1];
+         if (recindex) {
+           const posterUrl = this.loadResource(Number.parseInt(recindex));
 diff --git a/node_modules/@lingo-reader/mobi-parser/dist/index.node.mjs b/node_modules/@lingo-reader/mobi-parser/dist/index.node.mjs
-index ea2a772..028c799 100644
+index ea2a772..6985468 100644
 --- a/node_modules/@lingo-reader/mobi-parser/dist/index.node.mjs
 +++ b/node_modules/@lingo-reader/mobi-parser/dist/index.node.mjs
 @@ -1119,18 +1119,23 @@ class Kf8 {
@@ -238,3 +322,31 @@ index ea2a772..028c799 100644
      }
    }
    findTocChapter(referenceStr) {
+@@ -1339,17 +1347,22 @@ class Mobi {
+     html = html.replace(
+       /<img[^>]*>/g,
+       (matched) => {
+-        const recindex = matched.match(this.recindexReg)[1];
+-        const url = this.loadResource(Number.parseInt(recindex));
++        const recindexMatch = matched.match(this.recindexReg);
++        if (!recindexMatch) {
++          return matched;
++        }
++        const url = this.loadResource(Number.parseInt(recindexMatch[1]));
+         return matched.replace(this.recindexReg, `src="${url}"`);
+       }
+     );
+     html = html.replace(
+       /<(video|audio)[^>]*>/g,
+       (matched) => {
+-        const mediarecindex = matched.match(this.recindexReg)[1];
+-        const mediaUrl = this.loadResource(Number.parseInt(mediarecindex));
+-        matched = matched.replace(this.mediarecindexReg, `src="${mediaUrl}"`);
++        const mediarecindexMatch = matched.match(this.recindexReg);
++        if (mediarecindexMatch) {
++          const mediaUrl = this.loadResource(Number.parseInt(mediarecindexMatch[1]));
++          matched = matched.replace(this.mediarecindexReg, `src="${mediaUrl}"`);
++        }
+         const recindex = matched.match(this.recindexReg)?.[1];
+         if (recindex) {
+           const posterUrl = this.loadResource(Number.parseInt(recindex));

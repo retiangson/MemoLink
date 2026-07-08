@@ -690,7 +690,7 @@ if os.getenv("MEMOLINK_SKIP_DB_BOOTSTRAP") != "1":
                 is_published BOOLEAN NOT NULL DEFAULT FALSE,
                 sync_status VARCHAR(20) NOT NULL DEFAULT 'synced',
                 sync_error TEXT,
-                created_by_admin_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                created_by_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
                 created_at TIMESTAMPTZ DEFAULT now(),
                 updated_at TIMESTAMPTZ DEFAULT now()
             )

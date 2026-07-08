@@ -66,6 +66,10 @@ class BookService:
             raise BookAccessError(404, "Book not found")
         if is_admin:
             return book
+        # Private, unpublished books uploaded by this same user remain accessible
+        # to their owner regardless of publish state.
+        if book.created_by_user_id == user_id:
+            return book
         if not book.is_published:
             raise BookAccessError(404, "Book not found")
         user_book = self._user_books.get(user_id, book_id)
@@ -82,6 +86,13 @@ class BookService:
 
     def remove_from_my_books(self, user_id: int, book_id: int) -> bool:
         return self._user_books.remove(user_id, book_id)
+
+    def claim_own_upload(self, user_id: int, book_id: int) -> UserBookResponseDTO:
+        """Adds a user's own (unpublished, private) upload to their My Books.
+        Skips the published check that borrow() enforces, since the uploader
+        already owns the book regardless of its publish state."""
+        row = self._user_books.borrow(user_id, book_id)
+        return self._to_user_book_dto(row)
 
     def list_my_books(self, user_id: int) -> List[UserBookResponseDTO]:
         rows = self._user_books.list_for_user(user_id)

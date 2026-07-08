@@ -4,7 +4,7 @@ import json
 import os
 from typing import Optional
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, Request, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -14,11 +14,12 @@ from memolink_backend.core.security import get_current_user_info, UserInfo, leve
 from memolink_backend.core.db import get_db
 from memolink_backend.di.request_container import RequestContainer, get_request_container
 from memolink_backend.business.services.book_service import BookAccessError
-from memolink_backend.business.services.onedrive_service import OneDriveServiceError
+from memolink_backend.business.services.onedrive_service import OneDriveServiceError, SUPPORTED_EXTENSIONS
 from memolink_backend.business.services.archive_org_service import ArchiveOrgServiceError
 from memolink_backend.business.services.book_cache_service import BookCacheServiceError
 from memolink_backend.business.services.book_note_source_service import run_book_note_source_job
 from memolink_backend.business.services.book_highlight_service import BookHighlightError
+from memolink_backend.business.services.book_upload_service import BookUploadError, MAX_BOOK_UPLOAD_BYTES
 from memolink_backend.utils.file_extractor import extract_pptx_slides
 from memolink_backend.contracts.book_dtos import (
     BookResponseDTO,
@@ -149,6 +150,43 @@ def list_my_books(
     c: RequestContainer = Depends(get_request_container),
 ):
     return c.books().list_my_books(user_id)
+
+
+@router.get("/upload/supported-extensions", response_model=list[str])
+def list_upload_supported_extensions(
+    user_id: int = Depends(require_books_access),
+):
+    """Single source of truth for which file extensions BookUploadService.validate_file
+    accepts, so the frontend's upload file-picker filter can't drift from it."""
+    return sorted(SUPPORTED_EXTENSIONS)
+
+
+@router.post("/upload", response_model=UserBookResponseDTO)
+async def upload_own_book(
+    file: UploadFile = File(...),
+    user_id: int = Depends(require_books_access),
+    c: RequestContainer = Depends(get_request_container),
+):
+    """Lets a user upload a book they own. Stored in the same shared OneDrive as
+    admin uploads, but created unpublished (private) — it only ever appears in the
+    uploader's own My Books, never in the public library for other users."""
+    file_name = (file.filename or "").strip()
+    content = await file.read(MAX_BOOK_UPLOAD_BYTES + 1)
+    if len(content) > MAX_BOOK_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail="Book uploads are limited to 100 MB")
+    try:
+        book = await c.book_upload().upload(
+            uploaded_by_user_id=user_id,
+            file_name=file_name,
+            content=content,
+            mime_type=file.content_type,
+            is_published=False,
+        )
+    except BookUploadError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    except OneDriveServiceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    return c.books().claim_own_upload(user_id, book.id)
 
 
 @router.get("/{book_id}", response_model=BookResponseDTO)

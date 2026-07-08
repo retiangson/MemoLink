@@ -55,7 +55,7 @@ class BookSyncService:
                 file_size=f["size"],
                 onedrive_web_url=f["web_url"],
                 last_modified=_parse_iso(f["last_modified"]),
-                created_by_admin_id=admin_user_id,
+                created_by_user_id=admin_user_id,
                 default_title=_filename_to_title(f["name"]),
                 existing=existing,
                 commit=False,
