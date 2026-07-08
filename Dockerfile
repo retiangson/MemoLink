@@ -21,7 +21,18 @@ COPY --from=node-deps /var/lang/bin/node /usr/local/bin/node
 ENV PATH="/usr/local/bin:${PATH}"
 
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Pillow (pulled in transitively by pdfplumber/python-pptx) ships wheels tagged
+# manylinux_2_28 for recent releases, which this Amazon Linux 2 based image's
+# glibc doesn't satisfy — pip falls back to a source build, which needs a
+# compiler this base image doesn't ship. Install it, build, then strip it back
+# out so the final Lambda image doesn't carry a full C toolchain.
+RUN yum install -y gcc gcc-c++ make \
+        libjpeg-turbo-devel zlib-devel libtiff-devel freetype-devel \
+        lcms2-devel libwebp-devel tcl-devel tk-devel harfbuzz-devel fribidi-devel \
+    && pip install --no-cache-dir -r requirements.txt \
+    && yum remove -y gcc gcc-c++ make \
+    && yum clean all \
+    && rm -rf /var/cache/yum
 
 COPY memolink_backend/ ./memolink_backend/
 
