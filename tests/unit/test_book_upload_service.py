@@ -64,7 +64,7 @@ def test_book_upload_preserves_original_before_creating_published_metadata():
     books = FakeBooks()
     onedrive = FakeOneDrive()
     result = asyncio.run(BookUploadService(books, onedrive).upload(
-        admin_user_id=9,
+        uploaded_by_user_id=9,
         file_name="Course Notes.pdf",
         content=b"pdf bytes",
         mime_type="application/pdf",
@@ -79,7 +79,7 @@ def test_book_upload_rejects_unsupported_file_before_onedrive():
     onedrive = FakeOneDrive()
     with pytest.raises(BookUploadError, match="not supported"):
         asyncio.run(BookUploadService(FakeBooks(), onedrive).upload(
-            admin_user_id=9,
+            uploaded_by_user_id=9,
             file_name="payload.exe",
             content=b"binary",
             mime_type="application/octet-stream",
@@ -91,7 +91,7 @@ def test_book_upload_cleans_up_onedrive_when_metadata_creation_fails():
     onedrive = FakeOneDrive()
     with pytest.raises(RuntimeError, match="database unavailable"):
         asyncio.run(BookUploadService(FakeBooks(fail=True), onedrive).upload(
-            admin_user_id=9,
+            uploaded_by_user_id=9,
             file_name="book.epub",
             content=b"epub bytes",
             mime_type="application/epub+zip",
