@@ -6,9 +6,10 @@ WORKDIR /build
 COPY memolink_backend/whatsapp_bridge/package*.json ./
 RUN npm ci --omit=dev
 
-WORKDIR /build/book_parser
+WORKDIR /build/memolink_backend/book_parser
+COPY patches/ /build/patches/
 COPY memolink_backend/book_parser/package*.json ./
-RUN npm ci --omit=dev
+RUN npm ci
 
 # Stage 2: main Python Lambda image
 FROM public.ecr.aws/lambda/python:3.11
@@ -26,6 +27,6 @@ COPY memolink_backend/ ./memolink_backend/
 
 # Drop in the pre-built bridge node_modules (no npm needed at runtime)
 COPY --from=node-deps /build/node_modules ./memolink_backend/whatsapp_bridge/node_modules/
-COPY --from=node-deps /build/book_parser/node_modules ./memolink_backend/book_parser/node_modules/
+COPY --from=node-deps /build/memolink_backend/book_parser/node_modules ./memolink_backend/book_parser/node_modules/
 
 CMD ["memolink_backend.main.handler"]

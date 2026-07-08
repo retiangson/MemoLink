@@ -4,10 +4,12 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "postinstall": "patch-package"
+    "postinstall": "patch-package --patch-dir ../../patches"
   },
   "dependencies": {
-    "@lingo-reader/mobi-parser": "0.4.6",
+    "@lingo-reader/mobi-parser": "0.4.6"
+  },
+  "devDependencies": {
     "patch-package": "^8.0.1"
   }
 }

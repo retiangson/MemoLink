@@ -12,7 +12,7 @@
     "build:electron:publish": "node scripts/build-electron.mjs && electron-builder --publish always",
     "build:android": "vite build && cap sync android",
     "preview": "vite preview",
-    "postinstall": "patch-package"
+    "postinstall": "patch-package --patch-dir ../patches"
   },
   "build": {
     "appId": "com.memolink.desktop",
