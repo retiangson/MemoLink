@@ -7,6 +7,9 @@ from memolink_backend.contracts.book_dtos import BookResponseDTO
 from memolink_backend.domain.repositories.book_repository import BookRepository
 
 
+MAX_BOOK_UPLOAD_BYTES = 100 * 1024 * 1024
+
+
 class BookUploadError(Exception):
     def __init__(self, status_code: int, detail: str):
         self.status_code = status_code
@@ -33,10 +36,11 @@ class BookUploadService:
     async def upload(
         self,
         *,
-        admin_user_id: int,
+        uploaded_by_user_id: int,
         file_name: str,
         content: bytes,
         mime_type: Optional[str],
+        is_published: bool = True,
     ) -> BookResponseDTO:
         extension = self.validate_file(file_name, len(content))
         uploaded = await self._onedrive.upload_book_bytes(
@@ -57,9 +61,10 @@ class BookUploadService:
                 file_size=uploaded.get("size") or len(content),
                 onedrive_web_url=uploaded.get("web_url"),
                 last_modified=last_modified,
-                created_by_admin_id=admin_user_id,
+                created_by_admin_id=uploaded_by_user_id,
                 default_title=Path(file_name).stem,
                 source="onedrive",
+                is_published=is_published,
             )
             return BookResponseDTO.model_validate(row)
         except Exception:

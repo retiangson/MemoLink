@@ -102,6 +102,7 @@ class BookRepository:
         source_location: Optional[str] = None,
         existing: Optional[Book] = None,
         commit: bool = True,
+        is_published: bool = True,
     ) -> Book:
         book = existing if existing is not None else self.get_by_onedrive_item_id(onedrive_item_id)
         if book:
@@ -132,7 +133,7 @@ class BookRepository:
                 source_location=source_location,
                 created_by_admin_id=created_by_admin_id,
                 sync_status="synced",
-                is_published=True,
+                is_published=is_published,
             )
             self.db.add(book)
         if commit:

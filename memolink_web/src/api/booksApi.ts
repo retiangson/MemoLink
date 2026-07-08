@@ -322,6 +322,12 @@ export async function getBook(bookId: number): Promise<Book> {
   return (await api.get(`/books/${bookId}`)).data;
 }
 
+export async function uploadOwnBook(file: File): Promise<UserBook> {
+  const form = new FormData();
+  form.append("file", file);
+  return (await api.post("/books/upload", form)).data;
+}
+
 export async function borrowBook(bookId: number): Promise<UserBook> {
   return (await api.post(`/books/${bookId}/borrow`)).data;
 }
