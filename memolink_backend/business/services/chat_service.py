@@ -1906,11 +1906,14 @@ class ChatService(IChatService):
         rag_blocks: List[str] = []
         top_notes_for_confidence: list = []
 
+        # Citations are disabled for now (retrieval kept unreliable results, which
+        # confused users) - `sources` is intentionally left empty below. RAG context
+        # (rag_blocks) is unaffected so answer quality doesn't change.
         if len(all_notes) <= 20:
-            # Small workspace - include every note in full (up to 1 500 chars each)
+            # Small workspace - include every note in full context (up to 1 500
+            # chars each) so meta-queries ("summarize my notes") still see everything.
             top_notes_for_confidence = list(all_notes)
             for n in all_notes:
-                sources.append(ChatAnswerSource(note_id=n.id, title=n.title, snippet=n.content[:200] + "..."))
                 plain = _strip_base64_images(_HTML_TAG.sub(" ", n.content)).strip()
                 rag_blocks.append(f"[NOTE {n.id}: {n.title or 'Untitled'}]\n{plain[:1500]}")
         else:
@@ -1931,13 +1934,9 @@ class ChatService(IChatService):
                 logger.warning("Vector/hybrid note search failed, falling back to recent notes: %s", exc)
                 top_notes = all_notes[:dto.top_k]
 
-            if not top_notes:
-                top_notes = all_notes[:dto.top_k]
-
             top_notes_for_confidence = list(top_notes)
 
             for n in top_notes:
-                sources.append(ChatAnswerSource(note_id=n.id, title=n.title, snippet=n.content[:200] + "..."))
                 plain = _strip_base64_images(_HTML_TAG.sub(" ", n.content)).strip()
                 rag_blocks.append(f"[NOTE {n.id}: {n.title or 'Untitled'}]\n{plain}")
 
@@ -1959,7 +1958,6 @@ class ChatService(IChatService):
                         if not note:
                             continue
                         top_ids.add(nid)
-                        sources.append(ChatAnswerSource(note_id=note.id, title=note.title, snippet=note.content[:200] + "..."))
                         plain = _strip_base64_images(_HTML_TAG.sub(" ", note.content)).strip()
                         rag_blocks.append(f"[NOTE {note.id}: {note.title or 'Untitled'} - related via MemoGraph]\n{plain}")
                 except Exception as exc:

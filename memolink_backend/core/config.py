@@ -7,7 +7,10 @@ load_dotenv(BACKEND_ROOT / ".env")
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env")
+    # extra="ignore": some env vars (e.g. MEMOLINK_SKIP_DB_BOOTSTRAP) are read
+    # directly via os.getenv() in main.py rather than through this model, so
+    # they must not be rejected as unrecognized fields.
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     app_name: str = "MemoLink API"
 

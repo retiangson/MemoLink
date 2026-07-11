@@ -188,52 +188,41 @@ function ContentWithNoteLinks({ content, onOpenNote, onBorrowBook }: { content: 
 
 import type { ConfidenceLevel } from "../types";
 
-/** Expandable "Sources (N)" strip under an assistant reply, linking back to the
- *  notes actually used to ground the answer. Marks the check_citation
- *  evaluation task only when the user actually expands it (never auto-fired). */
-function ChatSources({ sources, onOpenNote, evaluationActive }: { sources: ChatSource[]; onOpenNote?: (noteId: number) => void; evaluationActive?: boolean }) {
-  const [open, setOpen] = useState(false);
-  const hasMarked = useRef(false);
-
-  function toggle() {
-    setOpen((v) => {
-      const next = !v;
-      if (next && evaluationActive && !hasMarked.current) {
-        hasMarked.current = true;
-        void markCitationViewed();
-      }
-      return next;
-    });
-  }
-
+/** "Sources (N)" toggle chip, sized to sit inline with the model/confidence
+ *  pills. The expandable note list itself renders separately via SourcesPanel
+ *  so it can span the full row width below the pill strip. */
+function SourcesToggle({ count, open, onToggle }: { count: number; open: boolean; onToggle: () => void }) {
   return (
-    <div className="mt-2">
-      <button
-        onClick={toggle}
-        className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 hover:bg-indigo-500/20 hover:border-indigo-500/40 transition"
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3 shrink-0" fill="currentColor" viewBox="0 0 16 16">
-          <path d="M5 0h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h2zm-1 1H3a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H6v2.5a.5.5 0 0 1-.5.5h-2A.5.5 0 0 1 3 4.5V1.5A.5.5 0 0 1 3.5 1H4z"/>
-        </svg>
-        Sources ({sources.length})
-        <svg xmlns="http://www.w3.org/2000/svg" className={`w-2.5 h-2.5 transition-transform ${open ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-        </svg>
-      </button>
-      {open && (
-        <div className="mt-1.5 flex flex-col gap-1.5 max-w-full sm:max-w-[500px]">
-          {sources.map((s) => (
-            <button
-              key={s.note_id}
-              onClick={() => onOpenNote?.(s.note_id)}
-              className="text-left px-3 py-2 rounded-lg bg-[var(--ml-bg-panel)] border border-[var(--ml-bg-hover)] hover:border-indigo-500/40 transition"
-            >
-              <p className="text-xs font-medium text-indigo-300 truncate">{s.title || "Untitled note"}</p>
-              <p className="text-[11px] text-gray-500 mt-0.5 line-clamp-2">{s.snippet}</p>
-            </button>
-          ))}
-        </div>
-      )}
+    <button
+      onClick={onToggle}
+      className="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-medium bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 hover:bg-indigo-500/20 hover:border-indigo-500/40 transition select-none"
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" className="w-2.5 h-2.5 shrink-0" fill="currentColor" viewBox="0 0 16 16">
+        <path d="M5 0h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h2zm-1 1H3a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H6v2.5a.5.5 0 0 1-.5.5h-2A.5.5 0 0 1 3 4.5V1.5A.5.5 0 0 1 3.5 1H4z"/>
+      </svg>
+      Sources ({count})
+      <svg xmlns="http://www.w3.org/2000/svg" className={`w-2.5 h-2.5 transition-transform ${open ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+      </svg>
+    </button>
+  );
+}
+
+/** Expanded list of notes actually used to ground the answer, shown below the
+ *  metadata row when the Sources toggle chip is open. */
+function SourcesPanel({ sources, onOpenNote }: { sources: ChatSource[]; onOpenNote?: (noteId: number) => void }) {
+  return (
+    <div className="mt-1.5 flex flex-col gap-1.5 max-w-full sm:max-w-[500px]">
+      {sources.map((s) => (
+        <button
+          key={s.note_id}
+          onClick={() => onOpenNote?.(s.note_id)}
+          className="text-left px-3 py-2 rounded-lg bg-[var(--ml-bg-panel)] border border-[var(--ml-bg-hover)] hover:border-indigo-500/40 transition"
+        >
+          <p className="text-xs font-medium text-indigo-300 truncate">{s.title || "Untitled note"}</p>
+          <p className="text-[11px] text-gray-500 mt-0.5 line-clamp-2">{s.snippet}</p>
+        </button>
+      ))}
     </div>
   );
 }
@@ -316,6 +305,19 @@ export default function ChatBubble({ role, content, model, streaming, onAdd, onD
   const [editPreviewOpen, setEditPreviewOpen] = useState(false);
   const [isSavingNote, setIsSavingNote] = useState(false);
   const [noteSaved, setNoteSaved] = useState(false);
+  const [sourcesOpen, setSourcesOpen] = useState(false);
+  const sourcesMarked = useRef(false);
+
+  function toggleSources() {
+    setSourcesOpen((v) => {
+      const next = !v;
+      if (next && evaluationActive && !sourcesMarked.current) {
+        sourcesMarked.current = true;
+        void markCitationViewed();
+      }
+      return next;
+    });
+  }
 
   const isThinking = content === "__THINKING__";
   const isImageGenerating = content === "__IMAGE_GENERATING__";
@@ -740,6 +742,9 @@ export default function ChatBubble({ role, content, model, streaming, onAdd, onD
                 </div>
               );
             })()}
+            {sources && sources.length > 0 && (
+              <SourcesToggle count={sources.length} open={sourcesOpen} onToggle={toggleSources} />
+            )}
           </div>
         )}
         {/* Web search suggestion chip — shown when notes had no relevant content */}
@@ -758,9 +763,9 @@ export default function ChatBubble({ role, content, model, streaming, onAdd, onD
           </div>
         )}
 
-        {/* Sources strip - notes actually used to ground this answer */}
-        {!streaming && role === "assistant" && sources && sources.length > 0 && (
-          <ChatSources sources={sources} onOpenNote={onOpenNote} evaluationActive={evaluationActive} />
+        {/* Sources panel - expanded list of notes actually used to ground this answer */}
+        {!streaming && sources && sources.length > 0 && sourcesOpen && (
+          <SourcesPanel sources={sources} onOpenNote={onOpenNote} />
         )}
 
         {/* Workflow action buttons - appear below AI message when suggestions are ready */}

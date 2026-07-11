@@ -10,8 +10,13 @@ _SEARCH_STOP_WORDS = {
     "from", "into", "your", "my", "our", "their", "this", "that", "these", "those", "about",
     "please", "could", "would", "should", "have", "has", "had", "been", "being", "what",
     "when", "where", "which", "who", "why", "how",
+    "can", "you", "yours", "i", "me", "we", "us", "he", "she", "they", "them", "it", "its",
+    "do", "does", "did", "will", "shall", "may", "might", "must", "am", "are", "was", "were",
+    "be", "not", "just", "want", "need", "get", "give", "let", "know", "like", "also", "tell",
+    "look", "see", "help", "some", "any", "all", "so", "if", "than", "then", "there", "here",
+    "out", "up", "down", "over", "again", "such", "no", "yes", "each", "both", "more", "most",
+    "other", "own", "same", "too", "very", "s", "t", "now",
 }
-
 
 class NoteRepository:
     def __init__(self, db: Session):

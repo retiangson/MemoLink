@@ -15,29 +15,28 @@ export function useWorkspace() {
   const [loading, setLoading] = useState(true);
   const [noWorkspaces, setNoWorkspaces] = useState(false);
 
-  const fetchWorkspaces = useCallback(async (): Promise<boolean> => {
+  const fetchWorkspaces = useCallback(async (): Promise<{ list: Workspace[]; reachable: boolean }> => {
     try {
       const list = await listWorkspaces();
       setWorkspaces(list);
-      return true;
+      return { list, reachable: true };
     } catch (err: any) {
       setWorkspaces([]);
-      return !isNetworkError(err);
+      return { list: [], reachable: !isNetworkError(err) };
     }
   }, []);
 
-  const fetchActiveWorkspace = useCallback(async (): Promise<{ ws: Workspace | null; reachable: boolean }> => {
+  const fetchActiveWorkspace = useCallback(async (): Promise<{ ws: Workspace | null; reachable: boolean; notFound: boolean }> => {
     try {
       const ws = await getActiveWorkspace();
       setActiveWorkspaceState(ws);
       setNoWorkspaces(false);
-      return { ws, reachable: true };
+      return { ws, reachable: true, notFound: false };
     } catch (err: any) {
       if (err?.response?.status === 404) {
-        setNoWorkspaces(true);
-        return { ws: null, reachable: true };
+        return { ws: null, reachable: true, notFound: true };
       }
-      return { ws: null, reachable: !isNetworkError(err) };
+      return { ws: null, reachable: !isNetworkError(err), notFound: false };
     }
   }, []);
 
@@ -48,8 +47,21 @@ export function useWorkspace() {
     setLoading(true);
     try {
       for (let attempt = 0; attempt < 30; attempt++) {
-        const [activeResult, wsReachable] = await Promise.all([fetchActiveWorkspace(), fetchWorkspaces()]);
-        if (activeResult.reachable && wsReachable) return activeResult.ws;
+        const [activeResult, wsResult] = await Promise.all([fetchActiveWorkspace(), fetchWorkspaces()]);
+        if (activeResult.reachable && wsResult.reachable) {
+          if (!activeResult.notFound) return activeResult.ws;
+          // "/workspaces/active" reported no active workspace - only trust that
+          // if the plain workspace list agrees. A stray 404 there must never
+          // force a user who already has workspaces back into onboarding.
+          if (wsResult.list.length > 0) {
+            const fallback = wsResult.list[0];
+            setActiveWorkspaceState(fallback);
+            setNoWorkspaces(false);
+            return fallback;
+          }
+          setNoWorkspaces(true);
+          return null;
+        }
         await new Promise((r) => setTimeout(r, 2000));
       }
       return null;
