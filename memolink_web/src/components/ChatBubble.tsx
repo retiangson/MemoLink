@@ -1,4 +1,4 @@
-﻿import React, { useState } from "react";
+﻿import React, { useState, useRef } from "react";
 import { marked } from "marked";
 import MarkdownRenderer from "./MarkdownRenderer";
 import { translateText } from "../api/chatApi";
@@ -193,11 +193,15 @@ import type { ConfidenceLevel } from "../types";
  *  evaluation task only when the user actually expands it (never auto-fired). */
 function ChatSources({ sources, onOpenNote, evaluationActive }: { sources: ChatSource[]; onOpenNote?: (noteId: number) => void; evaluationActive?: boolean }) {
   const [open, setOpen] = useState(false);
+  const hasMarked = useRef(false);
 
   function toggle() {
     setOpen((v) => {
       const next = !v;
-      if (next && evaluationActive) void markCitationViewed();
+      if (next && evaluationActive && !hasMarked.current) {
+        hasMarked.current = true;
+        void markCitationViewed();
+      }
       return next;
     });
   }
@@ -218,9 +222,9 @@ function ChatSources({ sources, onOpenNote, evaluationActive }: { sources: ChatS
       </button>
       {open && (
         <div className="mt-1.5 flex flex-col gap-1.5 max-w-full sm:max-w-[500px]">
-          {sources.map((s, idx) => (
+          {sources.map((s) => (
             <button
-              key={`${s.note_id}-${idx}`}
+              key={s.note_id}
               onClick={() => onOpenNote?.(s.note_id)}
               className="text-left px-3 py-2 rounded-lg bg-[var(--ml-bg-panel)] border border-[var(--ml-bg-hover)] hover:border-indigo-500/40 transition"
             >

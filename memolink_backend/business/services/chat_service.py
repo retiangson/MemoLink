@@ -2745,7 +2745,7 @@ class ChatService(IChatService):
         final_conf = conf_level or plan.pre_conf_level
         final_reason = conf_reason or plan.pre_conf_reason
         _dedup_sources = _dedupe_sources(plan.sources)
-        assistant_msg = self.repo_conv.add_message(plan.conversation_id, "assistant", clean_answer, model=used_model, confidence=final_conf, confidence_reason=final_reason, source_note_ids=[s.model_dump() for s in _dedup_sources])
+        assistant_msg = self.repo_conv.add_message(plan.conversation_id, "assistant", clean_answer, model=used_model, confidence=final_conf, confidence_reason=final_reason, source_notes=[s.model_dump() for s in _dedup_sources])
         return ChatResponseDTO(answer=clean_answer, sources=_dedup_sources, message_id=assistant_msg.id, routing_reason=plan.routing_reason)
 
     def ask_stream(self, dto: ChatRequestDTO) -> Iterator[str]:
@@ -2982,7 +2982,7 @@ class ChatService(IChatService):
         final_conf = conf_level or plan.pre_conf_level
         final_reason = conf_reason or plan.pre_conf_reason
         _dedup_sources = _dedupe_sources(plan.sources)
-        assistant_msg = self.repo_conv.add_message(plan.conversation_id, "assistant", clean_answer, model=used_model, confidence=final_conf, confidence_reason=final_reason, source_note_ids=[s.model_dump() for s in _dedup_sources])
+        assistant_msg = self.repo_conv.add_message(plan.conversation_id, "assistant", clean_answer, model=used_model, confidence=final_conf, confidence_reason=final_reason, source_notes=[s.model_dump() for s in _dedup_sources])
 
         # Suggest web search when notes had no relevant content and user didn't already enable it
         _suggest_web = (
