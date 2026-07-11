@@ -195,6 +195,8 @@ function SourcesToggle({ count, open, onToggle }: { count: number; open: boolean
   return (
     <button
       onClick={onToggle}
+      aria-expanded={open}
+      aria-controls="sources-panel"
       className="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-medium bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 hover:bg-indigo-500/20 hover:border-indigo-500/40 transition select-none"
     >
       <svg xmlns="http://www.w3.org/2000/svg" className="w-2.5 h-2.5 shrink-0" fill="currentColor" viewBox="0 0 16 16">
@@ -212,7 +214,7 @@ function SourcesToggle({ count, open, onToggle }: { count: number; open: boolean
  *  metadata row when the Sources toggle chip is open. */
 function SourcesPanel({ sources, onOpenNote }: { sources: ChatSource[]; onOpenNote?: (noteId: number) => void }) {
   return (
-    <div className="mt-1.5 flex flex-col gap-1.5 max-w-full sm:max-w-[500px]">
+    <div id="sources-panel" className="mt-1.5 flex flex-col gap-1.5 max-w-full sm:max-w-[500px]">
       {sources.map((s) => (
         <button
           key={s.note_id}

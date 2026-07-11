@@ -144,7 +144,9 @@ def test_chat_service_uses_notes_as_context_and_saves_assistant_message(monkeypa
     result = service.ask(ChatRequestDTO(user_id=1, prompt="Summarize my note"))
 
     assert result.answer == "Grounded answer"
-    assert result.sources[0].note_id == note.id
+    # Source citations are intentionally disabled (retrieval kept surfacing
+    # irrelevant notes) - sources always empty now, RAG context is unaffected.
+    assert result.sources == []
     assert any("USER NOTES CONTEXT" in m["content"] for m in fake_chat.last_messages)
     assert list(conv_repo.messages.values())[-1].role == "assistant"
 
