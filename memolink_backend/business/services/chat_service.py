@@ -142,6 +142,20 @@ def _strip_base64_images(text: str) -> str:
     text = _EMAIL_DRAFT_BODY.sub('', text)
     text = _WHATSAPP_DRAFT_BODY.sub('', text)
     return text
+
+
+def _dedupe_sources(sources: list) -> list:
+    """Keep the first occurrence of each note_id, preserving order."""
+    seen: set = set()
+    deduped = []
+    for s in sources or []:
+        if s.note_id in seen:
+            continue
+        seen.add(s.note_id)
+        deduped.append(s)
+    return deduped
+
+
 from memolink_backend.domain.repositories.conversation_repository import ConversationRepository
 from memolink_backend.domain.repositories.note_repository import NoteRepository
 from memolink_backend.domain.repositories.reminder_repository import ReminderRepository
@@ -2730,8 +2744,9 @@ class ChatService(IChatService):
         clean_answer, conf_level, conf_reason = _parse_confidence(answer)
         final_conf = conf_level or plan.pre_conf_level
         final_reason = conf_reason or plan.pre_conf_reason
-        assistant_msg = self.repo_conv.add_message(plan.conversation_id, "assistant", clean_answer, model=used_model, confidence=final_conf, confidence_reason=final_reason)
-        return ChatResponseDTO(answer=clean_answer, sources=plan.sources, message_id=assistant_msg.id, routing_reason=plan.routing_reason)
+        _dedup_sources = _dedupe_sources(plan.sources)
+        assistant_msg = self.repo_conv.add_message(plan.conversation_id, "assistant", clean_answer, model=used_model, confidence=final_conf, confidence_reason=final_reason, source_note_ids=[s.model_dump() for s in _dedup_sources])
+        return ChatResponseDTO(answer=clean_answer, sources=_dedup_sources, message_id=assistant_msg.id, routing_reason=plan.routing_reason)
 
     def ask_stream(self, dto: ChatRequestDTO) -> Iterator[str]:
         """Yield SSE-formatted chat stream events."""
@@ -2966,7 +2981,8 @@ class ChatService(IChatService):
         clean_answer, conf_level, conf_reason = _parse_confidence(full_answer)
         final_conf = conf_level or plan.pre_conf_level
         final_reason = conf_reason or plan.pre_conf_reason
-        assistant_msg = self.repo_conv.add_message(plan.conversation_id, "assistant", clean_answer, model=used_model, confidence=final_conf, confidence_reason=final_reason)
+        _dedup_sources = _dedupe_sources(plan.sources)
+        assistant_msg = self.repo_conv.add_message(plan.conversation_id, "assistant", clean_answer, model=used_model, confidence=final_conf, confidence_reason=final_reason, source_note_ids=[s.model_dump() for s in _dedup_sources])
 
         # Suggest web search when notes had no relevant content and user didn't already enable it
         _suggest_web = (
@@ -2982,6 +2998,7 @@ class ChatService(IChatService):
             routing_reason=plan.routing_reason,
             suggest_web_search=_suggest_web,
             search_query_suggestion=suggested_web_query if _suggest_web else None,
+            sources=_dedup_sources,
         ))
 
         # ── Evaluation analytics (safe, gated, never breaks chat) ──────────────
@@ -3023,9 +3040,9 @@ class ChatService(IChatService):
                     },
                 )
                 # Auto-track core workflow tasks from the real action
+                # (check_citation is marked separately, only when the user actually
+                # expands the Sources panel — see EvaluationService.mark_citation_viewed)
                 self._eval.mark_task(dto.user_id, "ask_rag_question", "Ask a question based on the note", "rag_chat")
-                if len(src_ids) > 0:
-                    self._eval.mark_task(dto.user_id, "check_citation", "Review the source citation", "rag_chat")
             except Exception as exc:
                 logger.debug("Analytics tracking failed (non-fatal, chat continues): %s", exc)
 

@@ -82,6 +82,15 @@ def record_rating(body: RatingRequest, user_id: int = Depends(get_current_user),
     return container.evaluation().record_rating(user_id, body)
 
 
+@router.post("/citation-viewed", response_model=OkResponse)
+def citation_viewed(user_id: int = Depends(get_current_user),
+                    container: RequestContainer = Depends(get_request_container)):
+    """Called only when the user actually expands the Sources panel on a chat
+    reply - marks the check_citation evaluation task as completed."""
+    container.evaluation().mark_citation_viewed(user_id)
+    return OkResponse()
+
+
 @router.get("/my-ratings", response_model=MyRatingsDTO)
 def my_ratings(user_id: int = Depends(get_current_user),
                container: RequestContainer = Depends(get_request_container)):

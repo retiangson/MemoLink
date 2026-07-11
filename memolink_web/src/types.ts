@@ -4,6 +4,12 @@ export type MessageRole = "user" | "assistant";
 
 export type ConfidenceLevel = "HIGH" | "MEDIUM" | "LOW" | "UNSUPPORTED";
 
+export interface ChatSource {
+  note_id: number;
+  title: string | null;
+  snippet: string;
+}
+
 export interface Message {
   id: number;
   role: MessageRole;
@@ -15,6 +21,7 @@ export interface Message {
   suggest_web_search?: boolean;
   search_query_suggestion?: string;
   email_results?: BrowseEmailResult[];
+  sources?: ChatSource[];
 }
 
 export interface Conversation {
@@ -70,6 +77,7 @@ export type ChatStreamEvent =
       suggest_web_search?: boolean;
       search_query_suggestion?: string;
       email_results?: BrowseEmailResult[];
+      sources?: ChatSource[];
     }
   | { type: "note.close"; note_id: number }
   | { type: "note.open"; note_id: number }

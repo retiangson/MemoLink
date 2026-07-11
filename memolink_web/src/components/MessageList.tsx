@@ -92,6 +92,7 @@ export function MessageList({
               onSearchOnline={!isPendingAssistantMsg && msg.role === "assistant" && isLast && onSearchOnline ? () => onSearchOnline(msg.search_query_suggestion) : undefined}
               emailResults={!isPendingAssistantMsg && msg.role === "assistant" ? msg.email_results : undefined}
               onOpenEmail={onOpenEmail}
+              sources={!isPendingAssistantMsg && msg.role === "assistant" ? msg.sources : undefined}
             />
           );
         })}
