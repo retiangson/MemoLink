@@ -5,7 +5,7 @@ from typing import List, Literal, Optional
 
 from pydantic import BaseModel
 
-from memolink_backend.contracts.chat_dtos import ChatEmailResultDTO
+from memolink_backend.contracts.chat_dtos import ChatEmailResultDTO, ChatAnswerSource
 
 
 class ChatStreamEvent(BaseModel):
@@ -32,6 +32,7 @@ class MessageCompleteEvent(ChatStreamEvent):
     suggest_web_search: bool = False
     search_query_suggestion: Optional[str] = None
     email_results: List[ChatEmailResultDTO] = []
+    sources: List[ChatAnswerSource] = []
 
 
 class NoteCloseEvent(ChatStreamEvent):

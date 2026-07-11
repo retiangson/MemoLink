@@ -293,6 +293,11 @@ class EvaluationService:
         except Exception as exc:
             logger.warning("[Eval] mark_task failed: %s", exc)
 
+    def mark_citation_viewed(self, user_id: Optional[int]) -> None:
+        """Record the check_citation task, called only when the user actually
+        expands the Sources panel on an assistant reply (never auto-fired)."""
+        self.mark_task(user_id, "check_citation", "Review the source citation", "rag_chat")
+
     # ── Instrumentation entry points (called from other services) ─────────────
     def record_ai_metrics(self, user_id: Optional[int], feature_name: str, data: dict) -> None:
         """Called from chat/RAG. Records automatically whenever analytics is

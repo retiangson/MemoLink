@@ -282,15 +282,16 @@ export function useChat({ activeConversation, setActiveConversation, setConversa
               const suggestWebSearch = event.suggest_web_search === true && !effectiveWebSearch;
               const searchQuerySuggestion = event.search_query_suggestion ?? undefined;
               const emailResults = event.email_results && event.email_results.length ? event.email_results : undefined;
+              const sources = event.sources && event.sources.length ? event.sources : undefined;
               const stripTag = (s: string) => s.replace(/<confidence[^>]*>[\s\S]*?<\/confidence>/gi, "").trimEnd();
               setActiveConversation((prev) => {
                 if (!prev) return prev;
-                return { ...prev, messages: prev.messages.map((m) => m.id === STREAMING_ID ? { ...m, id: finalId, model: finalModel, content: stripTag(m.content), confidence, confidence_reason: confidenceReason, routing_reason: routingReason, suggest_web_search: suggestWebSearch, search_query_suggestion: searchQuerySuggestion, email_results: emailResults } : m) };
+                return { ...prev, messages: prev.messages.map((m) => m.id === STREAMING_ID ? { ...m, id: finalId, model: finalModel, content: stripTag(m.content), confidence, confidence_reason: confidenceReason, routing_reason: routingReason, suggest_web_search: suggestWebSearch, search_query_suggestion: searchQuerySuggestion, email_results: emailResults, sources } : m) };
               });
               setConversations((p) =>
                 p.map((c) =>
                   c.id === conversationId
-                    ? { ...c, messages: c.messages.map((m) => m.id === STREAMING_ID ? { ...m, id: finalId, model: finalModel, content: stripTag(m.content), confidence, confidence_reason: confidenceReason, routing_reason: routingReason, suggest_web_search: suggestWebSearch, search_query_suggestion: searchQuerySuggestion, email_results: emailResults } : m) }
+                    ? { ...c, messages: c.messages.map((m) => m.id === STREAMING_ID ? { ...m, id: finalId, model: finalModel, content: stripTag(m.content), confidence, confidence_reason: confidenceReason, routing_reason: routingReason, suggest_web_search: suggestWebSearch, search_query_suggestion: searchQuerySuggestion, email_results: emailResults, sources } : m) }
                     : c
                 )
               );

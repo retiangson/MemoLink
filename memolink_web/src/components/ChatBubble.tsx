@@ -1,4 +1,4 @@
-﻿import React, { useState } from "react";
+﻿import React, { useState, useRef } from "react";
 import { marked } from "marked";
 import MarkdownRenderer from "./MarkdownRenderer";
 import { translateText } from "../api/chatApi";
@@ -7,11 +7,12 @@ import { QuizRenderer } from "./QuizRenderer";
 import { WorkflowApprovalCard } from "./WorkflowApprovalCard";
 import { WorkflowActionBar } from "./WorkflowActionBar";
 import { EvaluationRatingBar } from "./EvaluationRatingBar";
+import { markCitationViewed } from "../api/evaluationApi";
 import { EmailDraftCard } from "./EmailDraftCard";
 import { WhatsappDraftCard } from "./WhatsappDraftCard";
 import { EmailResultsList } from "./EmailResultsList";
 import type { BrowseEmailResult } from "../api/emailApi";
-import type { Message } from "../types";
+import type { Message, ChatSource } from "../types";
 import "highlight.js/styles/github-dark.css";
 import "../styles/markdown.css";
 
@@ -187,6 +188,56 @@ function ContentWithNoteLinks({ content, onOpenNote, onBorrowBook }: { content: 
 
 import type { ConfidenceLevel } from "../types";
 
+/** Expandable "Sources (N)" strip under an assistant reply, linking back to the
+ *  notes actually used to ground the answer. Marks the check_citation
+ *  evaluation task only when the user actually expands it (never auto-fired). */
+function ChatSources({ sources, onOpenNote, evaluationActive }: { sources: ChatSource[]; onOpenNote?: (noteId: number) => void; evaluationActive?: boolean }) {
+  const [open, setOpen] = useState(false);
+  const hasMarked = useRef(false);
+
+  function toggle() {
+    setOpen((v) => {
+      const next = !v;
+      if (next && evaluationActive && !hasMarked.current) {
+        hasMarked.current = true;
+        void markCitationViewed();
+      }
+      return next;
+    });
+  }
+
+  return (
+    <div className="mt-2">
+      <button
+        onClick={toggle}
+        className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 hover:bg-indigo-500/20 hover:border-indigo-500/40 transition"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3 shrink-0" fill="currentColor" viewBox="0 0 16 16">
+          <path d="M5 0h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h2zm-1 1H3a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H6v2.5a.5.5 0 0 1-.5.5h-2A.5.5 0 0 1 3 4.5V1.5A.5.5 0 0 1 3.5 1H4z"/>
+        </svg>
+        Sources ({sources.length})
+        <svg xmlns="http://www.w3.org/2000/svg" className={`w-2.5 h-2.5 transition-transform ${open ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      {open && (
+        <div className="mt-1.5 flex flex-col gap-1.5 max-w-full sm:max-w-[500px]">
+          {sources.map((s) => (
+            <button
+              key={s.note_id}
+              onClick={() => onOpenNote?.(s.note_id)}
+              className="text-left px-3 py-2 rounded-lg bg-[var(--ml-bg-panel)] border border-[var(--ml-bg-hover)] hover:border-indigo-500/40 transition"
+            >
+              <p className="text-xs font-medium text-indigo-300 truncate">{s.title || "Untitled note"}</p>
+              <p className="text-[11px] text-gray-500 mt-0.5 line-clamp-2">{s.snippet}</p>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 const CONFIDENCE_CONFIG: Record<ConfidenceLevel, { label: string; dot: string; pill: string; text: string }> = {
   HIGH:        { label: "High Confidence",   dot: "bg-emerald-400", pill: "bg-emerald-500/10 border-emerald-500/25", text: "text-emerald-400" },
   MEDIUM:      { label: "Medium Confidence", dot: "bg-amber-400",   pill: "bg-amber-500/10  border-amber-500/25",   text: "text-amber-400"   },
@@ -225,6 +276,7 @@ interface Props {
   onSearchOnline?: () => void;
   emailResults?: BrowseEmailResult[];
   onOpenEmail?: (email: BrowseEmailResult) => void;
+  sources?: ChatSource[];
 }
 
 const TRANSLATE_LANGUAGES = [
@@ -250,7 +302,7 @@ function parseNoteEdit(content: string): {
   };
 }
 
-export default function ChatBubble({ role, content, model, streaming, onAdd, onDelete, onApplyEdit, onOpenNote, onBorrowBook, onSaveNote, hasOpenNote, translationEnabled = true, modelAttributionEnabled = true, confidence, confidenceReason, confidenceEnabled = true, routingReason, autopilotEnabled = true, workflowContext, workflowActions, onWorkflowActionDone, onWorkflowConversationMessages, messageId, evaluationActive, evalRating, onRetry, suggestWebSearch, onSearchOnline, emailResults, onOpenEmail }: Props) {
+export default function ChatBubble({ role, content, model, streaming, onAdd, onDelete, onApplyEdit, onOpenNote, onBorrowBook, onSaveNote, hasOpenNote, translationEnabled = true, modelAttributionEnabled = true, confidence, confidenceReason, confidenceEnabled = true, routingReason, autopilotEnabled = true, workflowContext, workflowActions, onWorkflowActionDone, onWorkflowConversationMessages, messageId, evaluationActive, evalRating, onRetry, suggestWebSearch, onSearchOnline, emailResults, onOpenEmail, sources }: Props) {
   const isUser = role === "user";
   const [copied, setCopied] = useState(false);
   const [showLangPicker, setShowLangPicker] = useState(false);
@@ -704,6 +756,11 @@ export default function ChatBubble({ role, content, model, streaming, onAdd, onD
               Not in your notes — search online?
             </button>
           </div>
+        )}
+
+        {/* Sources strip - notes actually used to ground this answer */}
+        {!streaming && role === "assistant" && sources && sources.length > 0 && (
+          <ChatSources sources={sources} onOpenNote={onOpenNote} evaluationActive={evaluationActive} />
         )}
 
         {/* Workflow action buttons - appear below AI message when suggestions are ready */}

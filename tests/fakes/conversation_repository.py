@@ -19,7 +19,7 @@ class FakeConversationRepository:
         self.conversations[conv.id] = conv
         return conv
 
-    def add_message(self, conv_id, role, content, model=None, confidence=None, confidence_reason=None):
+    def add_message(self, conv_id, role, content, model=None, confidence=None, confidence_reason=None, source_notes=None):
         msg = SimpleNamespace(
             id=len(self.messages) + 1,
             conversation_id=conv_id,
@@ -28,6 +28,7 @@ class FakeConversationRepository:
             model=model,
             confidence=confidence,
             confidence_reason=confidence_reason,
+            source_notes=source_notes,
             created_at=datetime.now(timezone.utc),
         )
         self.messages[msg.id] = msg

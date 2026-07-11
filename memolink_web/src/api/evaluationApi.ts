@@ -67,6 +67,11 @@ export async function recordEvent(body: Record<string, unknown>): Promise<void> 
   try { await api.post("/evaluation/event", body); } catch { /* ignore */ }
 }
 
+export async function markCitationViewed(): Promise<void> {
+  // Fire-and-forget - analytics must never block the UI.
+  try { await api.post("/evaluation/citation-viewed"); } catch { /* ignore */ }
+}
+
 // ── Active-time budget (heartbeat) ────────────────────────────────────────────
 
 export interface BudgetStatus {
