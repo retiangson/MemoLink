@@ -35,6 +35,7 @@ memolink_web/dist-electron/
 
 # Claude Code local settings
 .claude/
+CLAUDE.md
 
 # Logs
 *.log
